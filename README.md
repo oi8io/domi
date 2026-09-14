@@ -57,7 +57,7 @@ INV-xx ──→ PRD-M{n}-xxx ──→ SPEC-M{n}-xxx ──→ TASK-M{n}-xxx �
 |---|---|---|
 | 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.2**（45 条审计版 + 5 条 v1.2 新增，共 50 条） |
 | 架构师 | ✅ 完成 | `docs/spec/M0.md`（取舍记录 9 条，均带"触发重新决策的条件"） |
-| 工程师 | 🔵 进行中 | `docs/tasks/M0.md` 22 个任务 · **19 done、1 dropped** · 只剩 TUI 两个 + DoD 走查 |
+| 工程师 | 🔵 进行中 | `docs/tasks/M0.md` 22 个任务 · **20 done、1 dropped、1 review** · 等真终端走查 |
 | 测试工程师 | — | M0 完成后另开独立会话 |
 
 **2026-09-14 方向变更**：见 `docs/adr/003-revert-to-self-built-runtime.md`。

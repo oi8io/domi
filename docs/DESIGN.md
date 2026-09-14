@@ -304,6 +304,7 @@ domi/
 │  ├─ eval/           # L1 轨迹回放 + L2 题集 harness（M2/M6 · INV-13）
 │  ├─ mcp/             # MCP client (2026-07-28)
 │  ├─ orchestrator/    # DAG 调度、sub-agent（M5 之前是空壳）
+│  ├─ runtime/        # M0 的进程内接线层（DomiSession 门面）；M3 整体搬进 domid（2026-09-14 新增）
 │  ├─ protocol/        # Domi Protocol 类型定义 + codegen（唯一契约来源）
 │  └─ client-core/     # 三端共享：协议客户端、事件订阅、状态 store
 ├─ apps/
