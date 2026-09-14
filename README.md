@@ -57,14 +57,14 @@ INV-xx ──→ PRD-M{n}-xxx ──→ SPEC-M{n}-xxx ──→ TASK-M{n}-xxx �
 |---|---|---|
 | 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.2**（45 条审计版 + 5 条 v1.2 新增，共 50 条） |
 | 架构师 | ✅ 完成 | `docs/spec/M0.md`（取舍记录 9 条，均带"触发重新决策的条件"） |
-| 工程师 | 🔵 进行中 | `docs/tasks/M0.md` 22 个任务 · TASK-M0-003/005/006 done · **当前 TASK-M0-007** |
+| 工程师 | 🔵 进行中 | `docs/tasks/M0.md` 22 个任务 · 8 个 done、1 个 dropped · **当前 TASK-M0-010** |
 | 测试工程师 | — | M0 完成后另开独立会话 |
 
 **2026-09-14 方向变更**：见 `docs/adr/003-revert-to-self-built-runtime.md`。
 `docs/RECON-DSH.md` 的"收缩为 DSH 发行版"结论已作废，该文档降级为情报文档。
 
-**M0 开工第一件事**：PRD-M0-007 的两个 spike —— Bun + OpenTUI 验证、`buildContext` 5 万事件压测。
-不是最后做，是第 1–2 天做。**（截至 2026-09-14 尚未执行，两个留白仍悬着）**
+**M0 开工第一件事**：PRD-M0-007 的 TUI spike（Bun + OpenTUI 验证）。**截至 2026-09-14 仍未执行，TUI 框架留白悬着。**
+（原第二个 spike「`buildContext` 5 万事件压测」已由 `docs/adr/005` 降级为可选，策略改为运行期选项。）
 
 ## 本地开发
 
