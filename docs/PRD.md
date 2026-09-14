@@ -6,6 +6,7 @@
 > 变更：v1.0 经两轮独立门禁审计后修订，见 `docs/qa/prd-gate-audit-v1.0.md`
 > **v1.2 回写**（触发：`docs/adr/003` 方向变更）——**原 45 条编号与 AC 全部保留不动**，仅追加 5 条新需求
 > （M1-011 步级快照 · M2-008 L1 回放评估 · M2-009 内置 MCP server · M5-007 聊天端桥接 · M6-005 L2 评估集）
+> **v1.2.3 回写**（2026-09-14，`docs/spec/M2.md`）——M2-005 的两处验收方式：AC-4 的解耦守卫与 M2-008 AC-5 合并成一份实现；AC-5 改用 Bun 内置 HTMLRewriter 而非 Playwright（导出文件里一行 JS 都没有，验的是文档结构不是渲染）。
 > **v1.2.2 回写**（2026-09-14，`docs/spec/M2.md`）——M2-008 AC-1 fixture 落盘格式改为单文件 JSON、AC-4 的「跳转轨迹面板」拆到 PRD-M2-005 一起验收。
 > **v1.2.1 回写**（2026-09-14，`docs/adr/005`）——M0-007 AC-2 降级、M0-006 新增 AC-4/AC-5（拼装策略改为可选项）。
 > 并回写 M0 的"不做什么"（模型层选型见 `docs/adr/004`）。
@@ -387,7 +388,7 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
   - AC-3：每步显示 token 消耗与累计花费
   - AC-4：轨迹完全由事件流渲染，无独立埋点；断言方式——**删除 `packages/trace` 后 kernel 与 store 的测试仍全绿**
   - AC-5：导出为**单文件静态 HTML**（内联所有 CSS/JS，无外部请求），在无网络的浏览器中可打开并展开全部节点。这是快照，不含任何与 daemon 的连接能力——与 M3 的 Web 客户端边界即在此
-- **验收方式**：`bun test trace/render.spec.ts`（AC-1/2/3）+ `scripts/check-trace-decoupling.sh`（AC-4）+ `bun test trace/export-html.spec.ts`（AC-5：Playwright 载入导出文件、断言无外部请求、断言节点可展开）
+- **验收方式**：`bun test packages/trace`（AC-1/2/3）+ ~~`scripts/check-trace-decoupling.sh`~~ **`scripts/check-eval-isolation.ts`**（AC-4，与 M2-008 AC-5 同一份实现）+ `bun test packages/trace/test/export-html.spec.ts`（AC-5：~~Playwright~~ **Bun 内置 HTMLRewriter** 解析导出文件、断言无外部引用、断言每个节点都是可展开的 `<details>`）—— v1.2.3 回写，理由见 `docs/spec/M2.md` 取舍-8/9
 - **层级**：Negotiable · **优先级**：P0
 
 ### PRD-M2-006 · 注入防护

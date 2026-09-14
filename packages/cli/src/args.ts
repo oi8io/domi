@@ -2,19 +2,29 @@
  * 命令面 —— PRD-M1-008 · SPEC-M1-008
  *
  * 用 Node/Bun 内置的 `util.parseArgs`，不引 commander/citty（ADR-008）：
- * 目前八个子命令，引一个库是为将来的想象付费。
+ * 目前九个子命令，引一个库是为将来的想象付费。
+ * ADR-008 的重新评估线是「超过 8 个」——已经踩线了，下一次加命令前先回去看那份 ADR。
  * 重新评估的条件写在 ADR-008：子命令超过 8 个，或需要自动补全。
  */
 import { parseArgs } from 'node:util'
 
-export const COMMANDS = ['chat', 'doctor', 'init', 'session', 'data', 'prompt', 'report-bug', 'eval'] as const
+export const COMMANDS = ['chat', 'doctor', 'init', 'session', 'data', 'prompt', 'report-bug', 'eval', 'trace'] as const
 export type Command = (typeof COMMANDS)[number]
 
 export interface ParsedCli {
   command: Command
   sub: string | undefined
   args: string[]
-  flags: { help: boolean; version: boolean; json: boolean; yes: boolean; ping: boolean }
+  flags: {
+    help: boolean
+    version: boolean
+    json: boolean
+    yes: boolean
+    ping: boolean
+    /** `domi trace <id> --html <路径>`；带值的选项必须在这里声明，
+     * 否则 strict:false 会把它当布尔，路径掉进 positionals 里（这个坑踩过一次） */
+    html: string | undefined
+  }
 }
 
 export class UnknownCommandError extends Error {
@@ -35,6 +45,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       json: { type: 'boolean' },
       yes: { type: 'boolean', short: 'y' },
       ping: { type: 'boolean' },
+      html: { type: 'string' },
     },
   })
 
@@ -53,6 +64,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       json: Boolean(values.json),
       yes: Boolean(values.yes),
       ping: Boolean(values.ping),
+      html: typeof values.html === 'string' ? values.html : undefined,
     },
   }
 }
@@ -72,6 +84,8 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi report-bug           打包日志（打包前会列出清单让你确认）
   domi eval record <id>     把一条真实会话导出成回放 fixture
   domi eval run             回放全部 fixture（不联网、不花钱）
+  domi trace <id>           打印一条会话的轨迹树
+  domi trace <id> --html f  导出单文件 HTML（离线可开）
 
 选项：
   -h, --help      看这个

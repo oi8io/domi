@@ -55,6 +55,18 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       return runEval(cli.sub, cli.args, io)
     }
 
+    // PRD-M2-005。同 eval：动态 import，删掉 packages/trace 也只是这一条命令退化
+    case 'trace': {
+      let runTrace: (id: string | undefined, htmlOut: string | undefined, io: Io) => Promise<number>
+      try {
+        ;({ runTrace } = await import('@domi/trace'))
+      } catch {
+        io.err('轨迹层不可用（packages/trace 不在这份安装里）。其它命令不受影响。')
+        return 127
+      }
+      return runTrace(cli.sub, cli.flags.html, io)
+    }
+
     case 'init':
       io.out(CONFIG_TEMPLATE)
       return 0

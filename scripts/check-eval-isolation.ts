@@ -1,10 +1,16 @@
 /**
- * PRD-M2-008 AC-5 · 删掉 packages/eval，kernel 与 store 的测试仍全绿
+ * 旁观者隔离 —— PRD-M2-008 AC-5 与 PRD-M2-005 AC-4
  *
- * 评估是**旁观者**：它读事件流、驱动内核，但内核不许反过来认识评估。
+ * 两条 AC 是同一句话的两次出现：
+ *   - M2-008 AC-5：删掉 `packages/eval` 后 kernel 与 store 的测试仍全绿
+ *   - M2-005 AC-4：删掉 `packages/trace` 后 kernel 与 store 的测试仍全绿
+ * 所以它们由**同一份实现**来守（PRD 里 M2-005 写的是 `check-trace-decoupling.sh`，
+ * 回写理由见 docs/spec/M2.md 取舍-8：同一条规则写两遍，迟早只有一遍是对的）。
+ *
+ * 评估与轨迹都是**旁观者**：它们读事件流，但主干不许反过来认识它们。
  * 一旦核心里出现 `import { replay } from '@domi/eval'`，
- * 评估就从旁观者变成了依赖，AC-5 说的「删掉还能跑」立刻不成立，
- * 顺带把 INV-13（评估不新增埋点）也破了 —— 内核开始为评估让路了。
+ * 旁观者就变成了依赖，「删掉还能跑」立刻不成立，
+ * 顺带把 INV-13（不为观察新增埋点）也破了 —— 内核开始为观察者让路了。
  *
  * 真删一遍目录再跑测试当然最硬，但那会把用户的工作区搞脏；
  * 这里查的是**让删除会失败的唯一原因**：有人从外面引用了它。
@@ -19,11 +25,14 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const SELF = join('packages', 'eval')
-const PKG_NAME = '@domi/eval'
+/** 被守着的旁观者包：目录名 → 包名 */
+const OBSERVERS = [
+  { dir: 'eval', pkg: '@domi/eval', ac: 'PRD-M2-008 AC-5' },
+  { dir: 'trace', pkg: '@domi/trace', ac: 'PRD-M2-005 AC-4' },
+] as const
 /** 唯一允许接线的地方，且只许动态 import */
 const WIRING = join('packages', 'cli')
-/** 被删掉 eval 之后必须还能独立跑测试的核心 —— AC-5 点名的两个在最前面 */
+/** 旁观者被整个删掉之后，必须还能独立跑测试的核心 —— 两条 AC 点名的两个在最前面 */
 const CORE = [
   'packages/kernel',
   'packages/store',
@@ -57,56 +66,78 @@ function codeOf(text: string): string {
   return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
-const STATIC_IMPORT = new RegExp(`from\\s+['"\`]${PKG_NAME}['"\`]`)
-const REQUIRE = new RegExp(`require\\(\\s*['"\`]${PKG_NAME}['"\`]`)
-const DYNAMIC_IMPORT = new RegExp(`import\\(\\s*['"\`]${PKG_NAME}['"\`]`)
-const RELATIVE_REACH = /from\s+['"`][./]+\/eval\/src\//
-const DYNAMIC_RELATIVE_REACH = /import\(\s*['"`][./]+\/eval\/src\//
-
-const violations: string[] = []
-
-for (const root of ['packages', 'apps', 'scripts']) {
-  for (const f of files(root)) {
-    if (f.startsWith(SELF)) continue
-    const isWiring = f.startsWith(WIRING)
-    const text = readFileSync(f, 'utf8')
-
-    if (f.endsWith('package.json')) {
-      if (text.includes(`"${PKG_NAME}"`) && !isWiring) violations.push(`${f} 把 ${PKG_NAME} 列成了依赖`)
-      continue
-    }
-
-    const code = codeOf(text)
-    const viaRelative = RELATIVE_REACH.test(code) || DYNAMIC_RELATIVE_REACH.test(code)
-    const viaName = STATIC_IMPORT.test(code) || REQUIRE.test(code) || DYNAMIC_IMPORT.test(code)
-
-    if (isWiring) {
-      // 接线点：静态 import / require / 相对路径绕行一律不行，只留动态 import
-      if (STATIC_IMPORT.test(code)) violations.push(`${f} 静态 import 了 ${PKG_NAME}；接线点只许动态 import`)
-      if (REQUIRE.test(code)) violations.push(`${f} require 了 ${PKG_NAME}；接线点只许动态 import`)
-      if (viaRelative) violations.push(`${f} 用相对路径绕进了 ${SELF}`)
-      continue
-    }
-
-    if (viaRelative) violations.push(`${f} 用相对路径绕进了 ${SELF}`)
-    else if (viaName) violations.push(`${f} 引用了 ${PKG_NAME}`)
+/** 注释里提名字是正常的（写文档要用），只看代码 —— codeOf 已经把注释剥掉了 */
+function patterns(pkg: string, dir: string) {
+  return {
+    staticImport: new RegExp(`from\\s+['"\`]${pkg}['"\`]`),
+    require: new RegExp(`require\\(\\s*['"\`]${pkg}['"\`]`),
+    dynamicImport: new RegExp(`import\\(\\s*['"\`]${pkg}['"\`]`),
+    relative: new RegExp(`from\\s+['"\`][./]+/${dir}/src/`),
+    dynamicRelative: new RegExp(`import\\(\\s*['"\`][./]+/${dir}/src/`),
   }
 }
 
-// 反向确认：核心包的清单里确实没有 eval —— 有的话删掉它连装都装不上
-for (const pkg of CORE) {
-  const manifest = join(pkg, 'package.json')
-  const text = readFileSync(manifest, 'utf8')
-  if (text.includes(PKG_NAME)) violations.push(`${manifest} 依赖了 ${PKG_NAME}，删掉 eval 它就装不起来`)
+const violations: string[] = []
+
+/**
+ * 旁观者之间互相认识是允许的 —— 它们是平级的观察层，
+ * 而两条 AC 管的都是「核心还能不能独立跑」。
+ * 实际的用处：守卫自己的红 fixture 测试就住在旁观者包里，
+ * 那些文件里必然出现违规写法，不豁免的话守卫会被自己的测试判定为红。
+ */
+const OBSERVER_DIRS = OBSERVERS.map((o) => join('packages', o.dir))
+
+for (const ob of OBSERVERS) {
+  const self = join('packages', ob.dir)
+  const re = patterns(ob.pkg, ob.dir)
+
+  for (const root of ['packages', 'apps', 'scripts']) {
+    for (const f of files(root)) {
+      if (OBSERVER_DIRS.some((d) => f.startsWith(d))) continue
+      const isWiring = f.startsWith(WIRING)
+      const text = readFileSync(f, 'utf8')
+
+      if (f.endsWith('package.json')) {
+        if (text.includes(`"${ob.pkg}"`) && !isWiring) violations.push(`[${ob.ac}] ${f} 把 ${ob.pkg} 列成了依赖`)
+        continue
+      }
+
+      const code = codeOf(text)
+      const viaRelative = re.relative.test(code) || re.dynamicRelative.test(code)
+      const viaName = re.staticImport.test(code) || re.require.test(code) || re.dynamicImport.test(code)
+
+      if (isWiring) {
+        // 接线点：静态 import / require / 相对路径绕行一律不行，只留动态 import
+        if (re.staticImport.test(code))
+          violations.push(`[${ob.ac}] ${f} 静态 import 了 ${ob.pkg}；接线点只许动态 import`)
+        if (re.require.test(code)) violations.push(`[${ob.ac}] ${f} require 了 ${ob.pkg}；接线点只许动态 import`)
+        if (viaRelative) violations.push(`[${ob.ac}] ${f} 用相对路径绕进了 ${self}`)
+        continue
+      }
+
+      if (viaRelative) violations.push(`[${ob.ac}] ${f} 用相对路径绕进了 ${self}`)
+      else if (viaName) violations.push(`[${ob.ac}] ${f} 引用了 ${ob.pkg}`)
+    }
+  }
+
+  // 反向确认：核心包的清单里确实没有它 —— 有的话删掉它连装都装不上
+  for (const pkg of CORE) {
+    const manifest = join(pkg, 'package.json')
+    if (readFileSync(manifest, 'utf8').includes(ob.pkg))
+      violations.push(`[${ob.ac}] ${manifest} 依赖了 ${ob.pkg}，删掉它就装不起来`)
+  }
 }
 
 if (violations.length > 0) {
-  for (const v of violations) console.error(`[PRD-M2-008 AC-5] ${v}`)
+  for (const v of violations) console.error(v)
   console.error(
-    `\n评估层只能单向依赖内核：${CORE.slice(0, 2).join('、')} 必须在 ${SELF} 被整个删掉后仍然能跑测试。` +
-      `\n接线只允许出现在 ${WIRING}，且必须是动态 import —— 否则删掉 eval 会把整个 domi 打死。` +
-      '\n反过来依赖的那一刻，内核就开始为评估让路了（INV-13）。',
+    `\n旁观者只能单向依赖内核：${CORE.slice(0, 2).join('、')} 必须在 ${OBSERVERS.map((o) => `packages/${o.dir}`).join(' / ')} ` +
+      '被整个删掉后仍然能跑测试。' +
+      `\n接线只允许出现在 ${WIRING}，且必须是动态 import —— 否则删掉它会把整个 domi 打死。` +
+      '\n反过来依赖的那一刻，内核就开始为观察者让路了（INV-13）。',
   )
   process.exit(1)
 }
-console.log(`[check-eval-isolation] OK —— 核心零引用，接线只在 ${WIRING} 且是动态 import`)
+console.log(
+  `[check-observer-isolation] OK —— ${OBSERVERS.map((o) => o.pkg).join(' / ')} 核心零引用，接线只在 ${WIRING} 且是动态 import`,
+)

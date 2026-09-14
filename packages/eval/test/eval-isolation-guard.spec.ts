@@ -59,6 +59,16 @@ describe('守卫会红', () => {
   }, 60_000)
 })
 
+describe('轨迹层同一条规矩（PRD-M2-005 AC-4）', () => {
+  test('kernel 反向 import @domi/trace 也被拦下 —— 两条 AC 由同一份实现守', async () => {
+    writeFileSync(FIXTURE, "import { buildTrace } from '@domi/trace'\nexport const x = buildTrace\n", 'utf8')
+    const { code, out } = await run()
+    expect(code).not.toBe(0)
+    expect(out).toContain('@domi/trace')
+    expect(out).toContain('PRD-M2-005 AC-4')
+  }, 60_000)
+})
+
 describe('接线点只许动态 import', () => {
   const WIRING = join('packages', 'cli', 'src', '__eval_fixture.ts')
   afterEach(() => cleanupFixture(WIRING))

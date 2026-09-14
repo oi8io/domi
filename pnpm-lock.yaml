@@ -257,6 +257,9 @@ importers:
       '@domi/store':
         specifier: workspace:*
         version: link:../store
+      '@domi/trace':
+        specifier: workspace:*
+        version: link:../trace
 
   packages/client-core:
     dependencies:
@@ -388,6 +391,18 @@ importers:
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol
+
+  packages/trace:
+    dependencies:
+      '@domi/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@domi/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@domi/store':
+        specifier: workspace:*
+        version: link:../store
 
 packages:
 
