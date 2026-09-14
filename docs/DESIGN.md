@@ -275,7 +275,7 @@ interface PermissionSpec {
 | 网关（可选） | 用户可配置指向 **LiteLLM / OpenRouter** | LiteLLM 可自托管、覆盖 100+ provider、支持本地模型，最契合本地优先定位。但只作为**可选后端**，不作为依赖 |
 | 存储 | **SQLite**（WAL + FTS5 + sqlite-vec） | 单文件零运维；全文与向量检索一站解决 |
 | MCP | `@modelcontextprotocol/sdk`，对齐 **2026-07-28** | 官方 SDK，跳过弃用 transport |
-| TUI | **OpenTUI**（Bun/Zig 渲染核，React reconciler）；Ink 作为兜底 | OpenTUI 渲染性能显著优于 Ink，对高频流式输出的 agent 场景是刚需。风险：项目较新，需在 M0 做一次 spike 验证；若不稳则退回 Ink |
+| TUI | **Ink 7 + React 19**（2026-09-14 回写，见 `docs/adr/001-runtime-choice.md`）；OpenTUI 推后为退路 | 实测推翻了原来的性能理由：Ink 自带 32ms 节流把 300 次 rerender 合并成 82 次写出，端到端 P95 4.6ms，余量在 200fps 量级，而模型每秒只吐几十个 token。真正的决定因素是**架构契合**：Ink 是 React，与 Web 端共用 `client-core` 的 hooks 与状态层（INV-02）；`ink-testing-library` 已验证在 Bun 下可用，`PRD-M0-005` AC-4 的四宽度 golden 快照有着落；零 native 依赖，对 Bun 的兼容风险面增量为 0。OpenTUI 的优势项（高帧率多区域动画）不是 domi 的形态 |
 | Web | React + Vite + Tailwind + shadcn/ui | 与 TUI 共享 React 心智，状态层可复用 |
 | Desktop | **Tauri v2** 套 Web 产物 | 体积小、内存低；桌面端 = Web 的打包目标，不是独立端 |
 | 协议 | JSON-RPC 2.0 over stdio（本地）/ WebSocket（远程），事件走 SSE 或 WS 推送 | 与 MCP 心智一致，实现成本低 |
