@@ -6,6 +6,7 @@
 > 变更：v1.0 经两轮独立门禁审计后修订，见 `docs/qa/prd-gate-audit-v1.0.md`
 > **v1.2 回写**（触发：`docs/adr/003` 方向变更）——**原 45 条编号与 AC 全部保留不动**，仅追加 5 条新需求
 > （M1-011 步级快照 · M2-008 L1 回放评估 · M2-009 内置 MCP server · M5-007 聊天端桥接 · M6-005 L2 评估集）
+> **v1.2.1 回写**（2026-09-14，`docs/adr/005`）——M0-007 AC-2 降级、M0-006 新增 AC-4/AC-5（拼装策略改为可选项）。
 > 并回写 M0 的"不做什么"（模型层选型见 `docs/adr/004`）。
 
 ---
@@ -152,6 +153,8 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
   - AC-1：`buildContext(events, policy)` 所在模块的依赖闭包中不含 `node:fs` / `node:net` / `Date.now` / `Math.random`
   - AC-2：同一事件流两次调用，结果 JSON 序列化后 byte 级相同
   - AC-3：给定 fixture 事件流，输出的 messages 数组可被完整深比较断言
+  - **AC-4（2026-09-14 新增，回写自 `docs/adr/005`）**：拼装策略是 `ContextPolicy` 上的可选项，经注册表挂载。断言三件事——① 不传 `strategy` 时默认 `'full'`；② 传入未注册的策略名产生明确错误（含可用策略列表），不静默回退默认；③ **注册一个新策略不需要修改 `buildContext` 本身**（测试中注册一个自定义策略并断言它被调用）
+  - **AC-5（同上）**：`'incremental'` 在 M0 是占位——调用时抛出明确指向 `docs/adr/005` 的错误，**不得**静默降级为 `'full'`。ADR-005 的限定是"option 只是注册点，不是两套实现"，静默降级会让这条限定失效且无人察觉
 - **验收方式**：`bun test kernel/build-context.spec.ts`；AC-1 由 `dependency-cruiser` 规则 `no-io-in-kernel` 守（CI 阻断）
 - **层级**：Invariant（INV-02）· **优先级**：P0
 
@@ -160,10 +163,10 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 - **用户价值**（对项目）：把最贵的架构风险在第一周暴露掉。
 - **AC**
   - AC-1：`docs/adr/001-runtime-choice.md` 存在，且**包含固定字段**：`## 实测-渲染帧耗时P95` / `## 实测-native模块兼容清单` / `## 结论` / `## 若不通的退路`
-  - AC-2：`docs/adr/002-buildcontext-perf.md` 存在，含 `## 实测-5万事件耗时` 字段且值为具体毫秒数；若 > 200ms，必须同时含 `## 缓解方案` 与 `## 触发时机`
+  - ~~AC-2~~：**已回写（2026-09-14，`docs/adr/005`）**。原要求 `docs/adr/002-buildcontext-perf.md` 含实测毫秒数；压测已从 M0 门禁降级，拼装策略改为运行期可选项。本条替换为：`docs/adr/005-context-strategy-as-option.md` 存在，且含 `## 触发重新激活压测的条件` 段
   - AC-3：`git branch -a` 中无 `spike/*` 分支，且 main 中无 `spike` 目录
 - **验收方式**：`scripts/check-adr-fields.ts`（字段存在性 + 数值格式校验，CI 阻断）
-- **层级**：Negotiable · **优先级**：P0（**必须在 M0 第 1–2 天完成，不是最后**）
+- **层级**：Negotiable · **优先级**：P0（**AC-1 的 TUI spike 仍须在 M0 早期完成**；AC-2 已降级，见 `docs/adr/005`）
 
 ### PRD-M0-008 · 配置与凭据
 
