@@ -54,7 +54,10 @@ function Root({ store, session }: { store: SessionStore; session: DomiSession })
       if (text === '') return
       setDraft('')
       setBusy(true)
-      void session.submit(text).finally(() => setBusy(false))
+      // PRD-M2-003 AC-1 的手动触发。结果由 ctx.compact 事件自己显示在对话里，
+      // 这里不额外往界面塞东西——那会变成「只在 UI 里、事件流里没有」的状态
+      const run = text === '/compact' ? session.compactNow('manual') : session.submit(text)
+      void run.finally(() => setBusy(false))
       return
     }
     if (key.backspace || key.delete) {

@@ -12,7 +12,7 @@ import { atom, computed } from 'nanostores'
 
 export interface TranscriptItem {
   seq: number
-  kind: 'user' | 'assistant' | 'reason' | 'tool-call' | 'tool-result' | 'permission' | 'error'
+  kind: 'user' | 'assistant' | 'reason' | 'tool-call' | 'tool-result' | 'permission' | 'error' | 'context'
   text: string
   ok?: boolean
   /** 工具调用的参数摘要：JSON 序列化后前 80 字符 + …（PRD-M0-005 AC-1 写死的规则） */
@@ -122,6 +122,24 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           kind: 'permission',
           text: `${ev.capabilityId} → ${ev.decision}`,
           ok: ev.decision === 'allow',
+        })
+        break
+      // 上下文清理/压缩也要在对话里看得见（PRD-M2-002 AC-4 / M2-003 AC-4）。
+      // 它们是**事件**，所以这里只是投影——不存在「只在 atom 里、事件流里没有」的状态
+      case 'ctx.cleanup':
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: `上下文清理 ${ev.tokensBefore} → ${ev.tokensAfter} tokens`,
+          summary: `去重 ${ev.saved.dedupe} · 截断 ${ev.saved.verbose} · 已解决错误 ${ev.saved.resolvedError} · 堆栈 ${ev.saved.stack}`,
+        })
+        break
+      case 'ctx.compact':
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: `上下文已压缩 ${ev.tokensBefore} → ${ev.tokensAfter} tokens（保留最近 ${ev.keptTurns} 轮）`,
+          summary: ev.summary.intent,
         })
         break
       case 'model.usage':

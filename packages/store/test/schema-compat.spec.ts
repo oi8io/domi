@@ -35,6 +35,7 @@ const MIXED = [
   ...load('legacy-v2.jsonl'),
   ...load('legacy-v3.jsonl'),
   ...load('legacy-v4.jsonl'),
+  ...load('legacy-v5.jsonl'),
 ]
 /** v1 代码写下的 error（没有 counters）与 v2 新增的 fs.snapshot —— 新代码都得认得 */
 const V1_V2 = load('legacy-v1-error.jsonl')
@@ -43,7 +44,7 @@ const V2_V3 = load('v2-to-v3.jsonl')
 
 describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
-    expect(MIXED).toHaveLength(12)
+    expect(MIXED).toHaveLength(13)
     for (const e of MIXED) {
       expect(() => parseEvent(e.ev, e.schemaVersion)).not.toThrow()
     }
@@ -57,7 +58,9 @@ describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', (
   })
 
   test('未来版本的新类型降级但保留原文，不丢数据', () => {
-    const futureTypes = ['ctx.compact', 'soul.evolve', 'memory.write']
+    // ctx.compact 在 v5 已经成了已知类型（M2-003），从这张表里移走——
+    // 这正是这条测试想要的：新增类型时，**旧 fixture 一个字不改**，只是不再降级
+    const futureTypes = ['soul.evolve', 'memory.write']
     for (const t of futureTypes) {
       const raw = MIXED.find((e) => e.ev.t === t)
       expect(raw).toBeDefined()

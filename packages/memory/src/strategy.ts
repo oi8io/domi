@@ -11,6 +11,7 @@ import { buildContext, type ContextPolicy, type ContextStrategy, registerContext
 import type { AnyEvent, EventEnvelope, ModelMessages } from '@domi/protocol'
 import { isKnownEvent } from '@domi/protocol'
 import { type CleanupOptions, cleanup } from './cleanup.ts'
+import { renderSummary, type Summary } from './compact.ts'
 
 export const STRATEGY_NAME = 'clean'
 
@@ -61,4 +62,53 @@ export function registerCleanStrategy(opts?: CleanupOptions): void {
   if (registered) return
   registerContextStrategy(STRATEGY_NAME, makeCleanStrategy(opts))
   registered = true
+}
+
+/**
+ * 'compact' 上下文策略 —— PRD-M2-003 AC-2 / AC-6
+ *
+ * 保边压中：system prompt 与最近 N 轮**逐字**保留，中间换成摘要消息。
+ * 和 'clean' 一样，清理完把事情交回 kernel 的 full 策略——kernel 一行不用改（AC-6）。
+ *
+ * 摘要从哪来：**事件流里最后一条 `ctx.compact`**。
+ * 也就是说策略本身不调用模型、不做任何 IO，它只是把已经发生过的那次压缩**投影**出来。
+ * 什么时候真去调模型压缩，是 runtime 的事（AC-1 的阈值触发）。
+ * 这条分工让上下文拼装保持纯函数，L1 回放才能确定性地重放它。
+ */
+export const COMPACT_STRATEGY_NAME = 'compact'
+
+export function makeCompactStrategy(): ContextStrategy {
+  return (events: readonly EventEnvelope[], policy: ContextPolicy): ModelMessages => {
+    // 最后一条 ctx.compact 说了算：它覆盖的区间换成摘要，区间之外逐字保留
+    let latest: { fromSeq: number; toSeq: number; summary: Summary } | null = null
+    for (const env of events) {
+      const ev = env.ev
+      if (isKnownEvent(ev) && ev.t === 'ctx.compact') {
+        latest = { fromSeq: ev.fromSeq, toSeq: ev.toSeq, summary: ev.summary }
+      }
+    }
+    if (!latest) return buildContext(events, { ...policy, strategy: 'full' })
+
+    const { fromSeq, toSeq, summary } = latest
+    const kept = events.filter((e) => e.seq < fromSeq || e.seq > toSeq)
+    // 摘要作为一条 user.input 事件插在最前面：它要经过和别的内容一样的拼装路径，
+    // 不走特例。特例是将来出 bug 的地方
+    const summaryEvent: EventEnvelope = {
+      seq: fromSeq,
+      sessionId: events[0]?.sessionId ?? '',
+      parentSeq: null,
+      ts: events[0]?.ts ?? 0,
+      schemaVersion: events[0]?.schemaVersion ?? 0,
+      ev: { t: 'user.input', text: renderSummary(summary) },
+    }
+    return buildContext([summaryEvent, ...kept], { ...policy, strategy: 'full' })
+  }
+}
+
+let compactRegistered = false
+
+export function registerCompactStrategy(): void {
+  if (compactRegistered) return
+  registerContextStrategy(COMPACT_STRATEGY_NAME, makeCompactStrategy())
+  compactRegistered = true
 }

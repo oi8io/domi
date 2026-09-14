@@ -20,7 +20,7 @@ import {
   runTurn,
   type TurnResult,
 } from '@domi/kernel'
-import { registerCleanStrategy } from '@domi/memory'
+import { compact, registerCleanStrategy, registerCompactStrategy, SummarySchema, shouldCompact } from '@domi/memory'
 import {
   capabilitiesFor,
   createProvider,
@@ -39,6 +39,7 @@ import { z } from 'zod'
  * 注册是幂等的，放在模块顶层是为了「配置里写了 strategy = "clean" 就直接能用」。
  */
 registerCleanStrategy()
+registerCompactStrategy()
 
 const TitleSchema = z.object({ title: z.string() })
 
@@ -238,8 +239,59 @@ export class DomiSession {
     return this.log.read(this.opts.sessionId)
   }
 
+  /**
+   * LLM 压缩 —— PRD-M2-003 AC-1。
+   *
+   * 只追加一条 `ctx.compact`，**原始事件一条不动**（INV-12）。
+   * 失败时什么都不做：压缩失败不该让一次正常对话看起来出错了——
+   * 大不了这一轮上下文长一点。这和标题生成是同一条降级原则。
+   */
+  async compactNow(trigger: 'threshold' | 'manual' = 'manual'): Promise<{ ok: boolean; detail: string }> {
+    const events = await this.log.read(this.opts.sessionId)
+    try {
+      const r = await compact(events, {
+        trigger,
+        summarize: async ({ text }) =>
+          generateStructured({ provider: this.provider, capabilities: this.provider.capabilities }, SummarySchema, {
+            model: this.currentModel,
+            messages: [
+              {
+                role: 'user',
+                content: '把下面这段对话历史压成结构化摘要。只保留后面还用得上的信息，' + '不要复述每一步。\n\n' + text,
+              },
+            ],
+          }),
+      })
+      if (r.covered.length === 0) return { ok: false, detail: '轮数还不够，没什么可压的' }
+      await this.log.append(this.opts.sessionId, [r.event])
+      await this.pump()
+      return {
+        ok: true,
+        detail: `已压缩 seq ${r.event.fromSeq}–${r.event.toSeq}，${r.event.tokensBefore} → ${r.event.tokensAfter} tokens（保留最近 ${r.event.keptTurns} 轮）`,
+      }
+    } catch (e) {
+      // 失败也要留痕，而且走**事件流**而不是侧信道：
+      // 只在 UI 里闪一下的状态，事后排查时等于没发生过
+      const message = `上下文压缩失败，这一轮照常继续：${e instanceof Error ? e.message : String(e)}`
+      await this.log.append(this.opts.sessionId, [{ t: 'error', scope: 'compact', message, recoverable: true }])
+      await this.pump()
+      return { ok: false, detail: message }
+    }
+  }
+
+  /** 到窗口 70% 就自动压一次（AC-1）。只在 strategy = 'compact' 时生效 */
+  private async maybeAutoCompact(): Promise<void> {
+    if (this.opts.config.context.strategy !== 'compact') return
+    const events = await this.log.read(this.opts.sessionId)
+    const used = aggregate(events, { maxContextTokens: this.opts.config.context.maxTokens }).tokens
+    const total = used.input + used.output
+    if (!shouldCompact(total, this.opts.config.context.maxTokens)) return
+    await this.compactNow('threshold')
+  }
+
   async submit(text: string): Promise<TurnResult> {
     this.listeners.onBusy?.(true)
+    await this.maybeAutoCompact()
     const policy: ContextPolicy = {
       maxTokens: this.opts.config.context.maxTokens,
       includeReasoning: this.opts.config.context.includeReasoning,

@@ -92,3 +92,50 @@ describe('PRD-M0-005 AC-1 · 参数摘要规则', () => {
     expect(() => summarizeArgs(circular)).not.toThrow()
   })
 })
+
+describe('PRD-M2-002 / M2-003 · 上下文事件也在对话里看得见', () => {
+  test('ctx.cleanup 投影成一条 context 条目，带各类别削减', () => {
+    const store = createSessionStore()
+    store.applyEvents([
+      env({
+        t: 'ctx.cleanup',
+        fromSeq: 1,
+        toSeq: 9,
+        tokensBefore: 900,
+        tokensAfter: 400,
+        saved: { dedupe: 300, verbose: 100, resolvedError: 80, stack: 20 },
+        preserved: [7],
+      }),
+    ])
+    const item = store.$items.get()[0]
+    expect(item?.kind).toBe('context')
+    expect(item?.text).toContain('900 → 400')
+    expect(item?.summary).toContain('去重 300')
+  })
+
+  test('ctx.compact 投影时把 intent 显示出来 —— 压缩之后最该确认的就是「它还记得我要干什么吗」', () => {
+    const store = createSessionStore()
+    store.applyEvents([
+      env({
+        t: 'ctx.compact',
+        fromSeq: 1,
+        toSeq: 9,
+        keptTurns: 2,
+        tokensBefore: 6100,
+        tokensAfter: 1800,
+        trigger: 'manual',
+        summary: {
+          intent: '把 sum.js 的减号改成加号',
+          filesModified: ['sum.js'],
+          keyDecisions: [],
+          openQuestions: [],
+          nextSteps: [],
+        },
+      }),
+    ])
+    const item = store.$items.get()[0]
+    expect(item?.kind).toBe('context')
+    expect(item?.text).toContain('保留最近 2 轮')
+    expect(item?.summary).toBe('把 sum.js 的减号改成加号')
+  })
+})

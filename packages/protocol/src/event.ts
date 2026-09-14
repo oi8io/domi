@@ -15,9 +15,10 @@ import { z } from 'zod'
  * v1 → v2：新增 `fs.snapshot`（文件写入前后指纹），`error` 新增可选的 `counters`。
  * v2 → v3：新增 `model.switch` / `snapshot` / `revert`（M1-002、M1-011）。
  * v3 → v4：新增 `ctx.cleanup`（M2-002 确定性上下文清理）。
+ * v4 → v5：新增 `ctx.compact`（M2-003 LLM 压缩）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -121,6 +122,34 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     /** 被显式标注为「后续引用过」因而整条保留的 seq —— 逐条可查（AC-2） */
     preserved: z.array(z.number().int().positive()),
   }),
+  /**
+   * LLM 压缩 —— PRD-M2-003 AC-4。
+   *
+   * **它只是一条追加的事件**：原始事件一条没动、一个字节没改（INV-12）。
+   * 压缩改的是「拼上下文时中间那段用什么代替」，而不是「历史变成了什么」。
+   * 所以 AC-5 的重放等价性是免费得到的——从原始事件流重放，压缩前后一模一样。
+   *
+   * `summary` 是**固定字段结构**而不是自由文本（AC-3）：
+   * 自由文本摘要没法断言、没法比较、下一次压缩还要把它再压一遍。
+   */
+  z.looseObject({
+    t: z.literal('ctx.compact'),
+    /** 被摘要覆盖的事件区间（闭区间）。区间之外的逐字保留 */
+    fromSeq: z.number().int().nonnegative(),
+    toSeq: z.number().int().nonnegative(),
+    /** 逐字保留的最近轮数（AC-2） */
+    keptTurns: z.number().int().nonnegative(),
+    tokensBefore: z.number().int().nonnegative(),
+    tokensAfter: z.number().int().nonnegative(),
+    trigger: z.enum(['threshold', 'manual']),
+    summary: z.object({
+      intent: z.string(),
+      filesModified: z.array(z.string()),
+      keyDecisions: z.array(z.string()),
+      openQuestions: z.array(z.string()),
+      nextSteps: z.array(z.string()),
+    }),
+  }),
   z.looseObject({
     t: z.literal('error'),
     scope: z.string(),
@@ -163,7 +192,9 @@ export const EventEnvelopeSchema = z.object({
 export type EventEnvelope = z.infer<typeof EventEnvelopeSchema>
 
 export function isUnknownEvent(ev: AnyEvent): ev is UnknownEvent {
-  return '__unparsed' in ev
+  // 先判类型再用 `in`：对非对象用 `in` 会抛 TypeError，而 INV-01 说这条路径上永不抛错。
+  // 正常路径（parseEvent）永远给对象，但这两个函数是**导出**的，谁都能拿脏数据来调
+  return typeof ev === 'object' && ev !== null && '__unparsed' in ev
 }
 
 /**
@@ -173,7 +204,7 @@ export function isUnknownEvent(ev: AnyEvent): ev is UnknownEvent {
  * 于是 else 分支拿不到具体字段。这个坑在运行时看不出来，只有 tsc 会说话。
  */
 export function isKnownEvent(ev: AnyEvent): ev is DomiEvent {
-  return !('__unparsed' in ev)
+  return typeof ev === 'object' && ev !== null && !('__unparsed' in ev)
 }
 
 /**

@@ -9,6 +9,7 @@ const PREFIX: Record<TranscriptItem['kind'], string> = {
   'tool-result': '←',
   permission: '🔑',
   error: '✗',
+  context: '✂',
 }
 
 function Line({ item }: { item: TranscriptItem }): React.ReactElement {
@@ -36,6 +37,13 @@ function Line({ item }: { item: TranscriptItem }): React.ReactElement {
       )
     case 'permission':
       return <Text color={item.ok ? 'gray' : 'red'}>{`${prefix} ${item.text}`}</Text>
+    case 'context':
+      return (
+        <Text color="cyan">
+          {`${prefix} ${item.text} `}
+          <Text dimColor>{item.summary}</Text>
+        </Text>
+      )
     case 'error':
       return <Text color="red">{`${prefix} ${item.text}`}</Text>
     default:

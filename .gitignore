@@ -15,3 +15,6 @@ packages/*/src/__eval_fixture.ts
 docs/adr/.*.bak
 apps/*/src/__arch_fixture.ts
 .github/workflows/__guard_fixture.yml
+
+# 桌面端把导出文件落在这里，不进版本库
+Claude outputs/
