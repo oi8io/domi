@@ -16,31 +16,51 @@ import * as protocol from '../packages/protocol/src/index.ts'
 
 const OUT = 'packages/protocol/.api.md'
 
-interface ZodDefLike {
-  typeName?: string
+/**
+ * zod 4 的内省入口是 `schema._zod.def`（v3 是 `_def.typeName`）。
+ * 这是私有 API——所以升级 zod 时本脚本必然先红，而这正是它该做的：
+ * 契约快照生成不了，就说明契约的读法变了，必须有人看一眼。
+ */
+interface ZodDef {
+  type?: string
   innerType?: ZodTypeAny
-  value?: unknown
   values?: unknown[]
+  entries?: Record<string, unknown>
+  keyType?: ZodTypeAny
+  valueType?: ZodTypeAny
+  element?: ZodTypeAny
+}
+
+function defOf(t: ZodTypeAny): ZodDef {
+  return ((t as unknown as { _zod?: { def?: ZodDef } })._zod?.def ?? {}) as ZodDef
 }
 
 function kindOf(t: ZodTypeAny): string {
-  const def = t._def as ZodDefLike
-  const name = (def.typeName ?? 'Unknown').replace(/^Zod/, '')
-  if (name === 'Optional' && def.innerType) return kindOf(def.innerType) + '?'
-  if (name === 'Nullable' && def.innerType) return kindOf(def.innerType) + ' | null'
-  if (name === 'Literal') return JSON.stringify(def.value)
-  if (name === 'Enum') return (def.values as string[]).map((v) => JSON.stringify(v)).join(' | ')
-  return name.toLowerCase()
+  const def = defOf(t)
+  const name = def.type ?? 'unknown'
+  if (name === 'optional' && def.innerType) return `${kindOf(def.innerType)}?`
+  if (name === 'nullable' && def.innerType) return `${kindOf(def.innerType)} | null`
+  if (name === 'literal') return (def.values ?? []).map((v) => JSON.stringify(v)).join(' | ')
+  if (name === 'enum')
+    return Object.values(def.entries ?? {})
+      .map((v) => JSON.stringify(v))
+      .join(' | ')
+  if (name === 'array' && def.element) return `${kindOf(def.element)}[]`
+  if (name === 'record' && def.keyType && def.valueType) {
+    return `record<${kindOf(def.keyType)}, ${kindOf(def.valueType)}>`
+  }
+  return name
 }
 
 function shapeLines(schema: ZodObject<ZodRawShape>, indent: string): string[] {
   return Object.entries(schema.shape)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => indent + k + ': ' + kindOf(v as ZodTypeAny))
+    .map(([k, v]) => `${indent + k}: ${kindOf(v as ZodTypeAny)}`)
 }
 
 function tagOf(o: ZodObject<ZodRawShape>): string {
-  return (o.shape.t as unknown as { _def: { value: string } })._def.value
+  const vals = defOf(o.shape.t as unknown as ZodTypeAny).values ?? []
+  return String(vals[0] ?? '?')
 }
 
 const options = protocol.DomiEventSchema.options as unknown as ZodObject<ZodRawShape>[]
@@ -52,7 +72,7 @@ const lines: string[] = [
   '> 这份文件变了就意味着协议契约变了（INV-01）。',
   '> 改之前先回答一个问题：**用旧版本写下的事件，新代码还能不能解析？**',
   '',
-  'SCHEMA_VERSION = ' + String(protocol.SCHEMA_VERSION),
+  `SCHEMA_VERSION = ${String(protocol.SCHEMA_VERSION)}`,
   '',
   '## 事件类型',
   '',
@@ -67,7 +87,7 @@ for (const opt of options.slice().sort((a, b) => tagOf(a).localeCompare(tagOf(b)
 lines.push('## 信封', '')
 lines.push(...shapeLines(protocol.EventEnvelopeSchema as unknown as ZodObject<ZodRawShape>, '  '))
 lines.push('', '## 导出符号', '')
-for (const k of Object.keys(protocol).sort()) lines.push('  ' + k)
+for (const k of Object.keys(protocol).sort()) lines.push(`  ${k}`)
 lines.push('')
 
 const content = lines.join('\n')
@@ -77,16 +97,16 @@ if (process.argv.includes('--check')) {
   try {
     existing = readFileSync(OUT, 'utf8')
   } catch {
-    console.error('[api-snapshot] ' + OUT + ' 不存在。先跑一次不带 --check 的生成。')
+    console.error(`[api-snapshot] ${OUT} 不存在。先跑一次不带 --check 的生成。`)
     process.exit(1)
   }
   if (existing !== content) {
-    console.error('[api-snapshot] ' + OUT + ' 与当前契约不一致 —— 协议变了。')
+    console.error(`[api-snapshot] ${OUT} 与当前契约不一致 —— 协议变了。`)
     console.error('若这是有意的：重新生成快照，并在 commit message 里说明旧事件为什么仍可解析。')
     process.exit(1)
   }
   console.log('[api-snapshot] OK —— 协议契约未变')
 } else {
   writeFileSync(OUT, content, 'utf8')
-  console.log('[api-snapshot] 已写入 ' + OUT + '（' + String(options.length) + ' 个事件类型）')
+  console.log(`[api-snapshot] 已写入 ${OUT}（${String(options.length)} 个事件类型）`)
 }
