@@ -9,10 +9,10 @@
  *   3. read 走 parseEvent 的降级路径，永不抛"无法解析"（INV-01）。
  */
 import { Database } from 'bun:sqlite'
-import { type AnyEvent, type DomiEvent, type EventEnvelope, SCHEMA_VERSION, parseEvent } from '@domi/protocol'
+import { type AnyEvent, type DomiEvent, type EventEnvelope, parseEvent, SCHEMA_VERSION } from '@domi/protocol'
 import { type AppendRange, type Clock, type EventLog, type ReadOpts, systemClock } from './event-log.ts'
-import { DDL, META_SCHEMA_VERSION, PRAGMAS } from './schema.ts'
 import { serializeRedacted } from './redact.ts'
+import { DDL, META_SCHEMA_VERSION, PRAGMAS } from './schema.ts'
 
 export interface SqliteEventLogOptions {
   /** 数据库文件路径；':memory:' 仅供不需要跨进程持久化的用例 */

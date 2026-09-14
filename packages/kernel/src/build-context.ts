@@ -8,7 +8,7 @@
  * 策略是 ContextPolicy 上的**可选项**，不是两套实现（ADR-005 的限定）：
  * M0 只实现 'full'，'incremental' 占位且调用即报错，**不静默降级**。
  */
-import { type EventEnvelope, type ModelMessage, type ModelMessages, type ToolCall, isKnownEvent } from '@domi/protocol'
+import { type EventEnvelope, isKnownEvent, type ModelMessage, type ModelMessages, type ToolCall } from '@domi/protocol'
 
 export type ContextStrategyName = 'full' | 'incremental' | (string & {})
 

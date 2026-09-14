@@ -5,11 +5,7 @@
  * 注意：这里不允许出现任何针对 events 表的 UPDATE / DELETE
  * （PRD-M0-001 AC-3，由 scripts/check-append-only.ts 扫描阻断）。
  */
-export const PRAGMAS = [
-  'PRAGMA journal_mode = WAL',
-  'PRAGMA synchronous = NORMAL',
-  'PRAGMA foreign_keys = ON',
-] as const
+export const PRAGMAS = ['PRAGMA journal_mode = WAL', 'PRAGMA synchronous = NORMAL', 'PRAGMA foreign_keys = ON'] as const
 
 export const DDL = `
 CREATE TABLE IF NOT EXISTS events (

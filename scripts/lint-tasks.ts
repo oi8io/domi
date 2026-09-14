@@ -8,9 +8,7 @@ import { join } from 'node:path'
 const TASK_DIR = 'docs/tasks'
 const PRD_FILE = 'docs/PRD.md'
 
-const prdIds = new Set(
-  Array.from(readFileSync(PRD_FILE, 'utf8').matchAll(/^### (PRD-M\d+-\d+)/gm), (m) => m[1]!),
-)
+const prdIds = new Set(Array.from(readFileSync(PRD_FILE, 'utf8').matchAll(/^### (PRD-M\d+-\d+)/gm), (m) => m[1]!))
 
 let failures = 0
 const files = readdirSync(TASK_DIR).filter((f) => f.endsWith('.md'))

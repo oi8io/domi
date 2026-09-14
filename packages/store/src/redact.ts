@@ -8,10 +8,10 @@
  * 两处各写一份必然漂移——TASK-M0-019 接手时不要复制粘贴。
  */
 export const CREDENTIAL_PATTERNS: readonly RegExp[] = [
-  /\bsk-[A-Za-z0-9_-]{20,}\b/g,            // OpenAI 系
-  /\bsk-ant-[A-Za-z0-9_-]{20,}\b/g,        // Anthropic
-  /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g,       // GitHub
-  /\bAKIA[0-9A-Z]{16}\b/g,                 // AWS access key id
+  /\bsk-[A-Za-z0-9_-]{20,}\b/g, // OpenAI 系
+  /\bsk-ant-[A-Za-z0-9_-]{20,}\b/g, // Anthropic
+  /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g, // GitHub
+  /\bAKIA[0-9A-Z]{16}\b/g, // AWS access key id
   /\bey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, // JWT
 ]
 

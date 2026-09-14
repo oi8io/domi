@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { DomiEventSchema, SCHEMA_VERSION, isUnknownEvent, parseEvent } from '../src/index.ts'
+import { DomiEventSchema, isUnknownEvent, parseEvent, SCHEMA_VERSION } from '../src/index.ts'
 
 describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
   test('已知事件严格解析', () => {
@@ -34,9 +34,13 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
 
   test('SCHEMA_VERSION 与判别联合的分支数一同演进（改动时提醒回写 fixture）', () => {
     expect(SCHEMA_VERSION).toBe(1)
-    expect(Object.keys(DomiEventSchema.options.reduce<Record<string, true>>((acc, o) => {
-      acc[(o.shape.t as { value: string }).value] = true
-      return acc
-    }, {}))).toHaveLength(9)
+    expect(
+      Object.keys(
+        DomiEventSchema.options.reduce<Record<string, true>>((acc, o) => {
+          acc[(o.shape.t as { value: string }).value] = true
+          return acc
+        }, {}),
+      ),
+    ).toHaveLength(9)
   })
 })

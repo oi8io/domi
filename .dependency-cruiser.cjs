@@ -32,6 +32,15 @@ module.exports = {
       to: { path: '^packages/(kernel|store|capability)/' },
     },
     {
+      name: 'no-react-in-client-core',
+      comment:
+        'ADR-009：client-core 的消费方有四类，其中 Telegram 桥接与 L1 回放评估不是 React。' +
+        '共享层一旦依赖 react，这两类就用不了它——这是 INV-02 的形状问题，不是洁癖。',
+      severity: 'error',
+      from: { path: '^packages/client-core/src' },
+      to: { path: '^(react|react-dom|ink|@nanostores/react)' },
+    },
+    {
       name: 'no-circular',
       severity: 'error',
       from: {},

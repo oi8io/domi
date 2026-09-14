@@ -26,7 +26,10 @@ const RULES: AdrRule[] = [
     file: 'docs/adr/001-runtime-choice.md',
     prd: 'PRD-M0-007 AC-1',
     fields: [
-      { heading: '实测-渲染帧耗时P95', mustMatch: { re: /\d+(\.\d+)?\s*ms/i, hint: '必须出现具体毫秒数，不接受"还行""够快"' } },
+      {
+        heading: '实测-渲染帧耗时P95',
+        mustMatch: { re: /\d+(\.\d+)?\s*ms/i, hint: '必须出现具体毫秒数，不接受"还行""够快"' },
+      },
       { heading: '实测-native模块兼容清单' },
       { heading: '结论' },
       { heading: '若不通的退路' },

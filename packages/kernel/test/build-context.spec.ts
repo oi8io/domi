@@ -5,12 +5,7 @@
  */
 import { beforeEach, describe, expect, test } from 'bun:test'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import {
-  type ContextPolicy,
-  buildContext,
-  listContextStrategies,
-  registerContextStrategy,
-} from '../src/index.ts'
+import { buildContext, type ContextPolicy, listContextStrategies, registerContextStrategy } from '../src/index.ts'
 
 const P: ContextPolicy = { maxTokens: 100_000, includeReasoning: false }
 
@@ -51,7 +46,11 @@ describe('PRD-M0-006 AC-3 · 输出可深比较断言', () => {
   test('轨迹专用事件不进上下文；delta 合并；工具结果成独立消息', () => {
     expect(buildContext(conversation(), P)).toEqual([
       { role: 'user', content: '把 README 的标题改成 domi' },
-      { role: 'assistant', content: '我先读一下 README。', toolCalls: [{ id: 'c1', name: 'fs.read', args: { path: 'README.md' } }] },
+      {
+        role: 'assistant',
+        content: '我先读一下 README。',
+        toolCalls: [{ id: 'c1', name: 'fs.read', args: { path: 'README.md' } }],
+      },
       { role: 'tool', toolCallId: 'c1', ok: true, content: '{"lines":3}' },
       { role: 'assistant', content: '改好了。' },
     ])
@@ -66,7 +65,11 @@ describe('PRD-M0-006 AC-3 · 输出可深比较断言', () => {
   test('未知事件被跳过但不影响其余拼装（INV-01 的下游行为）', () => {
     const evs = conversation()
     evs.splice(1, 0, {
-      seq: 99, sessionId: 's', parentSeq: 1, ts: 0, schemaVersion: 7,
+      seq: 99,
+      sessionId: 's',
+      parentSeq: 1,
+      ts: 0,
+      schemaVersion: 7,
       ev: { t: 'soul.evolve', __unparsed: { t: 'soul.evolve' }, __schemaVersion: 7 },
     })
     expect(buildContext(evs, P)).toHaveLength(4)
@@ -90,7 +93,9 @@ describe('PRD-M0-006 AC-4 · 策略是可选项', () => {
 
   test('注册新策略不需要改 buildContext 本身', () => {
     registerContextStrategy('only-user', (evs) =>
-      evs.flatMap((e) => ('text' in e.ev && e.ev.t === 'user.input' ? [{ role: 'user' as const, content: e.ev.text }] : [])),
+      evs.flatMap((e) =>
+        'text' in e.ev && e.ev.t === 'user.input' ? [{ role: 'user' as const, content: e.ev.text }] : [],
+      ),
     )
     expect(listContextStrategies()).toContain('only-user')
     expect(buildContext(conversation(), { ...P, strategy: 'only-user' })).toEqual([

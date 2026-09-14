@@ -270,17 +270,20 @@ interface PermissionSpec {
 | 层 | 选型 | 理由 |
 |---|---|---|
 | 运行时 | **Bun**（Node 22+ 兼容兜底） | 启动快、内置 SQLite、内置测试与打包。对 CLI 体验提升明显。风险：部分 native 模块兼容性，需在 M0 验证 |
-| 包管理 | **pnpm workspace** + Turborepo | monorepo 事实标准 |
-| 模型层 | **自研薄 `ModelProvider` 抽象**，底下默认接 Vercel AI SDK；同时提供 OpenAI-compatible 直连 provider | 不要把 AI SDK 直接暴露给内核。自研一层薄抽象（约 300 行）保留切换自由，且能表达 AI SDK 覆盖不到的能力（本地 llama.cpp、自定义思维链解析） |
+| 包管理 | **pnpm workspace**（**不用 Turborepo**，见 `docs/adr/008`） | 5 个包、全量检查 10 秒内，任务编排与缓存是纯负担 |
+| Lint / 格式化 | **Biome 2.5.13**（`docs/adr/007`） | 单二进制管 lint + format，零 native 依赖，毫秒级全仓检查 |
+| 契约校验 | **zod 4.6.5**（`docs/adr/006`） | 事件类型会一直增长，类型实例化开销比解析性能更要紧；现在迁移面最小 |
+| 共享状态 | **nanostores 1.5.3** + `@nanostores/react`（`docs/adr/009`） | 消费方有四类，其中桥接进程与评估回放**不是 React**；核心与框架解耦才能让 `client-core` 不依赖 react |
+| 模型层 | **自研薄 `ModelProvider` 抽象**，底下默认接 Vercel AI SDK（`ai@7.x`，见 `docs/adr/004`）；同时提供 OpenAI-compatible 直连 provider | 不要把 AI SDK 直接暴露给内核。自研一层薄抽象（约 300 行）保留切换自由，且能表达 AI SDK 覆盖不到的能力（本地 llama.cpp、自定义思维链解析） |
 | 网关（可选） | 用户可配置指向 **LiteLLM / OpenRouter** | LiteLLM 可自托管、覆盖 100+ provider、支持本地模型，最契合本地优先定位。但只作为**可选后端**，不作为依赖 |
 | 存储 | **SQLite**（WAL + FTS5 + sqlite-vec） | 单文件零运维；全文与向量检索一站解决 |
-| MCP | `@modelcontextprotocol/sdk`，对齐 **2026-07-28** | 官方 SDK，跳过弃用 transport |
+| MCP | `@modelcontextprotocol/sdk` —— **版本未定，见 `docs/adr/010` 的已知风险** | 对齐 2026-07-28 的 v2 仍是 beta，latest 的 1.30.0 是旧规范。进入 M2 的再批准门上决定 |
 | TUI | **Ink 7 + React 19**（2026-09-14 回写，见 `docs/adr/001-runtime-choice.md`）；OpenTUI 推后为退路 | 实测推翻了原来的性能理由：Ink 自带 32ms 节流把 300 次 rerender 合并成 82 次写出，端到端 P95 4.6ms，余量在 200fps 量级，而模型每秒只吐几十个 token。真正的决定因素是**架构契合**：Ink 是 React，与 Web 端共用 `client-core` 的 hooks 与状态层（INV-02）；`ink-testing-library` 已验证在 Bun 下可用，`PRD-M0-005` AC-4 的四宽度 golden 快照有着落；零 native 依赖，对 Bun 的兼容风险面增量为 0。OpenTUI 的优势项（高帧率多区域动画）不是 domi 的形态 |
 | Web | React + Vite + Tailwind + shadcn/ui | 与 TUI 共享 React 心智，状态层可复用 |
 | Desktop | **Tauri v2** 套 Web 产物 | 体积小、内存低；桌面端 = Web 的打包目标，不是独立端 |
 | 协议 | JSON-RPC 2.0 over stdio（本地）/ WebSocket（远程），事件走 SSE 或 WS 推送 | 与 MCP 心智一致，实现成本低 |
 
-**共享层设计**：`@domi/client-core` 包含协议客户端、事件订阅、状态 store（用 Zustand 或 nanostores，两端都能跑）。TUI 和 Web 只写渲染，不写状态逻辑。这决定了两端的一致性维护成本。
+**共享层设计**：`@domi/client-core` 包含协议客户端、事件订阅、状态 store（**nanostores**，见 `docs/adr/009`；`client-core` 本身不依赖 react，由 dependency-cruiser 守）。TUI 和 Web 只写渲染，不写状态逻辑。这决定了两端的一致性维护成本。
 
 ---
 

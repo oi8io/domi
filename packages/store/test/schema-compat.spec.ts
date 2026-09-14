@@ -5,12 +5,13 @@
  * 这条 AC 是 v1.0 PRD 漏掉、审计时补上的。它守的是 INV-01 里最容易被做漏的半句：
  * "**任意历史事件永远可解析**"。
  */
+
+import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Database } from 'bun:sqlite'
-import { SCHEMA_VERSION, isUnknownEvent, parseEvent } from '@domi/protocol'
+import { isUnknownEvent, parseEvent, SCHEMA_VERSION } from '@domi/protocol'
 import { META_SCHEMA_VERSION, SqliteEventLog } from '../src/index.ts'
 
 interface RawEnvelope {

@@ -6,7 +6,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { CREDENTIAL_PATTERNS, REDACTED, SqliteEventLog, redactString, serializeRedacted } from '../src/index.ts'
+import { CREDENTIAL_PATTERNS, REDACTED, redactString, SqliteEventLog, serializeRedacted } from '../src/index.ts'
 
 describe('PRD-M0-008 AC-2 · 凭据不进事件流', () => {
   const secrets = [

@@ -83,7 +83,9 @@ describe('PRD-M0-001 AC-4 · 事务中途抛异常后不留半条事件', () => 
     const headBefore = await log.head('s1')
 
     // 第 2 条带一个无法序列化的值（循环引用），append 必须整批失败
-    const poisoned = { t: 'tool.call', id: 'c2', name: 'fs.write', args: {} } as DomiEvent & { args: Record<string, unknown> }
+    const poisoned = { t: 'tool.call', id: 'c2', name: 'fs.write', args: {} } as DomiEvent & {
+      args: Record<string, unknown>
+    }
     ;(poisoned.args as Record<string, unknown>).self = poisoned.args
     await expect(log.append('s1', [{ t: 'model.delta', text: 'ok' }, poisoned])).rejects.toThrow()
 

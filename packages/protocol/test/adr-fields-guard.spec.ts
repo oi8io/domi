@@ -27,7 +27,7 @@ describe('守卫会红', () => {
     const text = readFileSync(ADR, 'utf8')
     const start = text.indexOf('## 实测-渲染帧耗时P95')
     const end = text.indexOf('## 实测-native模块兼容清单')
-    writeFileSync(ADR, text.slice(0, start) + '## 实测-渲染帧耗时P95\n\n性能还行，够用。\n\n' + text.slice(end), 'utf8')
+    writeFileSync(ADR, `${text.slice(0, start)}## 实测-渲染帧耗时P95\n\n性能还行，够用。\n\n${text.slice(end)}`, 'utf8')
     expect(await run()).not.toBe(0)
   })
 
