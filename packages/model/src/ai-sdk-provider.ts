@@ -12,7 +12,7 @@
 import type { ModelMessages, ToolSchema } from '@domi/protocol'
 import type { LanguageModel } from 'ai'
 import { type ModelMessage as AiMessage, jsonSchema, streamText, tool } from 'ai'
-import { type ModelCapabilities, assertCapability } from './capability.ts'
+import { assertCapability, type ModelCapabilities } from './capability.ts'
 import type { ModelEvent, ModelProvider, ModelRequest } from './provider.ts'
 
 /**

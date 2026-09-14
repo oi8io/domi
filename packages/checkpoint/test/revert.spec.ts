@@ -3,7 +3,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { REVERT_SIDE_EFFECT_NOTICE, deadRanges, isDead, liveEvents, projectAfterReverts } from '../src/index.ts'
+import { deadRanges, isDead, liveEvents, projectAfterReverts, REVERT_SIDE_EFFECT_NOTICE } from '../src/index.ts'
 
 let seq = 0
 function env(ev: DomiEvent): EventEnvelope {

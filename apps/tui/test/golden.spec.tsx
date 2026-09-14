@@ -46,6 +46,15 @@ function scene() {
   seq = 0
   const s = createSessionStore({ model: 'stub-1', provider: 'stub' })
   s.applyEvents(SCENE.map(env))
+  // 指标由 runtime 算好推过来（PRD-M1-007 AC-3：状态栏不自己算），
+  // 所以快照场景里也要显式推一次——这正是真实 app 的路径
+  s.setMetrics({
+    tokens: { input: 421, output: 88, cacheRead: 256 },
+    cost: '$0.0021',
+    contextPercent: 42,
+    contextLevel: 'ok',
+    unpricedModels: [],
+  })
   return s
 }
 

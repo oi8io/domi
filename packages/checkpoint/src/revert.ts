@@ -37,9 +37,7 @@ export function isDead(seq: number, ranges: readonly DeadRange[]): boolean {
  * 投影：把被回滚掉的事件标出来但**保留**（INV-12 的同一立场——
  * 压缩不销毁原始事件，回滚也不）。
  */
-export function projectAfterReverts(
-  events: readonly EventEnvelope[],
-): Array<EventEnvelope & { dead: boolean }> {
+export function projectAfterReverts(events: readonly EventEnvelope[]): Array<EventEnvelope & { dead: boolean }> {
   const ranges = deadRanges(events)
   return events.map((e) => ({ ...e, dead: isDead(e.seq, ranges) }))
 }

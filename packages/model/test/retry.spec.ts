@@ -2,7 +2,7 @@
  * PRD-M1-001 AC-5 · 429 / 5xx / 超时的指数退避重试
  */
 import { describe, expect, test } from 'bun:test'
-import { DEFAULT_RETRY, RetriesExhaustedError, backoffMs, isRetryable, withRetry } from '../src/index.ts'
+import { backoffMs, DEFAULT_RETRY, isRetryable, RetriesExhaustedError, withRetry } from '../src/index.ts'
 
 const noSleep = { ...DEFAULT_RETRY, sleep: async () => {} }
 

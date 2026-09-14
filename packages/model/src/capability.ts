@@ -50,11 +50,7 @@ export class UnsupportedCapabilityError extends Error {
   }
 }
 
-export function assertCapability(
-  provider: string,
-  caps: ModelCapabilities,
-  capability: keyof ModelCapabilities,
-): void {
+export function assertCapability(provider: string, caps: ModelCapabilities, capability: keyof ModelCapabilities): void {
   if (!caps[capability]) throw new UnsupportedCapabilityError(provider, capability)
 }
 

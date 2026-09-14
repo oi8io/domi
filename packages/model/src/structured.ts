@@ -47,11 +47,7 @@ export interface StructuredDeps {
   signal?: AbortSignal
 }
 
-export async function generateStructured<T>(
-  deps: StructuredDeps,
-  schema: z.ZodType<T>,
-  req: ModelRequest,
-): Promise<T> {
+export async function generateStructured<T>(deps: StructuredDeps, schema: z.ZodType<T>, req: ModelRequest): Promise<T> {
   const signal = deps.signal ?? new AbortController().signal
   const native = deps.capabilities.structuredOutput
 

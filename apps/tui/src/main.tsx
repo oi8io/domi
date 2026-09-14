@@ -98,6 +98,7 @@ export function main(): void {
   const store = createSessionStore({ model: config.model.name, provider: config.model.provider })
   session.on('onEvents', (envs) => store.applyEvents(envs))
   session.on('onBusy', (b) => store.setBusy(b))
+  session.on('onMetrics', (m) => store.setMetrics(m))
 
   render(<Root store={store} session={session} />)
 }

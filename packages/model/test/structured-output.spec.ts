@@ -6,10 +6,10 @@ import { describe, expect, test } from 'bun:test'
 import { z } from 'zod'
 import {
   CAPABILITIES,
+  generateStructured,
   STRUCTURED_MAX_ATTEMPTS,
   StructuredOutputError,
   StubProvider,
-  generateStructured,
 } from '../src/index.ts'
 
 const TitleSchema = z.object({ title: z.string().max(40), tags: z.array(z.string()) })
@@ -25,11 +25,7 @@ function textProvider(...turns: string[]) {
 describe('AC-1 · 类型安全 + 运行时校验', () => {
   test('valid：一次就拿到合法结构', async () => {
     const provider = textProvider('{"title":"修复 sum.js","tags":["bug","js"]}')
-    const r = await generateStructured(
-      { provider, capabilities: CAPABILITIES['openai-compatible'] },
-      TitleSchema,
-      REQ,
-    )
+    const r = await generateStructured({ provider, capabilities: CAPABILITIES['openai-compatible'] }, TitleSchema, REQ)
     expect(r).toEqual({ title: '修复 sum.js', tags: ['bug', 'js'] })
     // 类型是推出来的，不是 any
     const t: string = r.title
@@ -38,11 +34,7 @@ describe('AC-1 · 类型安全 + 运行时校验', () => {
 
   test('模型爱加代码块和解释文字，照样能解析出来', async () => {
     const provider = textProvider('好的，这是结果：\n```json\n{"title":"标题","tags":[]}\n```\n希望有用。')
-    const r = await generateStructured(
-      { provider, capabilities: CAPABILITIES['openai-compatible'] },
-      TitleSchema,
-      REQ,
-    )
+    const r = await generateStructured({ provider, capabilities: CAPABILITIES['openai-compatible'] }, TitleSchema, REQ)
     expect(r.title).toBe('标题')
   })
 })
@@ -68,11 +60,7 @@ describe('AC-2 · 原生通道', () => {
 describe('AC-3 · 降级路径最多 3 次', () => {
   test('malformed-json：第一次坏、第二次好 → 成功，且第二次把错误带回去了', async () => {
     const provider = textProvider('这不是 JSON', '{"title":"第二次","tags":[]}')
-    const r = await generateStructured(
-      { provider, capabilities: CAPABILITIES['openai-compatible'] },
-      TitleSchema,
-      REQ,
-    )
+    const r = await generateStructured({ provider, capabilities: CAPABILITIES['openai-compatible'] }, TitleSchema, REQ)
     expect(r.title).toBe('第二次')
     // 只说「格式不对」不说哪里不对，模型第二次大概率还错一样的地方
     expect(JSON.stringify(provider.calls[1]?.messages)).toContain('上一次的输出无法解析')
@@ -80,11 +68,7 @@ describe('AC-3 · 降级路径最多 3 次', () => {
 
   test('schema-mismatch：JSON 合法但字段不对，也会重试', async () => {
     const provider = textProvider('{"name":"字段名错了"}', '{"title":"改对了","tags":[]}')
-    const r = await generateStructured(
-      { provider, capabilities: CAPABILITIES['openai-compatible'] },
-      TitleSchema,
-      REQ,
-    )
+    const r = await generateStructured({ provider, capabilities: CAPABILITIES['openai-compatible'] }, TitleSchema, REQ)
     expect(r.title).toBe('改对了')
     expect(JSON.stringify(provider.calls[1]?.messages)).toContain('title')
   })

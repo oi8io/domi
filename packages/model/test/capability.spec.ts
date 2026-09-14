@@ -6,11 +6,11 @@ import type { ToolSchema } from '@domi/protocol'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
 import {
   AiSdkProvider,
-  CAPABILITIES,
-  UnsupportedCapabilityError,
   assertCapability,
+  CAPABILITIES,
   capabilitiesFor,
   lostCapabilities,
+  UnsupportedCapabilityError,
 } from '../src/index.ts'
 
 /**
@@ -25,13 +25,7 @@ const TOOLS: ToolSchema[] = [{ name: 'fs.read', description: '读文件', inputS
 describe('AC-2 · 五个布尔字段', () => {
   test.each(Object.keys(CAPABILITIES))('%s 的矩阵字段齐全', (kind) => {
     const caps = CAPABILITIES[kind as keyof typeof CAPABILITIES]
-    expect(Object.keys(caps).sort()).toEqual([
-      'promptCache',
-      'reasoning',
-      'structuredOutput',
-      'toolCall',
-      'vision',
-    ])
+    expect(Object.keys(caps).sort()).toEqual(['promptCache', 'reasoning', 'structuredOutput', 'toolCall', 'vision'])
     for (const v of Object.values(caps)) expect(typeof v).toBe('boolean')
   })
 
@@ -75,11 +69,13 @@ describe('AC-3 · 在发出 HTTP 请求之前抛错', () => {
       { model: 'm', messages: [{ role: 'user', content: 'hi' }], tools: TOOLS },
       new AbortController().signal,
     )
-    await expect((async () => {
-      for await (const _ of it) {
-        /* 不该走到这里 */
-      }
-    })()).rejects.toThrow(UnsupportedCapabilityError)
+    await expect(
+      (async () => {
+        for await (const _ of it) {
+          /* 不该走到这里 */
+        }
+      })(),
+    ).rejects.toThrow(UnsupportedCapabilityError)
 
     expect(fetchCalls).toBe(0)
   })
@@ -105,7 +101,10 @@ describe('AC-3 · 在发出 HTTP 请求之前抛错', () => {
       }),
     })
     const out = []
-    for await (const e of p.generate({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }, new AbortController().signal)) {
+    for await (const e of p.generate(
+      { model: 'm', messages: [{ role: 'user', content: 'hi' }] },
+      new AbortController().signal,
+    )) {
       out.push(e)
     }
     const errs = out.filter((e) => e.type === 'error')

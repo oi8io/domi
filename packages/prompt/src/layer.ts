@@ -84,7 +84,9 @@ export function assemble(layers: readonly PromptLayer[], ctx: PromptCtx): Assemb
     seen.add(l.id)
   }
 
-  const sorted = [...layers].sort((a, b) => (a.priority === b.priority ? a.id.localeCompare(b.id) : a.priority - b.priority))
+  const sorted = [...layers].sort((a, b) =>
+    a.priority === b.priority ? a.id.localeCompare(b.id) : a.priority - b.priority,
+  )
 
   let firstVolatile: PromptLayer | null = null
   for (const l of sorted) {

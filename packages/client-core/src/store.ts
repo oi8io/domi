@@ -19,6 +19,15 @@ export interface TranscriptItem {
   summary?: string
 }
 
+export interface MetricsSnapshot {
+  tokens: { input: number; output: number; cacheRead: number }
+  /** 已格式化的花费字符串；未知模型是 `—`，不是 $0（PRD-M1-007 AC-4） */
+  cost: string
+  contextPercent: number
+  contextLevel: 'ok' | 'warn' | 'danger'
+  unpricedModels: string[]
+}
+
 export interface StatusSnapshot {
   model: string
   provider: string
@@ -26,6 +35,11 @@ export interface StatusSnapshot {
   toolCalls: number
   /** provider 返回的原始 usage，不做归一（ADR-004）。状态栏只挑它认识的字段显示 */
   lastUsage: Record<string, unknown> | null
+  /**
+   * 聚合指标。**由 runtime 算好推过来**，client-core 不自己算——
+   * 算法在 packages/kernel/src/metrics.ts，三端共用同一份。
+   */
+  metrics: MetricsSnapshot | null
 }
 
 export interface AskSnapshot {
@@ -55,6 +69,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     busy: false,
     toolCalls: 0,
     lastUsage: null,
+    metrics: null,
   })
   const $ask = atom<AskSnapshot | null>(null)
 
@@ -133,6 +148,9 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     },
     setAsk(ask: AskSnapshot | null): void {
       $ask.set(ask)
+    },
+    setMetrics(metrics: MetricsSnapshot | null): void {
+      $status.set({ ...$status.get(), metrics })
     },
   }
 }

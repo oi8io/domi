@@ -4,16 +4,16 @@
  */
 import { describe, expect, test } from 'bun:test'
 import {
+  assemble,
   BUILTIN_LAYERS,
   CacheBoundaryError,
   DuplicateLayerError,
-  PRIORITY,
-  type PromptCtx,
-  type PromptLayer,
-  assemble,
   formatDump,
   layersFromConfig,
   mergeLayers,
+  PRIORITY,
+  type PromptCtx,
+  type PromptLayer,
 } from '../src/index.ts'
 
 const CTX: PromptCtx = { cwd: '/tmp/work', model: 'stub-1' }
@@ -60,9 +60,7 @@ describe('AC-2 · cacheable 层不得排在非 cacheable 之后', () => {
   })
 
   test('会变的层全部排在最后 → 通过', () => {
-    expect(() =>
-      assemble([layer('a', 100), layer('v1', 800, false), layer('v2', 900, false)], CTX),
-    ).not.toThrow()
+    expect(() => assemble([layer('a', 100), layer('v1', 800, false), layer('v2', 900, false)], CTX)).not.toThrow()
   })
 
   test('内置层本身满足边界（否则 domi 自己就打不中 cache）', () => {

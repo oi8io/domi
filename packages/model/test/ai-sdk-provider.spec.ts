@@ -10,8 +10,8 @@ import type { ToolSchema } from '@domi/protocol'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
 import {
   AiSdkProvider,
-  CAPABILITIES,
   buildToolNameMap,
+  CAPABILITIES,
   encodeToolName,
   type ModelEvent,
   toAiMessages,

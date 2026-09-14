@@ -12,7 +12,8 @@ import { Database } from 'bun:sqlite'
 import { type AnyEvent, type DomiEvent, type EventEnvelope, parseEvent, SCHEMA_VERSION } from '@domi/protocol'
 import { type AppendRange, type Clock, type EventLog, type ReadOpts, systemClock } from './event-log.ts'
 import { serializeRedacted } from './redact.ts'
-import { DDL, META_SCHEMA_VERSION, PRAGMAS } from './schema.ts'
+import { DDL, META_SCHEMA_VERSION, MIGRATIONS, PRAGMAS } from './schema.ts'
+import { flattenLineage, SessionRepo } from './sessions.ts'
 
 export interface SqliteEventLogOptions {
   /** 数据库文件路径；':memory:' 仅供不需要跨进程持久化的用例 */
@@ -53,8 +54,11 @@ export class SqliteEventLog implements EventLog {
         `[domi/store] 数据库 schema_version=${onDisk} 高于本程序的 ${SCHEMA_VERSION}；` +
           `以只读方式打开。升级 domi 后即可写入。`,
       )
-    } else if (onDisk < SCHEMA_VERSION) {
-      this.migrate(onDisk, SCHEMA_VERSION)
+    } else {
+      // 新建库的 DDL 建的是最初的表结构，所以**无条件**跑一遍迁移。
+      // 迁移是幂等的，重复跑不出错——这比「新建走一套、升级走另一套」可靠得多，
+      // 后者意味着新建路径上的表结构永远没被迁移代码验证过。
+      this.migrate(0, SCHEMA_VERSION)
     }
   }
 
@@ -70,8 +74,19 @@ export class SqliteEventLog implements EventLog {
    * **禁止修改或删除既有事件字段**（PRD-M2-007 AC-2）。M0 无历史版本，是空实现。
    */
   private migrate(from: number, to: number): void {
+    for (const m of MIGRATIONS) {
+      if (m.toVersion <= from || m.toVersion > to) continue
+      for (const sql of m.statements) {
+        try {
+          this.db.exec(sql)
+        } catch (e) {
+          // ALTER TABLE ADD COLUMN 在列已存在时报错 —— 迁移必须幂等，
+          // 因为崩溃恢复时会重跑。只吞这一类，其余照抛
+          if (!String(e).includes('duplicate column name')) throw e
+        }
+      }
+    }
     this.db.query('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)').run(META_SCHEMA_VERSION, String(to))
-    void from
   }
 
   async append(sessionId: string, evs: DomiEvent[]): Promise<AppendRange> {
@@ -94,6 +109,7 @@ export class SqliteEventLog implements EventLog {
 
     const tx = this.db.transaction((): AppendRange => {
       insertSession.run(sessionId, ts, this.cwd)
+      this.db.query('UPDATE sessions SET updated_at = ? WHERE id = ?').run(ts, sessionId)
       const base = maxSeq.get(sessionId)?.m ?? 0
       let prev: number | null = base > 0 ? base : null
       evs.forEach((ev, i) => {
@@ -137,6 +153,41 @@ export class SqliteEventLog implements EventLog {
       return { t: r.type, __unparsed: r.payload, __schemaVersion: r.schema_version }
     }
     return parseEvent(raw, r.schema_version)
+  }
+
+  /** 会话元数据仓库。事件与会话是两张表，但同一个连接同一个事务边界 */
+  get sessions(): SessionRepo {
+    return new SessionRepo(this.db)
+  }
+
+  /**
+   * 从某个 seq 分叉出新会话（PRD-M1-006 AC-3）。
+   * **不复制事件** —— 新会话只存自己的新事件，读取时沿 parent 链拼接。
+   * 所以「向一个分支追加不影响另一个」是结构上不可能发生的，不靠纪律。
+   */
+  async fork(fromSessionId: string, atSeq: number, newSessionId: string): Promise<void> {
+    const parent = this.sessions.get(fromSessionId)
+    if (!parent) throw new Error(`会话不存在：${fromSessionId}`)
+    this.sessions.upsert({
+      id: newSessionId,
+      cwd: parent.cwd,
+      createdAt: this.clock.now(),
+      updatedAt: this.clock.now(),
+      title: `${parent.title || fromSessionId} 的分支 @${atSeq}`,
+      model: parent.model,
+      parentSessionId: fromSessionId,
+      parentSeq: atSeq,
+    })
+  }
+
+  /** 沿 parent 链读出完整历史并重新编号，供 buildContext 用 */
+  async readLineage(sessionId: string): Promise<EventEnvelope[]> {
+    const chain = this.sessions.lineage(sessionId)
+    const chunks: EventEnvelope[][] = []
+    for (const link of chain) {
+      chunks.push(await this.read(link.id, link.upToSeq === null ? {} : { toSeq: link.upToSeq }))
+    }
+    return flattenLineage(chunks)
   }
 
   async head(sessionId: string): Promise<number> {
