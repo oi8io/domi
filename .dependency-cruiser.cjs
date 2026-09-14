@@ -43,6 +43,16 @@ module.exports = {
       to: { path: '^(react|react-dom|ink|@nanostores/react)' },
     },
     {
+      name: 'no-node-in-browser-packages',
+      comment:
+        'PRD-M3-003 AC-2：client-core 与 protocol 要在浏览器里跑，依赖闭包中不得出现 node 核心模块。' +
+        '这条在 M0 就守起来，是因为它**只会越来越难守**——等 M3 才发现被污染，' +
+        '要往回扒的是几个月的代码。现在守成本为零。',
+      severity: 'error',
+      from: { path: '^packages/(client-core|protocol)/src' },
+      to: { path: '^(node:)?(fs|fs/promises|path|os|net|http|https|crypto|child_process|stream|url|util|worker_threads|bun:sqlite)$' },
+    },
+    {
       name: 'no-circular',
       severity: 'error',
       from: {},
