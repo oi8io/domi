@@ -20,7 +20,14 @@ import {
   runTurn,
   type TurnResult,
 } from '@domi/kernel'
-import { compact, registerCleanStrategy, registerCompactStrategy, SummarySchema, shouldCompact } from '@domi/memory'
+import {
+  compact,
+  makeMemorySearchTool,
+  registerCleanStrategy,
+  registerCompactStrategy,
+  SummarySchema,
+  shouldCompact,
+} from '@domi/memory'
 import {
   capabilitiesFor,
   createProvider,
@@ -97,7 +104,12 @@ export class DomiSession {
     const permissions = new PermissionEngine({ rules: opts.config.permissions.rules }, (capabilityId, args) =>
       this.askUser(capabilityId, args),
     )
-    this.tools = new ToolRegistry({ cwd: opts.cwd, permissions }).register(fsRead).register(fsWrite).register(shellExec)
+    this.tools = new ToolRegistry({ cwd: opts.cwd, permissions })
+      .register(fsRead)
+      .register(fsWrite)
+      .register(shellExec)
+      // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用
+      .register(makeMemorySearchTool(this.log.search))
 
     // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
     // 那份知识只在 packages/model/src/factory.ts 里（AC-4 的 diff 为 0 靠这个成立）

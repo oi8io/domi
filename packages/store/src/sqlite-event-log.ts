@@ -15,6 +15,7 @@ import { type AnyEvent, type DomiEvent, type EventEnvelope, parseEvent, SCHEMA_V
 import { type AppendRange, type Clock, type EventLog, type ReadOpts, systemClock } from './event-log.ts'
 import { serializeRedacted } from './redact.ts'
 import { DDL, META_SCHEMA_VERSION, MIGRATIONS, PRAGMAS } from './schema.ts'
+import { SearchRepo } from './search.ts'
 import { flattenLineage, SessionRepo } from './sessions.ts'
 
 export interface SqliteEventLogOptions {
@@ -117,13 +118,18 @@ export class SqliteEventLog implements EventLog {
       this.db.query('UPDATE sessions SET updated_at = ? WHERE id = ?').run(ts, sessionId)
       const base = maxSeq.get(sessionId)?.m ?? 0
       let prev: number | null = base > 0 ? base : null
+      const indexable: Array<{ seq: number; type: string; ev: DomiEvent }> = []
       evs.forEach((ev, i) => {
         const seq = base + i + 1
         // 序列化+脱敏在事务内：任意一条失败 → 整批回滚（AC-4）
         const payload = serializeRedacted(ev)
         insertEvent.run(sessionId, seq, prev, ts, SCHEMA_VERSION, ev.t, payload)
+        indexable.push({ seq, type: ev.t, ev })
         prev = seq
       })
+      // 检索索引随写入增量建（PRD-M2-004）。放在同一个事务里，
+      // 是因为「事件写进去了但搜不到」比「两者都没写」更难查
+      this.search.index(sessionId, indexable)
       return { from: base + 1, to: base + evs.length }
     })
 
@@ -163,6 +169,11 @@ export class SqliteEventLog implements EventLog {
   /** 会话元数据仓库。事件与会话是两张表，但同一个连接同一个事务边界 */
   get sessions(): SessionRepo {
     return new SessionRepo(this.db)
+  }
+
+  /** 全文检索索引（PRD-M2-004）。派生数据，删掉可重建 */
+  get search(): SearchRepo {
+    return new SearchRepo(this.db)
   }
 
   /**

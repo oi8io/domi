@@ -1,3 +1,5 @@
 export * from './cleanup.ts'
 export * from './compact.ts'
+export * from './episodic.ts'
+export * from './search-tool.ts'
 export * from './strategy.ts'

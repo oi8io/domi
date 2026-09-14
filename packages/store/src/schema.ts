@@ -29,6 +29,27 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at DESC);
 
+-- 全文检索索引 —— PRD-M2-004 AC-1。
+-- 用 trigram 分词器：默认的 unicode61 不切中文，"数据库迁移"整条会被当成一个词。
+-- 代价是查询串**至少要三个字符**，两个字的中文词（"减号"）匹配不到——
+-- 那条路径由调用方降级成 LIKE 扫描，见 packages/store/src/search.ts。
+--
+-- 这张表是**派生数据**：删掉它重建即可，事件流才是真相（INV-01）。
+-- 所以它不进 MIGRATIONS，而是和建库 DDL 一起无条件跑（IF NOT EXISTS 幂等）。
+CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
+  session_id UNINDEXED,
+  seq UNINDEXED,
+  type UNINDEXED,
+  body,
+  tokenize='trigram'
+);
+
+-- 每个会话索引到第几条了。派生数据，可重建
+CREATE TABLE IF NOT EXISTS fts_progress (
+  session_id  TEXT PRIMARY KEY,
+  indexed_seq INTEGER NOT NULL
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS meta (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL

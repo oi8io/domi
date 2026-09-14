@@ -50,7 +50,7 @@
   },
   "overrides": [
     {
-      "includes": ["scripts/**"],
+      "includes": ["scripts/**", "bench/**"],
       "linter": {
         "rules": {
           "suspicious": {

@@ -313,12 +313,18 @@ importers:
 
   packages/memory:
     dependencies:
+      '@domi/capability':
+        specifier: workspace:*
+        version: link:../capability
       '@domi/kernel':
         specifier: workspace:*
         version: link:../kernel
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@domi/store':
+        specifier: workspace:*
+        version: link:../store
       zod:
         specifier: ^4.6.5
         version: 4.6.5

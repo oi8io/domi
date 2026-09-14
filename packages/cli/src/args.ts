@@ -133,4 +133,12 @@ decision = "ask"
 name = "confirm-shell"
 capability = "shell.exec"
 decision = "ask"
+
+# 跨会话检索（PRD-M2-004）。它是读操作，但**历史里有你的原话**，
+# 所以「能不能翻旧账」由这条规则说了算，而不是由「它是读操作」说了算。
+# 删掉这条 = 默认拒绝，domi 就不会去翻历史了
+[[permissions.rules]]
+name = "allow-memory-search"
+capability = "memory.search"
+decision = "allow"
 `
