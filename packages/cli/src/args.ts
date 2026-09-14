@@ -2,12 +2,12 @@
  * 命令面 —— PRD-M1-008 · SPEC-M1-008
  *
  * 用 Node/Bun 内置的 `util.parseArgs`，不引 commander/citty（ADR-008）：
- * 目前七个子命令，引一个库是为将来的想象付费。
+ * 目前八个子命令，引一个库是为将来的想象付费。
  * 重新评估的条件写在 ADR-008：子命令超过 8 个，或需要自动补全。
  */
 import { parseArgs } from 'node:util'
 
-export const COMMANDS = ['chat', 'doctor', 'init', 'session', 'data', 'prompt', 'report-bug'] as const
+export const COMMANDS = ['chat', 'doctor', 'init', 'session', 'data', 'prompt', 'report-bug', 'eval'] as const
 export type Command = (typeof COMMANDS)[number]
 
 export interface ParsedCli {
@@ -70,6 +70,8 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi data purge           清空 ~/.domi（需要输入确认词）
   domi prompt dump          打印最终拼装的提示词与稳定前缀边界
   domi report-bug           打包日志（打包前会列出清单让你确认）
+  domi eval record <id>     把一条真实会话导出成回放 fixture
+  domi eval run             回放全部 fixture（不联网、不花钱）
 
 选项：
   -h, --help      看这个

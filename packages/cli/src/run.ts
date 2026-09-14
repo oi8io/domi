@@ -42,6 +42,19 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
   }
 
   switch (cli.command) {
+    // PRD-M2-008 AC-1/AC-2。**故意用动态 import**：AC-5 要求 packages/eval 可以被整个删掉，
+    // 静态 import 会让删除直接把 `domi` 打死。这里删掉之后退化成一句话，其它命令照常。
+    case 'eval': {
+      let runEval: (sub: string | undefined, args: readonly string[], io: Io) => Promise<number>
+      try {
+        ;({ runEval } = await import('@domi/eval'))
+      } catch {
+        io.err('评估层不可用（packages/eval 不在这份安装里）。其它命令不受影响。')
+        return 127
+      }
+      return runEval(cli.sub, cli.args, io)
+    }
+
     case 'init':
       io.out(CONFIG_TEMPLATE)
       return 0

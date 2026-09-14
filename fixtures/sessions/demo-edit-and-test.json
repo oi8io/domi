@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "sessionId": "demo-edit-and-test",
+  "inputs": [
+    "把 sum.js 的减号改成加号并跑测试"
+  ],
+  "turns": [
+    {
+      "model": [
+        {
+          "type": "reason",
+          "text": "先读文件再改"
+        },
+        {
+          "type": "delta",
+          "text": "我先看看这个文件。"
+        },
+        {
+          "type": "tool-call",
+          "id": "c1",
+          "name": "fs.read",
+          "args": {
+            "path": "sum.js"
+          }
+        }
+      ]
+    },
+    {
+      "model": [
+        {
+          "type": "delta",
+          "text": "减号应该是加号，改掉。"
+        },
+        {
+          "type": "tool-call",
+          "id": "c2",
+          "name": "fs.write",
+          "args": {
+            "path": "sum.js",
+            "content": "export const sum = (a, b) => a + b"
+          }
+        }
+      ]
+    },
+    {
+      "model": [
+        {
+          "type": "tool-call",
+          "id": "c3",
+          "name": "shell.exec",
+          "args": {
+            "cmd": "bun test sum.spec.js"
+          }
+        }
+      ]
+    },
+    {
+      "model": [
+        {
+          "type": "delta",
+          "text": "改好了，测试通过。"
+        },
+        {
+          "type": "usage",
+          "raw": {
+            "input_tokens": 421,
+            "output_tokens": 88,
+            "cache_read_input_tokens": 256
+          }
+        }
+      ]
+    }
+  ],
+  "toolResults": [
+    {
+      "id": "c1",
+      "ok": true,
+      "payload": {
+        "lines": 1,
+        "text": "export const sum = (a, b) => a - b"
+      }
+    },
+    {
+      "id": "c2",
+      "ok": true,
+      "payload": {
+        "bytes": 34
+      }
+    },
+    {
+      "id": "c3",
+      "ok": true,
+      "payload": {
+        "stdout": "1 pass 0 fail",
+        "exitCode": 0
+      }
+    }
+  ],
+  "expectedCalls": [
+    {
+      "name": "fs.read",
+      "args": {
+        "path": "sum.js"
+      }
+    },
+    {
+      "name": "fs.write",
+      "args": {
+        "path": "sum.js",
+        "content": "export const sum = (a, b) => a + b"
+      }
+    },
+    {
+      "name": "shell.exec",
+      "args": {
+        "cmd": "bun test sum.spec.js"
+      }
+    }
+  ]
+}

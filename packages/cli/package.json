@@ -13,6 +13,7 @@
     "@domi/observability": "workspace:*",
     "@domi/prompt": "workspace:*",
     "@domi/store": "workspace:*",
-    "@domi/model": "workspace:*"
+    "@domi/model": "workspace:*",
+    "@domi/eval": "workspace:*"
   }
 }

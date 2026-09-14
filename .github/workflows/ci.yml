@@ -42,6 +42,10 @@ jobs:
       - name: 测试
         run: pnpm test
 
+      # PRD-M2-008：L1 回放。不联网、不花钱，所以可以进门禁（INV-08 / INV-13）
+      - name: L1 轨迹回放
+        run: pnpm eval
+
       # INV-07：main 任意时刻可运行
       - name: 冒烟
         run: test -f scripts/smoke.sh && bash scripts/smoke.sh || echo "smoke 脚本待 TASK-M0-022 补"

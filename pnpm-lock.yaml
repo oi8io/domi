@@ -242,6 +242,9 @@ importers:
       '@domi/config':
         specifier: workspace:*
         version: link:../config
+      '@domi/eval':
+        specifier: workspace:*
+        version: link:../eval
       '@domi/model':
         specifier: workspace:*
         version: link:../model
@@ -269,6 +272,21 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+
+  packages/eval:
+    dependencies:
+      '@domi/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@domi/model':
+        specifier: workspace:*
+        version: link:../model
+      '@domi/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@domi/store':
+        specifier: workspace:*
+        version: link:../store
 
   packages/kernel:
     dependencies:

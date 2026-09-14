@@ -1,6 +1,9 @@
 /**
- * PRD-M0-007 · spike 结论落盘的守卫，同样先红一次
- * 这个守卫挡的是"做了 spike 但结论只留下一句『性能还行』"。
+ * PRD-M0-007 AC-1 / AC-2 · spike 结论落盘的守卫，同样先红一次
+ *
+ * AC-1 要求 `docs/adr/001-runtime-choice.md` 含四个固定字段且 P95 是具体毫秒数；
+ * AC-2 已回写（见 `docs/adr/005`），改为要求 ADR-005 含「触发重新激活压测的条件」。
+ * 这个守卫挡的是「做了 spike 但结论只留下一句『性能还行』」。
  */
 import { afterEach, describe, expect, test } from 'bun:test'
 import { copyFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -45,7 +48,25 @@ describe('守卫会红', () => {
 })
 
 describe('真实 ADR 是合格的', () => {
-  test('001 与 005 的字段齐备', async () => {
+  test('AC-1 / AC-2：001 与 005 的字段齐备', async () => {
     expect(await run()).toBe(0)
   })
+})
+
+describe('PRD-M0-007 AC-3 · spike 代码不许留在仓库里', () => {
+  test('没有 spike/* 分支', async () => {
+    const p = Bun.spawn(['git', 'branch', '-a'], { stdout: 'pipe', stderr: 'pipe' })
+    const out = await new Response(p.stdout).text()
+    await p.exited
+    expect(out).not.toMatch(/spike\//)
+  }, 30_000)
+
+  test('工作树里没有 spike 目录 —— AGENTS.md：spike 代码必须删除重写', async () => {
+    const p = Bun.spawn(['git', 'ls-files', '--', '*spike*'], { stdout: 'pipe', stderr: 'pipe' })
+    const out = (await new Response(p.stdout).text()).trim()
+    await p.exited
+    // 文档里提到 spike 是正常的，被跟踪的**代码**不行
+    const codeFiles = out.split('\n').filter((f) => f !== '' && /\.(ts|tsx|js|mjs)$/.test(f))
+    expect(codeFiles).toEqual([])
+  }, 30_000)
 })

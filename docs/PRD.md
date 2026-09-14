@@ -6,6 +6,7 @@
 > 变更：v1.0 经两轮独立门禁审计后修订，见 `docs/qa/prd-gate-audit-v1.0.md`
 > **v1.2 回写**（触发：`docs/adr/003` 方向变更）——**原 45 条编号与 AC 全部保留不动**，仅追加 5 条新需求
 > （M1-011 步级快照 · M2-008 L1 回放评估 · M2-009 内置 MCP server · M5-007 聊天端桥接 · M6-005 L2 评估集）
+> **v1.2.2 回写**（2026-09-14，`docs/spec/M2.md`）——M2-008 AC-1 fixture 落盘格式改为单文件 JSON、AC-4 的「跳转轨迹面板」拆到 PRD-M2-005 一起验收。
 > **v1.2.1 回写**（2026-09-14，`docs/adr/005`）——M0-007 AC-2 降级、M0-006 新增 AC-4/AC-5（拼装策略改为可选项）。
 > 并回写 M0 的"不做什么"（模型层选型见 `docs/adr/004`）。
 
@@ -415,13 +416,13 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 
 - **用户价值**：改了 prompt、换了模型、动了压缩策略之后，能立刻知道有没有把原来能跑通的场景搞坏——而且不花钱、不联网。
 - **AC**
-  - AC-1：`domi eval record <sessionId>` 把一条真实会话导出为 fixture（事件流 JSONL + 工具调用的输入输出对）
+  - AC-1：`domi eval record <sessionId>` 把一条真实会话导出为 fixture（~~事件流 JSONL~~ **单文件 JSON**，含每轮模型输出 + 工具调用的输入输出对） —— v1.2.2 回写，理由见 `docs/spec/M2.md` §取舍-1
   - AC-2：`domi eval run` 以 fixture 中的模型响应**逐条回放**，kernel 走真实代码路径，**断言产生的工具调用序列（名称 + 归一化后的参数）与 fixture 一致**
   - AC-3：**L1 在无网络环境下必须通过**——测试进程内对出站 socket 打桩，任何真实模型调用使测试失败（守 INV-13 与 INV-08）
-  - AC-4：差异报告指出第一个分叉点的 seq、期望与实际，且**可直接跳转到轨迹面板的对应节点**（PRD-M2-005）
+  - AC-4：差异报告指出第一个分叉点的 seq、期望与实际（**跳转到轨迹面板**这一半随 PRD-M2-005 一起验收；现在报告已给出 seq 这个锚点） —— v1.2.2 回写，理由见 `docs/spec/M2.md` §取舍-2
   - AC-5：**删除 `packages/eval` 后 `packages/kernel` 与 `packages/store` 的测试仍全绿**（守 INV-13"不新增埋点"）
   - AC-6：回放对非确定性输入（时间戳、随机 id、绝对路径、耗时）做归一化，**同一 fixture 连续跑 10 次结果完全一致**
-- **验收方式**：`bun test eval/replay.spec.ts`（AC-2/3/6）+ `scripts/check-eval-isolation.ts`（AC-5，CI 阻断）+ `fixtures/sessions/*.jsonl`
+- **验收方式**：`bun test packages/eval`（AC-1/2/3/4/6）+ `scripts/check-eval-isolation.ts`（AC-5，CI 阻断，`pnpm guard:eval`）+ `fixtures/sessions/*.json`
 - **层级**：Invariant（INV-13）· **优先级**：P0
 
 ### PRD-M2-009 · 内置 MCP server 清单（browser use / computer use）
