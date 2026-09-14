@@ -5,6 +5,7 @@
  * 替身难用，人就会去调真接口。所以这里刻意做得好用：
  * 给一个"每轮吐什么"的脚本，它按轮次消费。
  */
+import type { ModelCapabilities } from './capability.ts'
 import type { ModelEvent, ModelProvider, ModelRequest } from './provider.ts'
 
 /** 一轮的脚本：要么是事件序列，要么是一个函数（可以读到本轮的 request） */
@@ -12,12 +13,23 @@ export type StubTurn = ModelEvent[] | ((req: ModelRequest, turn: number) => Mode
 
 export interface StubProviderOptions {
   id?: string
+  /** 替身默认什么都支持——测试要验能力拒绝时显式调低 */
+  capabilities?: Partial<ModelCapabilities>
   /** 轮次用尽后的行为：'repeat-last' 便于压测循环，'throw' 便于暴露"多跑了一轮" */
   onExhausted?: 'repeat-last' | 'throw'
 }
 
+const ALL_CAPABLE: ModelCapabilities = {
+  toolCall: true,
+  vision: true,
+  reasoning: true,
+  promptCache: true,
+  structuredOutput: true,
+}
+
 export class StubProvider implements ModelProvider {
   readonly id: string
+  readonly capabilities: ModelCapabilities
   /** 每次 generate 的入参都记下来，测试据此断言 providerOptions 等是否原样传到位 */
   readonly calls: ModelRequest[] = []
   private turn = 0
@@ -28,6 +40,7 @@ export class StubProvider implements ModelProvider {
     opts: StubProviderOptions = {},
   ) {
     this.id = opts.id ?? 'stub'
+    this.capabilities = { ...ALL_CAPABLE, ...opts.capabilities }
     this.onExhausted = opts.onExhausted ?? 'throw'
   }
 

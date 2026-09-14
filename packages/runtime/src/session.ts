@@ -12,7 +12,7 @@
 import { fsRead, fsWrite, PermissionEngine, shellExec, ToolRegistry } from '@domi/capability'
 import type { DomiConfig } from '@domi/config'
 import { type ContextPolicy, runTurn, type TurnResult } from '@domi/kernel'
-import { AiSdkProvider, type ModelProvider } from '@domi/model'
+import { type ModelProvider, createProvider } from '@domi/model'
 import type { EventEnvelope } from '@domi/protocol'
 import { SqliteEventLog } from '@domi/store'
 
@@ -54,13 +54,15 @@ export class DomiSession {
     )
     this.tools = new ToolRegistry({ cwd: opts.cwd, permissions }).register(fsRead).register(fsWrite).register(shellExec)
 
+    // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
+    // 那份知识只在 packages/model/src/factory.ts 里（AC-4 的 diff 为 0 靠这个成立）
     this.provider =
       opts.provider ??
-      new AiSdkProvider({
-        id: opts.config.model.provider,
-        // 真正建 provider 的那一步在 M1 做完整（多 provider / baseUrl）；
-        // M0 只要求跑通一条路（PRD §M0 不做什么）
-        model: opts.config.model.name as never,
+      createProvider({
+        provider: opts.config.model.provider,
+        name: opts.config.model.name,
+        apiKey: opts.config.model.apiKey,
+        baseUrl: opts.config.model.baseUrl,
       })
   }
 

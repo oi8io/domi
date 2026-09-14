@@ -12,6 +12,7 @@
 import type { ModelMessages, ToolSchema } from '@domi/protocol'
 import type { LanguageModel } from 'ai'
 import { type ModelMessage as AiMessage, jsonSchema, streamText, tool } from 'ai'
+import { type ModelCapabilities, assertCapability } from './capability.ts'
 import type { ModelEvent, ModelProvider, ModelRequest } from './provider.ts'
 
 /**
@@ -87,19 +88,25 @@ function safeJson(s: string): unknown {
 export interface AiSdkProviderOptions {
   id: string
   model: LanguageModel
+  capabilities: ModelCapabilities
 }
 
 export class AiSdkProvider implements ModelProvider {
   readonly id: string
+  readonly capabilities: ModelCapabilities
   private readonly model: LanguageModel
 
   constructor(opts: AiSdkProviderOptions) {
     this.id = opts.id
     this.model = opts.model
+    this.capabilities = opts.capabilities
   }
 
   async *generate(req: ModelRequest, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const schemas = req.tools ?? []
+    // PRD-M1-001 AC-3：在**发出请求之前**拒绝。放在 streamText 之后就晚了——
+    // 那时 HTTP 请求已经出去，钱也花了。
+    if (schemas.length > 0) assertCapability(this.id, this.capabilities, 'toolCall')
     const nameMap = buildToolNameMap(schemas)
 
     const tools = Object.fromEntries(

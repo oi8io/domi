@@ -7,6 +7,7 @@
  * 丢了的话，M2 的「压缩 × prompt cache 交叉」就没有输入。
  */
 import type { ModelMessages, ToolSchema } from '@domi/protocol'
+import type { ModelCapabilities } from './capability.ts'
 
 export type ModelEvent =
   | { type: 'delta'; text: string }
@@ -25,5 +26,7 @@ export interface ModelRequest {
 
 export interface ModelProvider {
   readonly id: string
+  /** 静态声明的能力矩阵（PRD-M1-001 AC-2）。调用未声明的能力会在发请求前抛错 */
+  readonly capabilities: ModelCapabilities
   generate(req: ModelRequest, signal: AbortSignal): AsyncIterable<ModelEvent>
 }

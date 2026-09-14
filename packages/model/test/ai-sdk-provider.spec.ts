@@ -8,7 +8,24 @@
 import { describe, expect, test } from 'bun:test'
 import type { ToolSchema } from '@domi/protocol'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
-import { AiSdkProvider, buildToolNameMap, encodeToolName, type ModelEvent, toAiMessages } from '../src/index.ts'
+import {
+  AiSdkProvider,
+  CAPABILITIES,
+  buildToolNameMap,
+  encodeToolName,
+  type ModelEvent,
+  toAiMessages,
+} from '../src/index.ts'
+
+/** 这些用例不验能力拒绝，所以给一个全支持的矩阵 */
+const CAPS = CAPABILITIES.openai
+
+/**
+ * AI SDK 在 finish 阶段会读 usage 的内部结构，给 `{}` 会炸。
+ * 我们的适配层把它转成 recoverable 的 error 事件（行为是对的），
+ * 但 fixture 要给合法形状，否则测的是错误路径而不是正常路径。
+ */
+const USAGE = { inputTokens: 10, outputTokens: 5, totalTokens: 15 }
 
 const TOOLS: ToolSchema[] = [
   { name: 'fs.read', description: '读文件', inputSchema: { type: 'object', properties: { path: { type: 'string' } } } },
@@ -41,6 +58,7 @@ describe('流翻译', () => {
   test('text-delta / reasoning-delta / tool-call 各就各位', async () => {
     const p = new AiSdkProvider({
       id: 'mock',
+      capabilities: CAPS,
       model: mock([
         ...START,
         { type: 'reasoning-start', id: 'r1' },
@@ -50,7 +68,7 @@ describe('流翻译', () => {
         { type: 'text-delta', id: 't1', delta: '好的' },
         { type: 'text-end', id: 't1' },
         { type: 'tool-call', toolCallId: 'c1', toolName: 'fs_read', input: '{"path":"a.txt"}' },
-        { type: 'finish', finishReason: 'tool-calls', usage: {} },
+        { type: 'finish', finishReason: 'tool-calls', usage: USAGE },
       ]),
     })
     const evs = await drain(p.generate({ model: 'm', messages: [USER], tools: TOOLS }, new AbortController().signal))
@@ -65,7 +83,8 @@ describe('流翻译', () => {
   test('构造期就抛的错（空 prompt）也变成 error 事件，不穿透到 loop 外', async () => {
     const p = new AiSdkProvider({
       id: 'mock',
-      model: mock([...START, { type: 'finish', finishReason: 'stop', usage: {} }]),
+      capabilities: CAPS,
+      model: mock([...START, { type: 'finish', finishReason: 'stop', usage: USAGE }]),
     })
     const evs = await drain(p.generate({ model: 'm', messages: [] }, new AbortController().signal))
     const err = evs.find((e) => e.type === 'error')
@@ -76,6 +95,7 @@ describe('流翻译', () => {
   test('流中途出错变成 recoverable 的 error 事件，不把异常抛给 loop', async () => {
     const p = new AiSdkProvider({
       id: 'mock',
+      capabilities: CAPS,
       model: new MockLanguageModelV4({
         doStream: async () => {
           throw new Error('upstream 503')
@@ -96,7 +116,8 @@ describe('docs/adr/004 的红线', () => {
     const providerOptions = { anthropic: { cacheControl: { type: 'ephemeral' }, thinking: { budgetTokens: 2048 } } }
     const p = new AiSdkProvider({
       id: 'mock',
-      model: mock([...START, { type: 'finish', finishReason: 'stop', usage: {} }], (o) => {
+      capabilities: CAPS,
+      model: mock([...START, { type: 'finish', finishReason: 'stop', usage: USAGE }], (o) => {
         seen = o
       }),
     })
@@ -107,6 +128,7 @@ describe('docs/adr/004 的红线', () => {
   test('usage 事件整块带回 providerMetadata，不挑字段', async () => {
     const p = new AiSdkProvider({
       id: 'mock',
+      capabilities: CAPS,
       model: mock([
         ...START,
         {
