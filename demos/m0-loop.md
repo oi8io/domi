@@ -14,8 +14,15 @@ CI 里的端到端测试用的是真 SQLite、真权限引擎、真文件系统�
 
 ## 准备
 
+**拿不到 Anthropic 官方 key 也能跑。** 只要网关说的是 Anthropic 协议，
+`provider = "anthropic"` + `base_url` 指到网关即可——能力矩阵认的是**协议**，不是域名。
+（本地模型走 `provider = "openai-compatible"`。）
+
 ```bash
-export ANTHROPIC_API_KEY=...      # 或 DOMI_API_KEY
+# 走自建网关 / 兼容端点
+export DOMI_API_KEY=你的兼容key
+export DOMI_BASE_URL=https://你的网关/v1
+
 mkdir -p /tmp/domi-demo && cd /tmp/domi-demo
 cat > sum.js <<'JS'
 export const sum = (a, b) => a - b
@@ -24,10 +31,12 @@ cat > test.sh <<'SH'
 #!/bin/sh
 grep -q "a + b" sum.js && echo PASS || { echo FAIL; exit 1; }
 SH
-cat > ~/.domi/config.toml <<'TOML'
+
+mkdir -p ~/.domi && cat > ~/.domi/config.toml <<'TOML'
 [model]
-provider = "anthropic"
-name = "claude-sonnet-4-5"
+provider = "anthropic"                    # 说的是协议，不是域名
+name = "claude-sonnet-4-5"                # 网关上的模型名，按你的网关填
+# base_url = "https://你的网关/v1"          # 也可以用 DOMI_BASE_URL 环境变量
 
 [[permissions.rules]]
 name = "allow-read"
@@ -45,6 +54,22 @@ capability = "shell.exec"
 decision = "ask"
 TOML
 ```
+
+**先跑一次自检**，它会把三种失败区分开——这一步能省掉大部分「为什么连不上」的猜测：
+
+```bash
+domi doctor --ping
+```
+
+| 它说 | 意思 | 下一步 |
+|---|---|---|
+| `端点通了，但 key 不被接受` | 网关在，key 不对 | 换 key |
+| `模型名 "xxx" 找不到` | 网关和 key 都对 | 问网关要模型名清单 |
+| `连不上 https://…` | DNS / 网络 / 地址写错 | 报告里给了一条 curl，直接粘 |
+| `端点接受了请求但什么都没返回` | 多半还是模型名 | 同上 |
+
+**key 里不要混进全角字符或空格**——`domi` 会当场拦下并说清楚，
+但如果你在别处遇到一句看不懂的 `Headers` 报错，八成就是这个。
 
 ## 走查清单
 

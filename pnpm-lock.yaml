@@ -242,6 +242,9 @@ importers:
       '@domi/config':
         specifier: workspace:*
         version: link:../config
+      '@domi/model':
+        specifier: workspace:*
+        version: link:../model
       '@domi/observability':
         specifier: workspace:*
         version: link:../observability

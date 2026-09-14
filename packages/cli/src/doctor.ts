@@ -26,6 +26,16 @@ export interface DoctorInput {
   gitAvailable: boolean
   provider: string
   model: string
+  /** 自定义网关地址。拿不到官方 key 时这是主路径，不是边缘场景 */
+  baseUrl?: string | undefined
+  /** --ping 的结果；没跑就是 undefined */
+  ping?: PingResult | undefined
+}
+
+export interface PingResult {
+  ok: boolean
+  ms: number
+  detail: string
 }
 
 export function diagnose(input: DoctorInput): Finding[] {
@@ -63,6 +73,28 @@ export function diagnose(input: DoctorInput): Finding[] {
           fix: '$ git --version   # 装上 git 后重启 domi',
         },
   )
+
+  out.push(
+    input.baseUrl
+      ? { ok: true, title: '自定义网关', detail: input.baseUrl, fix: null }
+      : { ok: true, title: '模型端点', detail: `${input.provider} 官方端点`, fix: null },
+  )
+
+  if (input.ping) {
+    out.push(
+      input.ping.ok
+        ? { ok: true, title: '连通性', detail: `${input.ping.detail}（${input.ping.ms}ms）`, fix: null }
+        : {
+            ok: false,
+            title: '连不上模型端点',
+            detail: input.ping.detail,
+            // 不给「检查一下网络」这种废话：给一条能立刻看到真实响应的命令
+            fix: input.baseUrl
+              ? `$ curl -sS -o /dev/null -w '%{http_code}\\n' ${input.baseUrl}/messages -H 'x-api-key: '"$DOMI_API_KEY"`
+              : "$ curl -sS -o /dev/null -w '%{http_code}\\n' https://api.anthropic.com/v1/messages -H 'x-api-key: '\"$ANTHROPIC_API_KEY\"",
+          },
+    )
+  }
 
   let writable = true
   try {

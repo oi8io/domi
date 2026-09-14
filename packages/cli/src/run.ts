@@ -18,6 +18,7 @@ import { CONFIG_TEMPLATE, HELP, type ParsedCli } from './args.ts'
 import { exportAll, formatPurgePlan, PURGE_CONFIRM_WORD, planPurge } from './data.ts'
 import { diagnose, formatFindings } from './doctor.ts'
 import { formatOnboarding } from './onboarding.ts'
+import { ping } from './ping.ts'
 
 export const VERSION = '0.1.0'
 
@@ -47,8 +48,18 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
 
     case 'doctor': {
       const cfg = loadConfig()
+      const pingResult = cli.flags.ping
+        ? await ping({
+            provider: cfg.model.provider,
+            model: cfg.model.name,
+            apiKey: cfg.model.apiKey,
+            baseUrl: cfg.model.baseUrl,
+          })
+        : undefined
       const findings = diagnose({
         configPath: configPath(),
+        baseUrl: cfg.model.baseUrl,
+        ping: pingResult,
         hasCredential: Boolean(cfg.model.apiKey),
         credentialEnvNames: credentialEnvNames(cfg.model.provider),
         dataDir: dataDir(),

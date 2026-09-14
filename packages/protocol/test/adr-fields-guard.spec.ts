@@ -9,9 +9,14 @@ const ADR = 'docs/adr/001-runtime-choice.md'
 const BAK = 'docs/adr/.001.bak'
 
 afterEach(() => {
-  if (existsSync(BAK)) {
-    copyFileSync(BAK, ADR)
+  if (!existsSync(BAK)) return
+  // 恢复原文是关键；删备份失败（没有删除权限的挂载）不该让测试红——
+  // .bak 已经在 .gitignore 里，残留不会被提交
+  copyFileSync(BAK, ADR)
+  try {
     rmSync(BAK)
+  } catch {
+    /* 留着就留着 */
   }
 })
 

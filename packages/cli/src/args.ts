@@ -14,7 +14,7 @@ export interface ParsedCli {
   command: Command
   sub: string | undefined
   args: string[]
-  flags: { help: boolean; version: boolean; json: boolean; yes: boolean }
+  flags: { help: boolean; version: boolean; json: boolean; yes: boolean; ping: boolean }
 }
 
 export class UnknownCommandError extends Error {
@@ -34,6 +34,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       version: { type: 'boolean', short: 'v' },
       json: { type: 'boolean' },
       yes: { type: 'boolean', short: 'y' },
+      ping: { type: 'boolean' },
     },
   })
 
@@ -51,6 +52,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       version: Boolean(values.version),
       json: Boolean(values.json),
       yes: Boolean(values.yes),
+      ping: Boolean(values.ping),
     },
   }
 }
@@ -60,6 +62,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
 用法：
   domi                      进入对话（最常用，不需要子命令）
   domi doctor               体检；每条问题都给一条可直接粘贴执行的命令
+  domi doctor --ping        额外发一次真实请求，区分「key 不对 / 网关没通 / 模型名错」
   domi init                 打印一份 config.toml 模板
   domi session list         列出会话
   domi session restore <id> 恢复软删除的会话

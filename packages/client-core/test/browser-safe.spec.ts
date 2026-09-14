@@ -21,8 +21,25 @@ async function depcruise(): Promise<{ code: number; out: string }> {
   return { code: await p.exited, out }
 }
 
+/**
+ * 清理临时 fixture。
+ *
+ * **不能只靠 rm**：这个仓库可能挂在没有删除权限的环境里（容器挂载、只读 bind、
+ * 沙箱重连后权限失效），那时 rm 会抛 EPERM/EFAULT，把一个**守卫本身是好的**测试
+ * 报成失败——错误信号指向了完全无关的地方。
+ * 删不掉就退而求其次：把内容换成一个不违反任何规则的空模块。
+ */
+function cleanupFixture(path: string): void {
+  if (!existsSync(path)) return
+  try {
+    rmSync(path)
+  } catch {
+    writeFileSync(path, 'export {}\n', 'utf8')
+  }
+}
+
 afterEach(() => {
-  if (existsSync(FIXTURE)) rmSync(FIXTURE)
+  cleanupFixture(FIXTURE)
 })
 
 describe('守卫会红', () => {
