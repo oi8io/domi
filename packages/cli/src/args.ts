@@ -90,7 +90,7 @@ name = "claude-sonnet-4-5"
 [context]
 maxTokens = 150000
 includeReasoning = false
-strategy = "full"             # 见 docs/adr/005
+strategy = "full"             # full / clean（确定性清理，见 docs/adr/005 与 PRD-M2-002）
 
 # 权限默认拒绝。没在这里出现的能力一律不放行。
 [[permissions.rules]]

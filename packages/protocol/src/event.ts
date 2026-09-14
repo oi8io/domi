@@ -14,9 +14,10 @@ import { z } from 'zod'
  * **新增事件类型时 +1，并追加一份 `fixtures/events/legacy-v{n}.jsonl`。**
  * v1 → v2：新增 `fs.snapshot`（文件写入前后指纹），`error` 新增可选的 `counters`。
  * v2 → v3：新增 `model.switch` / `snapshot` / `revert`（M1-002、M1-011）。
+ * v3 → v4：新增 `ctx.cleanup`（M2-002 确定性上下文清理）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -95,6 +96,30 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     snapshotId: z.string().nullable(),
     /** 回滚前对当前状态打的那一个快照，让回滚本身可回滚（AC-4） */
     undoSnapshotId: z.string().nullable(),
+  }),
+  /**
+   * 确定性上下文清理 —— PRD-M2-002 AC-4。
+   *
+   * 它记的是**投影层**发生了什么，事件流本身一条没动（INV-12）：
+   * 清理只改「这一轮送给模型的上下文长什么样」，不改磁盘上的历史。
+   * 各类别单独记 token 数，是为了让人能回答「到底是哪一类在省钱」——
+   * 只给一个总数的话，调清理规则时无从下手。
+   */
+  z.looseObject({
+    t: z.literal('ctx.cleanup'),
+    fromSeq: z.number().int().nonnegative(),
+    toSeq: z.number().int().nonnegative(),
+    tokensBefore: z.number().int().nonnegative(),
+    tokensAfter: z.number().int().nonnegative(),
+    /** 各类别削减的 token 数。键是清理规则的 id，值只增不减 */
+    saved: z.object({
+      dedupe: z.number().int().nonnegative(),
+      verbose: z.number().int().nonnegative(),
+      resolvedError: z.number().int().nonnegative(),
+      stack: z.number().int().nonnegative(),
+    }),
+    /** 被显式标注为「后续引用过」因而整条保留的 seq —— 逐条可查（AC-2） */
+    preserved: z.array(z.number().int().positive()),
   }),
   z.looseObject({
     t: z.literal('error'),

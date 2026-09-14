@@ -1,0 +1,5 @@
+// 本来就很短的会话——**清理不该在这种会话上硬省**
+{"seq":1,"sessionId":"08-mixed-short","parentSeq":null,"ts":1700000000001,"schemaVersion":4,"ev":{"t":"user.input","text":"现在几点"}}
+{"seq":2,"sessionId":"08-mixed-short","parentSeq":1,"ts":1700000000002,"schemaVersion":4,"ev":{"t":"tool.call","id":"h1","name":"shell.exec","args":{"cmd":"date"}}}
+{"seq":3,"sessionId":"08-mixed-short","parentSeq":2,"ts":1700000000003,"schemaVersion":4,"ev":{"t":"tool.result","id":"h1","ok":true,"payload":"Mon Sep 14 12:00:00 2026","ms":2}}
+{"seq":4,"sessionId":"08-mixed-short","parentSeq":3,"ts":1700000000004,"schemaVersion":4,"ev":{"t":"model.delta","text":"中午十二点。"}}

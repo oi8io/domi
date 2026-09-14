@@ -304,6 +304,15 @@ importers:
         specifier: workspace:*
         version: link:../store
 
+  packages/memory:
+    dependencies:
+      '@domi/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@domi/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/model:
     dependencies:
       '@ai-sdk/anthropic':
@@ -358,6 +367,9 @@ importers:
       '@domi/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@domi/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@domi/model':
         specifier: workspace:*
         version: link:../model

@@ -20,6 +20,7 @@ import {
   runTurn,
   type TurnResult,
 } from '@domi/kernel'
+import { registerCleanStrategy } from '@domi/memory'
 import {
   capabilitiesFor,
   createProvider,
@@ -30,6 +31,14 @@ import {
 } from '@domi/model'
 import type { EventEnvelope } from '@domi/protocol'
 import { z } from 'zod'
+
+/**
+ * 在**组合根**注册确定性清理策略（PRD-M2-002）。
+ * kernel 只提供注册点，永远不知道有这回事——这就是 PRD-M2-003 AC-6
+ * 「切换压缩策略实现，packages/kernel diff 为 0」的兑现处。
+ * 注册是幂等的，放在模块顶层是为了「配置里写了 strategy = "clean" 就直接能用」。
+ */
+registerCleanStrategy()
 
 const TitleSchema = z.object({ title: z.string() })
 

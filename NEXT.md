@@ -1,11 +1,16 @@
-在做: 把「提测」需要的东西补齐了 —— `pnpm check` 一条命令跑完全部：
-      typecheck + **14 道守卫** + **385 个测试** + L1 轨迹回放；另有 `pnpm smoke` 跑单二进制冒烟。
+在做: M2 里**不依赖再批准门**的两条已经做完（M2-008 回放、M2-002 确定性清理），
+      加上把「提测」需要的东西补齐 —— `pnpm check` 一条命令跑完全部：
+      typecheck + **14 道守卫** + **416 个测试** + L1 轨迹回放；另有 `pnpm smoke` 跑单二进制冒烟。
       - **L1 回放**（PRD-M2-008）：`domi eval record <id>` 录真实会话，`domi eval run` 回放，不联网不花钱、已进 CI。
         仓库里带一条示范 fixture，**新克隆下来不需要 key 就能跑通**。
       - **单二进制**（补 M1-008）：`pnpm smoke` 在 `env -i` 干净环境（无 PATH / 无 NODE_* / 无凭据）跑十条断言，全过；
         四平台产物由 CI 的 binaries job 出。冒烟当场抓到一个真 bug：第一次运行没凭据时看不到四步引导，已修。
       - **cache bench**（补 M1-004）：`pnpm bench:cache` 默认只打印计划不花钱，`--yes` 才真跑。
       - **INV-08 第一次有了机器守卫**：CI 里跑会花钱的脚本、或出现模型凭据环境变量，直接红。
+      - **确定性清理**（PRD-M2-002，新包 `packages/memory`）：去重 / 截断 / 清已解决的错误 / 砍堆栈，
+        全程不花钱不掷骰子。十条标准 fixture 平均削减 59.8%（门槛 15%）。
+        配置里写 `strategy = "clean"` 就能用；**加这个策略 kernel 一行没改**，测试直接断言这件事。
+        事件 schema 3 → 4（新增 `ctx.cleanup`），旧事件照常解析。
 下一步: **只剩两件我做不了的事**
         1. M0 走查：真终端跑 `demos/m0-loop.md` 的 13 条（TASK-M0-021 卡在 review）。
            已改成走 **Anthropic 兼容网关**（`provider = "anthropic"` + `base_url`），你手上的 key 能用；
