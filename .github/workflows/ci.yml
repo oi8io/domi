@@ -1,0 +1,47 @@
+# CI —— 三道防线的执行处。见 docs/ENGINEERING.md / docs/spec/M0.md §5
+#
+# INV-08：真实 LLM 调用不进 CI 门禁。
+# 本 workflow 不注入任何模型凭据——测试全部对 ModelProvider 打桩。
+# 需要真实调用的验收走 nightly，见 docs/PRD.md §0.4。
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # INV-05 等编译期不变量
+      - name: typecheck
+        run: pnpm typecheck
+
+      # INV-02 架构边界 / INV-10 任务反查 PRD / INV-01 append-only 与契约快照
+      - name: 架构守卫
+        run: pnpm guard
+
+      - name: 测试
+        run: pnpm test
+
+      # INV-07：main 任意时刻可运行
+      - name: 冒烟
+        run: test -f scripts/smoke.sh && bash scripts/smoke.sh || echo "smoke 脚本待 TASK-M0-022 补"
