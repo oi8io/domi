@@ -13,7 +13,7 @@ import { ShadowRepo } from '@domi/checkpoint'
 import { configPath, credentialEnvNames, loadConfig } from '@domi/config'
 import { buildManifest, formatManifest } from '@domi/observability'
 import { assemble, BUILTIN_LAYERS, formatDump, layersFromConfig, mergeLayers } from '@domi/prompt'
-import { formatAbsolute, formatRelative, SqliteEventLog } from '@domi/store'
+import { formatAbsolute, formatMigrate, formatRelative, migrateDatabase, SqliteEventLog } from '@domi/store'
 import { CONFIG_TEMPLATE, HELP, type ParsedCli } from './args.ts'
 import { exportAll, formatPurgePlan, PURGE_CONFIRM_WORD, planPurge } from './data.ts'
 import { diagnose, formatFindings } from './doctor.ts'
@@ -160,6 +160,14 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       }
       io.err('用法：$ domi data export <目录>   或   $ domi data purge')
       return 2
+    }
+
+    // PRD-M2-007 AC-3。迁移是唯一会碰用户既有数据的操作，所以备份与回滚在 store 里，
+    // 这里只负责把结果说清楚
+    case 'migrate': {
+      const r = migrateDatabase({ dbPath: join(dataDir(), 'events.db') })
+      io.out(formatMigrate(r))
+      return r.rolledBack ? 1 : 0
     }
 
     case 'report-bug': {

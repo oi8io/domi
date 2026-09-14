@@ -1,2 +1,2 @@
-{"seq": 30, "sessionId": "legacy", "parentSeq": 29, "ts": 1756000000030, "schemaVersion": 4, "ev": {"t": "ctx.cleanup", "fromSeq": 1, "toSeq": 29, "tokensBefore": 8200, "tokensAfter": 6100, "saved": {"dedupe": 900, "verbose": 800, "resolvedError": 300, "stack": 100}, "preserved": [7, 12]}}
-{"seq": 31, "sessionId": "legacy", "parentSeq": 30, "ts": 1756000000031, "schemaVersion": 4, "ev": {"t": "model.request", "provider": "stub", "model": "stub-1", "tokensIn": 6100}}
+{"seq": 11, "sessionId": "legacy", "parentSeq": 10, "ts": 1756000000011, "schemaVersion": 4, "ev": {"t": "ctx.cleanup", "fromSeq": 1, "toSeq": 10, "tokensBefore": 8200, "tokensAfter": 6100, "saved": {"dedupe": 900, "verbose": 800, "resolvedError": 300, "stack": 100}, "preserved": [7]}}
+{"seq": 12, "sessionId": "legacy", "parentSeq": 11, "ts": 1756000000012, "schemaVersion": 4, "ev": {"t": "model.request", "provider": "stub", "model": "stub-1", "tokensIn": 6100}}

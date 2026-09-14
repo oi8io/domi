@@ -2,13 +2,24 @@
  * 命令面 —— PRD-M1-008 · SPEC-M1-008
  *
  * 用 Node/Bun 内置的 `util.parseArgs`，不引 commander/citty（ADR-008）：
- * 目前九个子命令，引一个库是为将来的想象付费。
+ * 目前十个子命令，引一个库是为将来的想象付费。
  * ADR-008 的重新评估线是「超过 8 个」——已经踩线了，下一次加命令前先回去看那份 ADR。
  * 重新评估的条件写在 ADR-008：子命令超过 8 个，或需要自动补全。
  */
 import { parseArgs } from 'node:util'
 
-export const COMMANDS = ['chat', 'doctor', 'init', 'session', 'data', 'prompt', 'report-bug', 'eval', 'trace'] as const
+export const COMMANDS = [
+  'chat',
+  'doctor',
+  'init',
+  'session',
+  'data',
+  'prompt',
+  'report-bug',
+  'eval',
+  'trace',
+  'migrate',
+] as const
 export type Command = (typeof COMMANDS)[number]
 
 export interface ParsedCli {
@@ -86,6 +97,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi eval run             回放全部 fixture（不联网、不花钱）
   domi trace <id>           打印一条会话的轨迹树
   domi trace <id> --html f  导出单文件 HTML（离线可开）
+  domi migrate              升级事件库结构；**先自动备份**，失败自动回滚
 
 选项：
   -h, --help      看这个

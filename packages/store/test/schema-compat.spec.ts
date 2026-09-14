@@ -30,15 +30,20 @@ function load(name: string): RawEnvelope[] {
     .map((l) => JSON.parse(l) as RawEnvelope)
 }
 
-const MIXED = [...load('legacy-v1.jsonl'), ...load('legacy-v2.jsonl'), ...load('legacy-v3.jsonl')]
+const MIXED = [
+  ...load('legacy-v1.jsonl'),
+  ...load('legacy-v2.jsonl'),
+  ...load('legacy-v3.jsonl'),
+  ...load('legacy-v4.jsonl'),
+]
 /** v1 代码写下的 error（没有 counters）与 v2 新增的 fs.snapshot —— 新代码都得认得 */
 const V1_V2 = load('legacy-v1-error.jsonl')
 /** v2 写的普通事件 + v3 新增的三种类型 —— SCHEMA_VERSION 2 → 3 的兼容面 */
 const V2_V3 = load('v2-to-v3.jsonl')
 
-describe('PRD-M0-001 AC-5 · 三版本混合 fixture', () => {
+describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
-    expect(MIXED).toHaveLength(10)
+    expect(MIXED).toHaveLength(12)
     for (const e of MIXED) {
       expect(() => parseEvent(e.ev, e.schemaVersion)).not.toThrow()
     }
@@ -77,7 +82,8 @@ describe('PRD-M0-001 AC-5 · 三版本混合 fixture', () => {
 
   test('重放：混合流按 seq 排序后连续无空洞，parentSeq 链可走通', () => {
     const sorted = [...MIXED].sort((a, b) => a.seq - b.seq)
-    expect(sorted.map((e) => e.seq)).toEqual(Array.from({ length: 10 }, (_, i) => i + 1))
+    // 长度跟着 MIXED 走：每加一个历史版本的 fixture，这里自动覆盖到它（PRD-M2-007 AC-4）
+    expect(sorted.map((e) => e.seq)).toEqual(Array.from({ length: MIXED.length }, (_, i) => i + 1))
     for (let i = 1; i < sorted.length; i++) {
       expect(sorted[i]!.parentSeq).toBe(sorted[i - 1]!.seq)
     }

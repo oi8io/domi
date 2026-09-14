@@ -15,7 +15,7 @@
     "guard:api": "bun run scripts/gen-api-snapshot.ts --check",
     "guard:purity": "bun run scripts/check-kernel-purity.ts",
     "guard:adr": "bun run scripts/check-adr-fields.ts",
-    "guard": "pnpm lint && pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:purity && pnpm guard:adr && pnpm guard:secrets && pnpm guard:providers && pnpm guard:writes && pnpm guard:ac && pnpm guard:eval && pnpm guard:live",
+    "guard": "pnpm lint && pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:purity && pnpm guard:adr && pnpm guard:secrets && pnpm guard:providers && pnpm guard:writes && pnpm guard:ac && pnpm guard:eval && pnpm guard:live && pnpm guard:migrations",
     "check": "pnpm typecheck && pnpm guard && pnpm test && pnpm eval",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -29,7 +29,8 @@
     "build:all": "bun run scripts/build-binaries.ts --all",
     "smoke": "bun run scripts/build-binaries.ts && bash scripts/smoke-binary.sh",
     "guard:live": "bun run scripts/check-ci-no-live-calls.ts",
-    "bench:cache": "bun run scripts/measure-cache.ts"
+    "bench:cache": "bun run scripts/measure-cache.ts",
+    "guard:migrations": "bun run scripts/check-migrations.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
