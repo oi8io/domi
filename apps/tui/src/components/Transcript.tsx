@@ -46,8 +46,10 @@ function Line({ item }: { item: TranscriptItem }): React.ReactElement {
 export function Transcript({ items }: { items: TranscriptItem[] }): React.ReactElement {
   return (
     <Box flexDirection="column">
-      {items.map((item, i) => (
-        <Line key={`${item.seq}-${i}`} item={item} />
+      {/* key 用 seq 而不是数组下标：delta 合并时保留的是首条的 seq，仍然唯一，
+          而下标会在前面插入条目时让 React 复用错行 */}
+      {items.map((item) => (
+        <Line key={item.seq} item={item} />
       ))}
     </Box>
   )

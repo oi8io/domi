@@ -73,7 +73,9 @@ describe('AC-3 · 历史事件零丢失', () => {
     await s.submit('第二轮')
 
     const reqs = (await s.pumpAll()).filter((e) => e.ev.t === 'model.request')
-    expect((reqs.at(-1)?.ev as { model: string }).model).toBe('model-b')
+    const last = reqs.at(-1)
+    if (!last) throw new Error('切换之后应该有一次 model.request')
+    expect((last.ev as { model: string }).model).toBe('model-b')
     await s.flushAndClose()
   }, 15_000)
 })

@@ -47,10 +47,6 @@ export interface AggregateOptions {
   now?: number
 }
 
-function num(v: unknown): number {
-  return typeof v === 'number' && Number.isFinite(v) ? v : 0
-}
-
 /** provider 的 usage 字段名各家不同，这里只做**读取**的归一，事件流里存的仍是原文（ADR-004） */
 function readUsage(raw: Record<string, unknown>): TokenTotals {
   const pick = (...keys: string[]): number => {
