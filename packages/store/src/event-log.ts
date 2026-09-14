@@ -32,6 +32,8 @@ export interface Clock {
   now(): number
 }
 
+export const systemClock: Clock = { now: () => Date.now() }
+
 export class NotImplementedError extends Error {
   constructor(what: string) {
     super(`not implemented: ${what}`)
