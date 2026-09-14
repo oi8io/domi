@@ -1,0 +1,138 @@
+/**
+ * DomiSession —— M0 的进程内接线层。
+ *
+ * **为什么要有这一层**：M0「不拆 daemon」（PRD §M0 不做什么），但 INV-02 要求
+ * 三端零业务逻辑。如果让 `apps/tui` 自己去 new SqliteEventLog、装配 loop，
+ * 那 TUI 里就有了业务逻辑，M3 拆 daemon 时要把它们一个个抠出来。
+ *
+ * 所以装配集中在这里，`apps/tui` 只看得到 DomiSession 这个门面。
+ * M3 的做法是：daemon 里跑 DomiSession，客户端换成 Domi Protocol 的代理实现，
+ * **TUI 一行不用改**——门面的方法签名就是按将来的协议形状设计的。
+ */
+import { fsRead, fsWrite, PermissionEngine, shellExec, ToolRegistry } from '@domi/capability'
+import type { DomiConfig } from '@domi/config'
+import { type ContextPolicy, runTurn, type TurnResult } from '@domi/kernel'
+import { AiSdkProvider, type ModelProvider } from '@domi/model'
+import type { EventEnvelope } from '@domi/protocol'
+import { SqliteEventLog } from '@domi/store'
+
+/** 一次权限询问。TUI 渲染它，用户回答后 resolve */
+export interface PendingAsk {
+  capabilityId: string
+  args: unknown
+  answer(allowed: boolean): void
+}
+
+export interface SessionEvents {
+  onEvents(envelopes: EventEnvelope[]): void
+  onAsk(ask: PendingAsk | null): void
+  onBusy(busy: boolean): void
+}
+
+export interface SessionOptions {
+  config: DomiConfig
+  sessionId: string
+  cwd: string
+  dbPath: string
+  /** 注入替身用；不给就按配置建 AiSdkProvider */
+  provider?: ModelProvider
+  clock?: { now(): number }
+}
+
+export class DomiSession {
+  private readonly log: SqliteEventLog
+  private readonly tools: ToolRegistry
+  private readonly provider: ModelProvider
+  private readonly listeners: Partial<SessionEvents> = {}
+  private lastSeq = 0
+
+  constructor(private readonly opts: SessionOptions) {
+    this.log = new SqliteEventLog({ path: opts.dbPath, cwd: opts.cwd })
+
+    const permissions = new PermissionEngine({ rules: opts.config.permissions.rules }, (capabilityId, args) =>
+      this.askUser(capabilityId, args),
+    )
+    this.tools = new ToolRegistry({ cwd: opts.cwd, permissions }).register(fsRead).register(fsWrite).register(shellExec)
+
+    this.provider =
+      opts.provider ??
+      new AiSdkProvider({
+        id: opts.config.model.provider,
+        // 真正建 provider 的那一步在 M1 做完整（多 provider / baseUrl）；
+        // M0 只要求跑通一条路（PRD §M0 不做什么）
+        model: opts.config.model.name as never,
+      })
+  }
+
+  on<K extends keyof SessionEvents>(k: K, fn: SessionEvents[K]): this {
+    this.listeners[k] = fn
+    return this
+  }
+
+  private askUser(capabilityId: string, args: unknown): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const ask: PendingAsk = {
+        capabilityId,
+        args,
+        answer: (allowed) => {
+          this.listeners.onAsk?.(null)
+          resolve(allowed)
+        },
+      }
+      if (!this.listeners.onAsk) {
+        // 没有人能回答（非交互环境）→ 拒绝。与 PermissionEngine 的兜底同一个立场
+        resolve(false)
+        return
+      }
+      this.listeners.onAsk(ask)
+    })
+  }
+
+  /** 把自上次以来的新事件推给订阅者。轮询而非推送是 M0 的简化，M3 换成协议推送 */
+  async pump(): Promise<void> {
+    const fresh = await this.log.read(this.opts.sessionId, { fromSeq: this.lastSeq + 1 })
+    if (fresh.length === 0) return
+    this.lastSeq = fresh[fresh.length - 1]!.seq
+    this.listeners.onEvents?.(fresh)
+  }
+
+  async submit(text: string): Promise<TurnResult> {
+    this.listeners.onBusy?.(true)
+    const policy: ContextPolicy = {
+      maxTokens: this.opts.config.context.maxTokens,
+      includeReasoning: this.opts.config.context.includeReasoning,
+      strategy: this.opts.config.context.strategy,
+    }
+    const timer = setInterval(() => {
+      void this.pump()
+    }, 30)
+    try {
+      return await runTurn(
+        {
+          sink: this.log,
+          provider: this.provider,
+          tools: this.tools,
+          clock: this.opts.clock ?? { now: () => Date.now() },
+          policy,
+          model: this.opts.config.model.name,
+        },
+        this.opts.sessionId,
+        text,
+      )
+    } finally {
+      clearInterval(timer)
+      await this.pump()
+      this.listeners.onBusy?.(false)
+    }
+  }
+
+  /**
+   * 退出前把事件刷干净（PRD-M0-005 AC-3）。
+   * SQLite 的写在事务提交时就落盘了，这里做的是**关闭连接**让 WAL 正确收尾——
+   * 不关的话 kill 掉进程，最后一轮虽然在 WAL 里，但下次打开要走恢复流程。
+   */
+  async flushAndClose(): Promise<void> {
+    await this.pump()
+    this.log.close()
+  }
+}
