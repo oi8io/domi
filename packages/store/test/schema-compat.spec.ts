@@ -31,6 +31,8 @@ function load(name: string): RawEnvelope[] {
 }
 
 const MIXED = [...load('legacy-v1.jsonl'), ...load('legacy-v2.jsonl'), ...load('legacy-v3.jsonl')]
+/** v1 代码写下的 error（没有 counters）与 v2 新增的 fs.snapshot —— 新代码都得认得 */
+const V1_V2 = load('legacy-v1-error.jsonl')
 
 describe('PRD-M0-001 AC-5 · 三版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
@@ -78,6 +80,20 @@ describe('PRD-M0-001 AC-5 · 三版本混合 fixture', () => {
       expect(sorted[i]!.parentSeq).toBe(sorted[i - 1]!.seq)
     }
     expect(sorted[0]!.parentSeq).toBeNull()
+  })
+})
+
+describe('v1 → v2 的兼容（SCHEMA_VERSION 从 1 升到 2）', () => {
+  test('v1 写的 error 事件没有 counters，新代码照样认得', () => {
+    const ev = parseEvent(V1_V2[0]!.ev, 1)
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect((ev as Record<string, unknown>).counters).toBeUndefined()
+  })
+
+  test('v2 新增的 fs.snapshot 是已知类型', () => {
+    const ev = parseEvent(V1_V2[1]!.ev, 2)
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect((ev as Record<string, unknown>).phase).toBe('after')
   })
 })
 

@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@domi/model": "workspace:*",
-    "@domi/store": "workspace:*"
+    "@domi/store": "workspace:*",
+    "@domi/capability": "workspace:*"
   }
 }

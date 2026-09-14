@@ -1,0 +1,2 @@
+{"seq": 11, "sessionId": "legacy", "parentSeq": 10, "ts": 1756000000011, "schemaVersion": 1, "ev": {"t": "error", "scope": "loop", "message": "v1 时代的错误事件，没有 counters 字段", "recoverable": true}}
+{"seq": 12, "sessionId": "legacy", "parentSeq": 11, "ts": 1756000000012, "schemaVersion": 2, "ev": {"t": "fs.snapshot", "path": "sum.js", "phase": "after", "sha256": "deadbeef", "bytes": 34}}

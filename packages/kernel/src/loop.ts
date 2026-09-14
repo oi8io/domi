@@ -157,7 +157,9 @@ export async function runTurn(
       const result: DomiEvent = outcome.reason
         ? { t: 'tool.result', id: call.id, ok: outcome.ok, payload: outcome.payload, ms, reason: outcome.reason }
         : { t: 'tool.result', id: call.id, ok: outcome.ok, payload: outcome.payload, ms }
-      await deps.sink.append(sessionId, [result])
+      // 工具产生的事件排在 tool.result 之前：权限决策与文件指纹都发生在结果之前，
+      // 轨迹按 seq 读下来必须还原成真实的因果顺序
+      await deps.sink.append(sessionId, [...(outcome.events ?? []), result])
 
       if (outcome.reason === 'invalid_args') {
         argParseRetries++

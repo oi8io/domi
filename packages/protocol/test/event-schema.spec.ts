@@ -33,14 +33,17 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
   })
 
   test('SCHEMA_VERSION 与判别联合的分支数一同演进（改动时提醒回写 fixture）', () => {
-    expect(SCHEMA_VERSION).toBe(1)
-    expect(
-      Object.keys(
-        DomiEventSchema.options.reduce<Record<string, true>>((acc, o) => {
-          acc[(o.shape.t as { value: string }).value] = true
-          return acc
-        }, {}),
-      ),
-    ).toHaveLength(9)
+    // 这两个数字是**故意**写死的。改它们之前先回答三个问题：
+    //   1. 旧版本写下的事件，新代码还能解析吗？（新增类型 / 可选字段 = 能；改既有字段 = 不能）
+    //   2. fixtures/events/legacy-v{n}.jsonl 补了吗？
+    //   3. packages/protocol/.api.md 重新生成了吗？
+    // 三个都答完再改数字。这条测试的价值就在于逼人停一下。
+    expect(SCHEMA_VERSION).toBe(2)
+    const tags = DomiEventSchema.options.map(
+      (o) => (o.shape.t as unknown as { _zod: { def: { values: string[] } } })._zod.def.values[0],
+    )
+    expect(tags).toHaveLength(10)
+    expect(new Set(tags).size).toBe(tags.length)
+    expect(tags).toContain('fs.snapshot')
   })
 })

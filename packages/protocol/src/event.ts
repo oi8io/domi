@@ -8,8 +8,14 @@
  */
 import { z } from 'zod'
 
-/** 当前代码认识的 schema 版本。新增事件类型时 +1，并追加一份 fixtures/events/legacy-v{n}.jsonl */
-export const SCHEMA_VERSION = 1
+/**
+ * 当前代码认识的 schema 版本。
+ *
+ * **新增事件类型时 +1，并追加一份 `fixtures/events/legacy-v{n}.jsonl`。**
+ * v1 → v2：新增 `fs.snapshot`（文件写入前后指纹），`error` 新增可选的 `counters`。
+ * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
+ */
+export const SCHEMA_VERSION = 2
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -33,6 +39,18 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
   // ADR-004：原始 usage 原样透传，不做字段归一——压缩 × prompt cache 那一块要用
   z.looseObject({ t: z.literal('model.usage'), raw: z.record(z.string(), z.unknown()) }),
   z.looseObject({ t: z.literal('tool.call'), id: z.string(), name: z.string(), args: z.unknown() }),
+  /**
+   * 文件写入前后的内容指纹（PRD-M0-004 AC-2）。
+   * before 的 sha256 为 null 表示文件原本不存在。
+   * 有了这两条，任意一步的文件变更都能重建 diff——M1-011 的步级快照直接吃这个。
+   */
+  z.looseObject({
+    t: z.literal('fs.snapshot'),
+    path: z.string(),
+    phase: z.enum(['before', 'after']),
+    sha256: z.string().nullable(),
+    bytes: z.number().int().nonnegative(),
+  }),
   z.looseObject({
     t: z.literal('tool.result'),
     id: z.string(),

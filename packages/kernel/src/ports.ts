@@ -30,6 +30,12 @@ export interface ToolOutcome {
    * - 'user_denied'  → 不是错误，是用户的决定（PRD-M0-003 AC-2）
    */
   reason?: string
+  /**
+   * 工具执行过程中产生的事件（权限决策、文件指纹……），由 loop 统一落盘。
+   * 工具**不自己写 store**：顺序与事务边界只由一个地方管，
+   * 否则 append-only 的保证会被各写各的工具破坏。
+   */
+  events?: DomiEvent[]
 }
 
 export interface ToolRunner {
