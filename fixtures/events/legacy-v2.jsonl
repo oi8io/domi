@@ -1,0 +1,3 @@
+{"seq": 5, "sessionId": "legacy", "parentSeq": 4, "ts": 1756000000005, "schemaVersion": 2, "ev": {"t": "ctx.compact", "fromSeq": 1, "toSeq": 3, "summaryRef": "blob:abc"}}
+{"seq": 6, "sessionId": "legacy", "parentSeq": 5, "ts": 1756000000006, "schemaVersion": 2, "ev": {"t": "model.request", "provider": "stub", "model": "stub-1", "tokensIn": 32, "cacheReadTokens": 128}}
+{"seq": 7, "sessionId": "legacy", "parentSeq": 6, "ts": 1756000000007, "schemaVersion": 2, "ev": {"t": "permission", "capabilityId": "fs.write", "decision": "allow", "source": "user", "matchedRule": null, "channel": "tui"}}

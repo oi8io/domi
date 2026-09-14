@@ -14,14 +14,19 @@ export const SCHEMA_VERSION = 1
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
 
+/**
+ * 每个分支都 .passthrough()：**已知类型 + 未来新增字段**时，字段必须留下来。
+ * zod 默认 strip 会让 read() 静默丢掉新版本写入的字段——payload 还在磁盘上，
+ * 但内存里没了，轨迹与导出都看不到。那是 INV-01 的另一种违反方式。
+ */
 export const DomiEventSchema = z.discriminatedUnion('t', [
-  z.object({ t: z.literal('user.input'), text: z.string(), attachments: z.array(RefSchema).optional() }),
-  z.object({ t: z.literal('model.request'), provider: z.string(), model: z.string(), tokensIn: z.number().int().nonnegative() }),
-  z.object({ t: z.literal('model.delta'), text: z.string() }),
-  z.object({ t: z.literal('model.reason'), text: z.string() }),
+  z.object({ t: z.literal('user.input'), text: z.string(), attachments: z.array(RefSchema).optional() }).passthrough(),
+  z.object({ t: z.literal('model.request'), provider: z.string(), model: z.string(), tokensIn: z.number().int().nonnegative() }).passthrough(),
+  z.object({ t: z.literal('model.delta'), text: z.string() }).passthrough(),
+  z.object({ t: z.literal('model.reason'), text: z.string() }).passthrough(),
   // ADR-004：原始 usage 原样透传，不做字段归一——压缩 × prompt cache 那一块要用
-  z.object({ t: z.literal('model.usage'), raw: z.record(z.unknown()) }),
-  z.object({ t: z.literal('tool.call'), id: z.string(), name: z.string(), args: z.unknown() }),
+  z.object({ t: z.literal('model.usage'), raw: z.record(z.unknown()) }).passthrough(),
+  z.object({ t: z.literal('tool.call'), id: z.string(), name: z.string(), args: z.unknown() }).passthrough(),
   z.object({
     t: z.literal('tool.result'),
     id: z.string(),
@@ -29,15 +34,15 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     payload: z.unknown(),
     ms: z.number().int().nonnegative(),
     reason: z.string().optional(),
-  }),
+  }).passthrough(),
   z.object({
     t: z.literal('permission'),
     capabilityId: z.string(),
     decision: z.enum(['allow', 'deny', 'ask']),
     source: z.enum(['default', 'config', 'user']),
     matchedRule: z.string().nullable(),
-  }),
-  z.object({ t: z.literal('error'), scope: z.string(), message: z.string(), recoverable: z.boolean() }),
+  }).passthrough(),
+  z.object({ t: z.literal('error'), scope: z.string(), message: z.string(), recoverable: z.boolean() }).passthrough(),
 ])
 export type DomiEvent = z.infer<typeof DomiEventSchema>
 

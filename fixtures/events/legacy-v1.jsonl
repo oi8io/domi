@@ -1,0 +1,4 @@
+{"seq": 1, "sessionId": "legacy", "parentSeq": null, "ts": 1756000000001, "schemaVersion": 1, "ev": {"t": "user.input", "text": "跑一下测试"}}
+{"seq": 2, "sessionId": "legacy", "parentSeq": 1, "ts": 1756000000002, "schemaVersion": 1, "ev": {"t": "model.request", "provider": "stub", "model": "stub-1", "tokensIn": 64}}
+{"seq": 3, "sessionId": "legacy", "parentSeq": 2, "ts": 1756000000003, "schemaVersion": 1, "ev": {"t": "tool.call", "id": "c1", "name": "shell.exec", "args": {"cmd": "bun test"}}}
+{"seq": 4, "sessionId": "legacy", "parentSeq": 3, "ts": 1756000000004, "schemaVersion": 1, "ev": {"t": "tool.result", "id": "c1", "ok": true, "payload": {"code": 0}, "ms": 812}}
