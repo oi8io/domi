@@ -55,10 +55,10 @@ INV-xx ──→ PRD-M{n}-xxx ──→ SPEC-M{n}-xxx ──→ TASK-M{n}-xxx �
 
 | 环节 | 状态 | 产出 |
 |---|---|---|
-| 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.2**（45 条审计版 + 5 条 v1.2 新增，共 50 条） |
-| 架构师 | ✅ 完成 | `docs/spec/M0.md`（取舍记录 9 条，均带"触发重新决策的条件"） |
-| 工程师 | 🔵 进行中 | `docs/tasks/M0.md` 22 个任务 · **20 done、1 dropped、1 review** · 等真终端走查 |
-| 测试工程师 | — | M0 完成后另开独立会话 |
+| 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.2.1**（50 条）· M2 再批准草稿见 `docs/prd/M2.md` |
+| 架构师 | ✅ 完成 | `docs/spec/M0.md`（9 条取舍）· `docs/spec/M1.md`（11 条取舍），均带"触发重新决策的条件" |
+| 工程师 | 🔵 进行中 | M0 22 个任务（20 done / 1 dropped / 1 review）· **M1 23 个任务全部 done** · 331 测试全绿 |
+| 测试工程师 | ⏳ 待办 | **必须另开独立会话**；对账表见 `docs/qa/M1-reconciliation.md` |
 
 **2026-09-14 方向变更**：见 `docs/adr/003-revert-to-self-built-runtime.md`。
 `docs/RECON-DSH.md` 的"收缩为 DSH 发行版"结论已作废，该文档降级为情报文档。

@@ -15,11 +15,13 @@
     "guard:api": "bun run scripts/gen-api-snapshot.ts --check",
     "guard:purity": "bun run scripts/check-kernel-purity.ts",
     "guard:adr": "bun run scripts/check-adr-fields.ts",
-    "guard": "pnpm lint && pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:purity && pnpm guard:adr && pnpm guard:secrets",
+    "guard": "pnpm lint && pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:purity && pnpm guard:adr && pnpm guard:secrets && pnpm guard:providers && pnpm guard:writes",
     "check": "pnpm typecheck && pnpm guard && pnpm test",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "guard:secrets": "bun run scripts/scan-secrets.ts fixtures docs"
+    "guard:secrets": "bun run scripts/scan-secrets.ts fixtures docs",
+    "guard:providers": "bun run scripts/check-provider-isolation.ts",
+    "guard:writes": "bun run scripts/check-write-paths.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.0",
