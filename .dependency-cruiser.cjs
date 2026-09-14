@@ -28,8 +28,10 @@ module.exports = {
       name: 'no-logic-in-apps',
       comment: 'INV-02：三端零业务逻辑，只经 Domi Protocol / client-core 通信',
       severity: 'error',
+      // 允许的只有 runtime / client-core / config / protocol：
+      // 前两个是门面与投影，后两个是配置与契约。业务实现一律不许直接 import。
       from: { path: '^apps/(tui|web|desktop)/' },
-      to: { path: '^packages/(kernel|store|capability)/' },
+      to: { path: '^packages/(kernel|store|capability|model|mcp|memory|orchestrator)/' },
     },
     {
       name: 'no-react-in-client-core',

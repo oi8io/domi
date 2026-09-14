@@ -1,0 +1,77 @@
+/**
+ * PRD-M0-005 AC-4 · 40 / 60 / 80 / 200 四种宽度下 golden 快照 diff 为 0
+ *
+ * 快照文件提交进仓库。改了渲染就会红——那是它的作用，不是麻烦：
+ * 终端 UI 的回归没有别的办法看见。
+ * 更新方式：`UPDATE_GOLDEN=1 bun test apps/tui`，然后**读一遍 diff** 再提交。
+ */
+import { describe, expect, test } from 'bun:test'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { createSessionStore } from '@domi/client-core'
+import type { DomiEvent, EventEnvelope } from '@domi/protocol'
+import { App } from '../src/App.tsx'
+import { renderAt } from './render.tsx'
+
+const DIR = 'apps/tui/test/__snapshots__'
+const WIDTHS = [40, 60, 80, 200]
+
+let seq = 0
+function env(ev: DomiEvent): EventEnvelope {
+  seq += 1
+  return { seq, sessionId: 's', parentSeq: null, ts: 0, schemaVersion: 2, ev }
+}
+
+/** 固定场景：一轮完整对话，覆盖每一种 transcript 条目 */
+const SCENE: DomiEvent[] = [
+  { t: 'user.input', text: '把 sum.js 的减号改成加号，然后跑测试' },
+  { t: 'model.reason', text: '先看看文件内容' },
+  { t: 'model.delta', text: '我先读一下 sum.js。' },
+  { t: 'tool.call', id: 'c1', name: 'fs.read', args: { path: 'sum.js' } },
+  { t: 'permission', capabilityId: 'fs.read', decision: 'allow', source: 'config', matchedRule: 'allow-read' },
+  { t: 'tool.result', id: 'c1', ok: true, payload: { lines: 1 }, ms: 4 },
+  { t: 'model.delta', text: '减号写错了，改成加号。' },
+  {
+    t: 'tool.call',
+    id: 'c2',
+    name: 'fs.write',
+    args: { path: 'sum.js', content: 'export const sum = (a, b) => a + b' },
+  },
+  { t: 'permission', capabilityId: 'fs.write', decision: 'allow', source: 'user', matchedRule: 'confirm-write' },
+  { t: 'tool.result', id: 'c2', ok: true, payload: { bytes: 34, created: false }, ms: 2 },
+  { t: 'model.usage', raw: { input_tokens: 421, cache_read_input_tokens: 256 } },
+]
+
+function scene() {
+  seq = 0
+  const s = createSessionStore({ model: 'stub-1', provider: 'stub' })
+  s.applyEvents(SCENE.map(env))
+  return s
+}
+
+describe('PRD-M0-005 AC-4 · 四宽度 golden 快照', () => {
+  test.each(WIDTHS)(
+    '宽度 %i',
+    async (columns) => {
+      const h = renderAt(columns, <App store={scene()} />)
+      await h.flush()
+      const frame = h.lastFrame()
+      h.unmount()
+
+      const file = join(DIR, `scene-${columns}.txt`)
+      if (process.env.UPDATE_GOLDEN === '1' || !existsSync(file)) {
+        mkdirSync(DIR, { recursive: true })
+        writeFileSync(file, `${frame}\n`, 'utf8')
+      }
+      expect(frame).toBe(readFileSync(file, 'utf8').replace(/\n$/, ''))
+    },
+    15_000,
+  )
+
+  test('窄宽度下不会把状态栏挤没', async () => {
+    const h = renderAt(40, <App store={scene()} />)
+    await h.flush()
+    expect(h.lastFrame()).toContain('stub-1')
+    h.unmount()
+  })
+})

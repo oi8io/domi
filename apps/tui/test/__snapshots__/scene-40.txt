@@ -1,0 +1,14 @@
+› 把 sum.js 的减号改成加号，然后跑测试
+· 先看看文件内容
+我先读一下 sum.js。
+⚙ fs.read {"path":"sum.js"}
+🔑 fs.read → allow
+← ok {"lines":1}
+减号写错了，改成加号。
+⚙ fs.write
+{"path":"sum.js","content":"export const
+ sum = (a, b) => a + b"}
+🔑 fs.write → allow
+← ok {"bytes":34,"created":false}
+stub/stub-1 · 421 tok (cache 256) · 2
+次工具
