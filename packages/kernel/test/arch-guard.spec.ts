@@ -47,3 +47,14 @@ describe('真实仓库是绿的', () => {
     expect(code).toBe(0)
   }, 60_000)
 })
+
+describe('INV-02 · kernel 的运行时依赖面', () => {
+  test('kernel 的 dependencies 只有 @domi/protocol', async () => {
+    const pkg = JSON.parse(await Bun.file('packages/kernel/package.json').text()) as {
+      dependencies?: Record<string, string>
+    }
+    // 端口（ports.ts）存在的理由就是这一条：kernel 不 import store/model 的任何实现，
+    // 它们在测试里作为 devDependencies 出现是可以的，运行时依赖面必须是空的。
+    expect(Object.keys(pkg.dependencies ?? {})).toEqual(['@domi/protocol'])
+  })
+})

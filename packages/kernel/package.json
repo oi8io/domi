@@ -9,5 +9,9 @@
   },
   "dependencies": {
     "@domi/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@domi/model": "workspace:*",
+    "@domi/store": "workspace:*"
   }
 }

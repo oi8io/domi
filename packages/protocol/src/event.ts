@@ -48,7 +48,24 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     source: z.enum(['default', 'config', 'user']),
     matchedRule: z.string().nullable(),
   }),
-  z.looseObject({ t: z.literal('error'), scope: z.string(), message: z.string(), recoverable: z.boolean() }),
+  z.looseObject({
+    t: z.literal('error'),
+    scope: z.string(),
+    message: z.string(),
+    recoverable: z.boolean(),
+    /**
+     * 终止时三个计数器的当时值（SPEC-M0-007）。可选——旧事件没有这个字段照样解析。
+     * 放进契约而不是塞在 looseObject 的额外字段里，是为了让它出现在 .api.md 快照里：
+     * 轨迹排查时人要能知道"到底是哪个上限触发的"。
+     */
+    counters: z
+      .object({
+        toolCalls: z.number().int().nonnegative(),
+        argParseRetries: z.number().int().nonnegative(),
+        elapsedMs: z.number().int().nonnegative(),
+      })
+      .optional(),
+  }),
 ])
 export type DomiEvent = z.infer<typeof DomiEventSchema>
 

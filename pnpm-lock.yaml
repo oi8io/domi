@@ -193,6 +193,13 @@ importers:
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol
+    devDependencies:
+      '@domi/model':
+        specifier: workspace:*
+        version: link:../model
+      '@domi/store':
+        specifier: workspace:*
+        version: link:../store
 
   packages/model:
     dependencies:
