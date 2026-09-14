@@ -13,7 +13,8 @@
     "guard:tasks": "bun run scripts/lint-tasks.ts",
     "guard:append-only": "bun run scripts/check-append-only.ts",
     "guard:api": "bun run scripts/gen-api-snapshot.ts --check",
-    "guard": "pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api",
+    "guard:purity": "bun run scripts/check-kernel-purity.ts",
+    "guard": "pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:purity",
     "check": "pnpm typecheck && pnpm guard && pnpm test"
   },
   "devDependencies": {

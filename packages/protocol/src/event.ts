@@ -71,6 +71,16 @@ export function isUnknownEvent(ev: AnyEvent): ev is UnknownEvent {
 }
 
 /**
+ * 与 isUnknownEvent 互补。
+ * 必须显式写成 `ev is DomiEvent` —— 用 `Exclude<AnyEvent, UnknownEvent>` 收窄是不行的：
+ * `__unparsed` 是 z.unknown()，推出来的字段是**可选**的，Exclude 匹配不上，
+ * 于是 else 分支拿不到具体字段。这个坑在运行时看不出来，只有 tsc 会说话。
+ */
+export function isKnownEvent(ev: AnyEvent): ev is DomiEvent {
+  return !('__unparsed' in ev)
+}
+
+/**
  * 宽容解析：已知类型走严格 schema，其余一律降级。
  * **本函数永不抛错** —— 抛错就违反 INV-01。
  */
