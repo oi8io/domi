@@ -1,0 +1,4 @@
+{"seq": 20, "sessionId": "legacy", "parentSeq": null, "ts": 1756000000020, "schemaVersion": 2, "ev": {"t": "tool.result", "id": "c9", "ok": true, "payload": {"bytes": 10}, "ms": 3}}
+{"seq": 21, "sessionId": "legacy", "parentSeq": 20, "ts": 1756000000021, "schemaVersion": 3, "ev": {"t": "model.switch", "from": "claude-sonnet-4-5", "to": "qwen-local", "reason": "省钱", "lostCapabilities": ["promptCache", "reasoning"]}}
+{"seq": 22, "sessionId": "legacy", "parentSeq": 21, "ts": 1756000000022, "schemaVersion": 3, "ev": {"t": "snapshot", "id": "abc123", "label": "after fs.write sum.js", "files": 3, "largeFilesSkipped": 1}}
+{"seq": 23, "sessionId": "legacy", "parentSeq": 22, "ts": 1756000000023, "schemaVersion": 3, "ev": {"t": "revert", "toSeq": 20, "scope": "both", "snapshotId": "abc123", "undoSnapshotId": "def456"}}

@@ -33,6 +33,8 @@ function load(name: string): RawEnvelope[] {
 const MIXED = [...load('legacy-v1.jsonl'), ...load('legacy-v2.jsonl'), ...load('legacy-v3.jsonl')]
 /** v1 代码写下的 error（没有 counters）与 v2 新增的 fs.snapshot —— 新代码都得认得 */
 const V1_V2 = load('legacy-v1-error.jsonl')
+/** v2 写的普通事件 + v3 新增的三种类型 —— SCHEMA_VERSION 2 → 3 的兼容面 */
+const V2_V3 = load('v2-to-v3.jsonl')
 
 describe('PRD-M0-001 AC-5 · 三版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
@@ -94,6 +96,27 @@ describe('v1 → v2 的兼容（SCHEMA_VERSION 从 1 升到 2）', () => {
     const ev = parseEvent(V1_V2[1]!.ev, 2)
     expect(isUnknownEvent(ev)).toBe(false)
     expect((ev as Record<string, unknown>).phase).toBe('after')
+  })
+})
+
+describe('v2 → v3 的兼容（新增 model.switch / snapshot / revert）', () => {
+  test('v2 写的事件在 v3 代码下仍是已知类型', () => {
+    const ev = parseEvent(V2_V3[0]!.ev, 2)
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect(ev.t).toBe('tool.result')
+  })
+
+  test.each(['model.switch', 'snapshot', 'revert'])('v3 新增的 %s 是已知类型', (t) => {
+    const raw = V2_V3.find((e) => e.ev.t === t)!
+    const ev = parseEvent(raw.ev, 3)
+    expect(isUnknownEvent(ev)).toBe(false)
+  })
+
+  test('revert 携带 undoSnapshotId —— 没有它「回滚可回滚」就无从谈起', () => {
+    const raw = V2_V3.find((e) => e.ev.t === 'revert')!
+    const ev = parseEvent(raw.ev, 3) as Record<string, unknown>
+    expect(ev.undoSnapshotId).toBe('def456')
+    expect(ev.scope).toBe('both')
   })
 })
 

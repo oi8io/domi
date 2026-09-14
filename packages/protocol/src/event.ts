@@ -13,9 +13,10 @@ import { z } from 'zod'
  *
  * **新增事件类型时 +1，并追加一份 `fixtures/events/legacy-v{n}.jsonl`。**
  * v1 → v2：新增 `fs.snapshot`（文件写入前后指纹），`error` 新增可选的 `counters`。
+ * v2 → v3：新增 `model.switch` / `snapshot` / `revert`（M1-002、M1-011）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -65,6 +66,35 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     decision: z.enum(['allow', 'deny', 'ask']),
     source: z.enum(['default', 'config', 'user']),
     matchedRule: z.string().nullable(),
+  }),
+  /** M1-002：切换模型。事件流一条不动，上下文按新模型窗口重拼是 buildContext 的事 */
+  z.looseObject({
+    t: z.literal('model.switch'),
+    from: z.string(),
+    to: z.string(),
+    reason: z.string().optional(),
+    lostCapabilities: z.array(z.string()).optional(),
+  }),
+  /** M1-011：一次影子仓库快照 */
+  z.looseObject({
+    t: z.literal('snapshot'),
+    id: z.string(),
+    label: z.string(),
+    files: z.number().int().nonnegative(),
+    /** 超过阈值只记指纹没存内容的文件数（AC-5） */
+    largeFilesSkipped: z.number().int().nonnegative().optional(),
+  }),
+  /**
+   * M1-011：回滚。**append-only** —— 它不删除任何事件，
+   * 只是声明「从 toSeq 之后的那一段作废」（INV-01 / INV-12）。
+   */
+  z.looseObject({
+    t: z.literal('revert'),
+    toSeq: z.number().int().positive(),
+    scope: z.enum(['files', 'conversation', 'both']),
+    snapshotId: z.string().nullable(),
+    /** 回滚前对当前状态打的那一个快照，让回滚本身可回滚（AC-4） */
+    undoSnapshotId: z.string().nullable(),
   }),
   z.looseObject({
     t: z.literal('error'),

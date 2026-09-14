@@ -225,6 +225,12 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  packages/checkpoint:
+    dependencies:
+      '@domi/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
   packages/client-core:
     dependencies:
       '@domi/protocol':
@@ -280,6 +286,12 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+
+  packages/prompt:
+    dependencies:
+      '@domi/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/protocol:
     dependencies:
