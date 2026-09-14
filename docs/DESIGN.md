@@ -277,6 +277,7 @@ interface PermissionSpec {
 | 模型层 | **自研薄 `ModelProvider` 抽象**，底下默认接 Vercel AI SDK（`ai@7.x`，见 `docs/adr/004`）；同时提供 OpenAI-compatible 直连 provider | 不要把 AI SDK 直接暴露给内核。自研一层薄抽象（约 300 行）保留切换自由，且能表达 AI SDK 覆盖不到的能力（本地 llama.cpp、自定义思维链解析） |
 | 网关（可选） | 用户可配置指向 **LiteLLM / OpenRouter** | LiteLLM 可自托管、覆盖 100+ provider、支持本地模型，最契合本地优先定位。但只作为**可选后端**，不作为依赖 |
 | 存储 | **SQLite**（WAL + FTS5 + sqlite-vec） | 单文件零运维；全文与向量检索一站解决 |
+| 配置 | **TOML**，用 Bun 内置的 `Bun.TOML.parse` | 内置的够用就不引库；少一个要跟版本的东西 |
 | MCP | `@modelcontextprotocol/sdk` —— **版本未定，见 `docs/adr/010` 的已知风险** | 对齐 2026-07-28 的 v2 仍是 beta，latest 的 1.30.0 是旧规范。进入 M2 的再批准门上决定 |
 | TUI | **Ink 7 + React 19**（2026-09-14 回写，见 `docs/adr/001-runtime-choice.md`）；OpenTUI 推后为退路 | 实测推翻了原来的性能理由：Ink 自带 32ms 节流把 300 次 rerender 合并成 82 次写出，端到端 P95 4.6ms，余量在 200fps 量级，而模型每秒只吐几十个 token。真正的决定因素是**架构契合**：Ink 是 React，与 Web 端共用 `client-core` 的 hooks 与状态层（INV-02）；`ink-testing-library` 已验证在 Bun 下可用，`PRD-M0-005` AC-4 的四宽度 golden 快照有着落；零 native 依赖，对 Bun 的兼容风险面增量为 0。OpenTUI 的优势项（高帧率多区域动画）不是 domi 的形态 |
 | Web | React + Vite + Tailwind + shadcn/ui | 与 TUI 共享 React 心智，状态层可复用 |
@@ -298,6 +299,7 @@ domi/
 │  ├─ prompt/          # 分层提示词系统、结构化输出
 │  ├─ memory/          # L1–L4、Compactor 策略、soul 读写
 │  ├─ capability/      # Capability 注册表、权限引擎、内置 tool
+│  ├─ config/         # config.toml + 环境变量装载、启动前自检（2026-09-14 新增）
 │  ├─ checkpoint/     # 步级快照与回滚（shadow git，M1 / PRD-M1-011）
 │  ├─ eval/           # L1 轨迹回放 + L2 题集 harness（M2/M6 · INV-13）
 │  ├─ mcp/             # MCP client (2026-07-28)
