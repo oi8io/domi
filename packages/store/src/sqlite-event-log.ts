@@ -9,6 +9,8 @@
  *   3. read 走 parseEvent 的降级路径，永不抛"无法解析"（INV-01）。
  */
 import { Database } from 'bun:sqlite'
+import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { type AnyEvent, type DomiEvent, type EventEnvelope, parseEvent, SCHEMA_VERSION } from '@domi/protocol'
 import { type AppendRange, type Clock, type EventLog, type ReadOpts, systemClock } from './event-log.ts'
 import { serializeRedacted } from './redact.ts'
@@ -41,6 +43,9 @@ export class SqliteEventLog implements EventLog {
   readonly readOnlyFuture: boolean
 
   constructor(opts: SqliteEventLogOptions) {
+    // 首次运行时 ~/.domi 还不存在，SQLite 只会给一句 SQLITE_CANTOPEN。
+    // 「第一次跑就崩」是最劝退的失败方式，所以父目录由我们建
+    if (opts.path !== ':memory:') mkdirSync(dirname(opts.path), { recursive: true })
     this.db = new Database(opts.path, { create: true })
     this.clock = opts.clock ?? systemClock
     this.cwd = opts.cwd ?? process.cwd()

@@ -20,8 +20,19 @@ import {
   runTurn,
   type TurnResult,
 } from '@domi/kernel'
-import { capabilitiesFor, createProvider, lostCapabilities, type ModelProvider } from '@domi/model'
+import {
+  capabilitiesFor,
+  createProvider,
+  generateStructured,
+  lostCapabilities,
+  type ModelProvider,
+  StructuredOutputError,
+} from '@domi/model'
 import type { EventEnvelope } from '@domi/protocol'
+import { z } from 'zod'
+
+const TitleSchema = z.object({ title: z.string() })
+
 import { SqliteEventLog } from '@domi/store'
 
 /** 一次权限询问。TUI 渲染它，用户回答后 resolve */
@@ -178,6 +189,39 @@ export class DomiSession {
     const before = capabilitiesFor({ provider: this.currentProvider, name: this.currentModel })
     const after = capabilitiesFor({ provider: toProvider ?? this.currentProvider, name: to })
     return { lost: lostCapabilities(before, after) }
+  }
+
+  /**
+   * 自动生成会话标题 —— PRD-M1-006 AC-1 / PRD-M1-005 的 M1 内直接消费方。
+   *
+   * 失败时降级为首条用户输入前 40 字符。降级路径必须存在且被测到：
+   * 标题生成失败不该让一次正常对话看起来「出错了」——
+   * 它只是个标题。
+   */
+  async generateTitle(): Promise<string> {
+    const events = await this.log.read(this.opts.sessionId)
+    const firstInput = events.find((e) => e.ev.t === 'user.input')
+    const fallbackSource = firstInput ? (firstInput.ev as { text: string }).text : ''
+    const fallback = fallbackSource.slice(0, 40)
+
+    try {
+      const r = await generateStructured(
+        { provider: this.provider, capabilities: this.provider.capabilities },
+        TitleSchema,
+        {
+          model: this.currentModel,
+          messages: [{ role: 'user', content: `给下面这段对话起一个不超过 20 字的标题：\n${fallbackSource}` }],
+        },
+      )
+      const title = r.title.trim()
+      const final = title === '' ? fallback : title
+      this.log.sessions.upsert({ id: this.opts.sessionId, cwd: this.opts.cwd, title: final })
+      return final
+    } catch (e) {
+      if (!(e instanceof StructuredOutputError)) throw e
+      this.log.sessions.upsert({ id: this.opts.sessionId, cwd: this.opts.cwd, title: fallback })
+      return fallback
+    }
   }
 
   /** 测试与轨迹面板用：读出这个会话的全部事件（不走增量推送） */

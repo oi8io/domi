@@ -14,7 +14,8 @@
     "@nanostores/react": "^1.0.0",
     "ink": "^7.1.1",
     "nanostores": "^1.5.3",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "@domi/cli": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

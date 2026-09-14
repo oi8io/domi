@@ -187,6 +187,9 @@ importers:
 
   apps/tui:
     dependencies:
+      '@domi/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@domi/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
@@ -230,6 +233,24 @@ importers:
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol
+
+  packages/cli:
+    dependencies:
+      '@domi/checkpoint':
+        specifier: workspace:*
+        version: link:../checkpoint
+      '@domi/config':
+        specifier: workspace:*
+        version: link:../config
+      '@domi/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@domi/prompt':
+        specifier: workspace:*
+        version: link:../prompt
+      '@domi/store':
+        specifier: workspace:*
+        version: link:../store
 
   packages/client-core:
     dependencies:
@@ -287,6 +308,12 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  packages/observability:
+    dependencies:
+      '@domi/store':
+        specifier: workspace:*
+        version: link:../store
+
   packages/prompt:
     dependencies:
       '@domi/protocol':
@@ -319,6 +346,9 @@ importers:
       '@domi/store':
         specifier: workspace:*
         version: link:../store
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
 
   packages/store:
     dependencies:

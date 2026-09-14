@@ -11,6 +11,7 @@
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { type ParsedCli, parseCli, runCommand } from '@domi/cli'
 import { answerFromKey, createSessionStore, focusIdOf, type SessionStore, summarizeArgs } from '@domi/client-core'
 import { ConfigParseError, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
 import { DomiSession, type PendingAsk } from '@domi/runtime'
@@ -76,7 +77,33 @@ function Root({ store, session }: { store: SessionStore; session: DomiSession })
   )
 }
 
-export function main(): void {
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const io = {
+    out: (t: string) => {
+      process.stdout.write(`${t}\n`)
+    },
+    err: (t: string) => {
+      process.stderr.write(`${t}\n`)
+    },
+  }
+
+  let cli: ParsedCli
+  try {
+    cli = parseCli(argv)
+  } catch (e) {
+    io.err(e instanceof Error ? e.message : String(e))
+    process.exit(2)
+  }
+
+  // 非交互命令走 CLI 分发，不启动 Ink —— 它们要能被管道和脚本用
+  if (cli.command !== 'chat' || cli.flags.help || cli.flags.version) {
+    process.exit(await runCommand(cli, io))
+  }
+
+  return startChat()
+}
+
+function startChat(): void {
   let config: ReturnType<typeof loadConfigOrThrow>
   try {
     config = loadConfigOrThrow()
@@ -103,4 +130,4 @@ export function main(): void {
   render(<Root store={store} session={session} />)
 }
 
-if (import.meta.main) main()
+if (import.meta.main) void main()
