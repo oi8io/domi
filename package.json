@@ -1,0 +1,20 @@
+{
+  "name": "domi",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.1",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "guard:deps": "depcruise packages apps --config .dependency-cruiser.cjs",
+    "guard:tasks": "bun run scripts/lint-tasks.ts",
+    "guard": "pnpm guard:deps && pnpm guard:tasks",
+    "check": "pnpm typecheck && pnpm guard && pnpm test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "dependency-cruiser": "^17.0.0",
+    "typescript": "^5.9.0"
+  }
+}
