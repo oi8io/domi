@@ -14,7 +14,8 @@
     "guard:append-only": "bun run scripts/check-append-only.ts",
     "guard:api": "bun run scripts/gen-api-snapshot.ts --check",
     "guard:purity": "bun run scripts/check-kernel-purity.ts",
-    "guard": "pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:purity",
+    "guard:adr": "bun run scripts/check-adr-fields.ts",
+    "guard": "pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:purity && pnpm guard:adr",
     "check": "pnpm typecheck && pnpm guard && pnpm test"
   },
   "devDependencies": {
