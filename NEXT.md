@@ -1,14 +1,20 @@
-在做: 提前交付 **PRD-M2-008 · L1 确定性轨迹回放**（`packages/eval`）—— 这是「提测」真正跑得起来的东西。
-      `pnpm check` = typecheck + 12 道守卫 + 379 个测试 + `pnpm eval`（回放），全绿。
-      `domi eval record <sessionId>` 把真实会话导出成 fixture；`domi eval run` 回放，不联网不花钱，已进 CI。
-      仓库里提交了一条示范 fixture，**新克隆下来第一条命令就能跑通**，不需要 API key。
-下一步: **两件只能你做的事**
-        1. M0 走查：真终端跑 `demos/m0-loop.md` 的 13 条（TASK-M0-021 还卡在 review）。
-           已改成走 **Anthropic 兼容网关**（`provider = "anthropic"` + `base_url`），你手上的 key 能用。
-           `domi doctor --ping` 会把失败分成「key 不对 / 网关没通 / 模型名错 / 超时」四类。
-        2. M1 dogfooding：连续 5 个工作日用 domi 干真实活——M1 DoD 的判据，代码替不了（你说放后面）
-        独立 QA 会话的提示词已备好：`docs/qa/PROMPT.md`（隔壁小哥或你直接贴进一个空会话即可）
-卡在: M2 是 PROVISIONAL，其余条目进入前必须过再批准门。材料：`docs/prd/M2.md`。
-      门上必须由你拍板的一条：**MCP SDK 版本**（v2 仍是 beta），三条路与代价见 `docs/adr/010`。
-      M2-008 之所以先做，正因为它**不依赖**这条决定。
-      两处 M1 的实话仍未补：cache 命中率与单二进制都没有真实产物（`docs/qa/M1-reconciliation.md`）。
+在做: 把「提测」需要的东西补齐了 —— `pnpm check` 一条命令跑完全部：
+      typecheck + **14 道守卫** + **385 个测试** + L1 轨迹回放；另有 `pnpm smoke` 跑单二进制冒烟。
+      - **L1 回放**（PRD-M2-008）：`domi eval record <id>` 录真实会话，`domi eval run` 回放，不联网不花钱、已进 CI。
+        仓库里带一条示范 fixture，**新克隆下来不需要 key 就能跑通**。
+      - **单二进制**（补 M1-008）：`pnpm smoke` 在 `env -i` 干净环境（无 PATH / 无 NODE_* / 无凭据）跑十条断言，全过；
+        四平台产物由 CI 的 binaries job 出。冒烟当场抓到一个真 bug：第一次运行没凭据时看不到四步引导，已修。
+      - **cache bench**（补 M1-004）：`pnpm bench:cache` 默认只打印计划不花钱，`--yes` 才真跑。
+      - **INV-08 第一次有了机器守卫**：CI 里跑会花钱的脚本、或出现模型凭据环境变量，直接红。
+下一步: **只剩两件我做不了的事**
+        1. M0 走查：真终端跑 `demos/m0-loop.md` 的 13 条（TASK-M0-021 卡在 review）。
+           已改成走 **Anthropic 兼容网关**（`provider = "anthropic"` + `base_url`），你手上的 key 能用；
+           `domi doctor --ping` 把失败分成「key 不对 / 网关没通 / 模型名错 / 超时」四类。
+        2. `pnpm bench:cache --yes` 跑一次（TASK-M2-003 卡在 review）——AC-1/AC-2 的判据是真实数字。
+           **预期是 0%**：M1 稳定前缀只有约 35 token，低于 provider 的最小可缓存长度，脚本会先警告你这件事。
+        3. （你说放后面）M1 dogfooding 连续 5 个工作日 —— M1 DoD 的判据，代码替不了。
+        独立 QA 会话的提示词：`docs/qa/PROMPT.md`，贴进一个空会话即可，不需要我参与。
+卡在: M2 其余条目要过再批准门（`docs/prd/M2.md`），门上必须你拍板的是 **MCP SDK 版本**（v2 仍是 beta，见 `docs/adr/010`）。
+      M2-008 先做正因为它不依赖这条决定。
+      仍未验收：M1-008 AC-1（`npx domi` 需要真发布到 npm）、M1-004 AC-1/AC-2（等上面那次真实运行）。
+      实话都记在 `docs/qa/M1-reconciliation.md`，原文没删。

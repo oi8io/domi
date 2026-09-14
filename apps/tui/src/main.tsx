@@ -11,7 +11,7 @@
  */
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { type ParsedCli, parseCli, runCommand } from '@domi/cli'
+import { formatOnboarding, type ParsedCli, parseCli, runCommand } from '@domi/cli'
 import { answerFromKey, createSessionStore, focusIdOf, type SessionStore, summarizeArgs } from '@domi/client-core'
 import { ConfigParseError, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
 import { DomiSession, type PendingAsk } from '@domi/runtime'
@@ -108,8 +108,11 @@ function startChat(): void {
   try {
     config = loadConfigOrThrow()
   } catch (e) {
+    // PRD-M1-008 AC-3：**第一次运行大概率就走到这里**（还没填凭据）。
+    // 只丢一句 error.missing_credential 就等于把新用户扔在门口，
+    // 所以把四步清单一起打出来——「五分钟从零到第一次对话」这条路径全程不需要翻文档。
     if (e instanceof MissingCredentialError || e instanceof ConfigParseError) {
-      process.stderr.write(`${e.message}\n`)
+      process.stderr.write(`${e.message}\n\n${formatOnboarding()}\n`)
       process.exit(EXIT_CONFIG_ERROR)
     }
     throw e

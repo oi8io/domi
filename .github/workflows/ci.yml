@@ -46,6 +46,32 @@ jobs:
       - name: L1 轨迹回放
         run: pnpm eval
 
-      # INV-07：main 任意时刻可运行
-      - name: 冒烟
-        run: test -f scripts/smoke.sh && bash scripts/smoke.sh || echo "smoke 脚本待 TASK-M0-022 补"
+      # PRD-M1-008 AC-1/2/3/4 · INV-07：产物在没有 Node 的干净环境里跑得起来
+      - name: 单二进制冒烟（当前平台）
+        run: pnpm smoke
+
+  # AC-2 点名四个平台。跟 check 并行跑——它只验构建产得出来，不需要等测试
+  binaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: 构建四平台产物
+        run: pnpm build:all
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: domi-binaries
+          path: dist/domi-*
+          retention-days: 14

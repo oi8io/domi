@@ -10,5 +10,8 @@ coverage/
 
 # 架构守卫测试的临时违规 fixture（测试跑完会删；意外残留时不许提交）
 packages/*/src/__arch_fixture.ts
+packages/*/src/__provider_fixture.ts
+packages/*/src/__eval_fixture.ts
 docs/adr/.*.bak
 apps/*/src/__arch_fixture.ts
+.github/workflows/__guard_fixture.yml
