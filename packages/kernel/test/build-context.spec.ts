@@ -5,7 +5,13 @@
  */
 import { beforeEach, describe, expect, test } from 'bun:test'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { buildContext, type ContextPolicy, listContextStrategies, registerContextStrategy } from '../src/index.ts'
+import {
+  buildContext,
+  type ContextPolicy,
+  listContextStrategies,
+  markToolResult,
+  registerContextStrategy,
+} from '../src/index.ts'
 
 const P: ContextPolicy = { maxTokens: 100_000, includeReasoning: false }
 
@@ -51,7 +57,8 @@ describe('PRD-M0-006 AC-3 · 输出可深比较断言', () => {
         content: '我先读一下 README。',
         toolCalls: [{ id: 'c1', name: 'fs.read', args: { path: 'README.md' } }],
       },
-      { role: 'tool', toolCallId: 'c1', ok: true, content: '{"lines":3}' },
+      // 内容带边界标记（PRD-M2-006 AC-2）：标记之内的一切都是数据，摊平进单条消息也还在
+      { role: 'tool', toolCallId: 'c1', ok: true, content: markToolResult('c1', { lines: 3 }) },
       { role: 'assistant', content: '改好了。' },
     ])
   })

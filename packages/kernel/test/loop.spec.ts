@@ -20,6 +20,7 @@ import {
   runTurn,
   type ToolOutcome,
   type ToolRunner,
+  unmarkToolResult,
 } from '../src/index.ts'
 
 const POLICY: ContextPolicy = { maxTokens: 1_000_000, includeReasoning: false }
@@ -93,7 +94,8 @@ describe('PRD-M0-002 · 基本闭环', () => {
     // 外层再序列化一次会把引号转义掉，断言会假红。
     const toolMsg = provider.calls[1]?.messages.find((m) => m.role === 'tool')
     expect(toolMsg).toBeDefined()
-    expect(JSON.parse((toolMsg as { content: string }).content)).toEqual({ lines: 3 })
+    // 工具结果带边界标记（PRD-M2-006 AC-2），剥掉标记才是原始 JSON
+    expect(JSON.parse(unmarkToolResult((toolMsg as { content: string }).content))).toEqual({ lines: 3 })
   })
 })
 

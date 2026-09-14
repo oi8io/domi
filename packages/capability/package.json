@@ -10,5 +10,8 @@
   "dependencies": {
     "@domi/protocol": "workspace:*",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@domi/kernel": "workspace:*"
   }
 }

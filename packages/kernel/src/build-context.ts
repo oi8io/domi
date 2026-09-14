@@ -39,6 +39,33 @@ export function listContextStrategies(): readonly string[] {
  * permission / error）是**轨迹事件**——它们要被看见、被审计，但不该喂给模型。
  * 这条边界如果模糊掉，上下文会被自己的元数据撑爆。
  */
+/**
+ * 工具结果的边界标记 —— PRD-M2-006 AC-2
+ *
+ * `role: 'tool'` 已经是结构上的区分，但它只在**消息层**成立：
+ * 一旦上下文被压缩、被拼进单条 user message、或者被某个 provider 的适配层摊平，
+ * 这个区分就消失了。标记是写在**内容里**的，摊平之后仍然在。
+ *
+ * 标记用的是不会在正常代码与文本里出现的私有区字符（U+E000/U+E001），
+ * 所以工具结果里就算原样写着 `<tool_result>` 也伪造不出边界。
+ * 这就是 AC-2 说的"结构上可区分"——**可区分性不能依赖内容本身老实**。
+ */
+export const TOOL_RESULT_OPEN = '\uE000'
+export const TOOL_RESULT_CLOSE = '\uE001'
+
+export function markToolResult(id: string, payload: unknown): string {
+  const body = JSON.stringify(payload)
+  // 内容里若真出现了这两个字符，剥掉——伪造边界是注入最直接的一招
+  const safe = body.replace(/[\uE000\uE001]/g, '')
+  return `${TOOL_RESULT_OPEN}tool-result:${id}\n${safe}\n${TOOL_RESULT_CLOSE}`
+}
+
+/** 给测试与轨迹用：把标记剥掉看原文 */
+export function unmarkToolResult(s: string): string {
+  const m = s.match(/^\uE000tool-result:[^\n]*\n([\s\S]*)\n\uE001$/)
+  return m?.[1] ?? s
+}
+
 const fullStrategy: ContextStrategy = (events, policy) => {
   const out: ModelMessages = []
   let text = ''
@@ -71,7 +98,7 @@ const fullStrategy: ContextStrategy = (events, policy) => {
         break
       case 'tool.result':
         flush()
-        out.push({ role: 'tool', toolCallId: ev.id, ok: ev.ok, content: JSON.stringify(ev.payload) })
+        out.push({ role: 'tool', toolCallId: ev.id, ok: ev.ok, content: markToolResult(ev.id, ev.payload) })
         break
       default:
         // model.request / model.usage / permission / error：轨迹事件，不进上下文

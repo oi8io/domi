@@ -227,6 +227,10 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+    devDependencies:
+      '@domi/kernel':
+        specifier: workspace:*
+        version: link:../kernel
 
   packages/checkpoint:
     dependencies:
