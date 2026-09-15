@@ -6,8 +6,10 @@
       - `domi`（TUI）是 daemon 的客户端，没有 domid 会自动在后台拉起；退出只断开自己
       - `pnpm web` 起 Web 端：会话列表 / 回收站、事件流与轨迹、工具确认框、状态栏、切换模型、删除会话
       - 对话里 `/compact`、`/model <名字> [provider]`
+      - 配置文件改成了 **YAML**：`~/.domi/config.yaml`（`domi init` 打印模板）。
+        旧的 config.toml 还能读；迁移：`domi init --from-toml > ~/.domi/config.yaml`，然后删掉 toml（`domi doctor` 会提示）
       - anthropic 协议网关的 base_url 带不带 /v1 都行；openai-compatible 网关要用工具的话在
-        `~/.domi/config.toml` 里写 `[model.capabilities]` `toolCall = true`
+        config.yaml 里写 `model.capabilities.toolCall: true`
 
       ⚠️ 更新代码后：`pnpm install`，并停掉已在跑的 domid（`domi` 会复用它，旧进程跑的是旧代码，见 OPT-M3-002）
 
@@ -15,7 +17,8 @@
         2. TUI 里补会话列表 / 恢复 / 删除入口（parity 第 5、6、8 项的 TUI 列）
         3. TASK-M3-008 parity e2e（Playwright）；TASK-M3-009 推送延迟基准
         4. TASK-M3-010 kill -9 恢复、TASK-M3-011 远程认证、TASK-M3-012 跨会话引用、TASK-M3-013 MCP
-        5. 缺陷登记里 open 的：BUG-M3-003（状态栏缺本轮耗时）、BUG-M3-008（陈锁并发接管）
+        5. 缺陷登记里 open 的：BUG-M3-003（状态栏缺本轮耗时）、BUG-M3-008（陈锁并发接管）、
+           BUG-M3-012（配置里的提示词层从未被读取）
 
         仍然只有你能做的：真终端走 M3 DoD（`domi` 发长任务 → 关终端 → 浏览器看完成）、
         M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`、独立 QA、M1 dogfooding
