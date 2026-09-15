@@ -1399,6 +1399,11 @@
           "items": {
             "type": "string"
           }
+        },
+        "turnMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": [

@@ -75,6 +75,7 @@ export interface PendingAsk {
 export interface MetricsSnapshot {
   tokens: { input: number; output: number; cacheRead: number }
   cost: string
+  turnMs: number
   contextPercent: number
   contextLevel: 'ok' | 'warn' | 'danger'
   unpricedModels: string[]
@@ -119,6 +120,7 @@ export class DomiSession {
   /** 视图前缀长度：分支会话先接上父链那一段（TASK-M3-014）。对一个会话是常数 */
   private readonly offset: number
   private noticesDelivered = 0
+  private busy = false
   private currentModel: string
   private currentProvider: string
 
@@ -146,6 +148,10 @@ export class DomiSession {
     // 那份知识只在 packages/model/src/factory.ts 里（AC-4 的 diff 为 0 靠这个成立）
     this.injectedProvider = opts.provider !== undefined
     this.provider = opts.provider ?? this.buildProvider(opts.config.model.provider, opts.config.model.name)
+  }
+
+  private now(): number {
+    return (this.opts.clock ?? { now: () => Date.now() }).now()
   }
 
   private buildProvider(provider: string, name: string): ModelProvider {
@@ -236,10 +242,13 @@ export class DomiSession {
       const m = aggregate(all, {
         pricing: this.opts.pricing ?? {},
         maxContextTokens: this.opts.config.context.maxTokens,
+        // 这一轮还在跑：耗时算到现在；跑完了就算到这一轮最后一条事件
+        ...(this.busy ? { now: this.now() } : {}),
       })
       this.listeners.onMetrics({
         tokens: m.tokens,
         cost: formatCost(m),
+        turnMs: m.turnMs,
         contextPercent: m.contextPercent,
         contextLevel: contextLevel(m.contextPercent),
         unpricedModels: m.unpricedModels,
@@ -442,6 +451,7 @@ export class DomiSession {
 
   /** refs 应当先经过 checkRefs；这里不再校验 */
   async submit(text: string, opts: { refs?: readonly RefLink[] } = {}): Promise<TurnResult> {
+    this.busy = true
     this.listeners.onBusy?.(true)
     for (const t of this.opts.extraTools?.() ?? []) this.tools.register(t)
     await this.deliverNotices()
@@ -470,6 +480,7 @@ export class DomiSession {
       )
     } finally {
       clearInterval(timer)
+      this.busy = false
       await this.pump()
       this.listeners.onBusy?.(false)
     }

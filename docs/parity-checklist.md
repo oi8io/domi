@@ -25,7 +25,7 @@
 | 6 | 会话恢复 | 🟡 `domi session restore <id>`（CLI；BUG-M3-002 已修） | 🟡 回收站里点「恢复」，经 `session.restore` | ⬜ | ⬜ |
 | 7 | 会话分支 | 🟡 对话里 `/branch [seq]`，不带数字从最后一条分，分完切到新会话（BUG-M3-010 已修） | 🟡 每条旁「分支」按钮，经 `session.branch`，分完打开新会话；列表里标「分支」 | ⬜ | ⬜ |
 | 8 | 会话删除 | ⬜ CLI 与 TUI 都没有入口 | 🟡 「删除会话」点两下，经 `session.delete`（软删除；正在处理的不许删） | ⬜ | ⬜ |
-| 9 | 状态栏六项指标 | 🟡 `StatusBar`（PRD-M1-007，颜色快照）；**缺「本轮耗时」** | 🟡 `StatusBar`，经 `session.metrics`，与 TUI 同样五段、同一个 `formatTokens`；同样缺「本轮耗时」 | ⬜ | ⬜ |
+| 9 | 状态栏六项指标 | 🟡 `StatusBar`（PRD-M1-007，颜色快照）；「本轮」段已补（BUG-M3-003） | 🟡 `StatusBar`，经 `session.metrics`，与 TUI 同样六段、同一个 `formatTokens` / `formatElapsed` | ⬜ | ⬜ |
 | 10 | 模型切换 | 🟡 对话里 `/model <名字> [provider]` | 🟡 会话顶部的切换表单，显示会失去的能力；两端对话里都出现「模型切换 a → b」 | ⬜ | ⬜ |
 
 「状态栏六项指标」按 PRD-M1-007 AC-1/AC-2 数：模型、累计 token（输/出/缓存读）、累计花费、本轮耗时、工具调用次数、上下文占用百分比。
@@ -33,8 +33,7 @@
 ## 从这张表读出来的下一轮工作
 
 1. （metrics、询问接线、恢复 / 删除 / 切换模型、会话分支已在 2026-09-15 补上。）
-2. **「本轮耗时」两端都没有**：kernel 的 `TurnResult.counters.elapsedMs` 有这个数，但没进 metrics。
-   PRD-M1-007 AC-1 点了名，这是 M1 的遗留，不是 M3 的新活。
+2. （「本轮耗时」已补，BUG-M3-003。）
 3. **TUI 也要补入口**：第 5–8、10 项目前只在 CLI 或 runtime 里，TUI 会话界面里没有。对等是双向的——
    不能因为 TUI 先出生就默认它是完整的那一边。
 4. 两端 e2e 按行补齐，每补一行在这里改一格。

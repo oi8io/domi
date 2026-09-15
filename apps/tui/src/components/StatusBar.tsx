@@ -1,4 +1,4 @@
-import { formatTokens, type StatusSnapshot } from '@domi/client-core'
+import { formatElapsed, formatTokens, type StatusSnapshot } from '@domi/client-core'
 import { Box, Text } from 'ink'
 
 /**
@@ -20,13 +20,14 @@ export function StatusBar({ status }: { status: StatusSnapshot }): React.ReactEl
   const cost = m === null ? '—' : m.cost
   const pct = m?.contextPercent ?? 0
   const level = m?.contextLevel ?? 'ok'
+  const turn = m?.turnMs === undefined ? '' : `本轮 ${formatElapsed(m.turnMs)} · `
 
   // 用一个 Text 包起来而不是并排的 Box：40 列下 Box 的 flex 会把
   // 「ctx N%」甩到另一段去，读起来像两条信息。整体折行才是对的
   return (
     <Box>
       <Text dimColor>
-        {`${status.provider}/${status.model} · ${tokens} · ${cost} · ${status.toolCalls} 次工具 · `}
+        {`${status.provider}/${status.model} · ${tokens} · ${cost} · ${turn}${status.toolCalls} 次工具 · `}
         <Text color={CONTEXT_COLOR[level]}>{`ctx ${pct}%`}</Text>
         {status.busy ? ' · 运行中' : ''}
       </Text>

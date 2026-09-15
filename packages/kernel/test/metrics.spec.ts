@@ -41,6 +41,22 @@ describe('AC-1 · 聚合结果', () => {
     expect(m.turnMs).toBe(400)
   })
 
+  test('BUG-M3-003 · 本轮耗时只算最后一轮：从最后一条用户输入到这一轮最后一条事件；进行中用 now', () => {
+    seq = 0
+    const evs = [
+      env({ t: 'user.input', text: '第一轮' }, 1_000),
+      env({ t: 'model.delta', text: '答' }, 9_000),
+      env({ t: 'user.input', text: '第二轮' }, 20_000),
+      env({ t: 'model.request', provider: 'p', model: 'm', tokensIn: 1 }, 20_100),
+      env({ t: 'model.delta', text: '答' }, 21_500),
+    ]
+    expect(aggregate(evs).turnMs).toBe(1_500)
+    expect(aggregate(evs, { now: 25_000 }).turnMs).toBe(5_000)
+    // 还没有用户输入（比如只有一条切模型）：没有「本轮」
+    seq = 0
+    expect(aggregate([env({ t: 'model.switch', from: 'a', to: 'b' }, 5)]).turnMs).toBe(0)
+  })
+
   test('各家 usage 字段名不同，读取时归一；事件流里存的仍是原文（ADR-004）', () => {
     seq = 0
     const camel = [

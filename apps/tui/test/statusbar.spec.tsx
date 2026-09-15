@@ -56,6 +56,13 @@ describe('AC-1 · 状态栏显示的内容', () => {
     h.unmount()
   })
 
+  test('BUG-M3-003 · 本轮耗时', async () => {
+    const h = renderAt(120, <StatusBar status={status({ ...metrics(10, '—'), turnMs: 83_400 })} />)
+    await h.flush()
+    expect(h.lastFrame()).toContain('本轮 1m23s')
+    h.unmount()
+  })
+
   test('AC-4 · 未知模型的花费显示 — 而不是 $0', async () => {
     const h = renderAt(120, <StatusBar status={status(metrics(10, '—'))} />)
     await h.flush()

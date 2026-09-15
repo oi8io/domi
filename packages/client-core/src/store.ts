@@ -26,6 +26,8 @@ export interface MetricsSnapshot {
   contextPercent: number
   contextLevel: 'ok' | 'warn' | 'danger'
   unpricedModels: string[]
+  /** 最近一轮用了多久。老 daemon 不推这个 */
+  turnMs?: number | undefined
 }
 
 export interface StatusSnapshot {
@@ -50,6 +52,13 @@ export interface AskSnapshot {
   detail: string
   /** 工具要输入时的表单（JSON Schema）。有它就画表单，回答时带内容 */
   form?: { message: string; schema: unknown }
+}
+
+/** 状态栏的「本轮」段。一分钟以内到 0.1 秒，以上到秒 */
+export function formatElapsed(ms: number): string {
+  if (ms < 60_000) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`
+  const s = Math.floor(ms / 1000)
+  return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`
 }
 
 /** 状态栏的 token 段。TUI 与 Web 共用这一份，两端显示才会逐字一致 */

@@ -78,6 +78,8 @@ const MetricsSchema = z.object({
   contextPercent: z.number(),
   contextLevel: z.enum(['ok', 'warn', 'danger']),
   unpricedModels: z.array(z.string()),
+  /** 最近一轮用了多久（毫秒）；进行中的一轮算到推送那一刻（PRD-M1-007 AC-1） */
+  turnMs: z.number().int().nonnegative().optional(),
 })
 
 const AskSchema = z.object({

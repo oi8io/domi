@@ -115,6 +115,19 @@ describe('状态栏（parity 第 9 项）', () => {
     expect(html).toContain('ctx 72%')
   })
 
+  test('BUG-M3-003 · 本轮耗时，与 TUI 同一个格式', () => {
+    const store = createSessionStore({ provider: 'anthropic', model: 'glm' })
+    store.setMetrics({
+      tokens: { input: 1, output: 1, cacheRead: 0 },
+      cost: '—',
+      contextPercent: 1,
+      contextLevel: 'ok',
+      unpricedModels: [],
+      turnMs: 2_340,
+    })
+    expect(renderToStaticMarkup(<StatusBar status={store.$status.get()} />)).toContain('本轮 2.3s')
+  })
+
   test('还没有指标时不瞎编数字', () => {
     const html = renderToStaticMarkup(<StatusBar status={createSessionStore().$status.get()} />)
     expect(html).toContain('— tok')

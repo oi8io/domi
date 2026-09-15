@@ -36,6 +36,7 @@ export interface Metrics {
   /** 用了但价目表里没有的模型。有它才能在 UI 上说清「为什么是 —」 */
   unpricedModels: string[]
   toolCalls: number
+  /** 最近一轮用了多久。传了 now（这一轮还在跑）就算到 now */
   turnMs: number
   contextPercent: number
 }
@@ -78,16 +79,19 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
   let toolCalls = 0
   let cost = 0
   let priced = false
-  let firstTs: number | null = null
+  /** 本轮 = 最后一条用户输入开始（BUG-M3-003：以前算的是整个会话的跨度） */
+  let turnStart: number | null = null
   let lastTs = 0
 
   for (const env of events) {
     const ev: AnyEvent = env.ev
-    firstTs ??= env.ts
     lastTs = Math.max(lastTs, env.ts)
     if (!isKnownEvent(ev)) continue
 
     switch (ev.t) {
+      case 'user.input':
+        turnStart = env.ts
+        break
       case 'model.request':
         model = ev.model
         provider = ev.provider
@@ -126,7 +130,7 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
     costUsd: priced ? cost : null,
     unpricedModels: [...unpriced].sort(),
     toolCalls,
-    turnMs: firstTs === null ? 0 : Math.max(0, (opts.now ?? lastTs) - firstTs),
+    turnMs: turnStart === null ? 0 : Math.max(0, (opts.now ?? lastTs) - turnStart),
     contextPercent: max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0,
   }
 }
