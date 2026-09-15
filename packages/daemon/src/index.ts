@@ -1,4 +1,6 @@
 export * from './core.ts'
+export * from './launcher.ts'
 export * from './lock.ts'
+export { EXIT_LOCK_HELD, main as runDaemon } from './main.ts'
 export * from './runtime-host.ts'
 export * from './transport-ws.ts'

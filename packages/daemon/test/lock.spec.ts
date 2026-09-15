@@ -96,6 +96,18 @@ describe('崩溃留下的陈锁不该把人永远挡在外面', () => {
     expect(() => acquireLock(path, { pid: process.pid, port: 7777 })).toThrow(LockHeldError)
   })
 
+  test('锁文件一直是空的/坏的（写到一半就崩了）→ 过了宽限期当陈锁接管，而不是抛裸 EEXIST', () => {
+    // 并发拉起时，另一个进程刚 O_EXCL 建出文件、还没写内容，这时读到的也是空文件——
+    // 所以先等一小会儿再下结论；一直读不出内容，才说明写它的进程已经不在了
+    const path = tmp()
+    writeFileSync(path, '', 'utf8')
+    const started = Date.now()
+    const release = acquireLock(path, { pid: process.pid, port: 7777 })
+    expect(readLock(path)?.port).toBe(7777)
+    expect(Date.now() - started).toBeGreaterThanOrEqual(100)
+    release()
+  })
+
   test('锁文件内容坏了不至于让 daemon 起不来', () => {
     const path = tmp()
     writeFileSync(path, '这不是 JSON', 'utf8')

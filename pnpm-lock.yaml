@@ -196,9 +196,9 @@ importers:
       '@domi/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@domi/runtime':
+      '@domi/daemon':
         specifier: workspace:*
-        version: link:../../packages/runtime
+        version: link:../../packages/daemon
       '@nanostores/react':
         specifier: ^1.0.0
         version: 1.1.0(nanostores@1.5.3)(react@19.3.0)

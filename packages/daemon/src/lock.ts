@@ -23,6 +23,13 @@ export class LockHeldError extends Error {
   }
 }
 
+/** 锁文件读不出内容时，最多等这么久再下「写它的进程已经不在了」的结论 */
+const UNREADABLE_GRACE_MS = 150
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
 /** 抢锁。抢到返回释放函数；没抢到抛 LockHeldError 并带上持有者信息 */
 export function acquireLock(path: string, info: Omit<LockInfo, 'startedAt'>): () => void {
   const payload = JSON.stringify({ ...info, startedAt: Date.now() })
@@ -32,19 +39,24 @@ export function acquireLock(path: string, info: Omit<LockInfo, 'startedAt'>): ()
     writeFileSync(fd, payload, 'utf8')
     closeSync(fd)
   } catch (e) {
-    const held = readLock(path)
-    if (held && isAlive(held.pid)) throw new LockHeldError(held)
-    // 持有者已经死了 —— 这是**崩溃留下的陈锁**，不是竞争。清掉重来一次
-    if (held) {
-      try {
-        rmSync(path)
-      } catch {
-        // 删不掉就只能认输，让调用方看到原始错误
-        throw new LockHeldError(held)
-      }
-      return acquireLock(path, info)
+    if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+    // 读不出内容有两种可能：别人刚建出文件还没写完（并发拉起时很常见），
+    // 或者写到一半崩了。先等一小会儿，区分这两种
+    let held = readLock(path)
+    for (let waited = 0; held === null && waited < UNREADABLE_GRACE_MS; waited += 25) {
+      sleepSync(25)
+      held = readLock(path)
     }
-    throw e
+    if (held && isAlive(held.pid)) throw new LockHeldError(held)
+    // 持有者已经死了，或者锁文件一直是坏的 —— 这是**崩溃留下的陈锁**，不是竞争。清掉重来一次
+    try {
+      rmSync(path)
+    } catch (rmErr) {
+      // 删不掉就只能认输
+      if (held) throw new LockHeldError(held)
+      throw rmErr
+    }
+    return acquireLock(path, info)
   }
 
   let released = false

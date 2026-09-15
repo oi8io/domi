@@ -10,12 +10,12 @@
   "dependencies": {
     "@domi/client-core": "workspace:*",
     "@domi/config": "workspace:*",
-    "@domi/runtime": "workspace:*",
     "@nanostores/react": "^1.0.0",
     "ink": "^7.1.1",
     "nanostores": "^1.5.3",
     "react": "^19.3.0",
-    "@domi/cli": "workspace:*"
+    "@domi/cli": "workspace:*",
+    "@domi/daemon": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

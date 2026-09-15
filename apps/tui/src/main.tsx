@@ -1,37 +1,53 @@
 #!/usr/bin/env bun
 /**
- * domi TUI 入口 —— TASK-M0-020 / TASK-M0-021
+ * domi TUI 入口 —— TASK-M0-020 / TASK-M0-021 · M3 起是 daemon 的客户端（TASK-M3-006）
  *
  * INV-02：这个文件负责**接线与按键**，不负责业务。
- * 业务在 `@domi/runtime` 的 DomiSession 里，M3 拆 daemon 时它整体搬过去，
- * 这里换成协议代理，组件一行不用改。
+ * 业务在 domid 里（@domi/daemon → @domi/runtime），这里经 Domi Protocol 连过去；
+ * 组件一行没改——它们只认 client-core 的 store。
+ *
+ * 同一个可执行文件还有第二个角色：`DOMI_INTERNAL_ROLE=daemon` 时就是 domid 本身，
+ * 由 connect.ts 在需要时拉起（单二进制里没有别的文件可以跑）。
  *
  * ⚠️ `useInput` 在无 TTY 环境里没法自动验证（见 `docs/adr/001` 退路清单第 1 条）。
  * 它的判定点是在真终端里跑一次 `demos/m0-loop.md`。
  */
 import { homedir } from 'node:os'
-import { join } from 'node:path'
 import { formatOnboarding, type ParsedCli, parseCli, runCommand } from '@domi/cli'
-import { answerFromKey, createSessionStore, focusIdOf, type SessionStore, summarizeArgs } from '@domi/client-core'
+import { answerFromKey, type DomiClient, focusIdOf, type SessionStore } from '@domi/client-core'
 import { ConfigParseError, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
-import { DomiSession, type PendingAsk } from '@domi/runtime'
+import { useStore } from '@nanostores/react'
 import { Box, render, useApp, useInput } from 'ink'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { App } from './App.tsx'
 import { Prompt } from './components/Prompt.tsx'
+import { connectChat } from './connect.ts'
 
 const EXIT_CONFIG_ERROR = 2
+const EXIT_DAEMON_ERROR = 3
+const DAEMON_ROLE_ENV = 'DOMI_INTERNAL_ROLE'
 
-function Root({ store, session }: { store: SessionStore; session: DomiSession }): React.ReactElement {
+function Root({
+  store,
+  client,
+  sessionId,
+}: {
+  store: SessionStore
+  client: DomiClient
+  sessionId: string
+}): React.ReactElement {
   const { exit } = useApp()
   const [draft, setDraft] = useState('')
-  const [busy, setBusy] = useState(false)
-  const askRef = useRef<PendingAsk | null>(null)
+  // 提交到 daemon 回 accepted、再到第一条 busy 通知之间有个空档，这段时间也不许再提交
+  const [sending, setSending] = useState(false)
+  const status = useStore(store.$status)
+  const busy = sending || status.busy
 
   const quit = useCallback(() => {
-    // PRD-M0-005 AC-3：退出前把事件刷干净，否则最后一轮要靠 WAL 恢复
-    void session.flushAndClose().then(() => exit())
-  }, [session, exit])
+    // 只断开这个客户端。任务在 domid 里照常跑完——M3 DoD 要的就是这个
+    client.close()
+    exit()
+  }, [client, exit])
 
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
@@ -40,11 +56,12 @@ function Root({ store, session }: { store: SessionStore; session: DomiSession })
     }
 
     // 焦点在确认框时，按键只喂给确认框——别让用户以为自己在打字
-    if (focusIdOf(store.$ask.get()) === 'domi-confirm') {
+    const ask = store.$ask.get()
+    if (focusIdOf(ask) === 'domi-confirm') {
       const answer = answerFromKey(input, key)
-      if (answer === null) return
-      askRef.current?.answer(answer)
-      askRef.current = null
+      if (answer === null || !ask?.askId) return
+      // 不在这里关框：等 daemon 的 askDone，和别的客户端走同一条路
+      void client.answer(ask.askId, answer).catch(() => undefined)
       return
     }
 
@@ -53,11 +70,11 @@ function Root({ store, session }: { store: SessionStore; session: DomiSession })
       const text = draft.trim()
       if (text === '') return
       setDraft('')
-      setBusy(true)
-      // PRD-M2-003 AC-1 的手动触发。结果由 ctx.compact 事件自己显示在对话里，
-      // 这里不额外往界面塞东西——那会变成「只在 UI 里、事件流里没有」的状态
-      const run = text === '/compact' ? session.compactNow('manual') : session.submit(text)
-      void run.finally(() => setBusy(false))
+      setSending(true)
+      // PRD-M2-003 AC-1 的手动触发。结果由 ctx.compact 事件自己显示在对话里
+      const run =
+        text === '/compact' ? client.request('session.compact', { sessionId }) : client.submit(sessionId, text)
+      void run.catch(() => undefined).finally(() => setSending(false))
       return
     }
     if (key.backspace || key.delete) {
@@ -65,11 +82,6 @@ function Root({ store, session }: { store: SessionStore; session: DomiSession })
       return
     }
     if (input && !key.ctrl && !key.meta) setDraft((d) => d + input)
-  })
-
-  session.on('onAsk', (ask) => {
-    askRef.current = ask
-    store.setAsk(ask ? { capabilityId: ask.capabilityId, detail: summarizeArgs(ask.args) } : null)
   })
 
   return (
@@ -81,6 +93,14 @@ function Root({ store, session }: { store: SessionStore; session: DomiSession })
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  if (process.env[DAEMON_ROLE_ENV] === 'daemon') {
+    // 动态 import：普通的 domi 命令不必加载 daemon 那一整套
+    const { runDaemon } = await import('@domi/daemon')
+    const code = await runDaemon()
+    if (code !== 0) process.exit(code)
+    return
+  }
+
   const io = {
     out: (t: string) => {
       process.stdout.write(`${t}\n`)
@@ -106,7 +126,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   return startChat()
 }
 
-function startChat(): void {
+async function startChat(): Promise<void> {
   let config: ReturnType<typeof loadConfigOrThrow>
   try {
     config = loadConfigOrThrow()
@@ -122,18 +142,13 @@ function startChat(): void {
   }
 
   const cwd = process.cwd()
-  const session = new DomiSession({
-    config,
-    sessionId: `s-${Date.now()}`,
-    cwd,
-    dbPath: join(homedir(), '.domi', 'events.db'),
-  })
-  const store = createSessionStore({ model: config.model.name, provider: config.model.provider })
-  session.on('onEvents', (envs) => store.applyEvents(envs))
-  session.on('onBusy', (b) => store.setBusy(b))
-  session.on('onMetrics', (m) => store.setMetrics(m))
-
-  render(<Root store={store} session={session} />)
+  try {
+    const conn = await connectChat({ home: homedir(), cwd, model: config.model })
+    render(<Root store={conn.store} client={conn.client} sessionId={conn.sessionId} />)
+  } catch (e) {
+    process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`)
+    process.exit(EXIT_DAEMON_ERROR)
+  }
 }
 
 if (import.meta.main) void main()

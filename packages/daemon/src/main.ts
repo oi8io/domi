@@ -20,6 +20,10 @@ import { DEFAULT_PORT, serveWs } from './transport-ws.ts'
 
 export const EXIT_LOCK_HELD = 3
 
+/**
+ * 起 domid 并一直跑下去（直到 SIGINT / SIGTERM）。返回非 0 表示没起来。
+ * 单二进制里由 `DOMI_INTERNAL_ROLE=daemon domi` 调到这里（launcher.ts）。
+ */
 export async function main(env: Record<string, string | undefined> = process.env): Promise<number> {
   const home = join(env.HOME ?? homedir(), '.domi')
   mkdirSync(home, { recursive: true })
