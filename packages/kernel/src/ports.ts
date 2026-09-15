@@ -25,9 +25,10 @@ export interface ToolOutcome {
   ok: boolean
   payload: unknown
   /**
-   * 失败原因。loop 只特别对待两个值：
-   * - 'invalid_args' → 计入参数解析重试（PRD-M0-002 AC-3）
-   * - 'user_denied'  → 不是错误，是用户的决定（PRD-M0-003 AC-2）
+   * 失败原因。loop 只特别对待 'invalid_args'（计入参数解析重试，PRD-M0-002 AC-3）。
+   * 另外两个值有约定的含义，都不是错误、不计入重试：
+   * - 'user_denied'       → 用户当场拒绝（PRD-M0-003 AC-2）
+   * - 'permission_denied' → 权限规则或默认策略拒绝，没有人参与决定
    */
   reason?: string
   /**

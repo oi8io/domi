@@ -155,7 +155,8 @@ describe('PRD-M0-003 · 默认拒绝会真的挡住写入', () => {
 
     const res = events.find((e) => e.ev.t === 'tool.result')!.ev as Record<string, unknown>
     expect(res.ok).toBe(false)
-    expect(res.reason).toBe('user_denied')
+    // 没人点过拒绝：是默认策略拒的（BUG-M3-013 之前这里断言的是 user_denied）
+    expect(res.reason).toBe('permission_denied')
     expect(JSON.stringify(res.payload)).toContain('不要重试同一个调用')
 
     // 没有 fs.snapshot —— 工具压根没执行

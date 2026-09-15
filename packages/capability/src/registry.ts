@@ -3,7 +3,7 @@
  *
  * 这里是三件事的汇合点，顺序不能乱：
  *   1. 参数校验（失败 → invalid_args，回灌给模型重试，不是抛异常打断会话）
- *   2. 权限检查（每次都产生一条事件，INV-03；拒绝 → user_denied）
+ *   2. 权限检查（每次都产生一条事件，INV-03；用户拒绝 → user_denied，规则/默认拒绝 → permission_denied）
  *   3. 才是执行
  *
  * 权限检查放在参数校验**之后**是有意的：参数都没解析出来，确认框没法告诉用户
@@ -85,15 +85,19 @@ export class ToolRegistry {
     }
 
     if (decision.decision !== 'allow') {
+      const byUser = decision.source === 'user'
       return {
         ok: false,
-        reason: 'user_denied',
+        // PRD-M0-003 AC-2 的 user_denied 只给**用户当场拒绝**。规则拒绝、默认拒绝另起一个名字——
+        // 说成「用户拒绝了」，用户会以为自己误操作，模型会以为用户不想让它做（BUG-M3-013）
+        reason: byUser ? 'user_denied' : 'permission_denied',
         events: [permissionEvent],
-        // 给模型的是一句人话，不是异常——它需要知道"被拒了"并据此改计划
+        // 给模型的是一句人话，不是异常——它需要知道"被拒了"、被谁拒的，并据此改计划
         payload: {
-          message: `用户拒绝了 ${tool.capability}。不要重试同一个调用；换一种做法或询问用户。`,
+          message: denialMessage(tool.capability, decision.source, decision.matchedRule),
           capability: tool.capability,
           source: decision.source,
+          ...(decision.matchedRule === null ? {} : { rule: decision.matchedRule }),
         },
       }
     }
@@ -119,4 +123,20 @@ export class ToolRegistry {
       }
     }
   }
+}
+
+/** 拒绝说明：说清楚是谁拒的、要不要找用户。四种情况都让模型别原样重试 */
+export function denialMessage(capability: string, source: string, rule: string | null): string {
+  const noRetry = '不要重试同一个调用'
+  if (source === 'user') return `用户拒绝了 ${capability}。${noRetry}；换一种做法或询问用户。`
+  if (source === 'config') {
+    return `${capability} 被权限规则 "${rule}" 禁止（不是用户当场拒绝的）。${noRetry}；不用这个能力完成任务，或说明需要它的原因。`
+  }
+  if (rule !== null) {
+    return `${capability} 需要用户确认（规则 "${rule}"），但现在没有人可以确认，按拒绝处理。${noRetry}；稍后在交互界面里再试。`
+  }
+  return (
+    `${capability} 没有被任何权限规则允许，按默认拒绝处理（不是用户当场拒绝的）。${noRetry}。` +
+    `如果确实需要，告诉用户在 ~/.domi/config.yaml 的 permissions.rules 里加一条 capability: ${capability}（decision: allow 或 ask）。`
+  )
 }
