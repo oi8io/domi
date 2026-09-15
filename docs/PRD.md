@@ -6,6 +6,8 @@
 > 变更：v1.0 经两轮独立门禁审计后修订，见 `docs/qa/prd-gate-audit-v1.0.md`
 > **v1.2 回写**（触发：`docs/adr/003` 方向变更）——**原 45 条编号与 AC 全部保留不动**，仅追加 5 条新需求
 > （M1-011 步级快照 · M2-008 L1 回放评估 · M2-009 内置 MCP server · M5-007 聊天端桥接 · M6-005 L2 评估集）
+> **v1.4 回写**（2026-09-15，`docs/adr/014`）——用户拍板：配置文件由 TOML 改为 YAML（`~/.domi/config.yaml`）。
+> 只改四处 AC 里的**格式名**（M0-008 AC-1、M1-005 AC-3、M1-010 AC-1、M5-002 AC-1），断言的行为一条不变；旧 `config.toml` 过渡期内仍可读。
 > **v1.3.1 回写**（2026-09-14，`docs/spec/M2.md` 取舍-11）——M2-004 AC-1 的**语义（向量）检索**拆出，随 `docs/adr/010` 的时点在 M4 做；全文检索已交付。
 > **v1.3 回写**（2026-09-14，`docs/adr/011`）——用户拍板：MCP 暂时用不上，`PRD-M2-001` 与 `PRD-M2-009` 移入 M3。
 > M2 预算 19 → 14 天，M3 15 → 20 天，**合计不变**。AC 原文一个字没改。
@@ -178,7 +180,7 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 
 - **用户价值**：不用改代码就能填 API key，且 key 不会泄露到任何产物里。
 - **AC**
-  - AC-1：从 `~/.domi/config.toml` 与环境变量读取，环境变量优先（断言优先级）
+  - AC-1：从 `~/.domi/config.yaml` 与环境变量读取，环境变量优先（断言优先级）—— v1.4 回写：原为 `config.toml`，见 `docs/adr/014`
   - AC-2：**对全量事件流与日志输出做正则扫描，不存在 `sk-[A-Za-z0-9]{20,}` 等 5 类凭据模式**
   - AC-3：缺少凭据时退出码为 2，stderr 输出命中文案 key `error.missing_credential` 且不含 `at Object.<anonymous>` 等堆栈特征
 - **验收方式**：`bun test config/*.spec.ts`；AC-2 另由 `scripts/scan-secrets.ts` 在 CI 中对测试产生的全部 fixture 事件流扫描
@@ -228,7 +230,7 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 - **AC**
   - AC-1：提示词由带 `role` 与 `priority` 的层组成，拼装顺序完全由 priority 决定（给定乱序输入，断言输出顺序）
   - AC-2：每层声明 `cacheable`；**存在任一 cacheable 层排在非 cacheable 层之后时，构建期抛错**
-  - AC-3：用户可在 `config.toml` 中覆盖或追加层，不改代码即生效（断言配置注入的层出现在 dump 中）
+  - AC-3：用户可在 `config.yaml` 中覆盖或追加层，不改代码即生效（断言配置注入的层出现在 dump 中）—— v1.4 回写：原为 `config.toml`
   - AC-4：`domi prompt dump` 输出最终拼装结果，含各层 id、边界标记与 token 数
 - **验收方式**：`bun test prompt/layering.spec.ts`；AC-2 同时由类型系统（编译期）与运行时断言双重保证
 - **层级**：Negotiable · **优先级**：P0
@@ -304,7 +306,7 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 
 - **用户价值**：本地优先意味着数据在你手里——包括随时全部拿走或删掉的权利。
 - **AC**
-  - AC-1：`domi data export` 导出全部会话事件流与配置为单个归档，格式为可自行解析的 JSONL + TOML（无私有二进制）
+  - AC-1：`domi data export` 导出全部会话事件流与配置为单个归档，格式为可自行解析的 JSONL + YAML（无私有二进制）—— v1.4 回写：原为 TOML
   - AC-2：`domi data purge` 清空 `~/.domi/`；执行前列出将删除的目录与总大小，需输入确认词
   - AC-3：purge 后文件系统中 `~/.domi` 下无残留（断言目录为空或不存在）
   - AC-4：domi 运行期间**不向 `~/.domi/` 与当前工作目录以外的位置写文件**（断言方式：在测试中监控写入路径）
@@ -598,7 +600,7 @@ AC 原文不变（`docs/adr/011`）。进入 M3 的批准门上必须重新过�
 
 ### PRD-M5-002 · DAG 编排
 - **AC**
-  - AC-1：节点类型为 `agent-step` / `tool` / `sub-agent` / `human-approval` 四种，以 TOML 配置定义
+  - AC-1：节点类型为 `agent-step` / `tool` / `sub-agent` / `human-approval` 四种，以 YAML 配置定义（v1.4 回写：原为 TOML，与主配置同一种格式）
   - AC-2：配置经 zod 校验；环依赖在加载期报错（断言含环的配置无法加载）
   - AC-3：执行状态持久化在事件流；任意时刻可查询各节点状态
   - AC-4：失败节点可单独重试，不重跑已完成节点
