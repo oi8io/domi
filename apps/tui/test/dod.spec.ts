@@ -85,7 +85,7 @@ describe('M3 DoD', () => {
     const h = home()
     // openai-compatible 默认不声明工具调用（fail-closed）；这个假网关「支持」，显式打开
     mkdirSync(join(h, '.domi'), { recursive: true })
-    writeFileSync(join(h, '.domi', 'config.toml'), '[model.capabilities]\ntoolCall = true\n', 'utf8')
+    writeFileSync(join(h, '.domi', 'config.yaml'), 'model:\n  capabilities:\n    toolCall: true\n', 'utf8')
     const env = {
       PATH: process.env.PATH ?? '',
       DOMI_PORT: '0',

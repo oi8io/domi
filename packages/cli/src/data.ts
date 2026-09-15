@@ -2,12 +2,14 @@
  * domi data export / purge —— PRD-M1-010 · INV-11
  *
  * 「本地优先」如果不包含「随时全部拿走或删掉」，那只是「数据在你机器上」而已。
- * 所以导出格式必须是**能自己解析的**（JSONL + TOML），不留私有二进制；
+ * 所以导出格式必须是**能自己解析的**（JSONL + YAML），不留私有二进制；
  * purge 必须先把要删什么摆出来。
  */
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { type ConfigSource, readConfigFile } from '@domi/config'
 import type { SqliteEventLog } from '@domi/store'
+import { CONFIG_TEMPLATE } from './args.ts'
 
 export interface ExportResult {
   dir: string
@@ -16,7 +18,7 @@ export interface ExportResult {
   events: number
 }
 
-export async function exportAll(log: SqliteEventLog, outDir: string, configToml: string): Promise<ExportResult> {
+export async function exportAll(log: SqliteEventLog, outDir: string, configYaml: string): Promise<ExportResult> {
   mkdirSync(outDir, { recursive: true })
   const sessions = log.sessions.list({ includeDeleted: true, limit: 100_000 })
 
@@ -36,11 +38,29 @@ export async function exportAll(log: SqliteEventLog, outDir: string, configToml:
   writeFileSync(index, `${sessions.map((s) => JSON.stringify(s)).join('\n')}\n`, 'utf8')
   files.push(index)
 
-  const cfg = join(outDir, 'config.toml')
-  writeFileSync(cfg, configToml, 'utf8')
+  const cfg = join(outDir, 'config.yaml')
+  writeFileSync(cfg, configYaml, 'utf8')
   files.push(cfg)
 
   return { dir: outDir, files, sessions: sessions.length, events }
+}
+
+/**
+ * 要导出的配置文本 —— BUG-M3-011：原来导出的是**模板**，不是用户自己的配置。
+ * 读用户的配置文件（新旧格式都行），去掉 api_key，统一成 YAML。
+ * 注释带不过来：重新序列化只保留结构。还没有配置文件时导出模板。
+ */
+export function exportableConfig(src: ConfigSource): string {
+  if (!src.exists) return CONFIG_TEMPLATE
+  return toYamlWithoutSecrets(readConfigFile(src), `# 导出自 ${src.path}（已去掉密钥；原文件的注释没有带过来）`)
+}
+
+/** 结构原样转成 YAML，去掉 model.api_key。迁移与导出共用 */
+export function toYamlWithoutSecrets(config: Record<string, unknown>, header: string, keepSecrets = false): string {
+  const copy = structuredClone(config)
+  const model = copy.model as Record<string, unknown> | undefined
+  if (!keepSecrets && model && 'api_key' in model) delete model.api_key
+  return `${header}\n${Bun.YAML.stringify(copy, null, 2).replace(/: \n/g, ':\n')}\n`
 }
 
 export interface PurgePlan {

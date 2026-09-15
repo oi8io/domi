@@ -15,8 +15,8 @@ CI 里的端到端测试用的是真 SQLite、真权限引擎、真文件系统�
 ## 准备
 
 **拿不到 Anthropic 官方 key 也能跑。** 只要网关说的是 Anthropic 协议，
-`provider = "anthropic"` + `base_url` 指到网关即可——能力矩阵认的是**协议**，不是域名。
-（本地模型走 `provider = "openai-compatible"`。）
+`provider: anthropic` + `base_url` 指到网关即可——能力矩阵认的是**协议**，不是域名。
+（本地模型填任意别的 provider 名字，按 openai-compatible 处理；要用工具的话打开 `capabilities.toolCall`。）
 
 ```bash
 # 走自建网关 / 兼容端点
@@ -32,27 +32,24 @@ cat > test.sh <<'SH'
 grep -q "a + b" sum.js && echo PASS || { echo FAIL; exit 1; }
 SH
 
-mkdir -p ~/.domi && cat > ~/.domi/config.toml <<'TOML'
-[model]
-provider = "anthropic"                    # 说的是协议，不是域名
-name = "claude-sonnet-4-5"                # 网关上的模型名，按你的网关填
-# base_url = "https://你的网关/v1"          # 也可以用 DOMI_BASE_URL 环境变量
+mkdir -p ~/.domi && cat > ~/.domi/config.yaml <<'YAML'
+model:
+  provider: anthropic                     # 说的是协议，不是域名
+  name: claude-sonnet-4-5                # 网关上的模型名，按你的网关填
+  # base_url: https://你的网关            # 也可以用 DOMI_BASE_URL；带不带 /v1 都行
 
-[[permissions.rules]]
-name = "allow-read"
-capability = "fs.read"
-decision = "allow"
-
-[[permissions.rules]]
-name = "confirm-write"
-capability = "fs.write"
-decision = "ask"
-
-[[permissions.rules]]
-name = "confirm-shell"
-capability = "shell.exec"
-decision = "ask"
-TOML
+permissions:
+  rules:
+    - name: allow-read
+      capability: fs.read
+      decision: allow
+    - name: confirm-write
+      capability: fs.write
+      decision: ask
+    - name: confirm-shell
+      capability: shell.exec
+      decision: ask
+YAML
 ```
 
 **先跑一次自检**，它会把三种失败区分开——这一步能省掉大部分「为什么连不上」的猜测：

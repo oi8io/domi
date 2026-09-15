@@ -10,12 +10,19 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { ShadowRepo } from '@domi/checkpoint'
-import { configPath, credentialEnvNames, loadConfig } from '@domi/config'
+import { configSource, credentialEnvNames, loadConfig, readConfigFile } from '@domi/config'
 import { buildManifest, formatManifest } from '@domi/observability'
 import { assemble, BUILTIN_LAYERS, formatDump, layersFromConfig, mergeLayers } from '@domi/prompt'
 import { formatAbsolute, formatMigrate, formatRelative, migrateDatabase, SqliteEventLog } from '@domi/store'
 import { CONFIG_TEMPLATE, HELP, type ParsedCli } from './args.ts'
-import { exportAll, formatPurgePlan, PURGE_CONFIRM_WORD, planPurge } from './data.ts'
+import {
+  exportAll,
+  exportableConfig,
+  formatPurgePlan,
+  PURGE_CONFIRM_WORD,
+  planPurge,
+  toYamlWithoutSecrets,
+} from './data.ts'
 import { diagnose, formatFindings } from './doctor.ts'
 import { formatOnboarding } from './onboarding.ts'
 import { ping } from './ping.ts'
@@ -27,9 +34,13 @@ export interface Io {
   err(s: string): void
 }
 
+/** 先看 HOME：os.homedir() 在 Bun 里不跟随运行期对 HOME 的修改，测试与「换个 HOME 跑一次」都靠这个 */
+function userHome(): string {
+  return process.env.HOME || homedir()
+}
+
 export function dataDir(): string {
-  // 先看 HOME：os.homedir() 在 Bun 里不跟随运行期对 HOME 的修改，测试与「换个 HOME 跑一次」都靠这个
-  return join(process.env.HOME || homedir(), '.domi')
+  return join(userHome(), '.domi')
 }
 
 export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
@@ -68,12 +79,33 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       return runTrace(cli.sub, cli.flags.html, io)
     }
 
-    case 'init':
-      io.out(CONFIG_TEMPLATE)
+    case 'init': {
+      if (!cli.flags.fromToml) {
+        io.out(CONFIG_TEMPLATE)
+        return 0
+      }
+      // ADR-014 的迁移：结构原样搬过去，api_key 也保留（这是用户自己的文件，不是导出）
+      const legacy = join(dataDir(), 'config.toml')
+      const src = configSource({ path: legacy })
+      if (!src.exists) {
+        io.err(`没有找到 ${legacy}，不需要迁移。\n$ domi init > ${join(dataDir(), 'config.yaml')}   # 从模板开始`)
+        return 1
+      }
+      io.out(
+        toYamlWithoutSecrets(
+          readConfigFile(src),
+          `# 由 ${legacy} 转换而来（domi init --from-toml）。原文件的注释没法带过来，需要的话对照着补。`,
+          true,
+        ),
+      )
       return 0
+    }
 
     case 'doctor': {
-      const cfg = loadConfig()
+      const home = userHome()
+      const cfg = loadConfig({ home })
+      const src = configSource({ home })
+      const legacyPath = src.legacy ? src.path : src.ignoredLegacy
       const pingResult = cli.flags.ping
         ? await ping({
             provider: cfg.model.provider,
@@ -83,7 +115,8 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
           })
         : undefined
       const findings = diagnose({
-        configPath: configPath(),
+        configPath: src.path,
+        legacyConfig: legacyPath ? { path: legacyPath, ignored: !src.legacy } : undefined,
         baseUrl: cfg.model.baseUrl,
         ping: pingResult,
         hasCredential: Boolean(cfg.model.apiKey),
@@ -98,7 +131,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
     }
 
     case 'prompt': {
-      const cfg = loadConfig()
+      const cfg = loadConfig({ home: userHome() })
       const custom = layersFromConfig([])
       const a = assemble(mergeLayers(BUILTIN_LAYERS, custom), { cwd: process.cwd(), model: cfg.model.name })
       io.out(formatDump(a))
@@ -149,7 +182,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         }
         const log = new SqliteEventLog({ path: join(dataDir(), 'events.db'), cwd: process.cwd() })
         try {
-          const r = await exportAll(log, out, CONFIG_TEMPLATE)
+          const r = await exportAll(log, out, exportableConfig(configSource({ home: userHome() })))
           io.out(`导出了 ${r.sessions} 个会话、${r.events} 条事件到 ${r.dir}`)
           return 0
         } finally {

@@ -6,12 +6,14 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { configSource, loadConfig } from '@domi/config'
 import { SqliteEventLog } from '@domi/store'
 import {
   CONFIG_TEMPLATE,
   type Command,
   diagnose,
   exportAll,
+  exportableConfig,
   formatFindings,
   formatOnboarding,
   formatPurgePlan,
@@ -34,7 +36,7 @@ function tmp(): string {
 }
 
 const BASE = {
-  configPath: '/nonexistent/config.toml',
+  configPath: '/nonexistent/config.yaml',
   hasCredential: false,
   credentialEnvNames: ['DOMI_API_KEY', 'ANTHROPIC_API_KEY'],
   dataDir: '/tmp',
@@ -62,16 +64,33 @@ describe('AC-4 · doctor 的每条问题都带可执行命令', () => {
 
   test('一切正常时不编造问题', () => {
     const dir = tmp()
-    writeFileSync(join(dir, 'config.toml'), CONFIG_TEMPLATE)
+    writeFileSync(join(dir, 'config.yaml'), CONFIG_TEMPLATE)
     const findings = diagnose({
       ...BASE,
-      configPath: join(dir, 'config.toml'),
+      configPath: join(dir, 'config.yaml'),
       hasCredential: true,
       gitAvailable: true,
       dataDir: dir,
     })
     expect(findings.every((f) => f.ok)).toBe(true)
     expect(formatFindings(findings)).toContain('一切正常')
+  })
+
+  test('ADR-014 · 还在用旧的 config.toml → 给出迁移命令', () => {
+    const f = diagnose({ ...BASE, legacyConfig: { path: '/h/.domi/config.toml', ignored: false } }).find((x) =>
+      x.title.includes('TOML'),
+    )!
+    expect(f.ok).toBe(false)
+    expect(f.fix).toBe('$ domi init --from-toml > /h/.domi/config.yaml')
+  })
+
+  test('ADR-014 · YAML 与旧 TOML 都在 → 说清楚 TOML 已被忽略', () => {
+    const f = diagnose({ ...BASE, legacyConfig: { path: '/h/.domi/config.toml', ignored: true } }).find((x) =>
+      x.title.includes('TOML'),
+    )!
+    expect(f.ok).toBe(false)
+    expect(f.detail).toContain('被忽略')
+    expect(f.fix).toMatch(/^\$ /)
   })
 
   test('git 缺失时说清楚「仍能跑，但没有安全网」', () => {
@@ -129,7 +148,15 @@ describe('命令面', () => {
 })
 
 describe('PRD-M1-010 · 导出与清除', () => {
-  test('AC-1 · 导出是 JSONL + TOML，没有私有二进制', async () => {
+  test('配置模板本身就是合法配置（YAML，ADR-014）', () => {
+    const dir = tmp()
+    writeFileSync(join(dir, 'config.yaml'), CONFIG_TEMPLATE)
+    const cfg = loadConfig({ path: join(dir, 'config.yaml'), env: {} })
+    expect(cfg.model.provider).toBe('anthropic')
+    expect(cfg.permissions.rules.map((r) => r.name)).toContain('confirm-shell')
+  })
+
+  test('AC-1 · 导出是 JSONL + YAML，没有私有二进制', async () => {
     const dbDir = tmp()
     const log = new SqliteEventLog({ path: join(dbDir, 'e.db'), cwd: '/tmp/w' })
     await log.append('a', [{ t: 'user.input', text: '你好' }])
@@ -141,11 +168,28 @@ describe('PRD-M1-010 · 导出与清除', () => {
 
     expect(r.sessions).toBe(2)
     expect(r.events).toBe(2)
-    expect(r.files.every((f) => f.endsWith('.jsonl') || f.endsWith('.toml'))).toBe(true)
+    expect(r.files.every((f) => f.endsWith('.jsonl') || f.endsWith('.yaml'))).toBe(true)
     // 导出的东西必须能被别的工具直接读
     const line = readFileSync(join(out, 'session-a.jsonl'), 'utf8').split('\n')[0] as string
     expect(() => JSON.parse(line)).not.toThrow()
-    expect(readFileSync(join(out, 'config.toml'), 'utf8')).toContain('[model]')
+    expect(readFileSync(join(out, 'config.yaml'), 'utf8')).toContain('model:')
+  })
+
+  test('BUG-M3-011 · 导出的是你自己的配置（不是模板），且不带 api_key', () => {
+    const dir = tmp()
+    writeFileSync(
+      join(dir, 'config.yaml'),
+      'model:\n  provider: anthropic\n  name: glm-mine\n  api_key: sk-ant-should-not-leave-0123456789\n',
+    )
+    const text = exportableConfig(configSource({ path: join(dir, 'config.yaml'), env: {} }))
+    expect(text).toContain('glm-mine')
+    expect(text).not.toContain('sk-ant-should-not-leave')
+    expect(text).not.toContain('api_key')
+  })
+
+  test('BUG-M3-011 · 还没有配置文件时导出模板', () => {
+    const text = exportableConfig(configSource({ path: join(tmp(), 'none.yaml'), env: {} }))
+    expect(text).toBe(CONFIG_TEMPLATE)
   })
 
   test('AC-1 · 软删除的会话也导出 —— 「全部拿走」就是全部', async () => {

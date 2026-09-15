@@ -90,7 +90,7 @@ describe('把一句笼统的失败翻译成「是哪一环」', () => {
 
 describe('doctor 把 ping 结果并进体检报告', () => {
   const input = {
-    configPath: '/nonexistent/config.toml',
+    configPath: '/nonexistent/config.yaml',
     hasCredential: true,
     credentialEnvNames: ['DOMI_API_KEY'],
     dataDir: '/tmp',

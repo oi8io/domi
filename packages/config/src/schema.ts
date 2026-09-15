@@ -1,7 +1,7 @@
 /**
  * 配置契约 —— PRD-M0-008 · SPEC-M0-009
  *
- * TOML 解析用 Bun 内置的 `Bun.TOML.parse`，不引第三方库（`PRD-VISION.md` §6 第一类的反面：
+ * 配置文件是 YAML（docs/adr/014），解析用 Bun 内置的 `Bun.YAML`，不引第三方库（`PRD-VISION.md` §6 第一类的反面：
  * 内置的就够用时，引库只是多一个要跟版本的东西）。
  */
 import { z } from 'zod'
@@ -25,7 +25,7 @@ export const ConfigSchema = z.object({
     apiKey: z.string().optional(),
     /**
      * 能力矩阵的显式覆盖（PRD-M1-001 AC-2）。openai-compatible 默认全关（fail-closed），
-     * 后面挂的模型其实支持工具调用的话，在 [model.capabilities] 里打开
+     * 后面挂的模型其实支持工具调用的话，在 model.capabilities 里打开
      */
     capabilities: z
       .object({

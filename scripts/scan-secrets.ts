@@ -11,7 +11,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { CREDENTIAL_PATTERNS } from '@domi/store'
 
-const SCAN_EXT = new Set(['.jsonl', '.json', '.md', '.toml', '.txt', '.log'])
+const SCAN_EXT = new Set(['.jsonl', '.json', '.md', '.yaml', '.yml', '.toml', '.txt', '.log'])
 
 function collect(root: string): string[] {
   const out: string[] = []

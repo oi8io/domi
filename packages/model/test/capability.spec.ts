@@ -117,7 +117,7 @@ describe('AC-3 · 在发出 HTTP 请求之前抛错', () => {
       assertCapability('openai-compatible', CAPABILITIES['openai-compatible'], 'structuredOutput')
       throw new Error('should throw')
     } catch (e) {
-      expect((e as Error).message).toContain('config.toml')
+      expect((e as Error).message).toContain('config.yaml')
     }
   })
 })

@@ -44,7 +44,7 @@ export class UnsupportedCapabilityError extends Error {
   ) {
     super(
       `error.unsupported_capability: provider "${provider}" 未声明支持 ${capability}。\n` +
-        `若它其实支持（常见于 openai-compatible 网关），在 config.toml 的 [model.capabilities] 里显式打开。`,
+        `若它其实支持（常见于 openai-compatible 网关），在 ~/.domi/config.yaml 的 model.capabilities 里显式打开（例如 toolCall: true）。`,
     )
     this.name = 'UnsupportedCapabilityError'
   }

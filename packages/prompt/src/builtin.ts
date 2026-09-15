@@ -92,7 +92,7 @@ export interface ConfigLayerSpec {
   text: string
 }
 
-/** 把 config.toml 里的 [[prompt.layers]] 变成层。不改代码即生效（AC-3） */
+/** 把 config.yaml 里的 prompt.layers 变成层。不改代码即生效（AC-3） */
 export function layersFromConfig(specs: readonly ConfigLayerSpec[]): PromptLayer[] {
   return specs.map((s) => ({
     id: s.id,

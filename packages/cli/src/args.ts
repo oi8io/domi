@@ -32,6 +32,8 @@ export interface ParsedCli {
     json: boolean
     yes: boolean
     ping: boolean
+    /** `domi init --from-toml`：迁移旧配置（ADR-014） */
+    fromToml: boolean
     /** `domi trace <id> --html <路径>`；带值的选项必须在这里声明，
      * 否则 strict:false 会把它当布尔，路径掉进 positionals 里（这个坑踩过一次） */
     html: string | undefined
@@ -57,6 +59,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       yes: { type: 'boolean', short: 'y' },
       ping: { type: 'boolean' },
       html: { type: 'string' },
+      'from-toml': { type: 'boolean' },
     },
   })
 
@@ -75,6 +78,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       json: Boolean(values.json),
       yes: Boolean(values.yes),
       ping: Boolean(values.ping),
+      fromToml: Boolean(values['from-toml']),
       html: typeof values.html === 'string' ? values.html : undefined,
     },
   }
@@ -86,10 +90,11 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi                      进入对话（最常用，不需要子命令）
   domi doctor               体检；每条问题都给一条可直接粘贴执行的命令
   domi doctor --ping        额外发一次真实请求，区分「key 不对 / 网关没通 / 模型名错」
-  domi init                 打印一份 config.toml 模板
+  domi init                 打印一份 config.yaml 模板
+  domi init --from-toml     把旧的 config.toml 换成 YAML 打印出来（注释带不过来）
   domi session list         列出会话
   domi session restore <id> 恢复软删除的会话
-  domi data export <目录>    导出全部事件流与配置（JSONL + TOML，无私有格式）
+  domi data export <目录>    导出全部事件流与配置（JSONL + YAML，无私有格式）
   domi data purge           清空 ~/.domi（需要输入确认词）
   domi prompt dump          打印最终拼装的提示词与稳定前缀边界
   domi report-bug           打包日志（打包前会列出清单让你确认）
@@ -110,39 +115,40 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   -y, --yes       跳过确认（purge 不吃这一套）
 `
 
-export const CONFIG_TEMPLATE = `# domi 配置。环境变量优先于本文件。
-[model]
-provider = "anthropic"        # anthropic / openai / google / openai-compatible
-name = "claude-sonnet-4-5"
-# base_url = "http://localhost:11434/v1"   # 本地模型或网关
-# api_key = "..."                          # 建议用环境变量代替
+export const CONFIG_TEMPLATE = `# domi 配置（YAML，docs/adr/014）。环境变量优先于本文件。
+# 放在 ~/.domi/config.yaml
+model:
+  provider: anthropic           # anthropic / openai / google；其它名字一律按 openai-compatible
+  name: claude-sonnet-4-5
+  # base_url: https://api.z.ai/api/anthropic   # 网关；anthropic 协议带不带 /v1 都行
+  # api_key: ...                               # 建议用环境变量 DOMI_API_KEY 代替
+  # capabilities:                              # openai-compatible 默认全关，网关支持的话在这里打开
+  #   toolCall: true
 
-[context]
-maxTokens = 150000
-includeReasoning = false
-strategy = "full"             # full / clean（确定性清理，见 docs/adr/005 与 PRD-M2-002）
+context:
+  maxTokens: 150000
+  includeReasoning: false
+  strategy: full                # full / clean（确定性清理，见 docs/adr/005 与 PRD-M2-002）
 
 # 权限默认拒绝。没在这里出现的能力一律不放行。
-[[permissions.rules]]
-name = "allow-read"
-capability = "fs.read"
-decision = "allow"
+permissions:
+  rules:
+    - name: allow-read
+      capability: fs.read
+      decision: allow
 
-[[permissions.rules]]
-name = "confirm-write"
-capability = "fs.write"
-decision = "ask"
+    - name: confirm-write
+      capability: fs.write
+      decision: ask
 
-[[permissions.rules]]
-name = "confirm-shell"
-capability = "shell.exec"
-decision = "ask"
+    - name: confirm-shell
+      capability: shell.exec
+      decision: ask
 
-# 跨会话检索（PRD-M2-004）。它是读操作，但**历史里有你的原话**，
-# 所以「能不能翻旧账」由这条规则说了算，而不是由「它是读操作」说了算。
-# 删掉这条 = 默认拒绝，domi 就不会去翻历史了
-[[permissions.rules]]
-name = "allow-memory-search"
-capability = "memory.search"
-decision = "allow"
+    # 跨会话检索（PRD-M2-004）。它是读操作，但**历史里有你的原话**，
+    # 所以「能不能翻旧账」由这条规则说了算，而不是由「它是读操作」说了算。
+    # 删掉这条 = 默认拒绝，domi 就不会去翻历史了
+    - name: allow-memory-search
+      capability: memory.search
+      decision: allow
 `

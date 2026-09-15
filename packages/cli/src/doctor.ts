@@ -28,6 +28,8 @@ export interface DoctorInput {
   model: string
   /** 自定义网关地址。拿不到官方 key 时这是主路径，不是边缘场景 */
   baseUrl?: string | undefined
+  /** 旧格式配置（ADR-014 过渡期）。ignored = 同时有 YAML，这个 TOML 没被读 */
+  legacyConfig?: { path: string; ignored: boolean } | undefined
   /** --ping 的结果；没跑就是 undefined */
   ping?: PingResult | undefined
 }
@@ -51,6 +53,26 @@ export function diagnose(input: DoctorInput): Finding[] {
           fix: `$ mkdir -p ${dirname(input.configPath)} && domi init > ${input.configPath}`,
         },
   )
+
+  if (input.legacyConfig) {
+    const { path, ignored } = input.legacyConfig
+    const yamlPath = path.replace(/\.toml$/, '.yaml')
+    out.push(
+      ignored
+        ? {
+            ok: false,
+            title: '旧的 TOML 配置被忽略了',
+            detail: `已经有 YAML 配置，${path} 已被忽略（docs/adr/014）。确认 YAML 里该有的都有了，就可以删掉它。`,
+            fix: `$ rm ${path}`,
+          }
+        : {
+            ok: false,
+            title: '还在用旧的 TOML 配置',
+            detail: `${path} 现在还能读，但配置格式已改为 YAML（docs/adr/014），TOML 的支持会在 M4 去掉。`,
+            fix: `$ domi init --from-toml > ${yamlPath}`,
+          },
+    )
+  }
 
   out.push(
     input.hasCredential
