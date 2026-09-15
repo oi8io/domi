@@ -37,6 +37,7 @@ import {
   type ModelProvider,
   StructuredOutputError,
 } from '@domi/model'
+import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers } from '@domi/prompt'
 import type { EventEnvelope, RefLink } from '@domi/protocol'
 import { z } from 'zod'
 
@@ -443,6 +444,21 @@ export class DomiSession {
     return out
   }
 
+  /**
+   * 这一轮发给模型的提示词（BUG-M3-015 / BUG-M3-012）：内置层 + 配置里的层，同 id 覆盖。
+   * 每轮现拼（便宜），换了模型也跟着变；cache 边界不合法时 assemble 当场抛错
+   */
+  private prompt(): { system: string; dynamic: string } {
+    const layers = mergeLayers(BUILTIN_LAYERS, layersFromConfig(this.opts.config.prompt.layers))
+    const a = assemble(layers, { cwd: this.opts.cwd, model: this.currentModel })
+    const text = (role: 'system' | 'user'): string =>
+      a.messages
+        .filter((m) => m.role === role)
+        .map((m) => (m as { content: string }).content)
+        .join('\n\n')
+    return { system: text('system'), dynamic: text('user') }
+  }
+
   /** 按链接读出被引用的那一段（对方会话的视图编号） */
   private async readRef(ref: RefLink): Promise<EventEnvelope[]> {
     const all = await this.log.readLineage(ref.sessionId)
@@ -474,6 +490,7 @@ export class DomiSession {
           policy,
           model: this.currentModel,
           refs: { resolve: (ref) => this.readRef(ref) },
+          prompt: this.prompt(),
         },
         this.opts.sessionId,
         opts.refs && opts.refs.length > 0 ? { text, refs: opts.refs } : text,

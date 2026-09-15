@@ -132,7 +132,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
 
     case 'prompt': {
       const cfg = loadConfig({ home: userHome() })
-      const custom = layersFromConfig([])
+      const custom = layersFromConfig(cfg.prompt.layers)
       const a = assemble(mergeLayers(BUILTIN_LAYERS, custom), { cwd: process.cwd(), model: cfg.model.name })
       io.out(formatDump(a))
       return 0

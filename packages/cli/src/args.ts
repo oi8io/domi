@@ -188,6 +188,12 @@ mcp:
     # - name: docs
     #   url: https://mcp.example.com/mcp
 
+# 自定义提示词层（domi prompt dump 可以看拼装结果）。同 id 覆盖内置层，比如 builtin.conventions
+# prompt:
+#   layers:
+#     - id: my.style
+#       text: 回答要短，先给结论。
+
 # domid 监听在哪（docs/adr/017）。默认只有本机能连，不用改。
 # 要从别的机器连（domi --connect ws://这台机器:7437），把 host 改成 0.0.0.0：
 # 这时必须有 token——不写的话 domid 会生成一个放进 ~/.domi/daemon.token

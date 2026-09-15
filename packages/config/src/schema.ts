@@ -80,6 +80,27 @@ export const ConfigSchema = z.object({
   permissions: z.object({ rules: z.array(PermissionRuleSchema).default([]) }).default({ rules: [] }),
   mcp: McpConfigSchema,
   /**
+   * 自定义提示词层（PRD-M1-003 AC-3 · BUG-M3-012）。同 id 覆盖内置层（builtin.identity 之类），
+   * 其余按 priority 插进去；不写 priority 落在 500（内置层之后、工作区信息之前）
+   */
+  prompt: z
+    .object({
+      layers: z
+        .array(
+          z
+            .object({
+              id: z.string().min(1),
+              text: z.string(),
+              role: z.enum(['system', 'user']).optional(),
+              priority: z.number().int().optional(),
+              cacheable: z.boolean().optional(),
+            })
+            .strict(),
+        )
+        .default([]),
+    })
+    .default({ layers: [] }),
+  /**
    * domid 监听在哪（PRD-M3-006 · INV-11）。默认只有本机能连。
    * host 不是回环地址时**必须**有 token：没写就由 domid 生成一个存进 ~/.domi/daemon.token。
    * 环境变量 DOMI_HOST / DOMI_PORT / DOMI_TOKEN 优先

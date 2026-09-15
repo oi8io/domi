@@ -312,4 +312,16 @@ mcp:
       }),
     ).toThrow(/重名/)
   })
+
+  test('BUG-M3-012 · prompt.layers：不写就是空；写了按字段校验', () => {
+    expect(loadConfig({ home: home(YAML), env: {} }).prompt).toEqual({ layers: [] })
+    const cfg = loadConfig({
+      home: home('prompt:\n  layers:\n    - id: my.style\n      text: 回答要短\n      priority: 550\n'),
+      env: {},
+    })
+    expect(cfg.prompt.layers).toEqual([{ id: 'my.style', text: '回答要短', priority: 550 }])
+    expect(() =>
+      loadConfig({ home: home('prompt:\n  layers:\n    - id: x\n      text: y\n      role: assistant\n'), env: {} }),
+    ).toThrow(ConfigParseError)
+  })
 })

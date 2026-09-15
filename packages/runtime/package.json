@@ -12,6 +12,7 @@
     "@domi/config": "workspace:*",
     "@domi/kernel": "workspace:*",
     "@domi/model": "workspace:*",
+    "@domi/prompt": "workspace:*",
     "@domi/protocol": "workspace:*",
     "@domi/store": "workspace:*",
     "zod": "^4.6.5",

@@ -13,6 +13,7 @@
 import type { DomiEvent, EventEnvelope, RefLink } from '@domi/protocol'
 import { buildContext, type ContextPolicy } from './build-context.ts'
 import type { Clock, EventSink, ToolCallRequest, ToolRunner } from './ports.ts'
+import { type PromptParts, withPrompt } from './preamble.ts'
 import { notRunResult } from './recovery.ts'
 import { type RefResolver, refKey } from './refs.ts'
 
@@ -55,6 +56,8 @@ export interface LoopDeps {
   providerOptions?: Record<string, unknown>
   /** 跨会话引用的读取端口（PRD-M3-005）。事件流里有 ctx.ref 时用它把内容读出来 */
   refs?: RefResolver
+  /** 拼好的提示词（BUG-M3-015）。不给就只发对话本身（回放与大部分单测走这条） */
+  prompt?: PromptParts
 }
 
 /** 一次用户输入。refs 是这句话引用的其他会话片段 */
@@ -135,7 +138,8 @@ export async function runTurn(
         if (got !== undefined) resolved.set(key, got)
       }
     }
-    const messages = buildContext(events, resolved.size > 0 ? { ...deps.policy, refs: resolved } : deps.policy)
+    const history = buildContext(events, resolved.size > 0 ? { ...deps.policy, refs: resolved } : deps.policy)
+    const messages = deps.prompt ? withPrompt(history, deps.prompt) : history
 
     const pending: ToolCallRequest[] = []
     const produced: DomiEvent[] = []

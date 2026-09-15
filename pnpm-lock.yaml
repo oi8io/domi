@@ -470,6 +470,9 @@ importers:
       '@domi/model':
         specifier: workspace:*
         version: link:../model
+      '@domi/prompt':
+        specifier: workspace:*
+        version: link:../prompt
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol

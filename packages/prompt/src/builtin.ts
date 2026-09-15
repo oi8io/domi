@@ -86,9 +86,9 @@ export const BUILTIN_LAYERS: readonly PromptLayer[] = [identityLayer, guardrailL
 
 export interface ConfigLayerSpec {
   id: string
-  role?: 'system' | 'user'
-  priority?: number
-  cacheable?: boolean
+  role?: 'system' | 'user' | undefined
+  priority?: number | undefined
+  cacheable?: boolean | undefined
   text: string
 }
 

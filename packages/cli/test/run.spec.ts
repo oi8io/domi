@@ -57,6 +57,23 @@ describe('prompt dump', () => {
     expect(r.out).toContain('builtin.identity')
     expect(r.out).toContain('稳定前缀到此为止')
   })
+
+  test('BUG-M3-012 · config.yaml 里的 prompt.layers 出现在 dump 里（PRD-M1-003 AC-3）', async () => {
+    const d = tmp()
+    const file = join(d, 'config.yaml')
+    writeFileSync(file, 'prompt:\n  layers:\n    - id: my.style\n      text: 回答要短，先给结论。\n', 'utf8')
+    const prev = process.env.DOMI_CONFIG
+    process.env.DOMI_CONFIG = file
+    try {
+      const r = await run(['prompt'])
+      expect(r.code).toBe(0)
+      expect(r.out).toContain('my.style')
+      expect(r.out).toContain('builtin.guardrail')
+    } finally {
+      if (prev === undefined) delete process.env.DOMI_CONFIG
+      else process.env.DOMI_CONFIG = prev
+    }
+  })
 })
 
 describe('data', () => {

@@ -38,6 +38,14 @@ export function buildToolNameMap(schemas: ToolSchema[]): Map<string, string> {
   return map
 }
 
+/** 所有 system 消息拼成一段，交给 AI SDK 的 instructions（它不收 messages 里的 system） */
+export function systemOf(messages: ModelMessages): string {
+  return messages
+    .filter((m) => m.role === 'system')
+    .map((m) => m.content)
+    .join('\n\n')
+}
+
 /** 我们的消息 → AI SDK 的消息。tool 结果需要 toolName，从前面的 assistant 消息里找 */
 export function toAiMessages(messages: ModelMessages): AiMessage[] {
   const nameOf = new Map<string, string>()
@@ -45,7 +53,9 @@ export function toAiMessages(messages: ModelMessages): AiMessage[] {
 
   for (const m of messages) {
     switch (m.role) {
+      // system 不进 messages：AI SDK 要求它走 instructions 选项（见 systemOf）
       case 'system':
+        break
       case 'user':
         out.push({ role: m.role, content: m.content })
         break
@@ -145,6 +155,7 @@ export class AiSdkProvider implements ModelProvider {
     const opts = {
       model: this.model,
       messages: toAiMessages(req.messages),
+      ...(systemOf(req.messages) === '' ? {} : { instructions: systemOf(req.messages) }),
       abortSignal: signal,
       // SDK 默认把流里的错误 console.error 一遍。错误已经作为事件进了事件流，
       // 再打一遍只会在 domid 的终端里留一段没人看的堆栈
