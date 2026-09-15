@@ -12,6 +12,7 @@ coverage/
 packages/*/src/__arch_fixture.ts
 packages/*/src/__provider_fixture.ts
 packages/*/src/__eval_fixture.ts
+packages/*/src/__write_fixture.ts
 docs/adr/.*.bak
 apps/*/src/__arch_fixture.ts
 .github/workflows/__guard_fixture.yml
