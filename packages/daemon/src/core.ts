@@ -29,6 +29,18 @@ import {
 
 export const DAEMON_VERSION = '0.1.0'
 
+/**
+ * 宿主用它表达「没有这个会话」。**只有它**会被翻译成 SESSION_NOT_FOUND；
+ * 其它异常（配置坏了、库打不开）原样作为 INTERNAL 带回去——
+ * 把一切打不开都说成「没有这个会话」，用户会去找一个本来就存在的东西。
+ */
+export class SessionNotFoundError extends Error {
+  constructor(readonly sessionId: string) {
+    super(`没有这个会话：${sessionId}`)
+    this.name = 'SessionNotFoundError'
+  }
+}
+
 /** 一个已连接的客户端。传输层实现它，core 只管往里写 */
 export interface ClientConn {
   readonly id: string
@@ -186,7 +198,13 @@ export class Daemon {
         }
         this.busy.add(p.sessionId)
 
-        const session = await this.session(p.sessionId)
+        let session: SessionHandle | null
+        try {
+          session = await this.session(p.sessionId)
+        } catch (e) {
+          this.busy.delete(p.sessionId)
+          throw e
+        }
         if (!session) {
           this.busy.delete(p.sessionId)
           return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
@@ -226,8 +244,9 @@ export class Daemon {
       const s = await this.host.open(id)
       this.sessions.set(id, s)
       return s
-    } catch {
-      return null
+    } catch (e) {
+      if (e instanceof SessionNotFoundError) return null
+      throw e
     }
   }
 

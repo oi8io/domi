@@ -14,6 +14,7 @@ import {
   isAllowedOrigin,
   NonLocalListenError,
   type SessionHandle,
+  SessionNotFoundError,
   serveWs,
   type WsServer,
 } from '../src/index.ts'
@@ -56,7 +57,7 @@ function echoHost(): DaemonHost {
   }
   return {
     async open(id) {
-      if (id !== 's1') throw new Error('nope')
+      if (id !== 's1') throw new SessionNotFoundError(id)
       return handle
     },
     async create() {

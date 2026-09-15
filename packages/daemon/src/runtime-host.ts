@@ -12,7 +12,7 @@ import type { DomiConfig } from '@domi/config'
 import type { EventEnvelope } from '@domi/protocol'
 import { DomiSession, type SessionOptions } from '@domi/runtime'
 import { SqliteEventLog } from '@domi/store'
-import type { DaemonHost, SessionHandle, SessionSummary } from './core.ts'
+import { type DaemonHost, type SessionHandle, SessionNotFoundError, type SessionSummary } from './core.ts'
 
 export interface RuntimeHostOptions {
   config: DomiConfig
@@ -37,7 +37,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
   return {
     async open(sessionId: string): Promise<SessionHandle> {
       const row = index.sessions.get(sessionId)
-      if (!row) throw new Error(`没有这个会话：${sessionId}`)
+      if (!row) throw new SessionNotFoundError(sessionId)
       const s = new DomiSession({
         config: opts.config,
         sessionId,

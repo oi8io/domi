@@ -7,7 +7,14 @@
 import { describe, expect, test } from 'bun:test'
 import type { EventEnvelope, RpcNotification, RpcRequest, RpcResponse } from '@domi/protocol'
 import { PROTOCOL_VERSION } from '@domi/protocol'
-import { type ClientConn, Daemon, type DaemonHost, type SessionHandle, type SessionSummary } from '../src/index.ts'
+import {
+  type ClientConn,
+  Daemon,
+  type DaemonHost,
+  type SessionHandle,
+  SessionNotFoundError,
+  type SessionSummary,
+} from '../src/index.ts'
 
 /** 假客户端：记下收到的每一条通知，好断言「推了什么、推了几次」 */
 class FakeConn implements ClientConn {
@@ -77,7 +84,7 @@ function makeHost(opts: { submitMs?: number } = {}) {
 
   const host: DaemonHost = {
     async open(id) {
-      if (id !== 's1') throw new Error('no such session')
+      if (id !== 's1') throw new SessionNotFoundError(id)
       return handle
     },
     async create() {
@@ -319,6 +326,39 @@ describe('PRD-M3-004 · 并发写仲裁', () => {
     await handshaked(d, c)
     const r = await d.handle(c, req('session.submit', { sessionId: '不存在', text: 'x' }))
     expect(r.error?.code).toBe('SESSION_NOT_FOUND')
+  })
+})
+
+describe('打不开会话 ≠ 会话不存在', () => {
+  // 真实现场：配置里的 key 粘错了，DomiSession 构造时就抛错。
+  // 第一版把宿主的任何异常都当成「没有这个会话」，用户看到的是一句完全错误的提示
+  function brokenHost(): DaemonHost {
+    const { host } = makeHost()
+    return {
+      ...host,
+      async open() {
+        throw new Error('error.invalid_api_key: API key 含非 ASCII 字符')
+      },
+    }
+  }
+
+  test('宿主抛的其它错误 → INTERNAL，原因原样带回', async () => {
+    const d = new Daemon(brokenHost())
+    const c = new FakeConn('c1')
+    await handshaked(d, c)
+    const r = await d.handle(c, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
+    expect(r.error?.code).toBe('INTERNAL')
+    expect(r.error?.message).toContain('invalid_api_key')
+  })
+
+  test('提交时打不开会话，忙状态要释放 —— 否则这个会话永远 SESSION_BUSY', async () => {
+    const d = new Daemon(brokenHost())
+    const c = new FakeConn('c1')
+    await handshaked(d, c)
+    const first = await d.handle(c, req('session.submit', { sessionId: 's1', text: 'a' }))
+    expect(first.error?.code).toBe('INTERNAL')
+    const second = await d.handle(c, req('session.submit', { sessionId: 's1', text: 'b' }))
+    expect(second.error?.code).toBe('INTERNAL')
   })
 })
 
