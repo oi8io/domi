@@ -1,5 +1,5 @@
 在做: **M3 DoD 的自动化版本已绿**（`apps/tui/test/dod.spec.ts`）：TUI 发起长任务后退出，浏览器端之后连上来看到它跑完。
-      `pnpm check`：typecheck（含 apps/tui、apps/web）+ 16 道守卫 + **628 个测试** + L1 回放，全绿。
+      `pnpm check`：typecheck（含 apps/tui、apps/web）+ 18 道守卫 + **695 个测试** + L1 回放，全绿。
       任务与缺陷的账在 `docs/tasks/M3.md`（前七条 done；末尾是缺陷与待优化登记）。
 
       现在能用的：
@@ -11,12 +11,17 @@
       - anthropic 协议网关的 base_url 带不带 /v1 都行；openai-compatible 网关要用工具的话在
         config.yaml 里写 `model.capabilities.toolCall: true`
 
+      - **MCP**（2026-09-15）：config.yaml 的 `mcp.servers` 配 stdio / HTTP server，工具以 `mcp.<名字>.<工具>` 出现，
+        权限规则支持 `mcp.<名字>.*`。`domi init` 模板里带了 browser（Playwright）与 computer 两个，改 `enabled: true` 即用
+        （需要 npx；computer 在 macOS 上要给终端开「辅助功能」权限）
+
       ⚠️ 更新代码后：`pnpm install`，并停掉已在跑的 domid（`domi` 会复用它，旧进程跑的是旧代码，见 OPT-M3-002）
 
-下一步: 1. TASK-M3-014 会话分支（先修 BUG-M3-010：runtime 拼上下文不读父链）
+下一步: 用户规矩（2026-09-15）：**先推进功能，测试验证类最后统一查漏补缺**
+        1. TASK-M3-016 MCP elicitation 接确认框；TASK-M3-014 会话分支（先修 BUG-M3-010）
         2. TUI 里补会话列表 / 恢复 / 删除入口（parity 第 5、6、8 项的 TUI 列）
         3. TASK-M3-008 parity e2e（Playwright）；TASK-M3-009 推送延迟基准
-        4. TASK-M3-010 kill -9 恢复、TASK-M3-011 远程认证、TASK-M3-012 跨会话引用、TASK-M3-013 MCP
+        4. TASK-M3-010 kill -9 恢复、TASK-M3-011 远程认证、TASK-M3-012 跨会话引用；然后进 M4（Soul）
         5. 缺陷登记里 open 的：BUG-M3-003（状态栏缺本轮耗时）、BUG-M3-008（陈锁并发接管）、
            BUG-M3-012（配置里的提示词层从未被读取）
 
