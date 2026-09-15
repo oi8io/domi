@@ -151,4 +151,32 @@ permissions:
     - name: allow-memory-search
       capability: memory.search
       decision: allow
+
+    # 看网页、点界面：每一步都问你（ADR-016）。想放宽的话按工具名精确放行，
+    # 比如 capability: mcp.computer.screenshot，别整组 allow
+    - name: confirm-browser
+      capability: mcp.browser.*
+      decision: ask
+    - name: confirm-computer
+      capability: mcp.computer.*
+      decision: ask
+
+# MCP server（docs/adr/015、016）。工具以 mcp.<name>.<工具名> 出现，走上面的权限规则。
+mcp:
+  # HTTP server 允许访问的主机；没列出的一律拒绝（localhost 也要写）。支持 *.example.com
+  allowedHosts: []
+  servers:
+    # 浏览器（Playwright MCP，微软官方）。把 enabled 改成 true 即可
+    - name: browser
+      command: npx
+      args: [-y, "@playwright/mcp@0.0.81", --headless, --isolated]
+      enabled: false
+    # 桌面：截屏、鼠标、键盘、应用（macOS 需要给终端开「辅助功能」权限）
+    - name: computer
+      command: npx
+      args: [-y, --prefer-offline, "@zavora-ai/computer-use-mcp@7.4.0"]
+      enabled: false
+    # 其它 server 照着写：stdio 用 command/args，HTTP 用 url
+    # - name: docs
+    #   url: https://mcp.example.com/mcp
 `

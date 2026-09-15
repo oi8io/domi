@@ -16,7 +16,7 @@
 | **插件沙箱机制** | M6 | `PRD-VISION` §6 已写"插件 API 必须等 5–8 个内置能力跑通后再抽"，沙箱同理 |
 | **Web 技术栈细节 / Tauri 版本** | M3 / M5 | 方向在 DESIGN §5，具体版本进入时再钉 |
 | **Telegram 库**（grammY 1.46.0） | M5 | 基本已定，但 M5 还远，现在钉版本没有意义 |
-| **computer-use MCP server 选哪个** | M2，做 `PRD-M2-009` 时 | 该条是 `PRD-VISION` §6 第一类（纯引用），domi 零实现，换一个只是改配置 |
+| **computer-use MCP server 选哪个**（2026-09-15 已定，见 `docs/adr/016`） | M2，做 `PRD-M2-009` 时 | 该条是 `PRD-VISION` §6 第一类（纯引用），domi 零实现，换一个只是改配置 |
 
 ## 已知风险：MCP SDK 的版本分裂
 

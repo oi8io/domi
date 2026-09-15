@@ -385,6 +385,9 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
     devDependencies:
+      '@domi/cli':
+        specifier: workspace:*
+        version: link:../cli
       '@modelcontextprotocol/server':
         specifier: 2.0.0
         version: 2.0.0
