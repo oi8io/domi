@@ -19,7 +19,7 @@ export interface ProviderConfig {
   apiKey?: string | undefined
   baseUrl?: string | undefined
   /** 允许在配置里覆盖能力矩阵——openai-compatible 后面挂什么只有用户知道 */
-  capabilities?: Partial<ModelCapabilities> | undefined
+  capabilities?: { [K in keyof ModelCapabilities]?: boolean | undefined } | undefined
   /**
    * 自定义 fetch。两个真实用途：
    *   1. 企业代理 / mTLS —— 出站要走自己的通道
@@ -35,7 +35,9 @@ export function isKnownProvider(p: string): p is ProviderKind {
 
 export function capabilitiesFor(cfg: ProviderConfig): ModelCapabilities {
   const base = isKnownProvider(cfg.provider) ? CAPABILITIES[cfg.provider] : CAPABILITIES['openai-compatible']
-  return { ...base, ...cfg.capabilities }
+  // 只覆盖显式给了值的项：undefined 不是 false，不能把默认值冲掉
+  const overrides = Object.entries(cfg.capabilities ?? {}).filter(([, v]) => typeof v === 'boolean')
+  return { ...base, ...Object.fromEntries(overrides) }
 }
 
 export class InvalidApiKeyError extends Error {

@@ -23,6 +23,21 @@ export const ConfigSchema = z.object({
      * 无论从哪来，它都不会进事件流：脱敏挂在 EventLog.append 前置（SPEC-M0-009）。
      */
     apiKey: z.string().optional(),
+    /**
+     * 能力矩阵的显式覆盖（PRD-M1-001 AC-2）。openai-compatible 默认全关（fail-closed），
+     * 后面挂的模型其实支持工具调用的话，在 [model.capabilities] 里打开
+     */
+    capabilities: z
+      .object({
+        toolCall: z.boolean(),
+        vision: z.boolean(),
+        reasoning: z.boolean(),
+        promptCache: z.boolean(),
+        structuredOutput: z.boolean(),
+      })
+      .partial()
+      .strict()
+      .optional(),
   }),
   permissions: z.object({ rules: z.array(PermissionRuleSchema).default([]) }).default({ rules: [] }),
   context: z

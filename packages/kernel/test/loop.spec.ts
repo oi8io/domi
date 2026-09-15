@@ -217,3 +217,25 @@ describe('PRD-M0-003 AC-2 · 用户拒绝不是错误', () => {
     expect(res.reason).toBe('user_denied')
   })
 })
+
+describe('provider 在出流之前就抛错（2026-09-15 现场）', () => {
+  // AiSdkProvider 在发请求前做能力检查（PRD-M1-001 AC-3），不满足就直接抛。
+  // 原来这个异常穿出 runTurn：事件流里只有一条 user.input，daemon 把异常吞了，
+  // 用户那边什么都看不到——既没有回答，也没有错误
+  test('变成一条 error 事件落盘，本轮以 stream_error 结束，会话可以继续', async () => {
+    const throwing = {
+      id: 'broken',
+      capabilities: { toolCall: false, vision: false, reasoning: false, promptCache: false, structuredOutput: false },
+      // biome-ignore lint/correctness/useYield: 模拟「第一次取值就抛」的 provider
+      async *generate(): AsyncIterable<never> {
+        throw new Error('error.unsupported_capability: provider "broken" 未声明支持 toolCall')
+      },
+    }
+    const d = deps({ provider: throwing, tools: runner(() => ({ ok: true, payload: 1 })) })
+    const r = await runTurn(d, 's1', '你好')
+    expect(r.stopReason).toBe('stream_error')
+    const events = await d.sink.read('s1')
+    expect(events.map((e) => e.ev.t)).toEqual(['user.input', 'model.request', 'error'])
+    expect(JSON.stringify(events.at(-1)?.ev)).toContain('unsupported_capability')
+  })
+})

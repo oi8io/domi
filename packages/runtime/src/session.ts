@@ -120,6 +120,7 @@ export class DomiSession {
         name: opts.config.model.name,
         apiKey: opts.config.model.apiKey,
         baseUrl: opts.config.model.baseUrl,
+        capabilities: opts.config.model.capabilities,
       })
   }
 

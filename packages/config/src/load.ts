@@ -82,6 +82,7 @@ export function loadConfig(opts: LoadOptions = {}): DomiConfig {
         ? { baseUrl: env.DOMI_BASE_URL ?? (fileModel.base_url as string) }
         : {}),
       ...(apiKey ? { apiKey } : {}),
+      ...(fileModel.capabilities === undefined ? {} : { capabilities: fileModel.capabilities }),
     },
   }
 

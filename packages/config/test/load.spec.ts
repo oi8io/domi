@@ -163,3 +163,33 @@ describe('INV-11 · 凭据不进事件流是分层保证的', () => {
     expect(cfg.model.apiKey).toContain('sk-ant-')
   })
 })
+
+describe('[model.capabilities] —— 能力矩阵的显式覆盖（PRD-M1-001 AC-2）', () => {
+  // UnsupportedCapabilityError 的报错文案一直在教用户「在 [model.capabilities] 里显式打开」，
+  // 但这一节原来根本没有被读取：openai-compatible 网关因此永远用不了工具
+  test('配置文件里写的开关读得出来', () => {
+    const cfg = loadConfig({
+      home: home(`
+[model]
+provider = "my-gateway"
+name = "qwen"
+
+[model.capabilities]
+toolCall = true
+`),
+      env: { DOMI_API_KEY: 'k' },
+    })
+    expect(cfg.model.capabilities).toEqual({ toolCall: true })
+  })
+
+  test('没写就是没有覆盖，不是全 false', () => {
+    const cfg = loadConfig({ home: home(TOML), env: {} })
+    expect(cfg.model.capabilities).toBeUndefined()
+  })
+
+  test('写错类型直接报配置错误，而不是悄悄当成 false', () => {
+    expect(() =>
+      loadConfig({ home: home('[model]\nprovider = "x"\n[model.capabilities]\ntoolCall = "yes"\n'), env: {} }),
+    ).toThrow(/capabilities/)
+  })
+})

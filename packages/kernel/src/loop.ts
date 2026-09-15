@@ -102,32 +102,39 @@ export async function runTurn(
     produced.push({ t: 'model.request', provider: deps.provider.id, model: deps.model, tokensIn: messages.length })
 
     let streamError: { message: string; recoverable: boolean } | null = null
-    for await (const ev of deps.provider.generate(
-      { model: deps.model, messages, tools: deps.tools.schemas(), providerOptions: deps.providerOptions },
-      ac.signal,
-    )) {
-      switch (ev.type) {
-        case 'delta':
-          produced.push({ t: 'model.delta', text: String(ev.text) })
-          break
-        case 'reason':
-          produced.push({ t: 'model.reason', text: String(ev.text) })
-          break
-        case 'usage':
-          produced.push({ t: 'model.usage', raw: (ev.raw ?? {}) as Record<string, unknown> })
-          break
-        case 'tool-call': {
-          const call = { id: String(ev.id), name: String(ev.name), args: ev.args }
-          pending.push(call)
-          produced.push({ t: 'tool.call', ...call })
-          break
+    try {
+      for await (const ev of deps.provider.generate(
+        { model: deps.model, messages, tools: deps.tools.schemas(), providerOptions: deps.providerOptions },
+        ac.signal,
+      )) {
+        switch (ev.type) {
+          case 'delta':
+            produced.push({ t: 'model.delta', text: String(ev.text) })
+            break
+          case 'reason':
+            produced.push({ t: 'model.reason', text: String(ev.text) })
+            break
+          case 'usage':
+            produced.push({ t: 'model.usage', raw: (ev.raw ?? {}) as Record<string, unknown> })
+            break
+          case 'tool-call': {
+            const call = { id: String(ev.id), name: String(ev.name), args: ev.args }
+            pending.push(call)
+            produced.push({ t: 'tool.call', ...call })
+            break
+          }
+          case 'error':
+            streamError = { message: String(ev.message), recoverable: Boolean(ev.recoverable) }
+            break
+          default:
+            break
         }
-        case 'error':
-          streamError = { message: String(ev.message), recoverable: Boolean(ev.recoverable) }
-          break
-        default:
-          break
       }
+    } catch (e) {
+      // provider 约定用 error 事件报错，但出流之前的检查（能力不满足、参数非法）是直接抛的。
+      // 穿出去的话，事件流里只剩一条 user.input，用户什么都看不到。
+      // recoverable：会话本身没坏，改完配置可以接着用
+      streamError = { message: e instanceof Error ? e.message : String(e), recoverable: true }
     }
 
     await deps.sink.append(sessionId, produced)
