@@ -13,6 +13,7 @@ packages/*/src/__arch_fixture.ts
 packages/*/src/__provider_fixture.ts
 packages/*/src/__eval_fixture.ts
 packages/*/src/__write_fixture.ts
+packages/*/src/__deprecated_fixture.ts
 docs/adr/.*.bak
 apps/*/src/__arch_fixture.ts
 .github/workflows/__guard_fixture.yml
@@ -23,3 +24,6 @@ Claude outputs/
 # 挂载在不允许删除的文件系统上时，pnpm 的文件系统能力探测会在仓库根留下 _tmp_<pid>_<hex>，
 # 删不掉就一直堆着。6fa9e69 曾把 24 个这样的空文件误提交进来
 _tmp_*
+
+# bun build --compile 中途留下的临时文件
+*.bun-build
