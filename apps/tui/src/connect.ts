@@ -7,7 +7,7 @@
  * 单独成文件是为了能测：Ink 的按键在无 TTY 环境里验不了（docs/adr/001），
  * 但「连上、建会话、订阅」这一段不需要 TTY。
  */
-import { createSessionStore, DomiClient, type SessionStore, type WireSocket } from '@domi/client-core'
+import { authProtocols, createSessionStore, DomiClient, type SessionStore, type WireSocket } from '@domi/client-core'
 import { type DaemonEndpoint, ensureDaemon } from '@domi/daemon'
 
 export interface ChatConnection {
@@ -34,19 +34,58 @@ export interface ConnectOptions {
   model: { provider: string; name: string }
   command?: string[]
   env?: Record<string, string | undefined>
+  /** `domi --connect <url>`：连这个地址，不拉起本地 domid（PRD-M3-006 AC-1） */
+  connect?: string
+  /** 连接时带的 token（DOMI_TOKEN / 配置 / 本机 domid 生成的文件） */
+  token?: string
+}
+
+/** 远程连不上。说清楚是哪一步，别让人对着「一直在重连」猜 */
+export class RemoteConnectError extends Error {
+  constructor(url: string, why: 'auth' | 'unreachable', detail = '') {
+    super(
+      why === 'auth'
+        ? `${url} 拒绝了连接：token 不对或没带。
+` + '把服务端的 token 设进 DOMI_TOKEN 再试；服务端没配 token 的话，它在那台机器的 ~/.domi/daemon.token 里。'
+        : `连不上 ${url}${detail ? `（${detail}）` : ''}。确认对面的 domid 在跑、监听的是这个地址和端口。`,
+    )
+    this.name = 'RemoteConnectError'
+  }
+}
+
+/**
+ * 升级之前先敲一下门：浏览器式的 WebSocket 拿不到 401 这个状态码，只会看到「连接失败」，
+ * 分不清是 token 不对还是对面没开。普通 HTTP 请求能分清——认证没过是 401，过了是 426（只收 WebSocket）
+ */
+async function probe(url: string, token: string | undefined): Promise<void> {
+  const http = url.replace(/^ws/, 'http')
+  let res: Response
+  try {
+    res = await fetch(http, token ? { headers: { Authorization: `Bearer ${token}` } } : {})
+  } catch (e) {
+    throw new RemoteConnectError(url, 'unreachable', e instanceof Error ? e.message : String(e))
+  }
+  if (res.status === 401) throw new RemoteConnectError(url, 'auth')
 }
 
 export async function connectChat(opts: ConnectOptions): Promise<ChatConnection> {
-  const daemon = await ensureDaemon({
-    home: opts.home,
-    command: opts.command ?? selfCommand(),
-    cwd: opts.cwd,
-    ...(opts.env === undefined ? {} : { env: opts.env }),
-  })
+  let daemon: DaemonEndpoint
+  if (opts.connect !== undefined) {
+    await probe(opts.connect, opts.token)
+    daemon = { url: opts.connect, pid: 0, spawned: false }
+  } else {
+    daemon = await ensureDaemon({
+      home: opts.home,
+      command: opts.command ?? selfCommand(),
+      cwd: opts.cwd,
+      ...(opts.env === undefined ? {} : { env: opts.env }),
+    })
+  }
+  const protocols = authProtocols(opts.token)
   const client = new DomiClient({
     clientName: 'domi-tui',
     reconnectMs: 1000,
-    connect: () => new WebSocket(daemon.url) as unknown as WireSocket,
+    connect: () => new WebSocket(daemon.url, protocols) as unknown as WireSocket,
   })
   await client.start()
   const sessionId = await client.createSession(opts.cwd)

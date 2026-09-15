@@ -92,8 +92,11 @@ describe('PRD-M3-006 AC-2 · 默认只监听本地', () => {
     expect(start().hostname).toBe('127.0.0.1')
   })
 
-  test('非回环地址直接拒绝 —— 认证没做之前不许放开', () => {
+  test('非回环地址不带 token 直接拒绝（认证见 auth.spec.ts）', () => {
     expect(() => serveWs(new Daemon(echoHost()), { hostname: '0.0.0.0', port: 0 })).toThrow(NonLocalListenError)
+    expect(() => serveWs(new Daemon(echoHost()), { hostname: '0.0.0.0', port: 0, token: null })).toThrow(
+      NonLocalListenError,
+    )
   })
 })
 

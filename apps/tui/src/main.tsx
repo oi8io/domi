@@ -15,7 +15,8 @@
 import { homedir } from 'node:os'
 import { formatOnboarding, type ParsedCli, parseCli, runCommand } from '@domi/cli'
 import { answerFromKey, createSessionStore, type DomiClient, focusIdOf, type SessionStore } from '@domi/client-core'
-import { ConfigParseError, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
+import { ConfigParseError, loadConfig, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
+import { resolveClientToken } from '@domi/daemon'
 import { useStore } from '@nanostores/react'
 import { Box, render, Text, useApp, useInput } from 'ink'
 import { useCallback, useState } from 'react'
@@ -164,13 +165,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     process.exit(await runCommand(cli, io))
   }
 
-  return startChat()
+  return startChat(cli.flags.connect)
 }
 
-async function startChat(): Promise<void> {
+async function startChat(remote: string | undefined): Promise<void> {
   let config: ReturnType<typeof loadConfigOrThrow>
   try {
-    config = loadConfigOrThrow()
+    // 连远程时模型在对面跑，本机不需要模型凭据
+    config = remote === undefined ? loadConfigOrThrow() : loadConfig()
   } catch (e) {
     // PRD-M1-008 AC-3：**第一次运行大概率就走到这里**（还没填凭据）。
     // 只丢一句 error.missing_credential 就等于把新用户扔在门口，
@@ -184,7 +186,15 @@ async function startChat(): Promise<void> {
 
   const cwd = process.cwd()
   try {
-    const conn = await connectChat({ home: homedir(), cwd, model: config.model })
+    const home = process.env.HOME || homedir()
+    const token = resolveClientToken({ config, env: process.env, home })
+    const conn = await connectChat({
+      home,
+      cwd,
+      model: config.model,
+      ...(remote === undefined ? {} : { connect: remote }),
+      ...(token === undefined ? {} : { token }),
+    })
     render(<Root store={conn.store} client={conn.client} sessionId={conn.sessionId} />)
   } catch (e) {
     process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`)

@@ -15,12 +15,17 @@
         权限规则支持 `mcp.<名字>.*`。`domi init` 模板里带了 browser（Playwright）与 computer 两个，改 `enabled: true` 即用
         （需要 npx；computer 在 macOS 上要给终端开「辅助功能」权限）
 
+      - **远程连接**（2026-09-15）：那台机器的 config.yaml 里 `server.host: 0.0.0.0`（或 `DOMI_HOST=0.0.0.0`），
+        重启 domid；token 自动生成在那台机器的 `~/.domi/daemon.token`。这台机器上
+        `DOMI_TOKEN=<token> domi --connect ws://那台机器:7437`；浏览器用 `?daemon=ws://…#token=…`。
+        没有 TLS，跨公网请走 SSH 隧道（ADR-017）
+
       ⚠️ 更新代码后：`pnpm install`，并停掉已在跑的 domid（`domi` 会复用它，旧进程跑的是旧代码，见 OPT-M3-002）
 
 下一步: 用户规矩（2026-09-15）：**先推进功能，测试验证类最后统一查漏补缺**
         （已完成：TASK-M3-016 elicitation 接确认框；TASK-M3-014 会话分支，Web「分支」按钮 / TUI `/branch`；
-          TASK-M3-010 kill -9 后打开会话自动补到一致点）
-        1. TASK-M3-011 远程认证、TASK-M3-012 跨会话引用；然后进 M4（Soul）
+          TASK-M3-010 kill -9 后打开会话自动补到一致点；TASK-M3-011 远程连接 + token，见 ADR-017）
+        1. TASK-M3-012 跨会话引用；然后进 M4（Soul）
         2. TUI 里补会话列表 / 恢复 / 删除入口（parity 第 5、6、8 项的 TUI 列）
         3. 最后统一：TASK-M3-008 parity e2e（Playwright）；TASK-M3-009 推送延迟基准
         5. 缺陷登记里 open 的：BUG-M3-003（状态栏缺本轮耗时）、BUG-M3-008（陈锁并发接管）、

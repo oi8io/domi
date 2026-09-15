@@ -79,6 +79,18 @@ export const ConfigSchema = z.object({
   }),
   permissions: z.object({ rules: z.array(PermissionRuleSchema).default([]) }).default({ rules: [] }),
   mcp: McpConfigSchema,
+  /**
+   * domid 监听在哪（PRD-M3-006 · INV-11）。默认只有本机能连。
+   * host 不是回环地址时**必须**有 token：没写就由 domid 生成一个存进 ~/.domi/daemon.token。
+   * 环境变量 DOMI_HOST / DOMI_PORT / DOMI_TOKEN 优先
+   */
+  server: z
+    .object({
+      host: z.string().default('127.0.0.1'),
+      port: z.number().int().min(0).max(65_535).default(7437),
+      token: z.string().optional(),
+    })
+    .default({ host: '127.0.0.1', port: 7437 }),
   context: z
     .object({
       maxTokens: z.number().int().positive().default(150_000),

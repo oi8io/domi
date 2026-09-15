@@ -47,10 +47,22 @@ function tail(path: string, lines = 15): string {
   return readFileSync(path, 'utf8').trimEnd().split('\n').slice(-lines).join('\n')
 }
 
+const WILDCARD = new Set(['', '0.0.0.0', '::', '[::]'])
+
+/** 本机客户端该连哪个地址：监听的是通配地址就走回环，否则就是那个地址 */
+export function localConnectHost(listenHost: string | undefined): string {
+  if (listenHost === undefined || WILDCARD.has(listenHost)) return DEFAULT_HOSTNAME
+  return listenHost.replace(/^\[|\]$/g, '')
+}
+
+function wsUrl(host: string, port: number): string {
+  return `ws://${host.includes(':') ? `[${host}]` : host}:${port}`
+}
+
 /** 端口上有没有人在听。锁是在监听之前写的，只看锁会连到一个还没开门的端口 */
-function listening(port: number, timeoutMs = 300): Promise<boolean> {
+function listening(host: string, port: number, timeoutMs = 300): Promise<boolean> {
   return new Promise((resolve) => {
-    const sock = connect({ host: DEFAULT_HOSTNAME, port })
+    const sock = connect({ host, port })
     const done = (ok: boolean): void => {
       sock.destroy()
       resolve(ok)
@@ -65,8 +77,9 @@ function listening(port: number, timeoutMs = 300): Promise<boolean> {
 export async function findDaemon(home: string): Promise<DaemonEndpoint | null> {
   const info = readLock(daemonPaths(home).lock)
   if (!info || info.port <= 0 || !isAlive(info.pid)) return null
-  if (!(await listening(info.port))) return null
-  return { url: `ws://${DEFAULT_HOSTNAME}:${info.port}`, pid: info.pid, spawned: false }
+  const host = localConnectHost(info.host)
+  if (!(await listening(host, info.port))) return null
+  return { url: wsUrl(host, info.port), pid: info.pid, spawned: false }
 }
 
 export interface EnsureDaemonOptions {

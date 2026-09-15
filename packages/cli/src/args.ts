@@ -32,6 +32,8 @@ export interface ParsedCli {
     json: boolean
     yes: boolean
     ping: boolean
+    /** `domi --connect ws://host:port`：连远程 domid（PRD-M3-006 AC-1） */
+    connect: string | undefined
     /** `domi init --from-toml`：迁移旧配置（ADR-014） */
     fromToml: boolean
     /** `domi trace <id> --html <路径>`；带值的选项必须在这里声明，
@@ -59,6 +61,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       yes: { type: 'boolean', short: 'y' },
       ping: { type: 'boolean' },
       html: { type: 'string' },
+      connect: { type: 'string' },
       'from-toml': { type: 'boolean' },
     },
   })
@@ -80,6 +83,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       ping: Boolean(values.ping),
       fromToml: Boolean(values['from-toml']),
       html: typeof values.html === 'string' ? values.html : undefined,
+      connect: typeof values.connect === 'string' ? values.connect : undefined,
     },
   }
 }
@@ -88,6 +92,8 @@ export const HELP = `domi —— 本地优先的 agent 运行时
 
 用法：
   domi                      进入对话（最常用，不需要子命令）
+  domi --connect ws://主机:端口
+                            连另一台机器上的 domid（token 放在环境变量 DOMI_TOKEN）
   domi doctor               体检；每条问题都给一条可直接粘贴执行的命令
   domi doctor --ping        额外发一次真实请求，区分「key 不对 / 网关没通 / 模型名错」
   domi init                 打印一份 config.yaml 模板
@@ -107,6 +113,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
 对话里：
   /compact                  手动压缩上下文
   /model <名字> [provider]  会话中途切换模型（历史不动，只追加一条切换记录）
+  /branch [seq]             从某一条（默认最后一条）分出一个新会话并切过去
 
 选项：
   -h, --help      看这个
@@ -179,4 +186,12 @@ mcp:
     # 其它 server 照着写：stdio 用 command/args，HTTP 用 url
     # - name: docs
     #   url: https://mcp.example.com/mcp
+
+# domid 监听在哪（docs/adr/017）。默认只有本机能连，不用改。
+# 要从别的机器连（domi --connect ws://这台机器:7437），把 host 改成 0.0.0.0：
+# 这时必须有 token——不写的话 domid 会生成一个放进 ~/.domi/daemon.token
+server:
+  host: 127.0.0.1
+  port: 7437
+  # token: 至少 24 个字符（字母、数字、. _ ~ -）；更推荐用环境变量 DOMI_TOKEN
 `

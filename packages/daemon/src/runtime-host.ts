@@ -9,9 +9,10 @@
  * 执行一个需要确认的操作，本来就该等人，而不是替人答。
  */
 import type { DomiConfig } from '@domi/config'
-import type { EventEnvelope } from '@domi/protocol'
+import type { DomiEvent, EventEnvelope } from '@domi/protocol'
 import { DomiSession, type SessionOptions } from '@domi/runtime'
 import { SqliteEventLog } from '@domi/store'
+import { AUDIT_SESSION_ID } from './auth.ts'
 import {
   BranchPointError,
   type DaemonHost,
@@ -37,6 +38,8 @@ export interface RuntimeHostOptions {
 }
 
 export interface RuntimeHost extends DaemonHost {
+  /** daemon 自己的审计事件（被拒的连接等）。写进 AUDIT_SESSION_ID，不出现在会话列表里 */
+  audit(ev: DomiEvent): Promise<void>
   close(): void
 }
 
@@ -109,15 +112,19 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     },
 
     async list({ includeDeleted }): Promise<SessionSummary[]> {
-      return index.sessions.list({ includeDeleted }).map((r) => ({
-        id: r.id,
-        title: r.title,
-        model: r.model,
-        updatedAt: r.updatedAt,
-        eventCount: r.eventCount,
-        deleted: r.deletedAt !== null,
-        ...(r.parentSessionId === null ? {} : { parentId: r.parentSessionId }),
-      }))
+      // 下划线开头的是 daemon 自己的会话（审计），不是用户的对话
+      return index.sessions
+        .list({ includeDeleted })
+        .filter((r) => !r.id.startsWith('_'))
+        .map((r) => ({
+          id: r.id,
+          title: r.title,
+          model: r.model,
+          updatedAt: r.updatedAt,
+          eventCount: r.eventCount,
+          deleted: r.deletedAt !== null,
+          ...(r.parentSessionId === null ? {} : { parentId: r.parentSessionId }),
+        }))
     },
 
     /**
@@ -144,6 +151,10 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     async restore(sessionId) {
       if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
       index.sessions.restore(sessionId)
+    },
+
+    async audit(ev) {
+      await index.append(AUDIT_SESSION_ID, [ev])
     },
 
     onEvents(cb) {

@@ -13,6 +13,8 @@ import { closeSync, existsSync, openSync, readFileSync, rmSync, writeFileSync } 
 export interface LockInfo {
   pid: number
   port: number
+  /** 监听的地址。没有 = 127.0.0.1（M3-011 之前写的锁） */
+  host?: string
   startedAt: number
 }
 

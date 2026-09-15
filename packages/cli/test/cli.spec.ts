@@ -142,6 +142,15 @@ describe('命令面', () => {
     expect(p.args).toEqual(['s-123'])
   })
 
+  test('PRD-M3-006 AC-1 · --connect 带地址，进的还是对话', () => {
+    const p = parseCli(['--connect', 'ws://10.0.0.2:7437'])
+    expect(p.command).toBe('chat')
+    expect(p.flags.connect).toBe('ws://10.0.0.2:7437')
+    expect(parseCli([]).flags.connect).toBeUndefined()
+    expect(HELP).toContain('--connect')
+    expect(HELP).toContain('DOMI_TOKEN')
+  })
+
   test('help 把七个命令都列了', () => {
     for (const c of ['doctor', 'init', 'session', 'data', 'prompt', 'report-bug']) expect(HELP).toContain(c)
   })

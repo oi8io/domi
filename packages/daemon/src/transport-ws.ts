@@ -6,28 +6,26 @@
  *
  * 用 Bun 自带的 `Bun.serve` WebSocket，不引库（docs/adr/012）。
  *
- * 两道本地边界，都是**结构性的**，不是靠配置记得打开：
+ * 边界都是**结构性的**，不是靠配置记得打开：
  *
- * 1. **只监听回环地址。** M3-006 AC-2 要求「监听非本地地址必须显式配置且强制 token 认证」，
- *    认证这一轮还没做，所以非回环地址现在直接拒绝——而不是先放开、等认证做了再收紧。
- * 2. **浏览器来源必须是本机页面。** 没有认证的本地 WebSocket，任何网页都能从用户浏览器里连上来
+ * 1. **非回环地址必须带 token。** 没有 token 就不监听（PRD-M3-006 AC-2）。
+ *    token 从哪来是 auth.ts 的事，这里只认「有没有」。
+ * 2. **有 token 就在升级之前校验。** 没带或不对 → 401，并报给 onRejected 落成事件（AC-3）。
+ * 3. **没有 token 时，浏览器来源必须是本机页面。** 没有认证的本地 WebSocket，任何网页都能从用户浏览器里连上来
  *    （跨站 WebSocket 劫持）。浏览器一定会带 Origin；命令行客户端不带。所以：
  *    不带 Origin 放行，带了就必须是 localhost / 127.0.0.1 / [::1]。
+ *    有 token 时不看 Origin：别的页面拿不到 token，远程访问的页面本来就不在本机。
  */
-import { RequestSchema, type RpcNotification, type RpcResponse } from '@domi/protocol'
+import { AUTH_SUBPROTOCOL, RequestSchema, type RpcNotification, type RpcResponse } from '@domi/protocol'
+import { isLoopback, type RejectedConnection, tokenFromRequest, tokensMatch } from './auth.ts'
 import type { ClientConn, Daemon } from './core.ts'
 
 export const DEFAULT_HOSTNAME = '127.0.0.1'
 export const DEFAULT_PORT = 7437
 
-const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
-
 export class NonLocalListenError extends Error {
   constructor(hostname: string) {
-    super(
-      `拒绝监听 ${hostname}：非本地地址必须强制 token 认证（PRD-M3-006 AC-2），而认证还没实现。` +
-        `现在只能监听 ${DEFAULT_HOSTNAME}。`,
-    )
+    super(`拒绝监听 ${hostname}：非本地地址必须带 token 认证（PRD-M3-006 AC-2）。`)
     this.name = 'NonLocalListenError'
   }
 }
@@ -36,7 +34,7 @@ export class NonLocalListenError extends Error {
 export function isAllowedOrigin(origin: string | null): boolean {
   if (origin === null) return true
   try {
-    return LOOPBACK.has(new URL(origin).hostname)
+    return isLoopback(new URL(origin).hostname)
   } catch {
     return false
   }
@@ -46,6 +44,10 @@ export interface WsServerOptions {
   hostname?: string
   /** 0 = 让系统挑一个空闲端口（测试用） */
   port?: number
+  /** 要求客户端带的 token。null / 不给 = 不校验，只允许回环地址 */
+  token?: string | null
+  /** 一次连接因为认证被拒 */
+  onRejected?: (r: RejectedConnection) => void
 }
 
 export interface WsServer {
@@ -61,17 +63,33 @@ interface SocketData {
 
 export function serveWs(daemon: Daemon, opts: WsServerOptions = {}): WsServer {
   const hostname = opts.hostname ?? DEFAULT_HOSTNAME
-  if (!LOOPBACK.has(hostname)) throw new NonLocalListenError(hostname)
+  const token = opts.token ?? null
+  if (token === null && !isLoopback(hostname)) throw new NonLocalListenError(hostname)
 
   let seq = 0
   const server = Bun.serve<SocketData>({
     hostname,
     port: opts.port ?? DEFAULT_PORT,
     fetch(req, srv) {
-      if (!isAllowedOrigin(req.headers.get('origin'))) {
+      const origin = req.headers.get('origin')
+      if (token !== null) {
+        const given = tokenFromRequest(req)
+        if (given === null || !tokensMatch(given, token)) {
+          const addr = srv.requestIP(req)
+          opts.onRejected?.({
+            remote: addr ? `${addr.address}:${addr.port}` : 'unknown',
+            reason: given === null ? 'missing' : 'invalid',
+            origin,
+          })
+          return new Response('domid：需要 token（DOMI_TOKEN）', { status: 401 })
+        }
+      } else if (!isAllowedOrigin(origin)) {
         return new Response('forbidden origin', { status: 403 })
       }
-      if (srv.upgrade(req, { data: { conn: null } })) return undefined
+      // 客户端提供了子协议，就必须回一个它提供过的——只回 domi，token 不回显
+      const offered = (req.headers.get('sec-websocket-protocol') ?? '').split(',').map((p) => p.trim())
+      const headers = offered.includes(AUTH_SUBPROTOCOL) ? { 'Sec-WebSocket-Protocol': AUTH_SUBPROTOCOL } : undefined
+      if (srv.upgrade(req, { data: { conn: null }, ...(headers === undefined ? {} : { headers }) })) return undefined
       return new Response('domid：这里只接受 WebSocket（Domi Protocol）', { status: 426 })
     },
     websocket: {

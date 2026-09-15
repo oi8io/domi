@@ -1,3 +1,4 @@
+export * from './auth.ts'
 export * from './core.ts'
 export * from './launcher.ts'
 export * from './lock.ts'

@@ -4,6 +4,7 @@
  *
  *   bun packages/daemon/src/main.ts            # 默认 ws://127.0.0.1:7437
  *   DOMI_PORT=0 bun packages/daemon/src/main.ts
+ *   DOMI_HOST=0.0.0.0 bun packages/daemon/src/main.ts   # 远程可连，强制 token（PRD-M3-006）
  *
  * 启动顺序是**先抢锁、再监听**：反过来的话，两个同时启动的进程里输的那个
  * 可能已经占了端口才发现自己不该起。
@@ -14,10 +15,11 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfigOrThrow } from '@domi/config'
 import { McpHub } from '@domi/mcp'
+import { type RejectedConnection, resolveServerSettings } from './auth.ts'
 import { Daemon } from './core.ts'
 import { acquireLock, LockHeldError, rewriteLock } from './lock.ts'
 import { createRuntimeHost } from './runtime-host.ts'
-import { DEFAULT_PORT, serveWs } from './transport-ws.ts'
+import { serveWs } from './transport-ws.ts'
 
 export const EXIT_LOCK_HELD = 3
 
@@ -29,13 +31,14 @@ export async function main(env: Record<string, string | undefined> = process.env
   const home = join(env.HOME ?? homedir(), '.domi')
   mkdirSync(home, { recursive: true })
   const config = loadConfigOrThrow({ env, home: env.HOME ?? homedir() })
-  const requestedPort = env.DOMI_PORT === undefined ? DEFAULT_PORT : Number(env.DOMI_PORT)
+  const server = resolveServerSettings({ config, env, home: env.HOME ?? homedir() })
+  const requestedPort = server.port
 
   let release: () => void
   const lockPath = join(home, 'domid.lock')
   try {
     // 端口先记请求值；拿到真实端口后原地改写（DOMI_PORT=0 时两者不同）
-    release = acquireLock(lockPath, { pid: process.pid, port: requestedPort })
+    release = acquireLock(lockPath, { pid: process.pid, port: requestedPort, host: server.hostname })
   } catch (e) {
     if (e instanceof LockHeldError) {
       process.stderr.write(`${e.message}\n`)
@@ -60,9 +63,50 @@ export async function main(env: Record<string, string | undefined> = process.env
     notices: () => hub.notices().map((n) => n.message),
   })
   const daemon = new Daemon(host)
-  const server = serveWs(daemon, { port: requestedPort })
-  if (server.port !== requestedPort) rewriteLock(lockPath, { pid: process.pid, port: server.port })
-  process.stdout.write(`domid listening ${server.url}\n`)
+  const ws = serveWs(daemon, {
+    hostname: server.hostname,
+    port: requestedPort,
+    token: server.token,
+    onRejected: (r) => void recordRejection(r),
+  })
+  if (ws.port !== requestedPort) {
+    rewriteLock(lockPath, { pid: process.pid, port: ws.port, host: server.hostname })
+  }
+  // 地址和 token 的去处一次写出去（拉起方读第一行拿地址）。token 本身不打印：这些输出会进日志
+  const notes = [`domid listening ${ws.url}`]
+  if (server.token !== null) {
+    notes.push(
+      server.tokenFile
+        ? `domid 要求 token；token 在 ${server.tokenFile}（远程客户端设 DOMI_TOKEN）`
+        : 'domid 要求 token（来自 DOMI_TOKEN 或 config.yaml 的 server.token）',
+    )
+  }
+  process.stdout.write(`${notes.join('\n')}\n`)
+
+  /**
+   * 被拒的连接落成事件（AC-3）。同一来源、同一原因一分钟只记一条：
+   * 扫端口的人一秒能敲几百次门，审计会话不该被刷爆
+   */
+  const lastRecorded = new Map<string, number>()
+  async function recordRejection(r: RejectedConnection): Promise<void> {
+    const key = `${r.remote.replace(/:\d+$/, '')}|${r.reason}`
+    const now = Date.now()
+    if ((lastRecorded.get(key) ?? 0) > now - 60_000) return
+    lastRecorded.set(key, now)
+    process.stdout.write(
+      `domid 拒绝了来自 ${r.remote} 的连接：${r.reason === 'missing' ? '没带 token' : 'token 不对'}\n`,
+    )
+    await host.audit({
+      t: 'permission',
+      capabilityId: 'daemon.connect',
+      decision: 'deny',
+      source: 'config',
+      matchedRule: 'server.token',
+      remote: r.remote,
+      reason: r.reason,
+      ...(r.origin === null ? {} : { origin: r.origin }),
+    })
+  }
   if (config.mcp.servers.length > 0) {
     void hub.start().then((statuses) => {
       for (const s of statuses) {
@@ -73,7 +117,7 @@ export async function main(env: Record<string, string | undefined> = process.env
   }
 
   const shutdown = async (): Promise<void> => {
-    await server.stop()
+    await ws.stop()
     await daemon.close()
     await hub.close()
     host.close()
