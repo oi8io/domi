@@ -1,0 +1,1071 @@
+# Domi Protocol
+
+> **本文件由 `scripts/gen-protocol-docs.ts` 生成，不要手改。** 改协议请改 `packages/protocol/src/rpc.ts`。
+> 协议版本 **v1** · 传输：JSON-RPC 2.0 over stdio（本地）/ WebSocket（远程）
+
+## 约定
+
+- **握手必须是第一个请求**；未握手的其它请求返回 `NOT_HANDSHAKED`。
+- **版本不匹配就断开，不降级**：返回 `PROTOCOL_VERSION_MISMATCH`，`data` 里带双方版本号。
+- **事件推送是通知**（没有 `id`），客户端不轮询。断线重连时用 `session.subscribe` 的 `fromSeq` 断点续订。
+- **daemon 是事件流的唯一写入者**，客户端只提交意图。
+
+## 方法
+
+### `handshake`
+
+版本协商。不兼容时返回 PROTOCOL_VERSION_MISMATCH，不进入任何降级路径
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "protocolVersion": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "client": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "protocolVersion",
+    "client"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "protocolVersion": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "serverVersion": {
+      "type": "string"
+    },
+    "methods": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "protocolVersion",
+    "serverVersion",
+    "methods"
+  ]
+}
+```
+
+### `session.list`
+
+列出会话（不含软删除的）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "eventCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "model",
+          "updatedAt",
+          "eventCount"
+        ]
+      }
+    }
+  },
+  "required": [
+    "sessions"
+  ]
+}
+```
+
+### `session.create`
+
+新建会话
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "cwd": {
+      "type": "string"
+    }
+  }
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+### `session.submit`
+
+提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "text"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "accepted": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "accepted"
+  ]
+}
+```
+
+### `session.subscribe`
+
+订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "fromSeq": {
+      "default": 0,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "head": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "head"
+  ]
+}
+```
+
+### `session.answer`
+
+回答一次权限询问
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "askId": {
+      "type": "string"
+    },
+    "allowed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "askId",
+    "allowed"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `session.compact`
+
+手动触发上下文压缩（PRD-M2-003 AC-1 的 /compact）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "detail": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "ok",
+    "detail"
+  ]
+}
+```
+
+## 通知（服务端 → 客户端）
+
+### `session.events`
+
+事件流增量推送
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "parentSeq": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ts": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "ev": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "user.input"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "attachments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "text"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.request"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "tokensIn": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "provider",
+                      "model",
+                      "tokensIn"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.delta"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "text"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.reason"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "text"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.usage"
+                      },
+                      "raw": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "raw"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "tool.call"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "args": {}
+                    },
+                    "required": [
+                      "t",
+                      "id",
+                      "name",
+                      "args"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "fs.snapshot"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string",
+                        "enum": [
+                          "before",
+                          "after"
+                        ]
+                      },
+                      "sha256": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "phase",
+                      "sha256",
+                      "bytes"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "tool.result"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "ok": {
+                        "type": "boolean"
+                      },
+                      "payload": {},
+                      "ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "id",
+                      "ok",
+                      "payload",
+                      "ms"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "permission"
+                      },
+                      "capabilityId": {
+                        "type": "string"
+                      },
+                      "decision": {
+                        "type": "string",
+                        "enum": [
+                          "allow",
+                          "deny",
+                          "ask"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "default",
+                          "config",
+                          "user"
+                        ]
+                      },
+                      "matchedRule": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "capabilityId",
+                      "decision",
+                      "source",
+                      "matchedRule"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.switch"
+                      },
+                      "from": {
+                        "type": "string"
+                      },
+                      "to": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "lostCapabilities": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "from",
+                      "to"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "snapshot"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "files": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "largeFilesSkipped": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "id",
+                      "label",
+                      "files"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "revert"
+                      },
+                      "toSeq": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "files",
+                          "conversation",
+                          "both"
+                        ]
+                      },
+                      "snapshotId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "undoSnapshotId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "toSeq",
+                      "scope",
+                      "snapshotId",
+                      "undoSnapshotId"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.cleanup"
+                      },
+                      "fromSeq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "toSeq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "tokensBefore": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "tokensAfter": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "saved": {
+                        "type": "object",
+                        "properties": {
+                          "dedupe": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "verbose": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "resolvedError": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "stack": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "dedupe",
+                          "verbose",
+                          "resolvedError",
+                          "stack"
+                        ]
+                      },
+                      "preserved": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "fromSeq",
+                      "toSeq",
+                      "tokensBefore",
+                      "tokensAfter",
+                      "saved",
+                      "preserved"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.compact"
+                      },
+                      "fromSeq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "toSeq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "keptTurns": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "tokensBefore": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "tokensAfter": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "trigger": {
+                        "type": "string",
+                        "enum": [
+                          "threshold",
+                          "manual"
+                        ]
+                      },
+                      "summary": {
+                        "type": "object",
+                        "properties": {
+                          "intent": {
+                            "type": "string"
+                          },
+                          "filesModified": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "keyDecisions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "openQuestions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "nextSteps": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "intent",
+                          "filesModified",
+                          "keyDecisions",
+                          "openQuestions",
+                          "nextSteps"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "fromSeq",
+                      "toSeq",
+                      "keptTurns",
+                      "tokensBefore",
+                      "tokensAfter",
+                      "trigger",
+                      "summary"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "error"
+                      },
+                      "scope": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "recoverable": {
+                        "type": "boolean"
+                      },
+                      "counters": {
+                        "type": "object",
+                        "properties": {
+                          "toolCalls": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "argParseRetries": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "elapsedMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "toolCalls",
+                          "argParseRetries",
+                          "elapsedMs"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "scope",
+                      "message",
+                      "recoverable"
+                    ],
+                    "additionalProperties": {}
+                  }
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "t": {
+                    "type": "string"
+                  },
+                  "__unparsed": {},
+                  "__schemaVersion": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "t",
+                  "__unparsed",
+                  "__schemaVersion"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "seq",
+          "sessionId",
+          "parentSeq",
+          "ts",
+          "schemaVersion",
+          "ev"
+        ]
+      }
+    }
+  },
+  "required": [
+    "sessionId",
+    "events"
+  ]
+}
+```
+
+### `session.ask`
+
+权限询问
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "askId": {
+      "type": "string"
+    },
+    "sessionId": {
+      "type": "string"
+    },
+    "capabilityId": {
+      "type": "string"
+    },
+    "detail": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "askId",
+    "sessionId",
+    "capabilityId",
+    "detail"
+  ]
+}
+```
+
+### `session.busy`
+
+会话忙闲变化
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "busy": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "sessionId",
+    "busy"
+  ]
+}
+```
+

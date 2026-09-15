@@ -1,3 +1,4 @@
 export * from './event.ts'
 export * from './message.ts'
+export * from './rpc.ts'
 export * from './tool.ts'

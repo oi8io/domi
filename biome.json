@@ -6,7 +6,15 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**/*.ts", "**/*.tsx", "**/*.json", "!**/node_modules", "!**/.api.md", "!**/fixtures"]
+    "includes": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.json",
+      "!**/node_modules",
+      "!**/.api.md",
+      "!docs/protocol.schema.json",
+      "!**/fixtures"
+    ]
   },
   "formatter": {
     "enabled": true,
