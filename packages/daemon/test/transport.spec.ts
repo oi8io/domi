@@ -71,6 +71,9 @@ function echoHost(): DaemonHost {
     },
     async remove() {},
     async restore() {},
+    async branch() {
+      return 's2'
+    },
     onEvents(cb) {
       emit = cb
     },

@@ -112,6 +112,10 @@ function makeHost(opts: { submitMs?: number } = {}) {
       if (id !== 's1') throw new SessionNotFoundError(id)
       deleted = false
     },
+    async branch(id) {
+      if (id !== 's1') throw new SessionNotFoundError(id)
+      return 's2'
+    },
     onEvents(cb) {
       emit = cb
     },

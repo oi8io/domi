@@ -42,6 +42,18 @@ export class SessionNotFoundError extends Error {
   }
 }
 
+/** 分叉点不在会话里（比 head 大）。翻译成 INVALID_PARAMS：是请求错了，不是会话没了 */
+export class BranchPointError extends Error {
+  constructor(
+    readonly sessionId: string,
+    readonly atSeq: number,
+    readonly head: number,
+  ) {
+    super(`分叉点越界：会话 ${sessionId} 只有 ${head} 条，没有第 ${atSeq} 条`)
+    this.name = 'BranchPointError'
+  }
+}
+
 /** 一个已连接的客户端。传输层实现它，core 只管往里写 */
 export interface ClientConn {
   readonly id: string
@@ -66,6 +78,7 @@ export interface SessionSummary {
   updatedAt: number
   eventCount: number
   deleted: boolean
+  parentId?: string
 }
 
 /** 一次权限询问。answer 由宿主提供，core 只负责把它交到某个客户端手里 */
@@ -89,6 +102,11 @@ export interface DaemonHost {
   /** 软删除 / 恢复。会话不存在时抛 SessionNotFoundError */
   remove(sessionId: string): Promise<void>
   restore(sessionId: string): Promise<void>
+  /**
+   * 从会话视图的第 atSeq 条分出新会话，返回新 id。
+   * 会话不存在抛 SessionNotFoundError；越界抛 BranchPointError
+   */
+  branch(sessionId: string, atSeq: number): Promise<string>
   /** 会话产生新事件时调用；daemon 据此推给订阅者 */
   onEvents(cb: (sessionId: string, events: EventEnvelope[]) => void): void
   onBusy?(cb: (sessionId: string, busy: boolean) => void): void
@@ -181,6 +199,7 @@ export class Daemon {
       return await this.dispatch(conn, req, method, parsed.data as never)
     } catch (e) {
       if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message)
+      if (e instanceof BranchPointError) return fail(req.id, 'INVALID_PARAMS', e.message)
       return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
     }
   }
@@ -218,6 +237,11 @@ export class Daemon {
         const p = params as { sessionId: string }
         await this.host.restore(p.sessionId)
         return ok(req.id, { ok: true })
+      }
+
+      case 'session.branch': {
+        const p = params as { sessionId: string; atSeq: number }
+        return ok(req.id, { sessionId: await this.host.branch(p.sessionId, p.atSeq) })
       }
 
       case 'session.switchModel': {

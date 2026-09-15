@@ -27,7 +27,10 @@ afterEach(() => {
   }
 })
 
-function setup(provider = new StubProvider([[{ type: 'delta', text: '好的' }]], { onExhausted: 'repeat-last' })) {
+function setup(
+  provider = new StubProvider([[{ type: 'delta', text: '好的' }]], { onExhausted: 'repeat-last' }),
+  newId: () => string = () => 'sess-1',
+) {
   const d = mkdtempSync(join(tmpdir(), 'domi-host-'))
   dirs.push(d)
   const host = createRuntimeHost({
@@ -38,7 +41,7 @@ function setup(provider = new StubProvider([[{ type: 'delta', text: '好的' }]]
     dbPath: join(d, 'events.db'),
     defaultCwd: d,
     provider,
-    newId: () => 'sess-1',
+    newId,
   })
   hosts.push(host)
   return { host, daemon: new Daemon(host), dir: d }
@@ -163,5 +166,57 @@ describe('RuntimeHost', () => {
     expect((await call(daemon, c, 'session.list')).result).toMatchObject({
       sessions: [{ id: 'sess-1', deleted: false }],
     })
+  })
+
+  test('TASK-M3-014 · session.branch：新会话带着父链历史，续订与推送的 seq 连续，父会话不变', async () => {
+    const ids = ['base', 'br']
+    const { daemon } = setup(
+      new StubProvider([[{ type: 'delta', text: '回答' }]], { onExhausted: 'repeat-last' }),
+      () => ids.shift() as string,
+    )
+    const c = new Conn('c')
+    await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    const created = await call(daemon, c, 'session.create')
+    const baseId = (created.result as { sessionId: string }).sessionId
+    await call(daemon, c, 'session.subscribe', { sessionId: baseId, fromSeq: 0 })
+    await call(daemon, c, 'session.submit', { sessionId: baseId, text: '主线第一问' })
+    for (let i = 0; i < 100 && !c.events().some((e) => e.ev.t === 'model.delta'); i++) await Bun.sleep(10)
+    await Bun.sleep(50)
+    const at = c.events().length
+
+    const r = await call(daemon, c, 'session.branch', { sessionId: baseId, atSeq: at })
+    const branchId = (r.result as { sessionId: string }).sessionId
+    expect(branchId).not.toBe(baseId)
+
+    const b = new Conn('b')
+    await call(daemon, b, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    const sub = await call(daemon, b, 'session.subscribe', { sessionId: branchId, fromSeq: 0 })
+    expect(sub.result).toEqual({ head: at })
+    expect(b.events().map((e) => e.seq)).toEqual(Array.from({ length: at }, (_, i) => i + 1))
+    expect(JSON.stringify(b.events())).toContain('主线第一问')
+
+    await call(daemon, b, 'session.submit', { sessionId: branchId, text: '分支第一问' })
+    for (let i = 0; i < 100 && !JSON.stringify(b.events()).includes('分支第一问'); i++) await Bun.sleep(10)
+    await Bun.sleep(50)
+    const seqs = b.events().map((e) => e.seq)
+    expect(seqs).toEqual(seqs.map((_, i) => i + 1))
+    expect(JSON.stringify(c.events())).not.toContain('分支第一问')
+
+    const listed = await call(daemon, c, 'session.list')
+    expect((listed.result as { sessions: Array<{ id: string; parentId?: string }> }).sessions).toContainEqual(
+      expect.objectContaining({ id: branchId, parentId: baseId }),
+    )
+  })
+
+  test('session.branch 的分叉点越界 → INVALID_PARAMS', async () => {
+    const { daemon } = setup()
+    const c = new Conn('c')
+    await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    await call(daemon, c, 'session.create')
+    const r = await call(daemon, c, 'session.branch', { sessionId: 'sess-1', atSeq: 5 })
+    expect(r.error?.code).toBe('INVALID_PARAMS')
+    expect((await call(daemon, c, 'session.branch', { sessionId: 'nope', atSeq: 1 })).error?.code).toBe(
+      'SESSION_NOT_FOUND',
+    )
   })
 })

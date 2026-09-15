@@ -14,12 +14,13 @@
  */
 import { homedir } from 'node:os'
 import { formatOnboarding, type ParsedCli, parseCli, runCommand } from '@domi/cli'
-import { answerFromKey, type DomiClient, focusIdOf, type SessionStore } from '@domi/client-core'
+import { answerFromKey, createSessionStore, type DomiClient, focusIdOf, type SessionStore } from '@domi/client-core'
 import { ConfigParseError, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
 import { useStore } from '@nanostores/react'
-import { Box, render, useApp, useInput } from 'ink'
+import { Box, render, Text, useApp, useInput } from 'ink'
 import { useCallback, useState } from 'react'
 import { App } from './App.tsx'
+import { parseSlash } from './commands.ts'
 import { Prompt } from './components/Prompt.tsx'
 import { connectChat } from './connect.ts'
 
@@ -36,15 +37,18 @@ const EXIT_DAEMON_ERROR = 3
 const DAEMON_ROLE_ENV = 'DOMI_INTERNAL_ROLE'
 
 function Root({
-  store,
+  store: initialStore,
   client,
-  sessionId,
+  sessionId: initialSessionId,
 }: {
   store: SessionStore
   client: DomiClient
   sessionId: string
 }): React.ReactElement {
   const { exit } = useApp()
+  // 分支后切到新会话：换一个 store 重新订阅，旧会话在 daemon 里不受影响
+  const [{ sessionId, store }, setActive] = useState({ sessionId: initialSessionId, store: initialStore })
+  const [notice, setNotice] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   // 提交到 daemon 回 accepted、再到第一条 busy 通知之间有个空档，这段时间也不许再提交
   const [sending, setSending] = useState(false)
@@ -82,15 +86,35 @@ function Root({
       if (text === '') return
       setDraft('')
       setSending(true)
-      // 斜杠命令。结果都由事件自己显示在对话里（ctx.compact / model.switch），这里不另塞界面状态
-      const [cmd, ...rest] = text.split(/\s+/)
-      const run =
-        cmd === '/compact'
-          ? client.request('session.compact', { sessionId }) // PRD-M2-003 AC-1
-          : cmd === '/model' && rest[0]
-            ? client.switchModel(sessionId, rest[0], rest[1]) // PRD-M1-002 · parity 第 10 项
-            : client.submit(sessionId, text)
-      void run.catch(() => undefined).finally(() => setSending(false))
+      setNotice(null)
+      const cmd = parseSlash(text, store.$items.get().at(-1)?.seq ?? 0)
+      const run = (async (): Promise<unknown> => {
+        switch (cmd.kind) {
+          case 'invalid':
+            setNotice(cmd.message)
+            return
+          case 'compact':
+            return client.request('session.compact', { sessionId })
+          case 'model':
+            return client.switchModel(sessionId, cmd.model, cmd.provider)
+          case 'branch': {
+            const id = await client.branchSession(sessionId, cmd.atSeq)
+            const { model, provider } = store.$status.get()
+            const next = createSessionStore({ model, provider })
+            client.unwatch(sessionId)
+            await client.watch(id, next)
+            setActive({ sessionId: id, store: next })
+            setNotice(`已切到分支 ${id}（从第 ${cmd.atSeq} 条分出）`)
+            return
+          }
+          case 'submit':
+            return client.submit(sessionId, cmd.text)
+        }
+      })()
+      // SESSION_BUSY、越界之类的结构化错误原样给人看（PRD-M3-004 AC-3）
+      void run
+        .catch((e: unknown) => setNotice(e instanceof Error ? e.message : String(e)))
+        .finally(() => setSending(false))
       return
     }
     if (key.backspace || key.delete) {
@@ -103,6 +127,7 @@ function Root({
   return (
     <Box flexDirection="column">
       <App store={store} />
+      {notice !== null && <Text dimColor>{notice}</Text>}
       <Prompt value={draft} disabled={busy} />
     </Box>
   )

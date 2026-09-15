@@ -18,6 +18,7 @@ interface SessionRow {
   model: string
   eventCount: number
   deleted: boolean
+  parentId?: string | undefined
 }
 
 const STATE_LABEL: Record<ConnectionState, string> = {
@@ -64,6 +65,11 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
     open(id)
   }
 
+  const branched = async (id: string): Promise<void> => {
+    await refresh()
+    open(id)
+  }
+
   const removed = async (): Promise<void> => {
     if (active) client.unwatch(active.id)
     setActive(null)
@@ -98,7 +104,8 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
               <button type="button" className={active?.id === s.id ? 'current' : ''} onClick={() => open(s.id)}>
                 <span className="title">{s.title || s.id}</span>
                 <span className="meta">
-                  {s.model} · {s.eventCount} 条事件{s.deleted ? ' · 已删除' : ''}
+                  {s.model} · {s.eventCount} 条事件{s.parentId === undefined ? '' : ' · 分支'}
+                  {s.deleted ? ' · 已删除' : ''}
                 </span>
               </button>
               {s.deleted && (
@@ -118,6 +125,7 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
             sessionId={active.id}
             store={active.store}
             onDeleted={() => void removed()}
+            onBranched={(id) => void branched(id)}
           />
         ) : (
           <p className="empty">从左边选一个会话，或者新建一个。</p>
@@ -132,11 +140,14 @@ export function SessionView({
   sessionId,
   store,
   onDeleted,
+  onBranched,
 }: {
   client: DomiClient
   sessionId: string
   store: SessionStore
   onDeleted?: () => void
+  /** 分支建好了，交给上层去刷新列表并打开它 */
+  onBranched?: (sessionId: string) => void
 }) {
   const items = useStore(store.$items)
   const status = useStore(store.$status)
@@ -169,6 +180,13 @@ export function SessionView({
     )
   }
 
+  const branch = (seq: number): void => {
+    client.branchSession(sessionId, seq).then(
+      (id) => onBranched?.(id),
+      (err: Error) => setNotice(err.message),
+    )
+  }
+
   return (
     <section className="session">
       <SessionTools
@@ -179,7 +197,7 @@ export function SessionView({
         {...(onDeleted === undefined ? {} : { onDeleted })}
       />
       <StatusBar status={status} />
-      <Transcript items={items} />
+      <Transcript items={items} {...(onBranched === undefined ? {} : { onBranch: branch })} />
       {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
       <form className="composer" onSubmit={submit}>
         {notice !== null && <p className="error">{notice}</p>}

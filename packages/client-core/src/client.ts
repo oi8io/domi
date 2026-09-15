@@ -118,6 +118,12 @@ export class DomiClient {
     await this.request('session.restore', { sessionId })
   }
 
+  /** 从第 atSeq 条分出新会话，返回新会话 id（TASK-M3-014） */
+  async branchSession(sessionId: string, atSeq: number): Promise<string> {
+    const r = await this.request('session.branch', { sessionId, atSeq })
+    return r.sessionId
+  }
+
   /** 返回会失去的能力。切换本身会以 model.switch 事件出现在对话里 */
   async switchModel(sessionId: string, model: string, provider?: string): Promise<string[]> {
     const r = await this.request(

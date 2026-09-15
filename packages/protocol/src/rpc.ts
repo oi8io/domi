@@ -60,6 +60,8 @@ const SessionSummarySchema = z.object({
   eventCount: z.number().int().nonnegative(),
   /** 软删除的会话只在 includeDeleted 时出现，并标上这个 */
   deleted: z.boolean(),
+  /** 分支会话：从哪个会话分出来的（TASK-M3-014） */
+  parentId: z.string().optional(),
 })
 
 /** 状态栏指标。**由 runtime 算好推过来**，客户端不自己算（PRD-M1-007 AC-3） */
@@ -121,6 +123,13 @@ export const METHODS = {
     params: z.object({ sessionId: z.string() }),
     result: z.object({ ok: z.literal(true) }),
   },
+  'session.branch': {
+    summary:
+      '从会话的第 atSeq 条（订阅里看到的 seq）分出一个新会话（PRD-M1-006 AC-3）。' +
+      '新会话带着到这一条为止的历史，之后两边各走各的，事件一条不复制；越界 → INVALID_PARAMS',
+    params: z.object({ sessionId: z.string(), atSeq: z.number().int().min(1) }),
+    result: z.object({ sessionId: z.string() }),
+  },
   'session.switchModel': {
     summary: '会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力',
     params: z.object({ sessionId: z.string(), model: z.string().min(1), provider: z.string().min(1).optional() }),
@@ -137,7 +146,9 @@ export const METHODS = {
     result: z.object({ accepted: z.literal(true) }),
   },
   'session.subscribe': {
-    summary: '订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏',
+    summary:
+      '订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏。' +
+      '分支会话的 seq 是**视图编号**：父链到分叉点的那一段排在前面、从 1 连续编下来，自己的事件接在后面',
     params: z.object({ sessionId: z.string(), fromSeq: z.number().int().nonnegative().default(0) }),
     result: z.object({ head: z.number().int().nonnegative() }),
   },

@@ -86,6 +86,9 @@
                 },
                 "deleted": {
                   "type": "boolean"
+                },
+                "parentId": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -155,6 +158,38 @@
         },
         "required": [
           "ok"
+        ]
+      }
+    },
+    "session.branch": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "atSeq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "sessionId",
+          "atSeq"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
         ]
       }
     },

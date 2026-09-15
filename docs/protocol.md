@@ -120,6 +120,9 @@
           },
           "deleted": {
             "type": "boolean"
+          },
+          "parentId": {
+            "type": "string"
           }
         },
         "required": [
@@ -213,6 +216,50 @@
   },
   "required": [
     "ok"
+  ]
+}
+```
+
+### `session.branch`
+
+从会话的第 atSeq 条（订阅里看到的 seq）分出一个新会话（PRD-M1-006 AC-3）。新会话带着到这一条为止的历史，之后两边各走各的，事件一条不复制；越界 → INVALID_PARAMS
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "atSeq": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "sessionId",
+    "atSeq"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
   ]
 }
 ```
@@ -347,7 +394,7 @@
 
 ### `session.subscribe`
 
-订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏
+订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏。分支会话的 seq 是**视图编号**：父链到分叉点的那一段排在前面、从 1 连续编下来，自己的事件接在后面
 
 **params**
 

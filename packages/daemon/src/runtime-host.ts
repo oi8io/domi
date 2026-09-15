@@ -13,6 +13,7 @@ import type { EventEnvelope } from '@domi/protocol'
 import { DomiSession, type SessionOptions } from '@domi/runtime'
 import { SqliteEventLog } from '@domi/store'
 import {
+  BranchPointError,
   type DaemonHost,
   type HostAsk,
   type HostMetrics,
@@ -112,7 +113,24 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         updatedAt: r.updatedAt,
         eventCount: r.eventCount,
         deleted: r.deletedAt !== null,
+        ...(r.parentSessionId === null ? {} : { parentId: r.parentSessionId }),
       }))
+    },
+
+    /**
+     * atSeq 是客户端看到的**视图** seq。它可能落在祖先那一段里——那就从祖先分：
+     * 「从这条消息分支」的意思是「回到这条消息之后」，和它当初属于哪一段无关
+     */
+    async branch(sessionId, atSeq) {
+      if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+      const at = index.resolveViewSeq(sessionId, atSeq)
+      if (!at) {
+        const head = index.viewOffset(sessionId) + (await index.head(sessionId))
+        throw new BranchPointError(sessionId, atSeq, head)
+      }
+      const id = newId()
+      await index.fork(at.sessionId, at.seq, id)
+      return id
     },
 
     async remove(sessionId) {

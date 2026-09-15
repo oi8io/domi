@@ -39,7 +39,23 @@ const LABEL: Record<TranscriptItem['kind'], string> = {
   context: '上下文',
 }
 
-export function Transcript({ items }: { items: readonly TranscriptItem[] }) {
+/** 「从这里分支」。分支点是这一行最后一条事件：工具行带上结果，免得分出去的会话里有调用没结果 */
+function BranchButton({ seq, onBranch }: { seq: number; onBranch: (seq: number) => void }) {
+  return (
+    <button type="button" className="branch" title={`从第 ${seq} 条分支出一个新会话`} onClick={() => onBranch(seq)}>
+      分支
+    </button>
+  )
+}
+
+export function Transcript({
+  items,
+  onBranch,
+}: {
+  items: readonly TranscriptItem[]
+  /** 不给就不画分支按钮（只读视图） */
+  onBranch?: (seq: number) => void
+}) {
   if (items.length === 0) return <p className="empty">还没有事件。</p>
   return (
     <ol className="transcript">
@@ -59,12 +75,14 @@ export function Transcript({ items }: { items: readonly TranscriptItem[] }) {
               <pre className="args">{row.call.summary}</pre>
               {row.result !== null && <pre className="result">{row.result.summary ?? row.result.text}</pre>}
             </details>
+            {onBranch !== undefined && <BranchButton seq={(row.result ?? row.call).seq} onBranch={onBranch} />}
           </li>
         ) : (
           <li key={row.item.seq} className={`row ${row.item.kind}`} data-seq={row.item.seq}>
             <span className="label">{LABEL[row.item.kind]}</span>
             <div className="text">{row.item.text}</div>
             {row.item.summary !== undefined && <div className="summary">{row.item.summary}</div>}
+            {onBranch !== undefined && <BranchButton seq={row.item.seq} onBranch={onBranch} />}
           </li>
         ),
       )}

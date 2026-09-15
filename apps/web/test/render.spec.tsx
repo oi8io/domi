@@ -192,3 +192,17 @@ describe('表单型询问（TASK-M3-016）', () => {
     expect(formValues(schema, {})).toEqual({ ok: false })
   })
 })
+
+describe('会话分支（parity 第 7 项）', () => {
+  test('每条事件旁有「从这里分支」，点下去带着这条的 seq', () => {
+    const items: TranscriptItem[] = [
+      { seq: 1, kind: 'user', text: '问' },
+      { seq: 3, kind: 'assistant', text: '答' },
+    ]
+    const html = renderToStaticMarkup(<Transcript items={items} onBranch={() => undefined} />)
+    expect(html.match(/class="branch"/g)?.length).toBe(2)
+    expect(html).toContain('title="从第 3 条分支出一个新会话"')
+    // 不给回调就不画按钮（比如只读视图）
+    expect(renderToStaticMarkup(<Transcript items={items} />)).not.toContain('class="branch"')
+  })
+})

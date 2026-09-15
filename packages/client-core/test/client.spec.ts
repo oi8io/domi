@@ -268,6 +268,22 @@ describe('询问与指标投影进 store', () => {
     expect(sock.sent.at(-1)).toMatchObject({ params: { askId: 'f1', allowed: true, content: { env: 'prod' } } })
   })
 
+  test('branchSession 发 session.branch，返回新会话 id', async () => {
+    const { client, sock } = await connected()
+    const orig = sock.send.bind(sock)
+    sock.send = (data: string) => {
+      const req = JSON.parse(data) as { id: number; method: string }
+      if (req.method === 'session.branch') {
+        sock.sent.push(req as never)
+        queueMicrotask(() => sock.push({ jsonrpc: '2.0', id: req.id, result: { sessionId: 'br-1' } }))
+        return
+      }
+      orig(data)
+    }
+    expect(await client.branchSession('s1', 7)).toBe('br-1')
+    expect(sock.sent.at(-1)).toMatchObject({ method: 'session.branch', params: { sessionId: 's1', atSeq: 7 } })
+  })
+
   test('session.metrics → 状态栏的模型与指标', async () => {
     const { store, sock } = await connected()
     sock.push({
