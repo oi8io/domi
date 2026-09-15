@@ -53,6 +53,15 @@ module.exports = {
       to: { path: '^(node:)?(fs|fs/promises|path|os|net|http|https|crypto|child_process|stream|url|util|worker_threads|bun:sqlite)$' },
     },
     {
+      name: 'client-core-no-store',
+      comment:
+        'PRD-M3-004 AC-1 · INV-01：daemon 是事件流的唯一写入者，客户端只提交意图。' +
+        '按包名 import 已被 pnpm 隔离挡住，这条挡的是相对路径摸进 store。',
+      severity: 'error',
+      from: { path: '^packages/client-core/src' },
+      to: { path: '^packages/store/' },
+    },
+    {
       name: 'no-circular',
       severity: 'error',
       from: {},

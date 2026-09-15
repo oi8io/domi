@@ -280,6 +280,21 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  packages/daemon:
+    dependencies:
+      '@domi/config':
+        specifier: workspace:*
+        version: link:../config
+      '@domi/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@domi/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      '@domi/store':
+        specifier: workspace:*
+        version: link:../store
+
   packages/eval:
     dependencies:
       '@domi/kernel':
