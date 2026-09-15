@@ -42,6 +42,15 @@ export function tuiFormAnswer(schema: unknown): Record<string, unknown> | null {
   return null
 }
 const EXIT_DAEMON_ERROR = 3
+
+/** `/sessions` 的一行。当前会话打个 * */
+export function formatSessionLine(
+  s: { id: string; title: string; model: string; eventCount: number; deleted: boolean; parentId?: string | undefined },
+  current: string,
+): string {
+  const tags = [s.parentId === undefined ? '' : '分支', s.deleted ? '已删除' : ''].filter(Boolean)
+  return `${s.id === current ? '*' : ' '} ${s.id}  ${s.title || '（无标题）'}  ${s.model} · ${s.eventCount} 条${tags.length ? ` · ${tags.join(' · ')}` : ''}`
+}
 const DAEMON_ROLE_ENV = 'DOMI_INTERNAL_ROLE'
 
 function Root({
@@ -123,6 +132,45 @@ function Root({
             setNotice(`下一句话会带上 ${next.length} 段引用（最近一段：会话 ${cmd.ref.sessionId}）`)
             return
           }
+          case 'sessions': {
+            const { sessions } = await client.listSessions({ includeDeleted: cmd.includeDeleted })
+            setNotice(
+              sessions.length === 0 ? '还没有会话' : sessions.map((s) => formatSessionLine(s, sessionId)).join('\n'),
+            )
+            return
+          }
+          case 'open':
+          case 'new': {
+            const id = cmd.kind === 'new' ? await client.createSession(process.cwd()) : cmd.sessionId
+            if (id === sessionId) return
+            const { model, provider } = store.$status.get()
+            const next = createSessionStore({ model, provider })
+            // 先订阅新的再放掉旧的：id 不存在时 watch 抛错，留在原会话里
+            await client.watch(id, next)
+            client.unwatch(sessionId)
+            setActive({ sessionId: id, store: next })
+            setPendingRefs([])
+            setNotice(`已切到会话 ${id}`)
+            return
+          }
+          case 'delete': {
+            await client.deleteSession(cmd.sessionId)
+            // 删的是自己：换一个新会话接着用，不留在一个已删除的会话里
+            if (cmd.sessionId === sessionId) {
+              const id = await client.createSession(process.cwd())
+              const { model, provider } = store.$status.get()
+              const next = createSessionStore({ model, provider })
+              await client.watch(id, next)
+              client.unwatch(sessionId)
+              setActive({ sessionId: id, store: next })
+            }
+            setNotice(`已删除会话 ${cmd.sessionId}（事件都还在，/restore ${cmd.sessionId} 可以恢复）`)
+            return
+          }
+          case 'restore':
+            await client.restoreSession(cmd.sessionId)
+            setNotice(`已恢复会话 ${cmd.sessionId}（/open ${cmd.sessionId} 打开）`)
+            return
           case 'submit': {
             const r = await client.submit(sessionId, cmd.text, pendingRefs)
             setPendingRefs([])

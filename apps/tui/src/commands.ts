@@ -11,6 +11,11 @@ export type SlashCommand =
   | { kind: 'model'; model: string; provider?: string }
   | { kind: 'branch'; atSeq: number }
   | { kind: 'ref'; ref: RefLink }
+  | { kind: 'sessions'; includeDeleted: boolean }
+  | { kind: 'open'; sessionId: string }
+  | { kind: 'new' }
+  | { kind: 'delete'; sessionId: string }
+  | { kind: 'restore'; sessionId: string }
   | { kind: 'invalid'; message: string }
 
 /** lastSeq = 当前对话里最后一条的 seq；`/branch` 不带数字时从这里分 */
@@ -45,6 +50,19 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       const to = m?.[2] === undefined ? from : Number(m[2])
       if (!m || from < 1 || to < from) return usage
       return { kind: 'ref', ref: { sessionId: rest[0], fromSeq: from, toSeq: to } }
+    }
+    // 会话管理（parity 第 5、6、8 项）
+    case '/sessions':
+      if (rest[0] !== undefined && rest[0] !== '--all') return { kind: 'invalid', message: '用法：/sessions [--all]' }
+      return { kind: 'sessions', includeDeleted: rest[0] === '--all' }
+    case '/new':
+      return { kind: 'new' }
+    case '/open':
+    case '/delete':
+    case '/restore': {
+      if (!rest[0]) return { kind: 'invalid', message: `用法：${cmd} <会话 id>（/sessions 可以看到 id）` }
+      const kind = cmd.slice(1) as 'open' | 'delete' | 'restore'
+      return { kind, sessionId: rest[0] }
     }
     default:
       return { kind: 'submit', text }

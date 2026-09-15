@@ -27,7 +27,6 @@
           TASK-M3-010 kill -9 后打开会话自动补到一致点；TASK-M3-011 远程连接 + token，见 ADR-017；
           TASK-M3-012 跨会话引用，Web「引用这一轮」/ TUI `/ref`）
         1. 进 M4（Soul）：先按 PRD 规定把 M4 章节重写成 COMMITTED 并过 PM 门禁
-        2. TUI 里补会话列表 / 恢复 / 删除入口（parity 第 5、6、8 项的 TUI 列）
         3. 最后统一：TASK-M3-008 parity e2e（Playwright）；TASK-M3-009 推送延迟基准
         5. 缺陷登记里 open 的：BUG-M3-003（状态栏缺本轮耗时）、BUG-M3-008（陈锁并发接管）、
            BUG-M3-012（配置里的提示词层从未被读取）
