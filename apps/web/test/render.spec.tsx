@@ -8,6 +8,8 @@ import { describe, expect, test } from 'bun:test'
 import { createSessionStore, DomiClient, type TranscriptItem, type WireSocket } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { App, SessionView } from '../src/App.tsx'
+import { ConfirmDialog } from '../src/ConfirmDialog.tsx'
+import { StatusBar } from '../src/StatusBar.tsx'
 import { groupRows, Transcript } from '../src/Transcript.tsx'
 
 const neverConnects = (): WireSocket => {
@@ -69,5 +71,52 @@ describe('状态来自 client-core，页面不自己算', () => {
     const html = renderToStaticMarkup(<App client={client} daemonUrl="ws://127.0.0.1:7437" />)
     expect(html).toContain('协议版本不兼容')
     expect(html).toContain('客户端 v2，服务端 v1')
+  })
+})
+
+describe('工具确认（parity 第 3 项）', () => {
+  test('显示完整待执行内容；默认焦点在拒绝上', () => {
+    const detail = JSON.stringify({ path: 'a.txt', content: 'x'.repeat(200) }, null, 2)
+    const html = renderToStaticMarkup(
+      <ConfirmDialog ask={{ askId: 'k', capabilityId: 'fs.write', detail }} onAnswer={() => undefined} />,
+    )
+    expect(html).toContain('fs.write')
+    expect(html).toContain('x'.repeat(200)) // 不截断
+    // autoFocus 在 SSR 里不出属性，所以断言按钮顺序：拒绝排在前面、且是第一个按钮
+    expect(html.indexOf('拒绝')).toBeLessThan(html.indexOf('允许'))
+  })
+
+  test('store 里有询问时，会话视图里出现确认框', () => {
+    const store = createSessionStore()
+    store.setAsk({ askId: 'k', capabilityId: 'shell.exec', detail: 'bun test' })
+    const client = new DomiClient({ clientName: 't', connect: neverConnects })
+    const html = renderToStaticMarkup(<SessionView client={client} sessionId="s" store={store} />)
+    expect(html).toContain('role="alertdialog"')
+    expect(html).toContain('bun test')
+  })
+})
+
+describe('状态栏（parity 第 9 项）', () => {
+  test('与 TUI 同样的几段；上下文 ≥70% 标 warn', () => {
+    const store = createSessionStore({ provider: 'anthropic', model: 'glm' })
+    store.setMetrics({
+      tokens: { input: 1200, output: 30, cacheRead: 0 },
+      cost: '—',
+      contextPercent: 72,
+      contextLevel: 'warn',
+      unpricedModels: ['glm'],
+    })
+    const html = renderToStaticMarkup(<StatusBar status={store.$status.get()} />)
+    expect(html).toContain('anthropic/glm')
+    expect(html).toContain('1.2k/30 tok')
+    expect(html).toContain('0 次工具')
+    expect(html).toContain('class="ctx ctx-warn"')
+    expect(html).toContain('ctx 72%')
+  })
+
+  test('还没有指标时不瞎编数字', () => {
+    const html = renderToStaticMarkup(<StatusBar status={createSessionStore().$status.get()} />)
+    expect(html).toContain('— tok')
+    expect(html).not.toContain('$0')
   })
 })

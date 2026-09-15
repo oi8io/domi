@@ -207,3 +207,71 @@ describe('去重', () => {
     expect(client.lastSeq('other')).toBe(0)
   })
 })
+
+describe('询问与指标投影进 store', () => {
+  async function connected() {
+    let sock: FakeSocket | null = null
+    const client = new DomiClient({
+      clientName: 'test',
+      reconnectMs: 0,
+      connect: () => {
+        sock = new FakeSocket((req) =>
+          req.method === 'handshake'
+            ? okHandshake
+            : req.method === 'session.subscribe'
+              ? { result: { head: 0 } }
+              : req.method === 'session.answer'
+                ? { result: { ok: true } }
+                : undefined,
+        )
+        return sock
+      },
+    })
+    await client.start()
+    const store = createSessionStore()
+    await client.watch('s1', store)
+    return { client, store, sock: sock as unknown as FakeSocket }
+  }
+
+  test('session.ask → $ask 带上 askId；只有同一个 askId 的 askDone 才清掉它', async () => {
+    const { client, store, sock } = await connected()
+    const note = (method: string, params: unknown) => sock.push({ jsonrpc: '2.0', method, params })
+    note('session.ask', { askId: 'k2', sessionId: 's1', capabilityId: 'fs.write', detail: '{}' })
+    expect(store.$ask.get()).toEqual({ askId: 'k2', capabilityId: 'fs.write', detail: '{}' })
+
+    note('session.askDone', { sessionId: 's1', askId: 'k1', allowed: true }) // 旧的那个
+    expect(store.$ask.get()?.askId).toBe('k2')
+
+    expect(await client.answer('k2', false)).toBe(true)
+    expect(sock.sent.at(-1)).toMatchObject({ method: 'session.answer', params: { askId: 'k2', allowed: false } })
+    // 回答本身不清框，等 daemon 的 askDone
+    expect(store.$ask.get()?.askId).toBe('k2')
+    note('session.askDone', { sessionId: 's1', askId: 'k2', allowed: false })
+    expect(store.$ask.get()).toBeNull()
+  })
+
+  test('session.metrics → 状态栏的模型与指标', async () => {
+    const { store, sock } = await connected()
+    sock.push({
+      jsonrpc: '2.0',
+      method: 'session.metrics',
+      params: {
+        sessionId: 's1',
+        metrics: {
+          provider: 'anthropic',
+          model: 'glm',
+          tokens: { input: 1200, output: 30, cacheRead: 0 },
+          cost: '—',
+          contextPercent: 72,
+          contextLevel: 'warn',
+          unpricedModels: ['glm'],
+        },
+      },
+    })
+    const st = store.$status.get()
+    expect(st.provider).toBe('anthropic')
+    expect(st.model).toBe('glm')
+    expect(st.metrics?.contextLevel).toBe('warn')
+    expect(st.metrics).not.toHaveProperty('model')
+  })
+})

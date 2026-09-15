@@ -120,6 +120,15 @@ export class DomiClient {
   }
 
   /**
+   * 回答一次权限询问。返回 false = 没生效（已经被别的客户端答过）。
+   * 不在这里清确认框：等 daemon 推 session.askDone 再清，所有客户端走同一条路
+   */
+  async answer(askId: string, allowed: boolean): Promise<boolean> {
+    const r = await this.request('session.answer', { askId, allowed })
+    return r.ok
+  }
+
+  /**
    * 订阅一个会话，把事件投影进 store。
    * 已经订阅过的会话再调一次只会换 store，续订锚点保持不变。
    */
@@ -227,6 +236,22 @@ export class DomiClient {
     } else if (msg.method === 'session.busy') {
       const params = msg.params as NotifyParamsOf<'session.busy'>
       this.watches.get(params.sessionId)?.store.setBusy(params.busy)
+    } else if (msg.method === 'session.ask') {
+      const p = msg.params as NotifyParamsOf<'session.ask'>
+      this.watches.get(p.sessionId)?.store.setAsk({ askId: p.askId, capabilityId: p.capabilityId, detail: p.detail })
+    } else if (msg.method === 'session.askDone') {
+      const p = msg.params as NotifyParamsOf<'session.askDone'>
+      const store = this.watches.get(p.sessionId)?.store
+      // 只清同一个询问：答完之后紧接着来了下一个的话，不能把新的也清掉
+      if (store && store.$ask.get()?.askId === p.askId) store.setAsk(null)
+    } else if (msg.method === 'session.metrics') {
+      const p = msg.params as NotifyParamsOf<'session.metrics'>
+      const store = this.watches.get(p.sessionId)?.store
+      if (store) {
+        const { provider, model, ...metrics } = p.metrics
+        store.setModel(provider, model)
+        store.setMetrics(metrics)
+      }
     }
   }
 

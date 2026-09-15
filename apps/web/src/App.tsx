@@ -3,11 +3,13 @@
  *
  * 能连上、能列会话、能看到事件流与轨迹、能提交输入。**只渲染**：
  * 状态全在 client-core 的 atom 里，这个文件里没有一行是在算「事件意味着什么」。
- * 与 TUI 的逐项对等见 docs/parity-checklist.md（这一轮还没做完）。
+ * 与 TUI 的逐项对等见 docs/parity-checklist.md。
  */
 import { type ConnectionState, createSessionStore, type DomiClient, type SessionStore } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
 import { type FormEvent, useEffect, useState } from 'react'
+import { ConfirmDialog } from './ConfirmDialog.tsx'
+import { StatusBar } from './StatusBar.tsx'
 import { Transcript } from './Transcript.tsx'
 
 interface SessionRow {
@@ -107,6 +109,7 @@ export function SessionView({
 }) {
   const items = useStore(store.$items)
   const status = useStore(store.$status)
+  const ask = useStore(store.$ask)
   const [text, setText] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -124,9 +127,22 @@ export function SessionView({
     )
   }
 
+  const answer = (allowed: boolean): void => {
+    if (!ask?.askId) return
+    client.answer(ask.askId, allowed).then(
+      (applied) => {
+        // 没生效 = 别的客户端已经答过了；确认框会随 askDone 关掉，这里只说明一下
+        if (!applied) setNotice('这个询问已经在别处回答过了')
+      },
+      (err: Error) => setNotice(err.message),
+    )
+  }
+
   return (
     <section className="session">
+      <StatusBar status={status} />
       <Transcript items={items} />
+      {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
       <form className="composer" onSubmit={submit}>
         {notice !== null && <p className="error">{notice}</p>}
         <textarea

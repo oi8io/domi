@@ -43,9 +43,19 @@ export interface StatusSnapshot {
 }
 
 export interface AskSnapshot {
+  /** 经 daemon 转来的询问才有；回答时要带上它（session.answer） */
+  askId?: string
   capabilityId: string
   /** 完整的待执行内容，确认框必须显示它（PRD-M0-003 AC-1） */
   detail: string
+}
+
+/** 状态栏的 token 段。TUI 与 Web 共用这一份，两端显示才会逐字一致 */
+export function formatTokens(t: { input: number; output: number; cacheRead: number }): string {
+  const k = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
+  return t.cacheRead > 0
+    ? `${k(t.input)}/${k(t.output)} tok (cache ${k(t.cacheRead)})`
+    : `${k(t.input)}/${k(t.output)} tok`
 }
 
 export const ARG_SUMMARY_LIMIT = 80
@@ -169,6 +179,11 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     },
     setMetrics(metrics: MetricsSnapshot | null): void {
       $status.set({ ...$status.get(), metrics })
+    },
+    setModel(provider: string, model: string): void {
+      const cur = $status.get()
+      if (cur.provider === provider && cur.model === model) return
+      $status.set({ ...cur, provider, model })
     },
   }
 }

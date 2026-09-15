@@ -68,3 +68,15 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .composer textarea { width: 100%; resize: vertical; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
 .composer button { padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; }
 .error { color: var(--bad); font-size: 13px; }
+
+.statusbar { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 20px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.statusbar .ctx-warn { color: var(--warn); }
+.statusbar .ctx-danger { color: var(--bad); }
+.statusbar .running { color: var(--accent); }
+
+.confirm { margin: 0 20px 12px; padding: 12px 14px; border: 1px solid var(--warn); border-radius: 10px; background: color-mix(in srgb, var(--warn) 8%, var(--panel)); }
+.confirm-title { margin: 0 0 8px; }
+.confirm-detail { margin: 0 0 10px; max-height: 40vh; overflow: auto; padding: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; white-space: pre-wrap; word-break: break-all; }
+.confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.confirm-actions button { padding: 6px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.confirm-actions .allow { background: var(--accent); border-color: var(--accent); color: #fff; }

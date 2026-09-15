@@ -1,4 +1,4 @@
-import type { StatusSnapshot } from '@domi/client-core'
+import { formatTokens, type StatusSnapshot } from '@domi/client-core'
 import { Box, Text } from 'ink'
 
 /**
@@ -32,11 +32,4 @@ export function StatusBar({ status }: { status: StatusSnapshot }): React.ReactEl
       </Text>
     </Box>
   )
-}
-
-function formatTokens(t: { input: number; output: number; cacheRead: number }): string {
-  const k = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
-  return t.cacheRead > 0
-    ? `${k(t.input)}/${k(t.output)} tok (cache ${k(t.cacheRead)})`
-    : `${k(t.input)}/${k(t.output)} tok`
 }

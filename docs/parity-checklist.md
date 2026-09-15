@@ -19,13 +19,13 @@
 |---|---|---|---|---|---|
 | 1 | 发送消息 | ✅ 输入框提交（`apps/tui/src/main.tsx`） | 🟡 输入框 → `session.submit`；忙时按钮禁用（渲染测试） | ⬜ | ⬜ |
 | 2 | 流式接收 | ✅ `model.delta` 拼成一段（PRD-M0-005 AC-1） | 🟡 同一个 `client-core` 投影；经真 WebSocket 推到 store 有测试（`daemon/test/transport.spec.ts`） | ⬜ | ⬜ |
-| 3 | 工具确认 | ✅ `ConfirmDialog`，默认拒绝（PRD-M0-003） | ⬜ 协议里有 `session.ask` / `session.answer`，daemon 侧还没接线（`session.answer` 如实返回 `ok:false`） | ⬜ | ⬜ |
+| 3 | 工具确认 | ✅ `ConfirmDialog`，默认拒绝（PRD-M0-003） | 🟡 `ConfirmDialog`：完整内容、拒绝在前且默认聚焦；经 `session.ask` / `session.answer` / `session.askDone` 接到 runtime（允许后文件才写下去，`daemon/test/runtime-host.spec.ts`） | ⬜ | ⬜ |
 | 4 | 轨迹树展开 | 🟡 `domi trace <id>`（CLI 与 `--html`），不在 TUI 会话界面里 | 🟡 工具调用与结果配对，原生 `<details>` 折叠（渲染测试） | ⬜ | ⬜ |
 | 5 | 会话列表 | 🟡 `domi session`（CLI），不在 TUI 会话界面里 | 🟡 侧栏列表，经 `session.list` | ⬜ | ⬜ |
 | 6 | 会话恢复 | ⚠️ `domi session restore <id>` 只打印「已恢复」，没有调用 `SessionRepo.restore`（`packages/cli/src/run.ts`） | ⬜ 协议里还没有恢复方法 | ⬜ | ⬜ |
 | 7 | 会话分支 | ⬜ store 有 lineage，没有入口 | ⬜ | ⬜ | ⬜ |
 | 8 | 会话删除 | ⬜ store 有软删除，没有入口 | ⬜ 协议里还没有删除方法 | ⬜ | ⬜ |
-| 9 | 状态栏六项指标 | ✅ `StatusBar`（PRD-M1-007，颜色快照） | ⬜ 指标由 runtime 算好推送，协议里还没有 metrics 通知 | ⬜ | ⬜ |
+| 9 | 状态栏六项指标 | 🟡 `StatusBar`（PRD-M1-007，颜色快照）；**缺「本轮耗时」** | 🟡 `StatusBar`，经 `session.metrics`，与 TUI 同样五段、同一个 `formatTokens`；同样缺「本轮耗时」 | ⬜ | ⬜ |
 | 10 | 模型切换 | 🟡 `DomiSession.switchModel` 有，TUI 里没有入口 | ⬜ 协议里还没有切换方法 | ⬜ | ⬜ |
 
 「状态栏六项指标」按 PRD-M1-007 AC-1/AC-2 数：模型、累计 token（输/出/缓存读）、累计花费、本轮耗时、工具调用次数、上下文占用百分比。
@@ -33,8 +33,10 @@
 ## 从这张表读出来的下一轮工作
 
 1. **协议缺口先补**（改 `packages/protocol/src/rpc.ts`，`guard:protocol` 与 `guard:api` 会逼着文档与快照一起改）：
-   `session.restore` / `session.branch` / `session.delete` / `session.switchModel` 四个方法，`session.metrics` 一个通知，
-   以及把 `session.ask` / `session.answer` 真正接到 runtime 的权限询问上。
-2. **TUI 也要补入口**：第 5–8、10 项目前只在 CLI 或 runtime 里，TUI 会话界面里没有。对等是双向的——
+   `session.restore` / `session.branch` / `session.delete` / `session.switchModel` 四个方法。
+   （`session.metrics` 与询问接线已在 2026-09-15 补上。）
+2. **「本轮耗时」两端都没有**：kernel 的 `TurnResult.counters.elapsedMs` 有这个数，但没进 metrics。
+   PRD-M1-007 AC-1 点了名，这是 M1 的遗留，不是 M3 的新活。
+3. **TUI 也要补入口**：第 5–8、10 项目前只在 CLI 或 runtime 里，TUI 会话界面里没有。对等是双向的——
    不能因为 TUI 先出生就默认它是完整的那一边。
-3. 两端 e2e 按行补齐，每补一行在这里改一格。
+4. 两端 e2e 按行补齐，每补一行在这里改一格。
