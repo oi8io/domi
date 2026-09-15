@@ -106,8 +106,25 @@ export class DomiClient {
     return (await result) as ResultOf<M>
   }
 
-  listSessions(): Promise<ResultOf<'session.list'>> {
-    return this.request('session.list', {})
+  listSessions(opts: { includeDeleted?: boolean } = {}): Promise<ResultOf<'session.list'>> {
+    return this.request('session.list', opts.includeDeleted ? { includeDeleted: true } : {})
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.request('session.delete', { sessionId })
+  }
+
+  async restoreSession(sessionId: string): Promise<void> {
+    await this.request('session.restore', { sessionId })
+  }
+
+  /** 返回会失去的能力。切换本身会以 model.switch 事件出现在对话里 */
+  async switchModel(sessionId: string, model: string, provider?: string): Promise<string[]> {
+    const r = await this.request(
+      'session.switchModel',
+      provider === undefined ? { sessionId, model } : { sessionId, model, provider },
+    )
+    return r.lost
   }
 
   async createSession(cwd?: string): Promise<string> {

@@ -99,6 +99,10 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi trace <id> --html f  导出单文件 HTML（离线可开）
   domi migrate              升级事件库结构；**先自动备份**，失败自动回滚
 
+对话里：
+  /compact                  手动压缩上下文
+  /model <名字> [provider]  会话中途切换模型（历史不动，只追加一条切换记录）
+
 选项：
   -h, --help      看这个
   -v, --version   版本

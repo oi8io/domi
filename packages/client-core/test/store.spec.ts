@@ -61,6 +61,19 @@ describe('事件流投影', () => {
     expect(s.$items.get().map((i) => i.text)).toEqual(['先想', '答一', '再想', '答二'])
   })
 
+  test('模型切换出现在对话里，失去的能力写在摘要里', () => {
+    seq = 0
+    const s = createSessionStore()
+    s.applyEvents([
+      env({ t: 'model.switch', from: 'a', to: 'b' }),
+      env({ t: 'model.switch', from: 'b', to: 'weak', lostCapabilities: ['toolCall', 'vision'] }),
+    ])
+    expect(s.$items.get()).toEqual([
+      { seq: 1, kind: 'context', text: '模型切换 a → b' },
+      { seq: 2, kind: 'context', text: '模型切换 b → weak', summary: '新模型不支持：toolCall、vision' },
+    ])
+  })
+
   test('工具调用之后的 delta 另起一条，不会拼到前一段上', () => {
     seq = 0
     const s = createSessionStore()

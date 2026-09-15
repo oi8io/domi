@@ -52,6 +52,7 @@ export interface ClientConn {
 export interface SessionHandle {
   readonly id: string
   submit(text: string): Promise<unknown>
+  switchModel(model: string, provider?: string): Promise<{ lost: string[] }>
   compactNow(trigger: 'manual' | 'threshold'): Promise<{ ok: boolean; detail: string }>
   readEvents(fromSeq: number): Promise<EventEnvelope[]>
   head(): Promise<number>
@@ -64,6 +65,7 @@ export interface SessionSummary {
   model: string
   updatedAt: number
   eventCount: number
+  deleted: boolean
 }
 
 /** 一次权限询问。answer 由宿主提供，core 只负责把它交到某个客户端手里 */
@@ -81,7 +83,10 @@ export type HostMetrics = NotifyParamsOf<'session.metrics'>['metrics']
 export interface DaemonHost {
   open(sessionId: string): Promise<SessionHandle>
   create(cwd?: string): Promise<string>
-  list(): Promise<SessionSummary[]>
+  list(opts: { includeDeleted: boolean }): Promise<SessionSummary[]>
+  /** 软删除 / 恢复。会话不存在时抛 SessionNotFoundError */
+  remove(sessionId: string): Promise<void>
+  restore(sessionId: string): Promise<void>
   /** 会话产生新事件时调用；daemon 据此推给订阅者 */
   onEvents(cb: (sessionId: string, events: EventEnvelope[]) => void): void
   onBusy?(cb: (sessionId: string, busy: boolean) => void): void
@@ -172,6 +177,7 @@ export class Daemon {
     try {
       return await this.dispatch(conn, req, method, parsed.data as never)
     } catch (e) {
+      if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message)
       return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
     }
   }
@@ -190,8 +196,35 @@ export class Daemon {
         return ok(req.id, { protocolVersion: PROTOCOL_VERSION, serverVersion: DAEMON_VERSION, methods: METHOD_NAMES })
       }
 
-      case 'session.list':
-        return ok(req.id, { sessions: await this.host.list() })
+      case 'session.list': {
+        const p = params as { includeDeleted?: boolean }
+        return ok(req.id, { sessions: await this.host.list({ includeDeleted: p.includeDeleted ?? false }) })
+      }
+
+      case 'session.delete': {
+        const p = params as { sessionId: string }
+        if (this.isBusy(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正在处理，等它停下来再删')
+        await this.host.remove(p.sessionId)
+        const open = this.sessions.get(p.sessionId)
+        this.sessions.delete(p.sessionId)
+        await open?.close()
+        return ok(req.id, { ok: true })
+      }
+
+      case 'session.restore': {
+        const p = params as { sessionId: string }
+        await this.host.restore(p.sessionId)
+        return ok(req.id, { ok: true })
+      }
+
+      case 'session.switchModel': {
+        const p = params as { sessionId: string; model: string; provider?: string }
+        // 一轮进行到一半换模型，后半轮和前半轮就不是同一个模型答的了
+        if (this.isBusy(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正在处理，等这一轮结束再切')
+        const session = await this.session(p.sessionId)
+        if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
+        return ok(req.id, await session.switchModel(p.model, p.provider))
+      }
 
       case 'session.create': {
         const p = params as { cwd?: string }
@@ -292,6 +325,10 @@ export class Daemon {
       default:
         return fail(req.id, 'UNKNOWN_METHOD', `未实现：${method}`)
     }
+  }
+
+  private isBusy(id: string): boolean {
+    return this.busy.has(id) || this.hostBusy.has(id)
   }
 
   private async session(id: string): Promise<SessionHandle | null> {

@@ -47,6 +47,9 @@ function echoHost(): DaemonHost {
     async compactNow() {
       return { ok: false, detail: '' }
     },
+    async switchModel() {
+      return { lost: [] }
+    },
     async readEvents(from) {
       return events.filter((e) => e.seq > from)
     },
@@ -66,6 +69,8 @@ function echoHost(): DaemonHost {
     async list() {
       return []
     },
+    async remove() {},
+    async restore() {},
     onEvents(cb) {
       emit = cb
     },

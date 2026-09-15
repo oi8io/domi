@@ -75,6 +75,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       return {
         id: sessionId,
         submit: (text) => s.submit(text),
+        switchModel: (model, provider) => s.switchModel(model, provider === undefined ? {} : { provider }),
         compactNow: (trigger) => s.compactNow(trigger),
         async readEvents(fromSeq) {
           const all = await s.pumpAll()
@@ -96,14 +97,25 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       return id
     },
 
-    async list(): Promise<SessionSummary[]> {
-      return index.sessions.list().map((r) => ({
+    async list({ includeDeleted }): Promise<SessionSummary[]> {
+      return index.sessions.list({ includeDeleted }).map((r) => ({
         id: r.id,
         title: r.title,
         model: r.model,
         updatedAt: r.updatedAt,
         eventCount: r.eventCount,
+        deleted: r.deletedAt !== null,
       }))
+    },
+
+    async remove(sessionId) {
+      if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+      index.sessions.softDelete(sessionId, Date.now())
+    },
+
+    async restore(sessionId) {
+      if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+      index.sessions.restore(sessionId)
     },
 
     onEvents(cb) {

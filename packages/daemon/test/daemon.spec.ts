@@ -40,6 +40,8 @@ function makeHost(opts: { submitMs?: number } = {}) {
   let busyCb: ((s: string, b: boolean) => void) | null = null
   let askCb: ((s: string, a: HostAsk) => void) | null = null
   let metricsCb: ((s: string, m: HostMetrics) => void) | null = null
+  const switches: string[] = []
+  let deleted = false
   const readHooks: { beforeSnapshot?: (() => void) | undefined; afterSnapshot?: (() => void) | undefined } = {}
 
   const append = (texts: string[]): EventEnvelope[] => {
@@ -71,6 +73,10 @@ function makeHost(opts: { submitMs?: number } = {}) {
     async compactNow() {
       return { ok: true, detail: 'compacted' }
     },
+    async switchModel(model: string) {
+      switches.push(model)
+      return { lost: model === 'weak' ? ['toolCall'] : [] }
+    },
     async readEvents(fromSeq: number) {
       // 真实的读库是异步的：快照前后都可能有新事件写进来。钩子让测试把事件塞进这两个缝里
       await Promise.resolve()
@@ -94,8 +100,17 @@ function makeHost(opts: { submitMs?: number } = {}) {
     async create() {
       return 's1'
     },
-    async list(): Promise<SessionSummary[]> {
-      return [{ id: 's1', title: '测试会话', model: 'stub', updatedAt: 1, eventCount: events.length }]
+    async list({ includeDeleted }): Promise<SessionSummary[]> {
+      const row = { id: 's1', title: '测试会话', model: 'stub', updatedAt: 1, eventCount: events.length, deleted }
+      return deleted && !includeDeleted ? [] : [row]
+    },
+    async remove(id) {
+      if (id !== 's1') throw new SessionNotFoundError(id)
+      deleted = true
+    },
+    async restore(id) {
+      if (id !== 's1') throw new SessionNotFoundError(id)
+      deleted = false
     },
     onEvents(cb) {
       emit = cb
@@ -115,7 +130,7 @@ function makeHost(opts: { submitMs?: number } = {}) {
     metrics: (m: HostMetrics) => metricsCb?.('s1', m),
     busy: (b: boolean) => busyCb?.('s1', b),
   }
-  return { host, append, events, readHooks, raise }
+  return { host, append, events, readHooks, raise, switches }
 }
 
 let reqId = 0
@@ -437,6 +452,51 @@ describe('状态补发：重连的客户端也要知道指标与「还在跑」'
     await handshaked(d, c2)
     await d.handle(c2, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
     expect(notices(c2, 'session.busy')).toEqual([])
+  })
+})
+
+describe('TASK-M3-007 · 删除 / 恢复 / 切换模型', () => {
+  async function ready(opts: { submitMs?: number } = {}) {
+    const h = makeHost(opts)
+    const d = new Daemon(h.host)
+    const c = new FakeConn('c')
+    await handshaked(d, c)
+    return { ...h, d, c }
+  }
+  const ids = (r: RpcResponse) => (r.result as { sessions: Array<{ id: string }> }).sessions.map((s) => s.id)
+
+  test('删除后默认列表里没有，回收站里有且标了 deleted；恢复后回来', async () => {
+    const { d, c } = await ready()
+    expect((await d.handle(c, req('session.delete', { sessionId: 's1' }))).result).toEqual({ ok: true })
+    expect(ids(await d.handle(c, req('session.list')))).toEqual([])
+    const bin = await d.handle(c, req('session.list', { includeDeleted: true }))
+    expect(bin.result).toMatchObject({ sessions: [{ id: 's1', deleted: true }] })
+
+    expect((await d.handle(c, req('session.restore', { sessionId: 's1' }))).result).toEqual({ ok: true })
+    expect(ids(await d.handle(c, req('session.list')))).toEqual(['s1'])
+  })
+
+  test('删 / 恢复不存在的会话 → SESSION_NOT_FOUND', async () => {
+    const { d, c } = await ready()
+    expect((await d.handle(c, req('session.delete', { sessionId: 'nope' }))).error?.code).toBe('SESSION_NOT_FOUND')
+    expect((await d.handle(c, req('session.restore', { sessionId: 'nope' }))).error?.code).toBe('SESSION_NOT_FOUND')
+  })
+
+  test('正在处理的会话不许删，也不许切模型', async () => {
+    const { d, c } = await ready({ submitMs: 50 })
+    await d.handle(c, req('session.submit', { sessionId: 's1', text: '长任务' }))
+    expect((await d.handle(c, req('session.delete', { sessionId: 's1' }))).error?.code).toBe('SESSION_BUSY')
+    const sw = await d.handle(c, req('session.switchModel', { sessionId: 's1', model: 'm2' }))
+    expect(sw.error?.code).toBe('SESSION_BUSY')
+  })
+
+  test('切换模型把会失去的能力带回来', async () => {
+    const { d, c, switches } = await ready()
+    const r = await d.handle(c, req('session.switchModel', { sessionId: 's1', model: 'weak' }))
+    expect(r.result).toEqual({ lost: ['toolCall'] })
+    expect(switches).toEqual(['weak'])
+    const bad = await d.handle(c, req('session.switchModel', { sessionId: 's1', model: '' }))
+    expect(bad.error?.code).toBe('INVALID_PARAMS')
   })
 })
 

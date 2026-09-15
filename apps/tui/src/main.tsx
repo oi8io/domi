@@ -71,9 +71,14 @@ function Root({
       if (text === '') return
       setDraft('')
       setSending(true)
-      // PRD-M2-003 AC-1 的手动触发。结果由 ctx.compact 事件自己显示在对话里
+      // 斜杠命令。结果都由事件自己显示在对话里（ctx.compact / model.switch），这里不另塞界面状态
+      const [cmd, ...rest] = text.split(/\s+/)
       const run =
-        text === '/compact' ? client.request('session.compact', { sessionId }) : client.submit(sessionId, text)
+        cmd === '/compact'
+          ? client.request('session.compact', { sessionId }) // PRD-M2-003 AC-1
+          : cmd === '/model' && rest[0]
+            ? client.switchModel(sessionId, rest[0], rest[1]) // PRD-M1-002 · parity 第 10 项
+            : client.submit(sessionId, text)
       void run.catch(() => undefined).finally(() => setSending(false))
       return
     }

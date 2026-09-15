@@ -143,4 +143,25 @@ describe('RuntimeHost', () => {
     expect(last.metrics.model).toBe('stub-1')
     expect(typeof last.metrics.cost).toBe('string')
   })
+
+  test('删除 / 恢复落到 sessions 表；切换模型追加 model.switch 事件', async () => {
+    const { daemon } = setup()
+    const c = new Conn('c')
+    await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    await call(daemon, c, 'session.create')
+    await call(daemon, c, 'session.subscribe', { sessionId: 'sess-1', fromSeq: 0 })
+
+    const sw = await call(daemon, c, 'session.switchModel', { sessionId: 'sess-1', model: 'stub-2' })
+    expect(sw.result).toEqual({ lost: [] })
+    for (let i = 0; i < 50 && !c.events().some((e) => e.ev.t === 'model.switch'); i++) await Bun.sleep(10)
+    expect(c.events().find((e) => e.ev.t === 'model.switch')?.ev).toMatchObject({ from: 'stub-1', to: 'stub-2' })
+
+    await call(daemon, c, 'session.delete', { sessionId: 'sess-1' })
+    const listed = await call(daemon, c, 'session.list', { includeDeleted: true })
+    expect(listed.result).toMatchObject({ sessions: [{ id: 'sess-1', deleted: true, model: 'stub-2' }] })
+    await call(daemon, c, 'session.restore', { sessionId: 'sess-1' })
+    expect((await call(daemon, c, 'session.list')).result).toMatchObject({
+      sessions: [{ id: 'sess-1', deleted: false }],
+    })
+  })
 })

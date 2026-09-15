@@ -7,7 +7,7 @@
 import { describe, expect, test } from 'bun:test'
 import { createSessionStore, DomiClient, type TranscriptItem, type WireSocket } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { App, SessionView } from '../src/App.tsx'
+import { App, SessionTools, SessionView } from '../src/App.tsx'
 import { ConfirmDialog } from '../src/ConfirmDialog.tsx'
 import { StatusBar } from '../src/StatusBar.tsx'
 import { groupRows, Transcript } from '../src/Transcript.tsx'
@@ -118,5 +118,20 @@ describe('状态栏（parity 第 9 项）', () => {
     const html = renderToStaticMarkup(<StatusBar status={createSessionStore().$status.get()} />)
     expect(html).toContain('— tok')
     expect(html).not.toContain('$0')
+  })
+})
+
+describe('会话级操作（parity 第 8、10 项）', () => {
+  test('有切换模型与删除入口；忙的时候都不可用', () => {
+    const client = new DomiClient({ clientName: 't', connect: neverConnects })
+    const idle = renderToStaticMarkup(
+      <SessionTools client={client} sessionId="s" busy={false} onNotice={() => undefined} />,
+    )
+    expect(idle).toContain('切换模型')
+    expect(idle).toContain('删除会话')
+    const busy = renderToStaticMarkup(
+      <SessionTools client={client} sessionId="s" busy={true} onNotice={() => undefined} />,
+    )
+    expect(busy.match(/disabled=""/g)?.length).toBe(3)
   })
 })

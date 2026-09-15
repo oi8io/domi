@@ -58,6 +58,8 @@ const SessionSummarySchema = z.object({
   model: z.string(),
   updatedAt: z.number().int(),
   eventCount: z.number().int().nonnegative(),
+  /** 软删除的会话只在 includeDeleted 时出现，并标上这个 */
+  deleted: z.boolean(),
 })
 
 /** 状态栏指标。**由 runtime 算好推过来**，客户端不自己算（PRD-M1-007 AC-3） */
@@ -103,9 +105,24 @@ export const METHODS = {
     }),
   },
   'session.list': {
-    summary: '列出会话（不含软删除的）',
-    params: z.object({}),
+    summary: '列出会话。默认不含软删除的；includeDeleted 给回收站用',
+    params: z.object({ includeDeleted: z.boolean().optional() }),
     result: z.object({ sessions: z.array(SessionSummarySchema) }),
+  },
+  'session.delete': {
+    summary: '软删除会话：事件一条不删，只是不再出现在默认列表里（INV-01）。正在处理的会话不许删',
+    params: z.object({ sessionId: z.string() }),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  'session.restore': {
+    summary: '恢复软删除的会话',
+    params: z.object({ sessionId: z.string() }),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  'session.switchModel': {
+    summary: '会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力',
+    params: z.object({ sessionId: z.string(), model: z.string().min(1), provider: z.string().min(1).optional() }),
+    result: z.object({ lost: z.array(z.string()) }),
   },
   'session.create': {
     summary: '新建会话',

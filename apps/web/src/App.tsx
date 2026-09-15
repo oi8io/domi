@@ -7,7 +7,7 @@
  */
 import { type ConnectionState, createSessionStore, type DomiClient, type SessionStore } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { Transcript } from './Transcript.tsx'
@@ -17,6 +17,7 @@ interface SessionRow {
   title: string
   model: string
   eventCount: number
+  deleted: boolean
 }
 
 const STATE_LABEL: Record<ConnectionState, string> = {
@@ -33,19 +34,22 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
   const lastError = useStore(client.$lastError)
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [active, setActive] = useState<{ id: string; store: SessionStore } | null>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
 
   useEffect(() => {
     client.start().catch(() => undefined)
     return () => client.close()
   }, [client])
 
+  const refresh = useCallback(async (): Promise<void> => {
+    const r = await client.listSessions({ includeDeleted: showDeleted })
+    setSessions(r.sessions)
+  }, [client, showDeleted])
+
   useEffect(() => {
     if (state !== 'open') return
-    client
-      .listSessions()
-      .then((r) => setSessions(r.sessions))
-      .catch(() => undefined)
-  }, [client, state])
+    refresh().catch(() => undefined)
+  }, [state, refresh])
 
   const open = (id: string): void => {
     if (active) client.unwatch(active.id)
@@ -56,9 +60,19 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
 
   const create = async (): Promise<void> => {
     const id = await client.createSession()
-    const r = await client.listSessions()
-    setSessions(r.sessions)
+    await refresh()
     open(id)
+  }
+
+  const removed = async (): Promise<void> => {
+    if (active) client.unwatch(active.id)
+    setActive(null)
+    await refresh()
+  }
+
+  const restore = async (id: string): Promise<void> => {
+    await client.restoreSession(id)
+    await refresh()
   }
 
   return (
@@ -74,22 +88,37 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
         <button type="button" className="new" disabled={state !== 'open'} onClick={() => void create()}>
           新建会话
         </button>
+        <label className="toggle">
+          <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
+          显示已删除
+        </label>
         <ul className="sessions">
           {sessions.map((s) => (
-            <li key={s.id}>
+            <li key={s.id} className={s.deleted ? 'deleted' : ''}>
               <button type="button" className={active?.id === s.id ? 'current' : ''} onClick={() => open(s.id)}>
                 <span className="title">{s.title || s.id}</span>
                 <span className="meta">
-                  {s.model} · {s.eventCount} 条事件
+                  {s.model} · {s.eventCount} 条事件{s.deleted ? ' · 已删除' : ''}
                 </span>
               </button>
+              {s.deleted && (
+                <button type="button" className="restore" onClick={() => void restore(s.id)}>
+                  恢复
+                </button>
+              )}
             </li>
           ))}
         </ul>
       </aside>
       <main className="main">
         {active ? (
-          <SessionView key={active.id} client={client} sessionId={active.id} store={active.store} />
+          <SessionView
+            key={active.id}
+            client={client}
+            sessionId={active.id}
+            store={active.store}
+            onDeleted={() => void removed()}
+          />
         ) : (
           <p className="empty">从左边选一个会话，或者新建一个。</p>
         )}
@@ -102,10 +131,12 @@ export function SessionView({
   client,
   sessionId,
   store,
+  onDeleted,
 }: {
   client: DomiClient
   sessionId: string
   store: SessionStore
+  onDeleted?: () => void
 }) {
   const items = useStore(store.$items)
   const status = useStore(store.$status)
@@ -140,6 +171,13 @@ export function SessionView({
 
   return (
     <section className="session">
+      <SessionTools
+        client={client}
+        sessionId={sessionId}
+        busy={status.busy}
+        onNotice={setNotice}
+        {...(onDeleted === undefined ? {} : { onDeleted })}
+      />
       <StatusBar status={status} />
       <Transcript items={items} />
       {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
@@ -156,5 +194,73 @@ export function SessionView({
         </button>
       </form>
     </section>
+  )
+}
+
+/**
+ * 会话级操作：切换模型、删除。都是「发一个请求，结果看事件流或列表」——
+ * 切换成功后 model.switch 事件自己会出现在对话里，这里只显示会失去的能力。
+ * 删除要点两下：第一下变成「确认删除」，防手滑（软删除，可以在回收站恢复）。
+ */
+export function SessionTools({
+  client,
+  sessionId,
+  busy,
+  onNotice,
+  onDeleted,
+}: {
+  client: DomiClient
+  sessionId: string
+  busy: boolean
+  onNotice: (msg: string | null) => void
+  onDeleted?: () => void
+}) {
+  const [model, setModel] = useState('')
+  const [armed, setArmed] = useState(false)
+
+  const switchModel = (e: FormEvent): void => {
+    e.preventDefault()
+    const [name, provider] = model.trim().split(/\s+/)
+    if (!name) return
+    client.switchModel(sessionId, name, provider).then(
+      (lost) => {
+        setModel('')
+        onNotice(lost.length > 0 ? `已切换。新模型不支持：${lost.join('、')}` : null)
+      },
+      (err: Error) => onNotice(err.message),
+    )
+  }
+
+  const remove = (): void => {
+    if (!armed) {
+      setArmed(true)
+      return
+    }
+    client.deleteSession(sessionId).then(
+      () => onDeleted?.(),
+      (err: Error) => {
+        setArmed(false)
+        onNotice(err.message)
+      },
+    )
+  }
+
+  return (
+    <div className="tools">
+      <form onSubmit={switchModel}>
+        <input
+          value={model}
+          placeholder="切换模型：名字 [provider]"
+          onChange={(e) => setModel(e.target.value)}
+          disabled={busy}
+        />
+        <button type="submit" disabled={busy || model.trim() === ''}>
+          切换
+        </button>
+      </form>
+      <button type="button" className={armed ? 'danger armed' : 'danger'} disabled={busy} onClick={remove}>
+        {armed ? '确认删除' : '删除会话'}
+      </button>
+    </div>
   )
 }

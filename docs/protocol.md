@@ -71,7 +71,7 @@
 
 ### `session.list`
 
-列出会话（不含软删除的）
+列出会话。默认不含软删除的；includeDeleted 给回收站用
 
 **params**
 
@@ -79,7 +79,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "properties": {}
+  "properties": {
+    "includeDeleted": {
+      "type": "boolean"
+    }
+  }
 }
 ```
 
@@ -113,6 +117,9 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 9007199254740991
+          },
+          "deleted": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -120,13 +127,142 @@
           "title",
           "model",
           "updatedAt",
-          "eventCount"
+          "eventCount",
+          "deleted"
         ]
       }
     }
   },
   "required": [
     "sessions"
+  ]
+}
+```
+
+### `session.delete`
+
+软删除会话：事件一条不删，只是不再出现在默认列表里（INV-01）。正在处理的会话不许删
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `session.restore`
+
+恢复软删除的会话
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `session.switchModel`
+
+会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "sessionId",
+    "model"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "lost": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "lost"
   ]
 }
 ```

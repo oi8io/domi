@@ -156,6 +156,17 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           summary: ev.summary.intent,
         })
         break
+      // 切换模型要在对话里看得见：之后的回答换了人答（parity 第 10 项）
+      case 'model.switch': {
+        const lost = ev.lostCapabilities ?? []
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: `模型切换 ${ev.from} → ${ev.to}`,
+          ...(lost.length > 0 ? { summary: `新模型不支持：${lost.join('、')}` } : {}),
+        })
+        break
+      }
       case 'model.usage':
         $status.set({ ...$status.get(), lastUsage: ev.raw })
         break
