@@ -15,6 +15,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfigOrThrow } from '@domi/config'
 import { McpHub } from '@domi/mcp'
+import { PluginHost } from '@domi/plugin'
 import { type RejectedConnection, resolveServerSettings } from './auth.ts'
 import { Daemon } from './core.ts'
 import { acquireLock, LockHeldError, rewriteLock } from './lock.ts'
@@ -49,8 +50,17 @@ export async function main(env: Record<string, string | undefined> = process.env
 
   // MCP：先开门再连 server。连接可能要好几秒（每个 server 各自超时），
   // 不能让拉起 domid 的客户端一直等；会话每轮现取工具，连上之后自然就有了
+  // 插件（PRD-M6）：带代码的工具跑在沙箱里；插件带的 MCP server 与用户自己配的一起连
+  const plugins = config.plugins.enabled
+    ? new PluginHost({
+        pluginsDir: join(home, 'plugins'),
+        allowUnsandboxed: config.plugins.allowUnsandboxed,
+        log: (l) => process.stderr.write(`${l}\n`),
+      })
+    : undefined
+  for (const p of plugins?.problems() ?? []) process.stderr.write(`plugin: ${p.message}\n`)
   const hub = new McpHub({
-    servers: config.mcp.servers,
+    servers: [...config.mcp.servers, ...(plugins?.mcpServers() ?? [])],
     allowedHosts: config.mcp.allowedHosts,
     timeoutMs: config.mcp.timeoutMs,
     blobDir: join(home, 'blobs'),
@@ -59,7 +69,8 @@ export async function main(env: Record<string, string | undefined> = process.env
     config,
     dbPath: join(home, 'events.db'),
     defaultCwd: process.cwd(),
-    extraTools: () => hub.tools(),
+    extraTools: (cwd) => [...hub.tools(), ...(plugins?.tools(cwd) ?? [])],
+    ...(plugins === undefined ? {} : { plugins }),
     notices: () => hub.notices().map((n) => n.message),
   })
   const daemon = new Daemon(host)
@@ -114,7 +125,7 @@ export async function main(env: Record<string, string | undefined> = process.env
     },
     (e: unknown) => process.stderr.write(`domid 恢复任务失败：${e instanceof Error ? e.message : String(e)}\n`),
   )
-  if (config.mcp.servers.length > 0) {
+  if (config.mcp.servers.length > 0 || (plugins?.mcpServers().length ?? 0) > 0) {
     void hub.start().then((statuses) => {
       for (const s of statuses) {
         const detail = s.state === 'connected' ? `${s.tools.length} 个工具（${s.era}）` : (s.error ?? '')

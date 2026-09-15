@@ -12,9 +12,11 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import type { ZodObject, ZodRawShape, ZodTypeAny } from 'zod'
+import * as plugin from '../packages/plugin/src/index.ts'
 import * as protocol from '../packages/protocol/src/index.ts'
 
 const OUT = 'packages/protocol/.api.md'
+const PLUGIN_OUT = 'packages/plugin/.api.md'
 
 /**
  * zod 4 的内省入口是 `schema._zod.def`（v3 是 `_def.typeName`）。
@@ -92,21 +94,75 @@ lines.push('')
 
 const content = lines.join('\n')
 
+/** 插件 API 快照（PRD-M6-001 AC-4）：manifest 形状、API 版本、弃用表、ctx 能力、导出符号 */
+function nested(schema: ZodTypeAny, indent: string): string[] {
+  const def = defOf(schema) as ZodDef & { shape?: ZodRawShape; in?: ZodTypeAny }
+  const inner = def.type === 'default' || def.type === 'optional' ? def.innerType : undefined
+  if (inner) return nested(inner, indent)
+  if (def.type === 'pipe' && def.in) return nested(def.in, indent)
+  if (def.type === 'array' && def.element) return nested(def.element, indent)
+  const shape = (schema as unknown as ZodObject<ZodRawShape>).shape
+  if (def.type !== 'object' || !shape) return []
+  const out: string[] = []
+  for (const [k, v] of Object.entries(shape).sort(([a], [b]) => a.localeCompare(b))) {
+    out.push(`${indent}${k}: ${kindOf(v as ZodTypeAny)}`)
+    out.push(...nested(v as ZodTypeAny, `${indent}  `))
+  }
+  return out
+}
+
+const pluginLines = [
+  '# @domi/plugin 插件 API 快照',
+  '',
+  '> 由 `bun run scripts/gen-api-snapshot.ts` 生成，**不要手改**。',
+  '> 这份文件变了就意味着插件 API 变了（PRD-M6-001 AC-4，docs/adr/022）：',
+  '> 只加可选字段 = 小版本；改名、删字段、改含义 = 主版本，同时要登记弃用。',
+  '',
+  `PLUGIN_API_VERSIONS = ${JSON.stringify(plugin.PLUGIN_API_VERSIONS)}`,
+  `MANIFEST_FILE = ${plugin.MANIFEST_FILE}`,
+  `HOST_CALLS = ${plugin.HOST_CALLS.join(', ')}`,
+  '',
+  '## manifest',
+  '',
+  ...nested(plugin.ManifestSchema as unknown as ZodTypeAny, '  '),
+  '',
+  '## 弃用',
+  '',
+  ...plugin.DEPRECATIONS.map((d) => `  ${d.path}（${d.since} 起弃用，${d.removeIn} 移除；改用 ${d.instead}）`),
+  '',
+  '## 导出符号',
+  '',
+  ...Object.keys(plugin)
+    .sort()
+    .map((k) => `  ${k}`),
+  '',
+]
+const pluginContent = pluginLines.join('\n')
+
 if (process.argv.includes('--check')) {
-  let existing = ''
-  try {
-    existing = readFileSync(OUT, 'utf8')
-  } catch {
-    console.error(`[api-snapshot] ${OUT} 不存在。先跑一次不带 --check 的生成。`)
-    process.exit(1)
+  let failed = false
+  for (const [out, want, what] of [
+    [OUT, content, '协议契约'],
+    [PLUGIN_OUT, pluginContent, '插件 API'],
+  ] as const) {
+    let existing = ''
+    try {
+      existing = readFileSync(out, 'utf8')
+    } catch {
+      console.error(`[api-snapshot] ${out} 不存在。先跑一次不带 --check 的生成。`)
+      failed = true
+      continue
+    }
+    if (existing !== want) {
+      console.error(`[api-snapshot] ${out} 与当前${what}不一致 —— ${what}变了。`)
+      console.error('若这是有意的：重新生成快照，并在 commit message 里说明为什么旧的仍然可用。')
+      failed = true
+    }
   }
-  if (existing !== content) {
-    console.error(`[api-snapshot] ${OUT} 与当前契约不一致 —— 协议变了。`)
-    console.error('若这是有意的：重新生成快照，并在 commit message 里说明旧事件为什么仍可解析。')
-    process.exit(1)
-  }
-  console.log('[api-snapshot] OK —— 协议契约未变')
+  if (failed) process.exit(1)
+  console.log('[api-snapshot] OK —— 协议契约与插件 API 都未变')
 } else {
   writeFileSync(OUT, content, 'utf8')
-  console.log(`[api-snapshot] 已写入 ${OUT}（${String(options.length)} 个事件类型）`)
+  writeFileSync(PLUGIN_OUT, pluginContent, 'utf8')
+  console.log(`[api-snapshot] 已写入 ${OUT}（${String(options.length)} 个事件类型）与 ${PLUGIN_OUT}`)
 }

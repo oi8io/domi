@@ -13,7 +13,10 @@
       "!**/node_modules",
       "!**/.api.md",
       "!docs/protocol.schema.json",
-      "!**/fixtures"
+      "!**/fixtures",
+      "!eval/l2/tasks/*/workspace",
+      "!eval/l2/tasks/*/solution",
+      "!eval/l2/reports"
     ]
   },
   "formatter": {

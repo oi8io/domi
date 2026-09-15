@@ -1,0 +1,3 @@
+id: extract-constant
+title: 提取常量
+prompt: "time.js 里的魔法数字 86400 出现了好几次。定义并导出常量 SECONDS_PER_DAY，所有用到的地方都改成用它，行为不变。"

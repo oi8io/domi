@@ -55,6 +55,8 @@ export interface SkillRegistryOptions {
   official?: readonly Skill[]
   /** 目录变化时自动重读（AC-3） */
   watch?: boolean
+  /** 插件带来的 SKILL.md（PRD-M6-001）。优先级：官方 < 插件 < 用户目录 */
+  extraFiles?: () => readonly string[]
 }
 
 export class SkillRegistry {
@@ -87,6 +89,14 @@ export class SkillRegistry {
     const next = new Map<string, Skill>()
     const problems: string[] = []
     for (const s of this.opts.official ?? OFFICIAL_SKILLS) next.set(s.name, s)
+    for (const file of this.opts.extraFiles?.() ?? []) {
+      try {
+        const skill = parseSkillFile(readFileSync(file, 'utf8'), file)
+        next.set(skill.name, skill)
+      } catch (e) {
+        problems.push(e instanceof Error ? e.message : String(e))
+      }
+    }
     const dir = this.opts.dir
     if (dir && existsSync(dir)) {
       for (const entry of readdirSync(dir)) {

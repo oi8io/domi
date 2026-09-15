@@ -1,0 +1,27 @@
+name: word-count
+version: 1.0.0
+api: 1
+description: 统计 Markdown / 文本文件的行数、字数与字符数（官方示例：tool 型 + UI 面板）
+author: domi
+permissions:
+  read: ["**/*.md", "**/*.txt"]
+  write: []
+  hosts: []
+contributes:
+  tools:
+    - name: count
+      description: 统计工作目录下一个或多个 Markdown / 文本文件的行数、字数（中文按字计）与字符数
+      entry: tools/count.ts
+      input:
+        type: object
+        properties:
+          paths:
+            type: array
+            items: { type: string }
+            description: 相对工作目录的文件路径
+        required: [paths]
+      timeoutMs: 10000
+  ui:
+    - id: about
+      title: 字数统计
+      entry: ui/about.html

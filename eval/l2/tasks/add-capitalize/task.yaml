@@ -1,0 +1,3 @@
+id: add-capitalize
+title: 加一个函数
+prompt: "在 strings.js 里新增并导出 capitalize(s)：把字符串首字母大写，其余不变；空字符串原样返回。"

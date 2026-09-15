@@ -1,5 +1,5 @@
 在做: **M3 DoD 的自动化版本已绿**（`apps/tui/test/dod.spec.ts`）：TUI 发起长任务后退出，浏览器端之后连上来看到它跑完。
-      `pnpm check`：typecheck（含 apps/tui、apps/web）+ 18 道守卫 + **695 个测试** + L1 回放，全绿。
+      `pnpm check`：typecheck（含 apps/tui、apps/web）+ 21 道守卫 + **764 个测试** + L1 回放，全绿。
       任务与缺陷的账在 `docs/tasks/M3.md`（前七条 done；末尾是缺陷与待优化登记）。
 
       现在能用的：
@@ -28,24 +28,27 @@
         domid 被杀后重启会自动接着跑。通知：config.yaml 的 `notify`。Telegram：`domi bridge pair` → 给 bot 发 `/pair <码>` →
         `DOMI_TELEGRAM_TOKEN=… domi bridge telegram`。派子 agent 要在权限规则里放行 `task.spawn`（模板里是 ask）
 
+      - **插件**（2026-09-15）：`domi plugin install plugins/word-count` 安装（逐条确认权限），`domi plugin list` 查看，
+        `domi plugin scaffold tool|skill|mcp <名字>` 起一个新插件；Web 侧栏「插件」。带代码的插件在 bwrap / sandbox-exec 里跑，
+        `domi doctor` 显示沙箱状态。开发文档在 docs/site/，贡献指南 CONTRIBUTING.md
+      - **L2 评估**（2026-09-15）：`domi eval l2 --rounds 3` 用真实模型跑 20 道题（花钱），报告在 eval/l2/reports/
+
       ⚠️ 更新代码后：`pnpm install`，并停掉已在跑的 domid（`domi` 会复用它，旧进程跑的是旧代码，见 OPT-M3-002）
 
 下一步: 用户规矩（2026-09-15）：**先推进功能，测试验证类最后统一查漏补缺**
-        （已完成：TASK-M3-016 elicitation 接确认框；TASK-M3-014 会话分支，Web「分支」按钮 / TUI `/branch`；
-          TASK-M3-010 kill -9 后打开会话自动补到一致点；TASK-M3-011 远程连接 + token，见 ADR-017；
-          TASK-M3-012 跨会话引用，Web「引用这一轮」/ TUI `/ref`；TUI 会话命令 /sessions /open /new /delete /restore；
-          BUG-M3-003 本轮耗时、BUG-M3-008 陈锁并发接管、BUG-M3-012 配置提示词层、BUG-M3-015 提示词从未发给模型）
-        M3 缺陷登记里已没有 open 的 BUG。
-        M4 已进入（你拍板「按轮廓先写再做」，docs/prd/M4.md）：L3 记忆、Soul、审阅否决、导出导入、Skill 的功能都已落地
-        （TASK-M4-001…008）。
-        M5 已进入（你说「开干」，docs/prd/M5.md）：子 agent、DAG 编排、断点恢复、通知、Telegram 桥接的功能都已落地，
-        桌面端写到了代码与配置（TASK-M5-001…007）。
-        1. 下一个里程碑 M6（生态）同样是 SKETCH，进入前要你拍板
-        2. 最后统一：TASK-M3-008 parity e2e、TASK-M3-009 推送延迟基准、TASK-M4-009、TASK-M5-008（含桌面端构建）
+        M4（「按轮廓先写再做」）、M5（「开干」）、M6（「继续」）的功能都已落地：
+        L3 记忆 / Soul / Skill；子 agent / DAG 编排 / 通知 / Telegram / 桌面端代码；
+        插件 API / 权限快照 / 沙箱 / 官方示例与脚手架 / 文档站 / L2 题集（TASK-M6-001…007）。
+        **路线图上的功能里程碑已经走完**，接下来就是统一查漏补缺：
+        1. TASK-M3-008 parity e2e、TASK-M3-009 推送延迟基准
+        2. TASK-M4-009（记忆 / Soul / Skill 的 spec）
+        3. TASK-M5-008（编排与子 agent 的 spec、kill 模糊测试、桌面端构建）
+        4. TASK-M6-008（插件 / 沙箱逃逸 / 脚手架 spec、L2 harness spec、macOS sandbox-exec 真机）
 
         仍然只有你能做的：真终端走 M3 DoD（`domi` 发长任务 → 关终端 → 浏览器看完成）、
-        M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`、独立 QA、M1 dogfooding
+        M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`、独立 QA、M1 dogfooding、
+        M6 DoD（外部贡献者插件；L2 三次重复完整跑一轮）、在 GitHub 上开那 5 个 good first issue（草稿在 docs/good-first-issues.md）
 
-卡在: M6 的进入条件（同 M4 / M5，要你拍板）。桌面端需要一台装了 Rust 的机器才能构建。
+卡在: 没有功能上的阻塞。桌面端需要一台装了 Rust 的机器才能构建；macOS 沙箱需要一台 Mac 验证。
       体验类的问题按你定的规矩只记录不排期（OPT-M3-001…006），其中 OPT-M3-001（每个 token 一条事件）
       牵涉回放与压缩，动之前要单独讨论。

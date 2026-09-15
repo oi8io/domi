@@ -1,0 +1,3 @@
+id: fizzbuzz
+title: 实现 fizzbuzz
+prompt: "在 fizz.js 里实现并导出 fizzbuzz(n)：返回 1..n 的数组，3 的倍数写 Fizz，5 的倍数写 Buzz，同时是两者写 FizzBuzz，其余是数字的字符串。"

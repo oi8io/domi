@@ -1,0 +1,3 @@
+id: missing-await
+title: 修一个漏掉的 await
+prompt: "load.js 的 loadAll 返回的数组里全是 Promise，修好它（每一项应该是读到的对象）。"

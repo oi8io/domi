@@ -1,0 +1,12 @@
+name: mcp-filesystem
+version: 1.0.0
+api: 1
+description: 把官方的 filesystem MCP server 包成插件，只开放工作目录下的 docs/（官方示例：MCP 包装型）
+author: domi
+permissions: {}
+contributes:
+  mcp:
+    # 独立进程，不在插件沙箱里；它的工具以 mcp.mcp-filesystem-docs.<工具> 出现，照常按权限规则确认
+    - name: docs
+      command: npx
+      args: [-y, "@modelcontextprotocol/server-filesystem@2026.8.31", "./docs"]

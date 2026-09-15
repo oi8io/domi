@@ -31,14 +31,7 @@ import {
   runTurn,
   type TurnResult,
 } from '@domi/kernel'
-import {
-  compact,
-  makeMemorySearchTool,
-  registerCleanStrategy,
-  registerCompactStrategy,
-  SummarySchema,
-  shouldCompact,
-} from '@domi/memory'
+import { compact, registerCleanStrategy, registerCompactStrategy, SummarySchema, shouldCompact } from '@domi/memory'
 import {
   capabilitiesFor,
   createProvider,
@@ -63,6 +56,7 @@ registerCompactStrategy()
 const TitleSchema = z.object({ title: z.string() })
 
 import { SqliteEventLog } from '@domi/store'
+import { memorySearchPlugin } from './builtin-plugins.ts'
 import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
 import { MAX_SPAWN_DEPTH, makeSpawnTool } from './subagent.ts'
 
@@ -117,7 +111,7 @@ export interface SessionOptions {
    * 外部工具（MCP，ADR-015）。**每轮现取**：会话建好之后才连上的 server 也能用上。
    * 它们和内置工具走同一个 ToolRegistry、同一条权限路径（INV-03）
    */
-  extraTools?: () => readonly Tool[]
+  extraTools?: (cwd: string) => readonly Tool[]
   /** 进程级的提示（比如某个 MCP server 连不上）。每条只在本会话落一次 error 事件 */
   notices?: () => readonly string[]
   /** 记忆与 Soul（PRD-M4）。daemon 里所有会话共用一个；不给就没有抽取、Soul 不进提示词 */
@@ -166,8 +160,8 @@ export class DomiSession {
       .register(fsRead)
       .register(fsWrite)
       .register(shellExec)
-      // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用
-      .register(makeMemorySearchTool(this.log.search))
+    // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用。以插件形态注册（PRD-M6-001 AC-3）
+    for (const t of memorySearchPlugin.tools?.({ search: this.log.search }) ?? []) this.tools.register(t)
     if (opts.memory) this.tools.register(makeMemoryRecallTool(opts.memory))
     if (opts.skills) this.tools.register(makeSkillLoadTool(opts.skills))
     if ((opts.spawnDepth ?? 0) < MAX_SPAWN_DEPTH) this.tools.register(makeSpawnTool(this))
@@ -394,7 +388,7 @@ export class DomiSession {
             messages: [
               {
                 role: 'user',
-                content: '把下面这段对话历史压成结构化摘要。只保留后面还用得上的信息，' + '不要复述每一步。\n\n' + text,
+                content: `把下面这段对话历史压成结构化摘要。只保留后面还用得上的信息，不要复述每一步。\n\n${text}`,
               },
             ],
           }),
@@ -479,7 +473,7 @@ export class DomiSession {
     args: unknown,
     signal: AbortSignal,
   ): Promise<{ ok: boolean; payload: unknown; reason?: string }> {
-    for (const t of this.opts.extraTools?.() ?? []) this.tools.register(t)
+    for (const t of this.opts.extraTools?.(this.opts.cwd) ?? []) this.tools.register(t)
     const id = `node-${this.now().toString(36)}`
     await this.appendEvents([{ t: 'tool.call', id, name, args }])
     const t0 = this.now()
@@ -611,7 +605,7 @@ export class DomiSession {
   async submit(text: string, opts: { refs?: readonly RefLink[] } = {}): Promise<TurnResult> {
     this.busy = true
     this.listeners.onBusy?.(true)
-    for (const t of this.opts.extraTools?.() ?? []) this.tools.register(t)
+    for (const t of this.opts.extraTools?.(this.opts.cwd) ?? []) this.tools.register(t)
     await this.deliverNotices()
     await this.maybeAutoCompact()
     const policy: ContextPolicy = {

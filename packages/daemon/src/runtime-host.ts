@@ -10,12 +10,20 @@
  */
 
 import { dirname, join } from 'node:path'
-import { OFFICIAL_SKILLS, SkillRegistry } from '@domi/capability'
+import { SkillRegistry } from '@domi/capability'
 import type { DomiConfig } from '@domi/config'
 import { Notifier } from '@domi/notify'
 import { DagSpecError } from '@domi/orchestrator'
+import type { PluginHost } from '@domi/plugin'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { DomiSession, MemoryService, RefError, type SessionOptions, TaskService } from '@domi/runtime'
+import {
+  DomiSession,
+  MemoryService,
+  officialSkillsPlugin,
+  RefError,
+  type SessionOptions,
+  TaskService,
+} from '@domi/runtime'
 import { SqliteEventLog } from '@domi/store'
 import { AUDIT_SESSION_ID } from './auth.ts'
 
@@ -48,6 +56,8 @@ export interface RuntimeHostOptions {
   /** Soul 与 Skill 所在的目录。默认是 dbPath 旁边的 soul/ 与 skills/（即 ~/.domi 下） */
   soulDir?: string
   skillsDir?: string
+  /** 已加载的插件（PRD-M6）：skill 进 Skill 清单，UI 面板经协议给客户端 */
+  plugins?: PluginHost
   /** 测试注入：记忆抽取用的模型。不给就用 provider（再不给就按配置建） */
   memoryProvider?: SessionOptions['provider']
 }
@@ -77,7 +87,13 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     ...(memoryProvider === undefined ? {} : { provider: memoryProvider }),
   })
   const skills = opts.config.skills.enabled
-    ? new SkillRegistry({ dir: opts.skillsDir ?? join(home, 'skills'), official: OFFICIAL_SKILLS, watch: true })
+    ? new SkillRegistry({
+        dir: opts.skillsDir ?? join(home, 'skills'),
+        // 官方 Skill 以插件形态提供（PRD-M6-001 AC-3）
+        official: officialSkillsPlugin.skills?.() ?? [],
+        watch: true,
+        ...(opts.plugins ? { extraFiles: () => opts.plugins?.skillFiles() ?? [] } : {}),
+      })
     : undefined
 
   const notifier = new Notifier(opts.config.notify, { log: (l) => process.stderr.write(`${l}\n`) })
@@ -301,6 +317,32 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     },
 
     resumeTasks: () => tasks.resumeAll(),
+
+    ...(opts.plugins === undefined
+      ? {}
+      : {
+          plugins: {
+            async list() {
+              const ph = opts.plugins as PluginHost
+              return {
+                sandbox: ph.backend,
+                plugins: ph.plugins.map((p) => ({
+                  name: p.manifest.name,
+                  version: p.manifest.version,
+                  description: p.manifest.description,
+                  tools: p.manifest.contributes.tools.map((t) => `plugin.${p.manifest.name}.${t.name}`),
+                  skills: p.manifest.contributes.skills.length,
+                  mcp: p.manifest.contributes.mcp.map((s) => s.name),
+                  ui: p.manifest.contributes.ui.map((u) => ({ id: u.id, title: u.title })),
+                })),
+                problems: [...ph.problems()],
+              }
+            },
+            async ui(plugin: string, id: string) {
+              return (opts.plugins as PluginHost).uiHtml(plugin, id)
+            },
+          },
+        }),
 
     memory: {
       async list(includeDeleted) {

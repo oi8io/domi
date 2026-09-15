@@ -1,0 +1,3 @@
+id: remove-todos
+title: 删掉 TODO 注释
+prompt: "删掉 src/ 下所有以 `// TODO` 开头的注释行，其它代码一行都不要动。"

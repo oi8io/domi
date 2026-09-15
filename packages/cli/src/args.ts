@@ -23,6 +23,7 @@ export const COMMANDS = [
   'soul',
   'task',
   'bridge',
+  'plugin',
 ] as const
 export type Command = (typeof COMMANDS)[number]
 
@@ -125,6 +126,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi soul show|review|update|export|import   Soul：审阅改动、导出分享、导入别人的
   domi task run|list|status|retry|cancel      长任务编排（DAG，跑在 domid 里）
   domi bridge pair|telegram                   Telegram 桥接：生成配对码 / 启动桥接
+  domi plugin list|install|remove|scaffold    插件：安装时逐条确认权限，代码跑在沙箱里
 
 对话里：
   /compact                  手动压缩上下文
@@ -191,6 +193,12 @@ permissions:
       capability: skill.load
       decision: allow
 
+    # 插件工具以 plugin.<插件名>.<工具名> 出现（docs/adr/022）。插件能读写哪些文件、连哪些主机
+    # 由安装时你确认的快照决定；调用本身仍按这里的规则问你
+    - name: confirm-plugins
+      capability: plugin.*
+      decision: ask
+
     # 看网页、点界面：每一步都问你（ADR-016）。想放宽的话按工具名精确放行，
     # 比如 capability: mcp.computer.screenshot，别整组 allow
     - name: confirm-browser
@@ -237,6 +245,11 @@ mcp:
 # bridge:
 #   telegram:
 #     token: "123456:ABC..."
+
+# 插件（docs/adr/022、023）。domi plugin install <目录> 安装，domi plugin list 查看
+# plugins:
+#   enabled: true            # false = 一个插件都不加载
+#   allowUnsandboxed: false  # 没有 bwrap / sandbox-exec 时是否仍加载带代码的插件（不建议）
 
 # 自定义提示词层（domi prompt dump 可以看拼装结果）。同 id 覆盖内置层，比如 builtin.conventions
 # prompt:

@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>字数统计</title>
+<style>
+  body { font: 14px/1.6 system-ui, sans-serif; margin: 12px; color: #222; }
+  code { background: #f3f3f3; padding: 1px 4px; border-radius: 3px; }
+  @media (prefers-color-scheme: dark) { body { color: #ddd; background: #1b1b1b; } code { background: #333; } }
+</style>
+<h1>字数统计</h1>
+<p>这个插件给模型提供一个工具 <code>plugin.word-count.count</code>：统计工作目录下 Markdown / 文本文件的行数、字数与字符数。</p>
+<p>它只能读 <code>*.md</code> 与 <code>*.txt</code>，没有网络。试试对 domi 说：「数一下 README.md 有多少字」。</p>
+<p>这个面板本身是插件 UI 扩展点的示例：静态页面，在隔离的 iframe 里显示，拿不到你的会话数据。</p>

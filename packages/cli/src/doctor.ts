@@ -32,6 +32,8 @@ export interface DoctorInput {
   legacyConfig?: { path: string; ignored: boolean } | undefined
   /** --ping 的结果；没跑就是 undefined */
   ping?: PingResult | undefined
+  /** 插件沙箱（PRD-M6-003）。没给就不查 */
+  plugins?: { sandbox: 'bwrap' | 'sandbox-exec' | 'none'; allowUnsandboxed: boolean; withCode: number } | undefined
 }
 
 export interface PingResult {
@@ -42,6 +44,27 @@ export interface PingResult {
 
 export function diagnose(input: DoctorInput): Finding[] {
   const out: Finding[] = []
+
+  if (input.plugins) {
+    const p = input.plugins
+    if (p.sandbox !== 'none') {
+      out.push({ ok: true, title: '插件沙箱', detail: p.sandbox, fix: null })
+    } else if (p.allowUnsandboxed) {
+      out.push({
+        ok: false,
+        title: '插件代码在没有沙箱的情况下运行',
+        detail: '你打开了 plugins.allowUnsandboxed：插件能读写任何文件、访问任何网络。只在完全信任已装插件时这样做',
+        fix: '$ sed -i.bak "s/allowUnsandboxed: true/allowUnsandboxed: false/" ~/.domi/config.yaml',
+      })
+    } else if (p.withCode > 0) {
+      out.push({
+        ok: false,
+        title: '没有插件沙箱',
+        detail: `这台机器没有 bwrap / sandbox-exec，${p.withCode} 个带代码的插件没有加载（docs/adr/023）`,
+        fix: '$ sudo apt-get install -y bubblewrap',
+      })
+    }
+  }
 
   out.push(
     existsSync(input.configPath)

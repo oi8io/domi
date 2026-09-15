@@ -28,3 +28,6 @@ _tmp_*
 
 # bun build --compile 中途留下的临时文件
 *.bun-build
+
+# Tauri 构建产物
+apps/desktop/src-tauri/target/

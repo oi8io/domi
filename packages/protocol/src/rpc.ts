@@ -237,6 +237,30 @@ export const METHODS = {
     params: z.object({ runId: z.string() }),
     result: z.object({ ok: z.boolean() }),
   },
+  'plugin.list': {
+    summary: '已安装的插件、它们提供的东西、没加载上的原因，以及这台机器的沙箱（PRD-M6-001 / 003）',
+    params: z.object({}),
+    result: z.object({
+      sandbox: z.enum(['bwrap', 'sandbox-exec', 'none']),
+      plugins: z.array(
+        z.object({
+          name: z.string(),
+          version: z.string(),
+          description: z.string(),
+          tools: z.array(z.string()),
+          skills: z.number().int(),
+          mcp: z.array(z.string()),
+          ui: z.array(z.object({ id: z.string(), title: z.string() })),
+        }),
+      ),
+      problems: z.array(z.object({ name: z.string(), message: z.string() })),
+    }),
+  },
+  'plugin.ui': {
+    summary: '插件 UI 面板的 HTML。客户端必须放进无同源的沙箱 iframe（sandbox="allow-scripts"）里渲染',
+    params: z.object({ plugin: z.string(), id: z.string() }),
+    result: z.object({ html: z.string() }),
+  },
   'audit.record': {
     summary: '端上发生、daemon 看不到的安全相关事情（比如桥接收到未绑定 chat 的消息），记进审计会话（M5-007 AC-4）',
     params: z.object({

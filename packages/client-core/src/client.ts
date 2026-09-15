@@ -218,6 +218,14 @@ export class DomiClient {
     return (await this.request('task.cancel', { runId })).ok
   }
 
+  listPlugins(): Promise<ResultOf<'plugin.list'>> {
+    return this.request('plugin.list', {})
+  }
+
+  async pluginUi(plugin: string, id: string): Promise<string> {
+    return (await this.request('plugin.ui', { plugin, id })).html
+  }
+
   async recordAudit(kind: string, detail: string): Promise<void> {
     await this.request('audit.record', { kind, detail })
   }

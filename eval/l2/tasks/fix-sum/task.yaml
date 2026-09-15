@@ -1,0 +1,3 @@
+id: fix-sum
+title: 修一个求和函数
+prompt: "sum.js 里的 sum 算错了，修好它，并确认 `bun test` 通过。"

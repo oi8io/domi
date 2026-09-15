@@ -290,6 +290,10 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
         )
         break
 
+      case 'plugin.error':
+        nodes.push(node(env.seq, 'error', `插件 ${ev.plugin} 出错`, `${ev.tool ? `${ev.tool}: ` : ''}${ev.message}`))
+        break
+
       case 'task.retry':
         nodes.push(node(env.seq, 'task', `重试 ${ev.nodeId}`, ''))
         break

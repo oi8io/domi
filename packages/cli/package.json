@@ -16,6 +16,7 @@
     "@domi/store": "workspace:*",
     "@domi/model": "workspace:*",
     "@domi/eval": "workspace:*",
-    "@domi/trace": "workspace:*"
+    "@domi/trace": "workspace:*",
+    "@domi/plugin": "workspace:*"
   }
 }

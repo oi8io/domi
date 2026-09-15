@@ -1196,6 +1196,165 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `plugin.list`
+
+已安装的插件、它们提供的东西、没加载上的原因，以及这台机器的沙箱（PRD-M6-001 / 003）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sandbox": {
+      "type": "string",
+      "enum": [
+        "bwrap",
+        "sandbox-exec",
+        "none"
+      ]
+    },
+    "plugins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skills": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "mcp": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ui": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title"
+              ]
+            }
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "description",
+          "tools",
+          "skills",
+          "mcp",
+          "ui"
+        ]
+      }
+    },
+    "problems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "message"
+        ]
+      }
+    }
+  },
+  "required": [
+    "sandbox",
+    "plugins",
+    "problems"
+  ]
+}
+```
+
+### `plugin.ui`
+
+插件 UI 面板的 HTML。客户端必须放进无同源的沙箱 iframe（sandbox="allow-scripts"）里渲染
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "plugin": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "plugin",
+    "id"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "html": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "html"
+  ]
+}
+```
+
 ### `audit.record`
 
 端上发生、daemon 看不到的安全相关事情（比如桥接收到未绑定 chat 的消息），记进审计会话（M5-007 AC-4）
@@ -2463,6 +2622,30 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                     "required": [
                       "t",
                       "nodeId"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "plugin.error"
+                      },
+                      "plugin": {
+                        "type": "string"
+                      },
+                      "tool": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "plugin",
+                      "message"
                     ],
                     "additionalProperties": {}
                   },

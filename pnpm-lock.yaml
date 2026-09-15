@@ -306,6 +306,9 @@ importers:
       '@domi/observability':
         specifier: workspace:*
         version: link:../observability
+      '@domi/plugin':
+        specifier: workspace:*
+        version: link:../plugin
       '@domi/prompt':
         specifier: workspace:*
         version: link:../prompt
@@ -351,6 +354,9 @@ importers:
       '@domi/orchestrator':
         specifier: workspace:*
         version: link:../orchestrator
+      '@domi/plugin':
+        specifier: workspace:*
+        version: link:../plugin
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -370,6 +376,9 @@ importers:
 
   packages/eval:
     dependencies:
+      '@domi/config':
+        specifier: workspace:*
+        version: link:../config
       '@domi/kernel':
         specifier: workspace:*
         version: link:../kernel
@@ -379,9 +388,15 @@ importers:
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@domi/runtime':
+        specifier: workspace:*
+        version: link:../runtime
       '@domi/store':
         specifier: workspace:*
         version: link:../store
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
 
   packages/kernel:
     dependencies:
@@ -485,6 +500,24 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  packages/plugin:
+    dependencies:
+      '@domi/capability':
+        specifier: workspace:*
+        version: link:../capability
+      '@domi/config':
+        specifier: workspace:*
+        version: link:../config
+      '@domi/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      '@domi/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
   packages/prompt:
     dependencies:
       '@domi/protocol':
@@ -517,6 +550,9 @@ importers:
       '@domi/orchestrator':
         specifier: workspace:*
         version: link:../orchestrator
+      '@domi/plugin':
+        specifier: workspace:*
+        version: link:../plugin
       '@domi/prompt':
         specifier: workspace:*
         version: link:../prompt

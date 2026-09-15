@@ -1,0 +1,3 @@
+id: sort-names
+title: 排序
+prompt: "把 names.txt 里的名字按字母顺序排序后写回原文件，一行一个，去掉重复。"

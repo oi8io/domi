@@ -193,6 +193,14 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           text: `任务恢复：已完成 ${ev.completed.length} 个节点${ev.rerun.length > 0 ? `，重跑 ${ev.rerun.join('、')}` : ''}`,
         })
         break
+      case 'plugin.error':
+        push({
+          seq: env.seq,
+          kind: 'error',
+          text: `插件 ${ev.plugin}${ev.tool ? ` 的 ${ev.tool}` : ''} 出错：${ev.message}`,
+          ok: false,
+        })
+        break
       case 'task.retry':
         push({ seq: env.seq, kind: 'task', text: `重试节点 ${ev.nodeId}` })
         break

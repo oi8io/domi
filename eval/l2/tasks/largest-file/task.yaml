@@ -1,0 +1,3 @@
+id: largest-file
+title: 找最大的文件
+prompt: "files/ 目录里哪个文件最大？只把文件名（不含路径）写进 answer.txt。"

@@ -1,0 +1,3 @@
+id: fix-range
+title: 修一个差一错误
+prompt: "range.js 里 range(a, b) 应该返回从 a 到 b（含 b）的整数数组，但少了最后一个。修好它。"

@@ -151,6 +151,11 @@ export interface DaemonHost {
   branch(sessionId: string, atSeq: number): Promise<string>
   memory?: HostMemory
   tasks?: HostTasks
+  plugins?: {
+    list(): Promise<ResultOf<'plugin.list'>>
+    /** 没有这个面板时返回 null */
+    ui(plugin: string, id: string): Promise<string | null>
+  }
   /** 端上报来的审计事件 */
   auditRecord?(kind: string, detail: string, client: string): Promise<void>
   /** 会话产生新事件时调用；daemon 据此推给订阅者 */
@@ -340,6 +345,17 @@ export class Daemon {
           return ok(req.id, { ok: true })
         }
         return ok(req.id, { ok: await t.cancel(p.runId as string) })
+      }
+
+      case 'plugin.list':
+      case 'plugin.ui': {
+        const pl = this.host.plugins
+        if (!pl) throw new Error('这个 daemon 不支持插件（PRD-M6）')
+        if (method === 'plugin.list') return ok(req.id, await pl.list())
+        const p = params as { plugin: string; id: string }
+        const html = await pl.ui(p.plugin, p.id)
+        if (html === null) return fail(req.id, 'INVALID_PARAMS', `没有插件面板 ${p.plugin}/${p.id}`)
+        return ok(req.id, { html })
       }
 
       case 'audit.record': {

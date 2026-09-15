@@ -1,0 +1,7 @@
+import { expect, test } from 'bun:test'
+import { sum } from './sum.js'
+
+test('sum', () => {
+  expect(sum(2, 3)).toBe(5)
+  expect(sum(-1, 1)).toBe(0)
+})

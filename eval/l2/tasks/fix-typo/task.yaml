@@ -1,0 +1,3 @@
+id: fix-typo
+title: 改错别字
+prompt: "仓库里把 receive 拼成了 recieve，全部改正（文件名不用改）。"

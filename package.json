@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "bun test",
+    "test": "bun test --path-ignore-patterns='eval/l2/tasks/**'",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/tui/tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json && tsc --noEmit -p apps/bridge-telegram/tsconfig.json",
     "guard:deps": "depcruise packages apps --config .dependency-cruiser.cjs",
     "guard:tasks": "bun run scripts/lint-tasks.ts",
@@ -19,8 +19,11 @@
     "guard:purity": "bun run scripts/check-kernel-purity.ts",
     "guard:adr": "bun run scripts/check-adr-fields.ts",
     "guard:bridge": "bun run scripts/check-bridge-payload.ts",
+    "guard:docs": "bun run scripts/test-docs-snippets.ts",
+    "guard:repo": "bun run scripts/check-repo-meta.ts",
+    "guard:l2": "bun run scripts/check-ci-no-l2.ts",
     "guard:desktop": "bun run scripts/check-desktop-size.ts",
-    "guard": "pnpm lint && pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:protocol && pnpm guard:mcp && pnpm guard:automation && pnpm guard:purity && pnpm guard:adr && pnpm guard:secrets && pnpm guard:providers && pnpm guard:writes && pnpm guard:ac && pnpm guard:eval && pnpm guard:live && pnpm guard:migrations && pnpm guard:bridge && pnpm guard:desktop",
+    "guard": "pnpm lint && pnpm guard:deps && pnpm guard:tasks && pnpm guard:append-only && pnpm guard:api && pnpm guard:protocol && pnpm guard:mcp && pnpm guard:automation && pnpm guard:purity && pnpm guard:adr && pnpm guard:secrets && pnpm guard:providers && pnpm guard:writes && pnpm guard:ac && pnpm guard:eval && pnpm guard:live && pnpm guard:migrations && pnpm guard:bridge && pnpm guard:desktop && pnpm guard:docs && pnpm guard:repo && pnpm guard:l2",
     "check": "pnpm typecheck && pnpm guard && pnpm test && pnpm eval",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",

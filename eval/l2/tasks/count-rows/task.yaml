@@ -1,0 +1,3 @@
+id: count-rows
+title: 数数据行
+prompt: "data.csv 有表头。数一下有多少行数据（不含表头），只把这个数字写进 count.txt。"

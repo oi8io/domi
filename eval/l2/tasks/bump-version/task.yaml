@@ -1,0 +1,3 @@
+id: bump-version
+title: 改版本号
+prompt: "把 package.json 里的版本号改成 1.2.0，其它字段不要动。"

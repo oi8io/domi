@@ -1,0 +1,6 @@
+[
+  { "name": "alice", "city": "beijing", "score": 90 },
+  { "name": "bob", "city": "shanghai", "score": 72 },
+  { "name": "carol", "city": "beijing", "score": 85 },
+  { "name": "dave", "city": "shenzhen", "score": 60 }
+]

@@ -1,0 +1,1 @@
+{"seq": 18, "sessionId": "legacy", "parentSeq": 17, "ts": 1756000000018, "schemaVersion": 9, "ev": {"t": "plugin.error", "plugin": "word-count", "tool": "count", "message": "插件执行超过 10000ms，已强制终止"}}

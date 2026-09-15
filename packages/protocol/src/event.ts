@@ -20,9 +20,10 @@ import { z } from 'zod'
  * v6 → v7：新增 `memory.write`（M4 语义记忆与 Soul）。
  * v7 → v8：新增 `task.spawn` / `task.run` / `task.node` / `task.resume` / `task.retry` / `task.end`（M5 编排）；
  *          `permission` 新增可选的 `channel`（M5-007 审批从哪来）。
+ * v8 → v9：新增 `plugin.error`（M6-003 插件崩溃 / 超时 / 协议错乱）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -249,6 +250,8 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     rerun: z.array(z.string()),
   }),
   z.looseObject({ t: z.literal('task.retry'), nodeId: z.string() }),
+  /** M6-003：插件进程出了问题（崩溃、超时、输出不是协议）。daemon 不受影响，这一次工具调用失败 */
+  z.looseObject({ t: z.literal('plugin.error'), plugin: z.string(), tool: z.string().optional(), message: z.string() }),
   z.looseObject({ t: z.literal('task.end'), status: z.enum(['done', 'failed', 'cancelled']) }),
   z.looseObject({
     t: z.literal('error'),

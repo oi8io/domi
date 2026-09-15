@@ -1,0 +1,3 @@
+id: md-table
+title: 列表转表格
+prompt: "把 items.md 里的列表（每行「名字: 价格」）改写成一个 Markdown 表格，表头是「名字 | 价格」，行的顺序不变。"

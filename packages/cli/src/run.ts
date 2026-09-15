@@ -41,6 +41,18 @@ export function dataDir(): string {
   return join(userHome(), '.domi')
 }
 
+async function pluginDoctor(
+  allowUnsandboxed: boolean,
+): Promise<{ sandbox: 'bwrap' | 'sandbox-exec' | 'none'; allowUnsandboxed: boolean; withCode: number }> {
+  const { detectSandbox, loadInstalled } = await import('@domi/plugin')
+  const { plugins } = loadInstalled(join(dataDir(), 'plugins'))
+  return {
+    sandbox: detectSandbox(),
+    allowUnsandboxed,
+    withCode: plugins.filter((p) => p.manifest.contributes.tools.length > 0).length,
+  }
+}
+
 export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
   if (cli.flags.help) {
     io.out(HELP)
@@ -75,6 +87,12 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         return 127
       }
       return runTrace(cli.sub, cli.flags.html, io)
+    }
+
+    // PRD-M6：插件的安装与脚手架在本进程里做（不需要 domid）
+    case 'plugin': {
+      const { runPlugin } = await import('./plugin.ts')
+      return runPlugin(cli.sub, cli.args, io, { pluginsDir: join(dataDir(), 'plugins') })
     }
 
     // PRD-M4。动态 import：这两个命令要拉起 runtime，其它命令不必为它付加载时间
@@ -133,6 +151,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         gitAvailable: await new ShadowRepo({ workTree: process.cwd() }).available(),
         provider: cfg.model.provider,
         model: cfg.model.name,
+        plugins: await pluginDoctor(cfg.plugins.allowUnsandboxed),
       })
       io.out(formatFindings(findings))
       return findings.every((f) => f.ok) ? 0 : 1

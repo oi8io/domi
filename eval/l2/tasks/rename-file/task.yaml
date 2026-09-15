@@ -1,0 +1,3 @@
+id: rename-file
+title: 改文件名
+prompt: "把 notes/draft.txt 改名为 notes/final.txt，内容不变。"

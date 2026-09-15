@@ -10,6 +10,7 @@ import { useStore } from '@nanostores/react'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { type PendingRef, PendingRefs } from './PendingRefs.tsx'
+import { PluginPanel } from './PluginPanel.tsx'
 import { SoulPanel } from './SoulPanel.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { TaskPanel } from './TaskPanel.tsx'
@@ -41,7 +42,7 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
   // 跨会话引用：在哪个会话里点的都攒在这里，切到别的会话发送时带上（PRD-M3-005）
   const [refs, setRefs] = useState<PendingRef[]>([])
   // 主区显示会话还是 Soul（PRD-M4）
-  const [view, setView] = useState<'session' | 'soul' | 'tasks'>('session')
+  const [view, setView] = useState<'session' | 'soul' | 'tasks' | 'plugins'>('session')
   const [showDeleted, setShowDeleted] = useState(false)
 
   useEffect(() => {
@@ -118,6 +119,14 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
         >
           长任务
         </button>
+        <button
+          type="button"
+          className={`soul-link${view === 'plugins' ? ' current' : ''}`}
+          disabled={state !== 'open'}
+          onClick={() => setView(view === 'plugins' ? 'session' : 'plugins')}
+        >
+          插件
+        </button>
         <label className="toggle">
           <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
           显示已删除
@@ -144,6 +153,8 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
       <main className="main">
         {view === 'soul' ? (
           <SoulPanel client={client} />
+        ) : view === 'plugins' ? (
+          <PluginPanel client={client} />
         ) : view === 'tasks' ? (
           <TaskPanel client={client} onOpen={(id) => open(id)} />
         ) : active ? (

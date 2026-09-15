@@ -1,0 +1,8 @@
+name: git-workflow
+version: 1.0.0
+api: 1
+description: 分支、提交、变基与合并请求的做法说明（官方示例：skill 型）
+author: domi
+permissions: {}
+contributes:
+  skills: [skills/git-workflow]

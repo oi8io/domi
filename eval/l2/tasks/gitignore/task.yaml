@@ -1,0 +1,3 @@
+id: gitignore
+title: 补 .gitignore
+prompt: "给项目加上 .gitignore，忽略 node_modules/、dist/ 与所有 .env 文件；已有的规则保留。"

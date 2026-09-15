@@ -969,6 +969,141 @@
         ]
       }
     },
+    "plugin.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sandbox": {
+            "type": "string",
+            "enum": [
+              "bwrap",
+              "sandbox-exec",
+              "none"
+            ]
+          },
+          "plugins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "tools": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "skills": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "mcp": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ui": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "version",
+                "description",
+                "tools",
+                "skills",
+                "mcp",
+                "ui"
+              ]
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "message"
+              ]
+            }
+          }
+        },
+        "required": [
+          "sandbox",
+          "plugins",
+          "problems"
+        ]
+      }
+    },
+    "plugin.ui": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "plugin": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin",
+          "id"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "html"
+        ]
+      }
+    },
     "audit.record": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2146,6 +2281,30 @@
                           "required": [
                             "t",
                             "nodeId"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "string",
+                              "const": "plugin.error"
+                            },
+                            "plugin": {
+                              "type": "string"
+                            },
+                            "tool": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "plugin",
+                            "message"
                           ],
                           "additionalProperties": {}
                         },

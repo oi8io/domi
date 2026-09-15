@@ -18,7 +18,8 @@
     "@domi/store": "workspace:*",
     "@domi/mcp": "workspace:*",
     "@domi/notify": "workspace:*",
-    "@domi/orchestrator": "workspace:*"
+    "@domi/orchestrator": "workspace:*",
+    "@domi/plugin": "workspace:*"
   },
   "devDependencies": {
     "@domi/client-core": "workspace:*",
