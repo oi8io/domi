@@ -24,6 +24,14 @@ import { Prompt } from './components/Prompt.tsx'
 import { connectChat } from './connect.ts'
 
 const EXIT_CONFIG_ERROR = 2
+
+/** 终端里能直接回答的表单：只有一个布尔字段时，y 就是 true。其它返回 null（去 Web 端填） */
+export function tuiFormAnswer(schema: unknown): Record<string, unknown> | null {
+  const props = Object.entries((schema as { properties?: Record<string, { type?: string }> })?.properties ?? {})
+  if (props.length === 0) return {}
+  if (props.length === 1 && props[0]?.[1].type === 'boolean') return { [props[0][0]]: true }
+  return null
+}
 const EXIT_DAEMON_ERROR = 3
 const DAEMON_ROLE_ENV = 'DOMI_INTERNAL_ROLE'
 
@@ -60,8 +68,11 @@ function Root({
     if (focusIdOf(ask) === 'domi-confirm') {
       const answer = answerFromKey(input, key)
       if (answer === null || !ask?.askId) return
+      // 表单型询问：终端里只接得住「一个布尔字段」这种；其余的 y 不生效，得去 Web 端填（n 照样能拒绝）
+      const content = answer && ask.form ? tuiFormAnswer(ask.form.schema) : undefined
+      if (answer && ask.form && content === null) return
       // 不在这里关框：等 daemon 的 askDone，和别的客户端走同一条路
-      void client.answer(ask.askId, answer).catch(() => undefined)
+      void client.answer(ask.askId, answer, content ?? undefined).catch(() => undefined)
       return
     }
 

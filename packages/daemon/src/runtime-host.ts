@@ -72,8 +72,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           askId: `${sessionId}#${askSeq}`,
           capabilityId: ask.capabilityId,
           // 完整内容，不截断（PRD-M0-003 AC-1）：确认框是用户做决定的地方
-          detail: JSON.stringify(ask.args, null, 2) ?? String(ask.args),
-          answer: (allowed) => ask.answer(allowed),
+          detail: ask.form ? ask.form.message : (JSON.stringify(ask.args, null, 2) ?? String(ask.args)),
+          ...(ask.form === undefined ? {} : { form: ask.form }),
+          answer: (allowed, content) => ask.answer(allowed, content),
         })
       })
 

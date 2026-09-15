@@ -88,3 +88,17 @@ describe('PRD-M0-003 AC-1 · 确认框显示完整待执行内容', () => {
     h.unmount()
   })
 })
+
+describe('TASK-M3-016 · 表单型询问在终端里', () => {
+  test('单个布尔字段：y 直接回答；多字段：提示去 Web 端填', async () => {
+    const { tuiFormAnswer } = await import('../src/main.tsx')
+    const { formNeedsWeb } = await import('../src/components/ConfirmDialog.tsx')
+    const one = { type: 'object', properties: { confirm: { type: 'boolean' } } }
+    const many = { type: 'object', properties: { env: { type: 'string' }, n: { type: 'integer' } } }
+    expect(tuiFormAnswer(one)).toEqual({ confirm: true })
+    expect(tuiFormAnswer({ type: 'object', properties: {} })).toEqual({})
+    expect(tuiFormAnswer(many)).toBeNull()
+    expect(formNeedsWeb(one)).toBe(false)
+    expect(formNeedsWeb(many)).toBe(true)
+  })
+})

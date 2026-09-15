@@ -83,6 +83,8 @@ const AskSchema = z.object({
   sessionId: z.string(),
   capabilityId: z.string(),
   detail: z.string(),
+  /** 工具要输入时带上（TASK-M3-016）：客户端按 schema 画表单，回答时把内容放进 session.answer 的 content */
+  form: z.object({ message: z.string(), schema: z.unknown() }).optional(),
 })
 
 /**
@@ -141,7 +143,12 @@ export const METHODS = {
   },
   'session.answer': {
     summary: '回答一次权限询问。askId 不存在（已被别的客户端答过）时返回 ok:false',
-    params: z.object({ askId: z.string(), allowed: z.boolean() }),
+    params: z.object({
+      askId: z.string(),
+      allowed: z.boolean(),
+      /** 表单型询问的填写内容；权限确认不用带 */
+      content: z.record(z.string(), z.unknown()).optional(),
+    }),
     result: z.object({ ok: z.boolean() }),
   },
   'session.compact': {

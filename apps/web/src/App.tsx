@@ -158,9 +158,9 @@ export function SessionView({
     )
   }
 
-  const answer = (allowed: boolean): void => {
+  const answer = (allowed: boolean, content?: Record<string, unknown>): void => {
     if (!ask?.askId) return
-    client.answer(ask.askId, allowed).then(
+    client.answer(ask.askId, allowed, content).then(
       (applied) => {
         // 没生效 = 别的客户端已经答过了；确认框会随 askDone 关掉，这里只说明一下
         if (!applied) setNotice('这个询问已经在别处回答过了')

@@ -140,8 +140,11 @@ export class DomiClient {
    * 回答一次权限询问。返回 false = 没生效（已经被别的客户端答过）。
    * 不在这里清确认框：等 daemon 推 session.askDone 再清，所有客户端走同一条路
    */
-  async answer(askId: string, allowed: boolean): Promise<boolean> {
-    const r = await this.request('session.answer', { askId, allowed })
+  async answer(askId: string, allowed: boolean, content?: Record<string, unknown>): Promise<boolean> {
+    const r = await this.request(
+      'session.answer',
+      content === undefined ? { askId, allowed } : { askId, allowed, content },
+    )
     return r.ok
   }
 
@@ -255,7 +258,12 @@ export class DomiClient {
       this.watches.get(params.sessionId)?.store.setBusy(params.busy)
     } else if (msg.method === 'session.ask') {
       const p = msg.params as NotifyParamsOf<'session.ask'>
-      this.watches.get(p.sessionId)?.store.setAsk({ askId: p.askId, capabilityId: p.capabilityId, detail: p.detail })
+      this.watches.get(p.sessionId)?.store.setAsk({
+        askId: p.askId,
+        capabilityId: p.capabilityId,
+        detail: p.detail,
+        ...(p.form === undefined ? {} : { form: p.form }),
+      })
     } else if (msg.method === 'session.askDone') {
       const p = msg.params as NotifyParamsOf<'session.askDone'>
       const store = this.watches.get(p.sessionId)?.store

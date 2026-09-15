@@ -422,6 +422,28 @@ describe('权限询问经协议走一圈（PRD-M3-003 AC-1 第 3 项「工具确
   })
 })
 
+describe('TASK-M3-016 · 表单型询问', () => {
+  test('询问带着表单推出去；回答里的内容原样交给宿主', async () => {
+    const { host, raise } = makeHost()
+    const d = new Daemon(host)
+    const c = new FakeConn('c')
+    await handshaked(d, c)
+    await d.handle(c, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
+    const got: Array<[boolean, unknown]> = []
+    raise.ask({
+      askId: 'f1',
+      capabilityId: 'mcp.demo.input',
+      detail: '部署到哪？',
+      form: { message: '部署到哪？', schema: { type: 'object', properties: { env: { type: 'string' } } } },
+      answer: (allowed, content) => got.push([allowed, content]),
+    })
+    expect(notices(c, 'session.ask')[0]).toMatchObject({ askId: 'f1', form: { message: '部署到哪？' } })
+    const r = await d.handle(c, req('session.answer', { askId: 'f1', allowed: true, content: { env: 'prod' } }))
+    expect(r.result).toEqual({ ok: true })
+    expect(got).toEqual([[true, { env: 'prod' }]])
+  })
+})
+
 describe('状态补发：重连的客户端也要知道指标与「还在跑」', () => {
   test('指标实时推送，订阅时补发最近一份', async () => {
     const { host, raise } = makeHost()

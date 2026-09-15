@@ -48,6 +48,8 @@ export interface AskSnapshot {
   capabilityId: string
   /** 完整的待执行内容，确认框必须显示它（PRD-M0-003 AC-1） */
   detail: string
+  /** 工具要输入时的表单（JSON Schema）。有它就画表单，回答时带内容 */
+  form?: { message: string; schema: unknown }
 }
 
 /** 状态栏的 token 段。TUI 与 Web 共用这一份，两端显示才会逐字一致 */

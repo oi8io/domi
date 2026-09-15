@@ -52,11 +52,15 @@ const TitleSchema = z.object({ title: z.string() })
 
 import { SqliteEventLog } from '@domi/store'
 
-/** 一次权限询问。TUI 渲染它，用户回答后 resolve */
+/**
+ * 一次询问。TUI / daemon 渲染它，用户回答后 resolve。
+ * 两种：权限确认（只要是/否），与工具要输入（form 不为空，回答可带内容）
+ */
 export interface PendingAsk {
   capabilityId: string
   args: unknown
-  answer(allowed: boolean): void
+  form?: { message: string; schema: unknown }
+  answer(allowed: boolean, content?: Record<string, unknown>): void
 }
 
 export interface MetricsSnapshot {
@@ -114,7 +118,11 @@ export class DomiSession {
     const permissions = new PermissionEngine({ rules: opts.config.permissions.rules }, (capabilityId, args) =>
       this.askUser(capabilityId, args),
     )
-    this.tools = new ToolRegistry({ cwd: opts.cwd, permissions })
+    this.tools = new ToolRegistry({
+      cwd: opts.cwd,
+      permissions,
+      elicit: (tool, req) => this.askInput(tool.capability, req),
+    })
       .register(fsRead)
       .register(fsWrite)
       .register(shellExec)
@@ -165,6 +173,32 @@ export class DomiSession {
         return
       }
       this.listeners.onAsk(ask)
+    })
+  }
+
+  /**
+   * 工具向用户要输入（TASK-M3-016）。走和权限确认同一个通道，能力 id 是「同组.input」，
+   * 比如 mcp.github.create_issue 要输入时显示为 mcp.github.input。没人能回答 → decline，不替人填
+   */
+  private askInput(
+    capability: string,
+    req: { message: string; requestedSchema?: unknown },
+  ): Promise<{ action: 'accept' | 'decline'; content?: Record<string, unknown> }> {
+    const capabilityId = `${capability.split('.').slice(0, -1).join('.') || capability}.input`
+    return new Promise((resolve) => {
+      if (!this.listeners.onAsk) {
+        resolve({ action: 'decline' })
+        return
+      }
+      this.listeners.onAsk({
+        capabilityId,
+        args: { message: req.message },
+        form: { message: req.message, schema: req.requestedSchema ?? { type: 'object', properties: {} } },
+        answer: (allowed, content) => {
+          this.listeners.onAsk?.(null)
+          resolve(allowed ? { action: 'accept', ...(content === undefined ? {} : { content }) } : { action: 'decline' })
+        },
+      })
     })
   }
 

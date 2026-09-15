@@ -12,7 +12,7 @@
 import type { DomiEvent, ToolSchema } from '@domi/protocol'
 import { z } from 'zod'
 import type { PermissionEngine } from './permission.ts'
-import type { Tool, ToolCtx } from './types.ts'
+import type { ElicitRequest, ElicitResponse, Tool, ToolCtx } from './types.ts'
 
 export interface ToolCallRequest {
   id: string
@@ -31,6 +31,8 @@ export interface ToolOutcome {
 export interface ToolRegistryOptions {
   cwd: string
   permissions: PermissionEngine
+  /** 工具向用户要输入时走这里；带上是哪个工具在问，确认框才能说清楚 */
+  elicit?: (tool: { name: string; capability: string }, req: ElicitRequest) => Promise<ElicitResponse>
 }
 
 export class ToolRegistry {
@@ -103,12 +105,16 @@ export class ToolRegistry {
     }
 
     const events: DomiEvent[] = [permissionEvent]
+    const elicit = this.opts.elicit
     const ctx: ToolCtx = {
       cwd: this.opts.cwd,
       signal,
       emit: (ev) => {
         events.push(ev)
       },
+      ...(elicit
+        ? { elicit: (req: ElicitRequest) => elicit({ name: tool.name, capability: tool.capability }, req) }
+        : {}),
     }
 
     try {

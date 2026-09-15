@@ -9,7 +9,8 @@
  *   4. 二进制结果落 blob，事件里只留引用（M2-009 AC-2）
  * 不调用已弃用的 sampling / roots / logging（AC-4，scripts/check-deprecated-mcp.ts 守）。
  */
-import type { Tool } from '@domi/capability'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import type { ElicitRequest, ElicitResponse, Tool } from '@domi/capability'
 import type { McpServerConfig } from '@domi/config'
 import {
   Client,
@@ -55,6 +56,13 @@ export interface McpNotice {
   kind: 'connect_failed' | 'host_not_allowed' | 'tool_skipped'
   message: string
 }
+
+/**
+ * 当前这次工具调用的「向用户要输入」通道。
+ * 2026-07-28 的追问（MRTR）是在 callTool 内部由 SDK 驱动的，处理器是按 client 注册的、不知道是哪次调用——
+ * 用异步上下文把调用方（哪个会话、哪个工具）带进去，并发调用才不会问错人
+ */
+const callContext = new AsyncLocalStorage<{ elicit: (req: ElicitRequest) => Promise<ElicitResponse> }>()
 
 /** Anthropic 的工具名上限 64，且点会被编码成下划线（packages/model） */
 const TOOL_NAME_LIMIT = 64
@@ -168,11 +176,15 @@ export class McpHub {
     })
     client.setRequestHandler('elicitation/create', async (req) => {
       const params = req.params as { message?: string; requestedSchema?: unknown }
-      if (!this.opts.onElicit) return { action: 'decline' }
-      return this.opts.onElicit(server, {
+      const view = {
         message: params.message ?? '',
         ...(params.requestedSchema === undefined ? {} : { requestedSchema: params.requestedSchema }),
-      })
+      }
+      // 先问发起这次调用的会话；不在任何调用里（比如老 server 事后单独发来的请求）才走 hub 级的处理器
+      const call = callContext.getStore()
+      if (call) return (await call.elicit(view)) as ElicitResult
+      if (!this.opts.onElicit) return { action: 'decline' }
+      return this.opts.onElicit(server, view)
     })
     return client
   }
@@ -224,10 +236,10 @@ export class McpHub {
       schema: schemaFrom(inputJsonSchema),
       inputJsonSchema,
       async execute(args, ctx) {
-        const result = await client.callTool(
-          { name: t.name, arguments: (args ?? {}) as Record<string, unknown> },
-          { signal: ctx.signal },
-        )
+        const call = () =>
+          client.callTool({ name: t.name, arguments: (args ?? {}) as Record<string, unknown> }, { signal: ctx.signal })
+        const elicit = ctx.elicit
+        const result = elicit ? await callContext.run({ elicit }, call) : await call()
         const content = externalizeContent(blobDir, (result.content ?? []) as unknown[])
         if (result.isError) {
           const text = content

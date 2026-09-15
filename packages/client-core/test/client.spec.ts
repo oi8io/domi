@@ -250,6 +250,24 @@ describe('询问与指标投影进 store', () => {
     expect(store.$ask.get()).toBeNull()
   })
 
+  test('表单型询问：form 进 store；回答时带上内容', async () => {
+    const { client, store, sock } = await connected()
+    sock.push({
+      jsonrpc: '2.0',
+      method: 'session.ask',
+      params: {
+        askId: 'f1',
+        sessionId: 's1',
+        capabilityId: 'mcp.x.input',
+        detail: '填一下',
+        form: { message: '填一下', schema: { type: 'object' } },
+      },
+    })
+    expect(store.$ask.get()?.form).toEqual({ message: '填一下', schema: { type: 'object' } })
+    await client.answer('f1', true, { env: 'prod' })
+    expect(sock.sent.at(-1)).toMatchObject({ params: { askId: 'f1', allowed: true, content: { env: 'prod' } } })
+  })
+
   test('session.metrics → 状态栏的模型与指标', async () => {
     const { store, sock } = await connected()
     sock.push({

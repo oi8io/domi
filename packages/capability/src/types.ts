@@ -18,6 +18,18 @@ export interface Decision {
   matchedRule: string | null
 }
 
+/** 工具向用户要输入（MCP elicitation 等）。一次问答，不是权限决定 */
+export interface ElicitRequest {
+  message: string
+  /** 要填的表单（JSON Schema，object 类型）；没有就是纯确认 */
+  requestedSchema?: unknown
+}
+
+export interface ElicitResponse {
+  action: 'accept' | 'decline' | 'cancel'
+  content?: Record<string, unknown>
+}
+
 export interface ToolCtx {
   /** 工作目录，所有文件访问的根。越界一律拒绝（PRD-M0-003 AC-5） */
   cwd: string
@@ -28,6 +40,8 @@ export interface ToolCtx {
    * 这样顺序与事务边界只有一个地方管，append-only 的保证不会被工具各写各的破坏。
    */
   emit(ev: DomiEvent): void
+  /** 向用户要输入。没有这个通道（非交互环境）时为 undefined，调用方应按 decline 处理 */
+  elicit?(req: ElicitRequest): Promise<ElicitResponse>
 }
 
 export interface Tool<A = unknown, R = unknown> {

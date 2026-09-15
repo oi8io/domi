@@ -135,3 +135,60 @@ describe('会话级操作（parity 第 8、10 项）', () => {
     expect(busy.match(/disabled=""/g)?.length).toBe(3)
   })
 })
+
+describe('表单型询问（TASK-M3-016）', () => {
+  test('按 schema 画出输入项：文本、数字、布尔、枚举；按钮是「拒绝 / 提交」', () => {
+    const html = renderToStaticMarkup(
+      <ConfirmDialog
+        ask={{
+          askId: 'f',
+          capabilityId: 'mcp.x.input',
+          detail: '部署参数',
+          form: {
+            message: '部署参数',
+            schema: {
+              type: 'object',
+              properties: {
+                env: { type: 'string', title: '环境', enum: ['staging', 'prod'] },
+                replicas: { type: 'integer', title: '副本数' },
+                note: { type: 'string', description: '备注' },
+                confirm: { type: 'boolean', title: '确认' },
+              },
+              required: ['env'],
+            },
+          },
+        }}
+        onAnswer={() => undefined}
+      />,
+    )
+    expect(html).toContain('部署参数')
+    expect(html).toMatch(/<select[^>]*name="env"/)
+    expect(html).toContain('<option value="prod">prod</option>')
+    expect(html).toMatch(/type="number"[^>]*name="replicas"/)
+    expect(html).toContain('name="note"')
+    expect(html).toMatch(/type="checkbox"[^>]*name="confirm"/)
+    expect(html).toContain('提交')
+    expect(html.indexOf('拒绝')).toBeLessThan(html.indexOf('提交'))
+  })
+
+  test('formValues：按 schema 把表单值转成正确的类型', async () => {
+    const { formValues } = await import('../src/ConfirmDialog.tsx')
+    const schema = {
+      type: 'object',
+      properties: {
+        n: { type: 'integer' },
+        x: { type: 'number' },
+        ok: { type: 'boolean' },
+        s: { type: 'string' },
+        empty: { type: 'string' },
+      },
+    }
+    expect(formValues(schema, { n: '3', x: '1.5', ok: 'on', s: 'hi', empty: '' })).toEqual({
+      n: 3,
+      x: 1.5,
+      ok: true,
+      s: 'hi',
+    })
+    expect(formValues(schema, {})).toEqual({ ok: false })
+  })
+})

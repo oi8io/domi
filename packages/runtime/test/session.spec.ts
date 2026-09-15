@@ -194,3 +194,76 @@ describe('外部工具（MCP）接进会话 —— PRD-M2-001 · ADR-015', () =>
     await s.flushAndClose()
   })
 })
+
+describe('TASK-M3-016 · 工具向用户要输入（elicitation）走询问通道', () => {
+  const askingTool = {
+    name: 'mcp.demo.deploy',
+    capability: 'mcp.demo.deploy',
+    description: 'deploy',
+    schema: z.object({}),
+    execute: async (
+      _args: unknown,
+      ctx: { elicit?: (req: { message: string; requestedSchema?: unknown }) => Promise<unknown> },
+    ) =>
+      ctx.elicit
+        ? ctx.elicit({
+            message: '部署到哪？',
+            requestedSchema: { type: 'object', properties: { env: { type: 'string' } } },
+          })
+        : 'no-elicit',
+  }
+
+  function session() {
+    return new DomiSession({
+      config: ConfigSchema.parse({
+        model: { provider: 'stub', name: 'stub-1', apiKey: 'k' },
+        permissions: { rules: [{ name: 'demo', capability: 'mcp.demo.*', decision: 'allow' }] },
+      }),
+      sessionId: 's1',
+      cwd: tmp(),
+      dbPath: join(tmp(), 'e.db'),
+      clock,
+      extraTools: () => [askingTool as never],
+      provider: new StubProvider([
+        [{ type: 'tool-call', id: 'c1', name: 'mcp.demo.deploy', args: {} }],
+        [{ type: 'delta', text: '好' }],
+      ]),
+    })
+  }
+
+  test('询问带着表单推给订阅者；填了内容就原样交回工具', async () => {
+    const s = session()
+    const asks: PendingAsk[] = []
+    s.on('onAsk', (a) => {
+      if (!a) return
+      asks.push(a)
+      a.answer(true, { env: 'prod' })
+    })
+    await s.submit('部署')
+    expect(asks[0]).toMatchObject({
+      capabilityId: 'mcp.demo.input',
+      form: { message: '部署到哪？', schema: { type: 'object' } },
+    })
+    const res = (await s.pumpAll()).find((e) => e.ev.t === 'tool.result')?.ev
+    expect(JSON.stringify(res)).toContain('"action":"accept"')
+    expect(JSON.stringify(res)).toContain('"env":"prod"')
+    await s.flushAndClose()
+  })
+
+  test('拒绝 → decline；没人能回答 → decline（不替人填）', async () => {
+    const s = session()
+    s.on('onAsk', (a) => a?.answer(false))
+    await s.submit('部署')
+    expect(JSON.stringify((await s.pumpAll()).find((e) => e.ev.t === 'tool.result')?.ev)).toContain(
+      '"action":"decline"',
+    )
+    await s.flushAndClose()
+
+    const lonely = session()
+    await lonely.submit('部署')
+    expect(JSON.stringify((await lonely.pumpAll()).find((e) => e.ev.t === 'tool.result')?.ev)).toContain(
+      '"action":"decline"',
+    )
+    await lonely.flushAndClose()
+  })
+})

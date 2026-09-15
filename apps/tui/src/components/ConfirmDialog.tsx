@@ -27,7 +27,11 @@ export function ConfirmDialog({ ask }: { ask: AskSnapshot }): React.ReactElement
     <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
       <Text color="yellow">{`需要授权：${ask.capabilityId}`}</Text>
       <Text>{ask.detail}</Text>
-      <Text dimColor>y 允许 / n 拒绝（默认拒绝）</Text>
+      <Text dimColor>
+        {ask.form && formNeedsWeb(ask.form.schema)
+          ? '这个请求要填表：请在 Web 端（pnpm web）回答；n 拒绝'
+          : 'y 允许 / n 拒绝（默认拒绝）'}
+      </Text>
     </Box>
   )
 }
@@ -51,4 +55,10 @@ export function RevertDialog({ ask }: { ask: RevertAsk }): React.ReactElement {
       <Text dimColor>y 确认回滚 / n 取消（默认取消）</Text>
     </Box>
   )
+}
+
+/** 终端里答不了的表单（多于一个字段，或不是布尔） */
+export function formNeedsWeb(schema: unknown): boolean {
+  const props = Object.values((schema as { properties?: Record<string, { type?: string }> })?.properties ?? {})
+  return !(props.length === 0 || (props.length === 1 && props[0]?.type === 'boolean'))
 }

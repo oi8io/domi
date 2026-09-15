@@ -407,6 +407,13 @@
     },
     "allowed": {
       "type": "boolean"
+    },
+    "content": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
     }
   },
   "required": [
@@ -1169,6 +1176,19 @@
     },
     "detail": {
       "type": "string"
+    },
+    "form": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "schema": {}
+      },
+      "required": [
+        "message",
+        "schema"
+      ]
     }
   },
   "required": [

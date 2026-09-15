@@ -74,7 +74,9 @@ export interface HostAsk {
   capabilityId: string
   /** 完整的待执行内容，确认框必须显示它（PRD-M0-003 AC-1） */
   detail: string
-  answer(allowed: boolean): void
+  /** 表单型询问（工具要输入） */
+  form?: { message: string; schema: unknown }
+  answer(allowed: boolean, content?: Record<string, unknown>): void
 }
 
 export type HostMetrics = NotifyParamsOf<'session.metrics'>['metrics']
@@ -142,6 +144,7 @@ export class Daemon {
       sessionId,
       capabilityId: ask.capabilityId,
       detail: ask.detail,
+      ...(ask.form === undefined ? {} : { form: ask.form }),
     })
   }
 
@@ -309,12 +312,12 @@ export class Daemon {
       }
 
       case 'session.answer': {
-        const p = params as { askId: string; allowed: boolean }
+        const p = params as { askId: string; allowed: boolean; content?: Record<string, unknown> }
         const ask = this.asks.get(p.askId)
         // 已经被别的客户端答过（或根本不存在）：如实说没生效，不重复作答
         if (!ask) return ok(req.id, { ok: false })
         this.asks.delete(p.askId)
-        ask.answer(p.allowed)
+        ask.answer(p.allowed, p.content)
         this.broadcast(
           ask.sessionId,
           notify('session.askDone', { sessionId: ask.sessionId, askId: p.askId, allowed: p.allowed }),

@@ -270,3 +270,52 @@ describe('PRD-M2-009 AC-2 · 二进制结果不进事件流正文', () => {
     expect(image.bytes).toBe(Buffer.from(PIXEL_PNG_BASE64, 'base64').length)
   })
 })
+
+describe('TASK-M3-016 · 追问交给调用它的那个会话', () => {
+  test('工具执行时带着 ctx.elicit：MRTR 的追问走它，而不是 hub 的默认处理', async () => {
+    const http = startHttpServer()
+    cleanups.push(http.stop)
+    const h = hub({ servers: [server({ name: 'web', url: http.url })] }) // 没有 onElicit
+    await h.start()
+    const seen: Array<{ message: string; requestedSchema?: unknown }> = []
+    const out = await tool(h, 'mcp.web.deploy').execute(
+      { env: 'staging' },
+      {
+        ...ctx(),
+        elicit: async (req) => {
+          seen.push(req)
+          return { action: 'accept', content: { confirm: true } }
+        },
+      },
+    )
+    expect(out).toMatchObject({ content: [{ type: 'text', text: 'deployed staging' }] })
+    expect(seen).toEqual([
+      {
+        message: '部署到 staging？',
+        requestedSchema: expect.objectContaining({ properties: { confirm: { type: 'boolean' } } }),
+      },
+    ])
+  })
+
+  test('两个会话同时调同一个 server，追问各回各家', async () => {
+    const http = startHttpServer()
+    cleanups.push(http.stop)
+    const h = hub({ servers: [server({ name: 'web', url: http.url })] })
+    await h.start()
+    const who: string[] = []
+    const run = (name: string, env: string) =>
+      tool(h, 'mcp.web.deploy').execute(
+        { env },
+        {
+          ...ctx(),
+          elicit: async (req) => {
+            who.push(`${name}:${req.message}`)
+            await Bun.sleep(10)
+            return { action: 'accept', content: { confirm: true } }
+          },
+        },
+      )
+    await Promise.all([run('A', 'a'), run('B', 'b')])
+    expect(who.sort()).toEqual(['A:部署到 a？', 'B:部署到 b？'])
+  })
+})
