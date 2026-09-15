@@ -90,7 +90,9 @@ export interface SessionOptions {
 export class DomiSession {
   private readonly log: SqliteEventLog
   private readonly tools: ToolRegistry
-  private readonly provider: ModelProvider
+  private provider: ModelProvider
+  /** 注入的替身不随切换重建——测试要的就是同一个实例 */
+  private readonly injectedProvider: boolean
   private readonly listeners: Partial<SessionEvents> = {}
   private lastSeq = 0
   private currentModel: string
@@ -113,15 +115,20 @@ export class DomiSession {
 
     // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
     // 那份知识只在 packages/model/src/factory.ts 里（AC-4 的 diff 为 0 靠这个成立）
-    this.provider =
-      opts.provider ??
-      createProvider({
-        provider: opts.config.model.provider,
-        name: opts.config.model.name,
-        apiKey: opts.config.model.apiKey,
-        baseUrl: opts.config.model.baseUrl,
-        capabilities: opts.config.model.capabilities,
-      })
+    this.injectedProvider = opts.provider !== undefined
+    this.provider = opts.provider ?? this.buildProvider(opts.config.model.provider, opts.config.model.name)
+  }
+
+  private buildProvider(provider: string, name: string): ModelProvider {
+    const m = this.opts.config.model
+    return createProvider({
+      provider,
+      name,
+      apiKey: m.apiKey,
+      baseUrl: m.baseUrl,
+      // 能力覆盖是为配置里那个 provider 写的，换了 provider 就不再适用
+      capabilities: provider === m.provider ? m.capabilities : undefined,
+    })
   }
 
   /** 当前在用的 provider 与模型（会话中途可能被 switchModel 换掉） */
@@ -193,6 +200,9 @@ export class DomiSession {
 
     this.currentModel = to
     this.currentProvider = toProvider
+    // provider 实例在构造时就绑定了模型名，只改字符串的话请求照旧发给旧模型。
+    // 跨 provider 时沿用同一套 key / base_url——配置里只有一套凭据（多凭据见缺陷登记）
+    if (!this.injectedProvider) this.provider = this.buildProvider(toProvider, to)
     await this.log.append(this.opts.sessionId, [
       {
         t: 'model.switch',

@@ -3,9 +3,10 @@
  * 走的是和用户一样的入口，不是直接调实现函数。
  */
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { SqliteEventLog } from '@domi/store'
 import { parseCli, runCommand, VERSION } from '../src/index.ts'
 
 const dirs: string[] = []
@@ -85,6 +86,36 @@ describe('session', () => {
     const r = await run(['session', 'restore'])
     expect(r.code).toBe(2)
     expect(r.err).toContain('$ domi session restore')
+  })
+
+  describe('BUG-M3-002 · restore 要真的恢复', () => {
+    const realHome = process.env.HOME
+    afterEach(() => {
+      process.env.HOME = realHome
+    })
+
+    test('软删除的会话恢复后重新出现在列表里', async () => {
+      const home = tmp()
+      process.env.HOME = home
+      mkdirSync(join(home, '.domi'), { recursive: true })
+      const log = new SqliteEventLog({ path: join(home, '.domi', 'events.db'), cwd: home })
+      await log.append('s-gone', [{ t: 'user.input', text: '删掉的那次' }])
+      log.sessions.softDelete('s-gone', 1)
+      log.close()
+      expect((await run(['session', 'list'])).out).not.toContain('s-gone')
+
+      const r = await run(['session', 'restore', 's-gone'])
+      expect(r.code).toBe(0)
+      expect((await run(['session', 'list'])).out).toContain('s-gone')
+    })
+
+    test('不存在的 id 报错，而不是说「已恢复」', async () => {
+      process.env.HOME = tmp()
+      const r = await run(['session', 'restore', 's-nope'])
+      expect(r.code).toBe(1)
+      expect(r.out).not.toContain('已恢复')
+      expect(r.err).toContain('s-nope')
+    })
   })
 })
 

@@ -28,7 +28,8 @@ export interface Io {
 }
 
 export function dataDir(): string {
-  return join(homedir(), '.domi')
+  // 先看 HOME：os.homedir() 在 Bun 里不跟随运行期对 HOME 的修改，测试与「换个 HOME 跑一次」都靠这个
+  return join(process.env.HOME || homedir(), '.domi')
 }
 
 export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
@@ -114,8 +115,13 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       const log = new SqliteEventLog({ path: join(dataDir(), 'events.db'), cwd: process.cwd() })
       try {
         if (restoreId) {
-          const id = restoreId
-          io.out(`已恢复 ${id}`)
+          // BUG-M3-002：这里原来只打印「已恢复」，一行恢复的动作都没有
+          if (!log.sessions.get(restoreId)) {
+            io.err(`没有这个会话：${restoreId}\n$ domi session all   # 列出包括已删除在内的全部会话`)
+            return 1
+          }
+          log.sessions.restore(restoreId)
+          io.out(`已恢复 ${restoreId}`)
           return 0
         }
         const now = Date.now()

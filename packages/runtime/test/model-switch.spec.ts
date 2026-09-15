@@ -110,3 +110,43 @@ describe('AC-2 · 切到能力更弱的模型时列出将失去的能力', () =>
     await s.flushAndClose()
   }, 15_000)
 })
+
+describe('切换之后，发出去的请求真的换了模型（2026-09-15 发现）', () => {
+  // 原来 switchModel 只改了 currentModel 这个字符串：AiSdkProvider 在构造时就绑死了模型名，
+  // 请求里的 model 字段它根本不看。替身 provider 看不出这个问题——所以这里用真工厂 + 假网关
+  test('第二轮请求体里的 model 是新名字', async () => {
+    const bodies: Array<{ model?: string }> = []
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(req) {
+        bodies.push((await req.json()) as { model?: string })
+        const chunk = (d: Record<string, unknown>, f: string | null) =>
+          `data: ${JSON.stringify({ id: 'c', object: 'chat.completion.chunk', created: 1, model: 'x', choices: [{ index: 0, delta: d, finish_reason: f }] })}\n\n`
+        return new Response(`${chunk({ content: 'ok' }, null)}${chunk({}, 'stop')}data: [DONE]\n\n`, {
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      },
+    })
+    try {
+      const config = ConfigSchema.parse({
+        model: {
+          provider: 'local-gw',
+          name: 'model-a',
+          apiKey: 'k',
+          baseUrl: `http://127.0.0.1:${server.port}/v1`,
+          capabilities: { toolCall: true },
+        },
+      })
+      const s = new DomiSession({ config, sessionId: 's1', cwd: tmp(), dbPath: join(tmp(), 'e.db'), clock })
+      await s.submit('第一轮')
+      await s.switchModel('model-b')
+      await s.submit('第二轮')
+      expect(bodies.map((b) => b.model)).toEqual(['model-a', 'model-b'])
+      expect(s.modelInfo()).toEqual({ provider: 'local-gw', model: 'model-b' })
+      await s.flushAndClose()
+    } finally {
+      await server.stop(true)
+    }
+  }, 15_000)
+})
