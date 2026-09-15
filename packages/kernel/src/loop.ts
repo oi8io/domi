@@ -13,6 +13,7 @@
 import type { DomiEvent } from '@domi/protocol'
 import { buildContext, type ContextPolicy } from './build-context.ts'
 import type { Clock, EventSink, ToolCallRequest, ToolRunner } from './ports.ts'
+import { notRunResult } from './recovery.ts'
 
 export interface LoopLimits {
   /** 单轮工具调用次数上限（PRD-M0-002 AC-2） */
@@ -80,9 +81,17 @@ export async function runTurn(
     elapsedMs: deps.clock.now() - startedAt,
   })
 
-  const stop = async (reason: Exclude<StopReason, 'completed'>, message: string): Promise<TurnResult> => {
+  const stop = async (
+    reason: Exclude<StopReason, 'completed'>,
+    message: string,
+    skipped: readonly ToolCallRequest[] = [],
+  ): Promise<TurnResult> => {
     const c = counters()
-    await deps.sink.append(sessionId, [{ t: 'error', scope: 'loop', message, recoverable: true, counters: c }])
+    // 停下时还没跑的调用也要配上结果：悬空的 tool_use 会让下一轮请求被 provider 拒掉（BUG-M3-014）
+    await deps.sink.append(sessionId, [
+      ...skipped.map((call) => notRunResult(call.id, `本轮已停止（${reason}）`)),
+      { t: 'error', scope: 'loop', message, recoverable: true, counters: c },
+    ])
     ac.abort()
     return { stopReason: reason, counters: c }
   }
@@ -141,14 +150,14 @@ export async function runTurn(
 
     if (streamError) {
       // 流中途截断：会话事件流仍然完整，用户可以继续输入（PRD-M0-002 AC-4）
-      return stop('stream_error', `模型流中断：${streamError.message}`)
+      return stop('stream_error', `模型流中断：${streamError.message}`, pending)
     }
 
     if (pending.length === 0) return { stopReason: 'completed', counters: counters() }
 
-    for (const call of pending) {
+    for (const [i, call] of pending.entries()) {
       if (toolCalls >= limits.maxToolCalls) {
-        return stop('max_tool_calls', `单轮工具调用达到上限 ${limits.maxToolCalls} 次，已终止。`)
+        return stop('max_tool_calls', `单轮工具调用达到上限 ${limits.maxToolCalls} 次，已终止。`, pending.slice(i))
       }
       toolCalls++
 
@@ -171,7 +180,11 @@ export async function runTurn(
       if (outcome.reason === 'invalid_args') {
         argParseRetries++
         if (argParseRetries > limits.maxArgParseRetries) {
-          return stop('max_arg_parse_retries', `参数解析连续失败超过 ${limits.maxArgParseRetries} 次，已终止。`)
+          return stop(
+            'max_arg_parse_retries',
+            `参数解析连续失败超过 ${limits.maxArgParseRetries} 次，已终止。`,
+            pending.slice(i + 1),
+          )
         }
       } else {
         // 成功一次就清零：连续失败才是信号，累计失败不是

@@ -20,6 +20,7 @@ import {
   runTurn,
   type ToolOutcome,
   type ToolRunner,
+  turnState,
   unmarkToolResult,
 } from '../src/index.ts'
 
@@ -118,6 +119,18 @@ describe('PRD-M0-002 AC-2 · 20 次工具循环后强制停止', () => {
       argParseRetries: 0,
       elapsedMs: expect.any(Number),
     })
+  })
+
+  test('BUG-M3-014 · 停下时没来得及跑的调用也配上结果，下一轮的上下文仍然一致', async () => {
+    const provider = new StubProvider([[{ type: 'tool-call', id: 'c', name: 'fs.read', args: {} }]], {
+      onExhausted: 'repeat-last',
+    })
+    const d = deps({ provider, tools: runner(() => ({ ok: true, payload: 1 })) })
+    await runTurn(d, 's1', 'loop')
+    const events = await d.sink.read('s1')
+    expect(turnState(events)).toEqual({ open: false, danglingCalls: [] })
+    const skipped = events.filter((e) => e.ev.t === 'tool.result' && (e.ev as { reason?: string }).reason === 'not_run')
+    expect(skipped).toHaveLength(1)
   })
 })
 
