@@ -294,6 +294,13 @@ importers:
       '@domi/store':
         specifier: workspace:*
         version: link:../store
+    devDependencies:
+      '@domi/client-core':
+        specifier: workspace:*
+        version: link:../client-core
+      '@domi/model':
+        specifier: workspace:*
+        version: link:../model
 
   packages/eval:
     dependencies:

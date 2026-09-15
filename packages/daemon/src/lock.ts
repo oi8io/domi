@@ -59,6 +59,15 @@ export function acquireLock(path: string, info: Omit<LockInfo, 'startedAt'>): ()
   }
 }
 
+/**
+ * 持锁者改写锁里的信息（比如 DOMI_PORT=0 时拿到真实端口之后）。
+ * 原地写，不先释放再抢——那中间的空档足够另一个进程抢走锁。
+ */
+export function rewriteLock(path: string, info: Omit<LockInfo, 'startedAt'>): void {
+  const prev = readLock(path)
+  writeFileSync(path, JSON.stringify({ ...info, startedAt: prev?.startedAt ?? Date.now() }), 'utf8')
+}
+
 export function readLock(path: string): LockInfo | null {
   if (!existsSync(path)) return null
   try {

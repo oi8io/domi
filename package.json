@@ -26,6 +26,7 @@
     "guard:ac": "bun run scripts/check-ac-coverage.ts",
     "guard:eval": "bun run scripts/check-eval-isolation.ts",
     "eval": "bun apps/tui/src/main.tsx eval run",
+    "domid": "bun packages/daemon/src/main.ts",
     "build": "bun run scripts/build-binaries.ts",
     "build:all": "bun run scripts/build-binaries.ts --all",
     "smoke": "bun run scripts/build-binaries.ts && bash scripts/smoke-binary.sh",
