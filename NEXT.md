@@ -1,5 +1,5 @@
 在做: **M3 骨架轮做完了**（范围见 `docs/prd/M3.md` §3）。
-      `pnpm check`：typecheck（现在含 apps/tui 与 apps/web）+ **16 道守卫** + **585 个测试** + L1 回放，全绿。
+      `pnpm check`：typecheck（现在含 apps/tui 与 apps/web）+ **16 道守卫** + **606 个测试** + L1 回放，全绿。
 
       这一轮交付的：
       - **Domi Protocol**（M3-001）：zod 方法表是唯一来源；握手不匹配就停，不降级；
@@ -15,9 +15,17 @@
 
       试一下：终端一 `pnpm domid`，终端二 `pnpm web`，浏览器开 http://127.0.0.1:5173
 
+      2026-09-15 第一次真用 Web 端之后补的：
+      - **网关 base_url**：`https://api.z.ai/api/anthropic`（Claude Code 写法，不带 /v1）现在也认；
+        网关回非事件流 / 空流时，错误里写明请求地址与响应正文。改完之后请求已到达网关，
+        剩下的 `[1305] overloaded` 是 z.ai 那边模型过载，不是 domi 的问题
+      - **工具确认**：session.ask / answer / askDone 接通，Web 有确认框（默认拒绝）；
+        之前 Web 发出的任何写文件、跑命令都被静默拒掉
+      - **状态栏**：session.metrics，Web 与 TUI 同样五段
+      - 打不开会话（比如 key 坏了）不再被说成「没有这个会话」
+
 下一步: M3 下一轮（按 parity 清单表后的顺序）
-        1. 协议补缺口：session.restore / branch / delete / switchModel、metrics 通知、
-           session.ask ↔ 权限询问真正接线（现在 session.answer 如实返回 ok:false）
+        1. 协议补缺口：session.restore / branch / delete / switchModel；「本轮耗时」进 metrics（M1 遗留）
         2. TUI 改成 DomiClient 的客户端（现在 TUI 仍是进程内直接用 DomiSession）
         3. Playwright + parity e2e 逐行补；Tailwind / shadcn 随第一个复用组件引入
         4. M3-002 AC-3（kill -9 恢复）、M3-005、M3-006 认证与 `--connect`、MCP（ADR-011）
