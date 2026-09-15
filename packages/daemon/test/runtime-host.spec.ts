@@ -5,7 +5,7 @@
  * 建的会话能列出来、提交后事件经 core 推给订阅者、历史从同一个 SQLite 里读得回来。
  */
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
@@ -27,18 +27,21 @@ afterEach(() => {
   }
 })
 
-function setup() {
+function setup(provider = new StubProvider([[{ type: 'delta', text: '好的' }]], { onExhausted: 'repeat-last' })) {
   const d = mkdtempSync(join(tmpdir(), 'domi-host-'))
   dirs.push(d)
   const host = createRuntimeHost({
-    config: ConfigSchema.parse({ model: { provider: 'stub', name: 'stub-1', apiKey: 'k' } }),
+    config: ConfigSchema.parse({
+      model: { provider: 'stub', name: 'stub-1', apiKey: 'k' },
+      permissions: { rules: [{ name: 'confirm-write', capability: 'fs.write', decision: 'ask' }] },
+    }),
     dbPath: join(d, 'events.db'),
     defaultCwd: d,
-    provider: new StubProvider([[{ type: 'delta', text: '好的' }]], { onExhausted: 'repeat-last' }),
+    provider,
     newId: () => 'sess-1',
   })
   hosts.push(host)
-  return { host, daemon: new Daemon(host) }
+  return { host, daemon: new Daemon(host), dir: d }
 }
 
 class Conn implements ClientConn {
@@ -94,5 +97,50 @@ describe('RuntimeHost', () => {
     await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
     const r = await call(daemon, c, 'session.subscribe', { sessionId: 'nope', fromSeq: 0 })
     expect(r.error?.code).toBe('SESSION_NOT_FOUND')
+  })
+
+  test('需要确认的工具：询问推到客户端，允许之后文件才真的写下去', async () => {
+    const { daemon, dir } = setup(
+      new StubProvider([
+        [{ type: 'tool-call', id: 'c1', name: 'fs.write', args: { path: 'out.txt', content: '来自 Web' } }],
+        [{ type: 'delta', text: '写好了' }],
+      ]),
+    )
+    const c = new Conn('c')
+    await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    await call(daemon, c, 'session.create')
+    await call(daemon, c, 'session.subscribe', { sessionId: 'sess-1', fromSeq: 0 })
+    await call(daemon, c, 'session.submit', { sessionId: 'sess-1', text: '写个文件' })
+
+    const asks = () =>
+      c.got
+        .filter((m): m is RpcNotification => 'method' in m && m.method === 'session.ask')
+        .map((m) => m.params as { askId: string; capabilityId: string; detail: string })
+    for (let i = 0; i < 100 && asks().length === 0; i++) await Bun.sleep(10)
+    const [ask] = asks()
+    expect(ask?.capabilityId).toBe('fs.write')
+    // 完整内容，不是 80 字符的摘要
+    expect(ask?.detail).toContain('来自 Web')
+    expect(existsSync(join(dir, 'out.txt'))).toBe(false) // 没答之前什么都没发生
+
+    const r = await call(daemon, c, 'session.answer', { askId: ask?.askId ?? '', allowed: true })
+    expect(r.result).toEqual({ ok: true })
+    for (let i = 0; i < 100 && !c.events().some((e) => e.ev.t === 'model.delta'); i++) await Bun.sleep(10)
+    expect(readFileSync(join(dir, 'out.txt'), 'utf8')).toBe('来自 Web')
+  })
+
+  test('指标带着 provider/model 推给订阅者', async () => {
+    const { daemon } = setup()
+    const c = new Conn('c')
+    await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    await call(daemon, c, 'session.create')
+    await call(daemon, c, 'session.subscribe', { sessionId: 'sess-1', fromSeq: 0 })
+    await call(daemon, c, 'session.submit', { sessionId: 'sess-1', text: '你好' })
+    const metrics = () => c.got.filter((m): m is RpcNotification => 'method' in m && m.method === 'session.metrics')
+    for (let i = 0; i < 100 && metrics().length === 0; i++) await Bun.sleep(10)
+    const last = metrics().at(-1)?.params as { metrics: { provider: string; model: string; cost: string } }
+    expect(last.metrics.provider).toBe('stub')
+    expect(last.metrics.model).toBe('stub-1')
+    expect(typeof last.metrics.cost).toBe('string')
   })
 })

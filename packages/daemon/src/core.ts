@@ -18,6 +18,7 @@ import {
   METHOD_NAMES,
   METHODS,
   type MethodName,
+  type NotifyParamsOf,
   notify,
   ok,
   PROTOCOL_VERSION,
@@ -65,6 +66,17 @@ export interface SessionSummary {
   eventCount: number
 }
 
+/** 一次权限询问。answer 由宿主提供，core 只负责把它交到某个客户端手里 */
+export interface HostAsk {
+  askId: string
+  capabilityId: string
+  /** 完整的待执行内容，确认框必须显示它（PRD-M0-003 AC-1） */
+  detail: string
+  answer(allowed: boolean): void
+}
+
+export type HostMetrics = NotifyParamsOf<'session.metrics'>['metrics']
+
 /** 宿主提供的东西。测试注入假的，生产注入真的 —— core 两边都不知道 */
 export interface DaemonHost {
   open(sessionId: string): Promise<SessionHandle>
@@ -73,6 +85,8 @@ export interface DaemonHost {
   /** 会话产生新事件时调用；daemon 据此推给订阅者 */
   onEvents(cb: (sessionId: string, events: EventEnvelope[]) => void): void
   onBusy?(cb: (sessionId: string, busy: boolean) => void): void
+  onAsk?(cb: (sessionId: string, ask: HostAsk) => void): void
+  onMetrics?(cb: (sessionId: string, metrics: HostMetrics) => void): void
 }
 
 interface Subscription {
@@ -94,14 +108,41 @@ export class Daemon {
   private readonly sessions = new Map<string, SessionHandle>()
   /** 正在处理中的会话。串行化与 SESSION_BUSY 都看它 */
   private readonly busy = new Set<string>()
+  /** 宿主报告的忙闲（真正在跑模型/工具）。订阅时补发，重连的客户端才知道「还在跑」 */
+  private readonly hostBusy = new Set<string>()
+  /** 等人回答的询问。任务停在那里等，所以订阅时必须补发——否则后连上来的客户端永远看不见它 */
+  private readonly asks = new Map<string, HostAsk & { sessionId: string }>()
+  private readonly metrics = new Map<string, HostMetrics>()
 
   constructor(private readonly host: DaemonHost) {
     host.onEvents((sessionId, events) => this.push(sessionId, events))
     host.onBusy?.((sessionId, b) => {
-      for (const s of this.subs.get(sessionId) ?? []) {
-        s.conn.send(notify('session.busy', { sessionId, busy: b }))
-      }
+      if (b) this.hostBusy.add(sessionId)
+      else this.hostBusy.delete(sessionId)
+      this.broadcast(sessionId, notify('session.busy', { sessionId, busy: b }))
     })
+    host.onAsk?.((sessionId, ask) => {
+      this.asks.set(ask.askId, { ...ask, sessionId })
+      this.broadcast(sessionId, this.askNotice(sessionId, ask))
+    })
+    host.onMetrics?.((sessionId, m) => {
+      this.metrics.set(sessionId, m)
+      this.broadcast(sessionId, notify('session.metrics', { sessionId, metrics: m }))
+    })
+  }
+
+  private askNotice(sessionId: string, ask: HostAsk): RpcNotification {
+    return notify('session.ask', {
+      askId: ask.askId,
+      sessionId,
+      capabilityId: ask.capabilityId,
+      detail: ask.detail,
+    })
+  }
+
+  /** 发给某个会话的全部订阅者。补发历史中的订阅者也照发：这些是状态，不是事件，不存在顺序问题 */
+  private broadcast(sessionId: string, msg: RpcNotification): void {
+    for (const s of this.subs.get(sessionId) ?? []) s.conn.send(msg)
   }
 
   /** 客户端断开：只清订阅，**不动会话**——任务照常跑完（M3-002 AC-2） */
@@ -183,6 +224,13 @@ export class Daemon {
         const pending = sub.pending ?? []
         sub.pending = null
         this.deliver(sub, [...backlog, ...pending])
+        // 事件之外的三样状态也补上：指标、忙闲、还在等回答的询问
+        const m = this.metrics.get(p.sessionId)
+        if (m) conn.send(notify('session.metrics', { sessionId: p.sessionId, metrics: m }))
+        if (this.hostBusy.has(p.sessionId)) conn.send(notify('session.busy', { sessionId: p.sessionId, busy: true }))
+        for (const ask of this.asks.values()) {
+          if (ask.sessionId === p.sessionId) conn.send(this.askNotice(p.sessionId, ask))
+        }
         return ok(req.id, { head: await session.head() })
       }
 
@@ -227,10 +275,19 @@ export class Daemon {
         return ok(req.id, await session.compactNow('manual'))
       }
 
-      case 'session.answer':
-        // 权限询问的回答由宿主接线（TUI 在同进程里直接答；远程客户端走这里）。
-        // 骨架阶段先如实返回 false，而不是假装成功 —— 假装成功会让人以为权限流程通了
-        return ok(req.id, { ok: false })
+      case 'session.answer': {
+        const p = params as { askId: string; allowed: boolean }
+        const ask = this.asks.get(p.askId)
+        // 已经被别的客户端答过（或根本不存在）：如实说没生效，不重复作答
+        if (!ask) return ok(req.id, { ok: false })
+        this.asks.delete(p.askId)
+        ask.answer(p.allowed)
+        this.broadcast(
+          ask.sessionId,
+          notify('session.askDone', { sessionId: ask.sessionId, askId: p.askId, allowed: p.allowed }),
+        )
+        return ok(req.id, { ok: true })
+      }
 
       default:
         return fail(req.id, 'UNKNOWN_METHOD', `未实现：${method}`)

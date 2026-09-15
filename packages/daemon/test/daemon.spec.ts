@@ -11,6 +11,8 @@ import {
   type ClientConn,
   Daemon,
   type DaemonHost,
+  type HostAsk,
+  type HostMetrics,
   type SessionHandle,
   SessionNotFoundError,
   type SessionSummary,
@@ -36,6 +38,8 @@ function makeHost(opts: { submitMs?: number } = {}) {
   const events: EventEnvelope[] = []
   let emit: ((s: string, e: EventEnvelope[]) => void) | null = null
   let busyCb: ((s: string, b: boolean) => void) | null = null
+  let askCb: ((s: string, a: HostAsk) => void) | null = null
+  let metricsCb: ((s: string, m: HostMetrics) => void) | null = null
   const readHooks: { beforeSnapshot?: (() => void) | undefined; afterSnapshot?: (() => void) | undefined } = {}
 
   const append = (texts: string[]): EventEnvelope[] => {
@@ -99,8 +103,19 @@ function makeHost(opts: { submitMs?: number } = {}) {
     onBusy(cb) {
       busyCb = cb
     },
+    onAsk(cb) {
+      askCb = cb
+    },
+    onMetrics(cb) {
+      metricsCb = cb
+    },
   }
-  return { host, append, events, readHooks }
+  const raise = {
+    ask: (a: HostAsk) => askCb?.('s1', a),
+    metrics: (m: HostMetrics) => metricsCb?.('s1', m),
+    busy: (b: boolean) => busyCb?.('s1', b),
+  }
+  return { host, append, events, readHooks, raise }
 }
 
 let reqId = 0
@@ -326,6 +341,102 @@ describe('PRD-M3-004 · 并发写仲裁', () => {
     await handshaked(d, c)
     const r = await d.handle(c, req('session.submit', { sessionId: '不存在', text: 'x' }))
     expect(r.error?.code).toBe('SESSION_NOT_FOUND')
+  })
+})
+
+function notices(c: FakeConn, method: string): Array<Record<string, unknown>> {
+  return c.received
+    .filter((m): m is RpcNotification => 'method' in m && m.method === method)
+    .map((m) => m.params as Record<string, unknown>)
+}
+
+const METRICS: HostMetrics = {
+  provider: 'anthropic',
+  model: 'glm',
+  tokens: { input: 10, output: 2, cacheRead: 0 },
+  cost: '—',
+  contextPercent: 1,
+  contextLevel: 'ok',
+  unpricedModels: ['glm'],
+}
+
+describe('权限询问经协议走一圈（PRD-M3-003 AC-1 第 3 项「工具确认」的 daemon 那一半）', () => {
+  test('询问推给订阅者；回答后宿主拿到答案，所有订阅者收到 askDone', async () => {
+    const { host, raise } = makeHost()
+    const d = new Daemon(host)
+    const a = new FakeConn('a')
+    const b = new FakeConn('b')
+    for (const c of [a, b]) {
+      await handshaked(d, c)
+      await d.handle(c, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
+    }
+    const answers: boolean[] = []
+    raise.ask({ askId: 'k1', capabilityId: 'fs.write', detail: '{"path":"a.txt"}', answer: (x) => answers.push(x) })
+    expect(notices(a, 'session.ask')).toEqual([
+      { askId: 'k1', sessionId: 's1', capabilityId: 'fs.write', detail: '{"path":"a.txt"}' },
+    ])
+    expect(notices(b, 'session.ask')).toHaveLength(1)
+
+    const r = await d.handle(a, req('session.answer', { askId: 'k1', allowed: true }))
+    expect(r.result).toEqual({ ok: true })
+    expect(answers).toEqual([true])
+    // 另一个客户端据此关掉自己的确认框
+    expect(notices(b, 'session.askDone')).toEqual([{ sessionId: 's1', askId: 'k1', allowed: true }])
+  })
+
+  test('同一个询问答第二次不生效，宿主只收到一次答案', async () => {
+    const { host, raise } = makeHost()
+    const d = new Daemon(host)
+    const c = new FakeConn('c')
+    await handshaked(d, c)
+    const answers: boolean[] = []
+    raise.ask({ askId: 'k1', capabilityId: 'shell.exec', detail: 'rm -rf x', answer: (x) => answers.push(x) })
+    expect((await d.handle(c, req('session.answer', { askId: 'k1', allowed: false }))).result).toEqual({ ok: true })
+    expect((await d.handle(c, req('session.answer', { askId: 'k1', allowed: true }))).result).toEqual({ ok: false })
+    expect(answers).toEqual([false])
+  })
+
+  test('询问发生时没人在线 —— 后连上来的客户端订阅时能看到它', async () => {
+    const { host, raise } = makeHost()
+    const d = new Daemon(host)
+    raise.ask({ askId: 'k9', capabilityId: 'fs.write', detail: 'x', answer: () => undefined })
+    const late = new FakeConn('late')
+    await handshaked(d, late)
+    await d.handle(late, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
+    expect(notices(late, 'session.ask').map((p) => p.askId)).toEqual(['k9'])
+  })
+})
+
+describe('状态补发：重连的客户端也要知道指标与「还在跑」', () => {
+  test('指标实时推送，订阅时补发最近一份', async () => {
+    const { host, raise } = makeHost()
+    const d = new Daemon(host)
+    const a = new FakeConn('a')
+    await handshaked(d, a)
+    await d.handle(a, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
+    raise.metrics(METRICS)
+    expect(notices(a, 'session.metrics')).toEqual([{ sessionId: 's1', metrics: METRICS }])
+
+    const late = new FakeConn('late')
+    await handshaked(d, late)
+    await d.handle(late, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
+    expect(notices(late, 'session.metrics')).toEqual([{ sessionId: 's1', metrics: METRICS }])
+  })
+
+  test('宿主正忙时订阅，立刻收到 busy:true；忙完之后订阅的不会收到', async () => {
+    const { host, raise } = makeHost()
+    const d = new Daemon(host)
+    raise.busy(true)
+    const c1 = new FakeConn('c1')
+    await handshaked(d, c1)
+    await d.handle(c1, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
+    expect(notices(c1, 'session.busy')).toEqual([{ sessionId: 's1', busy: true }])
+
+    raise.busy(false)
+    const c2 = new FakeConn('c2')
+    await handshaked(d, c2)
+    await d.handle(c2, req('session.subscribe', { sessionId: 's1', fromSeq: 0 }))
+    expect(notices(c2, 'session.busy')).toEqual([])
   })
 })
 

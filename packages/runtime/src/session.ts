@@ -123,6 +123,11 @@ export class DomiSession {
       })
   }
 
+  /** 当前在用的 provider 与模型（会话中途可能被 switchModel 换掉） */
+  modelInfo(): { provider: string; model: string } {
+    return { provider: this.currentProvider, model: this.currentModel }
+  }
+
   on<K extends keyof SessionEvents>(k: K, fn: SessionEvents[K]): this {
     this.listeners[k] = fn
     return this

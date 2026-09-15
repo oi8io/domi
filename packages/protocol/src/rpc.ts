@@ -60,6 +60,22 @@ const SessionSummarySchema = z.object({
   eventCount: z.number().int().nonnegative(),
 })
 
+/** 状态栏指标。**由 runtime 算好推过来**，客户端不自己算（PRD-M1-007 AC-3） */
+const MetricsSchema = z.object({
+  provider: z.string(),
+  model: z.string(),
+  tokens: z.object({
+    input: z.number().int().nonnegative(),
+    output: z.number().int().nonnegative(),
+    cacheRead: z.number().int().nonnegative(),
+  }),
+  /** 已格式化；未知模型是 `—`，不是 $0（PRD-M1-007 AC-4） */
+  cost: z.string(),
+  contextPercent: z.number(),
+  contextLevel: z.enum(['ok', 'warn', 'danger']),
+  unpricedModels: z.array(z.string()),
+})
+
 const AskSchema = z.object({
   askId: z.string(),
   sessionId: z.string(),
@@ -107,7 +123,7 @@ export const METHODS = {
     result: z.object({ head: z.number().int().nonnegative() }),
   },
   'session.answer': {
-    summary: '回答一次权限询问',
+    summary: '回答一次权限询问。askId 不存在（已被别的客户端答过）时返回 ok:false',
     params: z.object({ askId: z.string(), allowed: z.boolean() }),
     result: z.object({ ok: z.boolean() }),
   },
@@ -136,6 +152,19 @@ export const NOTIFICATIONS = {
   'session.ask': {
     summary: '权限询问',
     params: AskSchema,
+  },
+  /**
+   * 一次询问已经有了答案（不管是哪个客户端答的）。
+   * 同一会话可能开着好几个客户端，其余的据此关掉自己的确认框
+   */
+  'session.askDone': {
+    summary: '权限询问已被回答',
+    params: z.object({ sessionId: z.string(), askId: z.string(), allowed: z.boolean() }),
+  },
+  /** 状态栏指标。订阅时补发最近一份，之后每次变化推一次 */
+  'session.metrics': {
+    summary: '状态栏指标（模型、token、花费、工具次数、上下文占用）',
+    params: z.object({ sessionId: z.string(), metrics: MetricsSchema }),
   },
   /** 忙闲状态，给状态栏用 */
   'session.busy': {

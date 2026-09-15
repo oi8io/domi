@@ -257,7 +257,7 @@
 
 ### `session.answer`
 
-回答一次权限询问
+回答一次权限询问。askId 不存在（已被别的客户端答过）时返回 ok:false
 
 **params**
 
@@ -1040,6 +1040,122 @@
     "sessionId",
     "capabilityId",
     "detail"
+  ]
+}
+```
+
+### `session.askDone`
+
+权限询问已被回答
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "askId": {
+      "type": "string"
+    },
+    "allowed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "sessionId",
+    "askId",
+    "allowed"
+  ]
+}
+```
+
+### `session.metrics`
+
+状态栏指标（模型、token、花费、工具次数、上下文占用）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "tokens": {
+          "type": "object",
+          "properties": {
+            "input": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "output": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "cacheRead": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "input",
+            "output",
+            "cacheRead"
+          ]
+        },
+        "cost": {
+          "type": "string"
+        },
+        "contextPercent": {
+          "type": "number"
+        },
+        "contextLevel": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "warn",
+            "danger"
+          ]
+        },
+        "unpricedModels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "tokens",
+        "cost",
+        "contextPercent",
+        "contextLevel",
+        "unpricedModels"
+      ]
+    }
+  },
+  "required": [
+    "sessionId",
+    "metrics"
   ]
 }
 ```
