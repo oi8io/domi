@@ -21,20 +21,19 @@
 | 2 | 流式接收 | ✅ `model.delta` 拼成一段（PRD-M0-005 AC-1） | 🟡 同一个 `client-core` 投影；经真 WebSocket 推到 store 有测试（`daemon/test/transport.spec.ts`） | ⬜ | ⬜ |
 | 3 | 工具确认 | ✅ `ConfirmDialog`，默认拒绝（PRD-M0-003） | 🟡 `ConfirmDialog`：完整内容、拒绝在前且默认聚焦；经 `session.ask` / `session.answer` / `session.askDone` 接到 runtime（允许后文件才写下去，`daemon/test/runtime-host.spec.ts`） | ⬜ | ⬜ |
 | 4 | 轨迹树展开 | 🟡 `domi trace <id>`（CLI 与 `--html`），不在 TUI 会话界面里 | 🟡 工具调用与结果配对，原生 `<details>` 折叠（渲染测试） | ⬜ | ⬜ |
-| 5 | 会话列表 | 🟡 `domi session`（CLI），不在 TUI 会话界面里 | 🟡 侧栏列表，经 `session.list` | ⬜ | ⬜ |
-| 6 | 会话恢复 | ⚠️ `domi session restore <id>` 只打印「已恢复」，没有调用 `SessionRepo.restore`（`packages/cli/src/run.ts`） | ⬜ 协议里还没有恢复方法 | ⬜ | ⬜ |
-| 7 | 会话分支 | ⬜ store 有 lineage，没有入口 | ⬜ | ⬜ | ⬜ |
-| 8 | 会话删除 | ⬜ store 有软删除，没有入口 | ⬜ 协议里还没有删除方法 | ⬜ | ⬜ |
+| 5 | 会话列表 | 🟡 `domi session`（CLI），不在 TUI 会话界面里 | 🟡 侧栏列表，经 `session.list`；「显示已删除」开关 | ⬜ | ⬜ |
+| 6 | 会话恢复 | 🟡 `domi session restore <id>`（CLI；BUG-M3-002 已修） | 🟡 回收站里点「恢复」，经 `session.restore` | ⬜ | ⬜ |
+| 7 | 会话分支 | ⬜ store 有 fork / lineage，但 runtime 拼上下文时不读父链（BUG-M3-010），先修再开入口 | ⬜ 同左 | ⬜ | ⬜ |
+| 8 | 会话删除 | ⬜ CLI 与 TUI 都没有入口 | 🟡 「删除会话」点两下，经 `session.delete`（软删除；正在处理的不许删） | ⬜ | ⬜ |
 | 9 | 状态栏六项指标 | 🟡 `StatusBar`（PRD-M1-007，颜色快照）；**缺「本轮耗时」** | 🟡 `StatusBar`，经 `session.metrics`，与 TUI 同样五段、同一个 `formatTokens`；同样缺「本轮耗时」 | ⬜ | ⬜ |
-| 10 | 模型切换 | 🟡 `DomiSession.switchModel` 有，TUI 里没有入口 | ⬜ 协议里还没有切换方法 | ⬜ | ⬜ |
+| 10 | 模型切换 | 🟡 对话里 `/model <名字> [provider]` | 🟡 会话顶部的切换表单，显示会失去的能力；两端对话里都出现「模型切换 a → b」 | ⬜ | ⬜ |
 
 「状态栏六项指标」按 PRD-M1-007 AC-1/AC-2 数：模型、累计 token（输/出/缓存读）、累计花费、本轮耗时、工具调用次数、上下文占用百分比。
 
 ## 从这张表读出来的下一轮工作
 
-1. **协议缺口先补**（改 `packages/protocol/src/rpc.ts`，`guard:protocol` 与 `guard:api` 会逼着文档与快照一起改）：
-   `session.restore` / `session.branch` / `session.delete` / `session.switchModel` 四个方法。
-   （`session.metrics` 与询问接线已在 2026-09-15 补上。）
+1. **会话分支**：先修 BUG-M3-010（runtime 不读父链），再加 `session.branch`。
+   （metrics、询问接线、恢复 / 删除 / 切换模型已在 2026-09-15 补上。）
 2. **「本轮耗时」两端都没有**：kernel 的 `TurnResult.counters.elapsedMs` 有这个数，但没进 metrics。
    PRD-M1-007 AC-1 点了名，这是 M1 的遗留，不是 M3 的新活。
 3. **TUI 也要补入口**：第 5–8、10 项目前只在 CLI 或 runtime 里，TUI 会话界面里没有。对等是双向的——
