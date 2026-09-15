@@ -61,15 +61,81 @@ export function assertAsciiKey(key: string): void {
   if (/\s/.test(key)) throw new InvalidApiKeyError('含空白字符')
 }
 
+/**
+ * anthropic 协议的 base_url 两种写法都认 —— 统一成 AI SDK 要的「带 /v1」。
+ *
+ * Anthropic 官方 SDK（以及 Claude Code、几乎所有兼容网关的文档）的 base **不带** /v1，
+ * SDK 自己拼 `/v1/messages`；AI SDK 的 base **要带** /v1，只拼 `/messages`。
+ * 照网关文档填 `https://api.z.ai/api/anthropic`，请求就打到一个不存在的路径上，
+ * 而有的网关对不存在的路径回 200 + JSON——于是用户看到的只是「流里什么都没有」。
+ * 用户不该需要知道我们底下用的是哪个 SDK。
+ */
+export function normalizeAnthropicBaseUrl(url: string): string {
+  const trimmed = url.replace(/\/+$/, '')
+  return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
+}
+
+export class GatewayResponseError extends Error {
+  constructor(
+    readonly url: string,
+    readonly status: number,
+    readonly contentType: string,
+    readonly bodySnippet: string,
+  ) {
+    super(
+      `网关回了 HTTP ${status}，但不是事件流（content-type: ${contentType || '无'}）。` +
+        `请求地址：POST ${url}\n响应正文：${bodySnippet}\n` +
+        '多半是 base_url 路径不对或网关不支持流式。先跑 `domi doctor --ping` 看是哪一环。',
+    )
+    this.name = 'GatewayResponseError'
+  }
+}
+
+/** 最近一次出站请求。空流时拿它告诉用户「发到了哪」 */
+export interface RequestTrace {
+  lastUrl: string | undefined
+}
+
+function urlOf(input: unknown): string {
+  if (typeof input === 'string') return input
+  if (input instanceof URL) return input.href
+  return (input as { url?: string }).url ?? String(input)
+}
+
+/**
+ * 包一层 fetch，只做诊断，不改请求：
+ * 流式请求拿到 2xx 却不是 text/event-stream 时，把正文读出来直接报错。
+ * 否则 SDK 会把一段 JSON 当成「零个事件的流」，最后只剩一句没有信息量的 NoOutputGenerated。
+ */
+type FetchLike = (input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => Promise<Response>
+
+export function diagnosticFetch(base: FetchLike, trace: RequestTrace): typeof globalThis.fetch {
+  const wrapped = async (input: unknown, init?: RequestInit): Promise<Response> => {
+    const url = urlOf(input)
+    trace.lastUrl = url
+    const res = await base(input as Parameters<typeof globalThis.fetch>[0], init)
+    const streaming = typeof init?.body === 'string' && /"stream"\s*:\s*true/.test(init.body)
+    const contentType = res.headers.get('content-type') ?? ''
+    if (streaming && res.ok && !contentType.includes('text/event-stream')) {
+      const body = (await res.text()).slice(0, 300)
+      throw new GatewayResponseError(url, res.status, contentType, body)
+    }
+    return res
+  }
+  return wrapped as unknown as typeof globalThis.fetch
+}
+
 export function createProvider(cfg: ProviderConfig): ModelProvider {
   const capabilities = capabilitiesFor(cfg)
   const apiKey = cfg.apiKey ?? ''
   assertAsciiKey(apiKey)
 
+  const trace: RequestTrace = { lastUrl: undefined }
+  const baseUrl = cfg.baseUrl && cfg.provider === 'anthropic' ? normalizeAnthropicBaseUrl(cfg.baseUrl) : cfg.baseUrl
   const common = {
     apiKey,
-    ...(cfg.baseUrl ? { baseURL: cfg.baseUrl } : {}),
-    ...(cfg.fetch ? { fetch: cfg.fetch } : {}),
+    ...(baseUrl ? { baseURL: baseUrl } : {}),
+    fetch: diagnosticFetch(cfg.fetch ?? ((input, init) => globalThis.fetch(input, init)), trace),
   }
 
   const model = (() => {
@@ -91,5 +157,5 @@ export function createProvider(cfg: ProviderConfig): ModelProvider {
     }
   })()
 
-  return new AiSdkProvider({ id: cfg.provider, model: model as never, capabilities })
+  return new AiSdkProvider({ id: cfg.provider, model: model as never, capabilities, trace })
 }

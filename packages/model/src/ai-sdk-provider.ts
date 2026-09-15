@@ -11,7 +11,7 @@
  */
 import type { ModelMessages, ToolSchema } from '@domi/protocol'
 import type { LanguageModel } from 'ai'
-import { type ModelMessage as AiMessage, jsonSchema, streamText, tool } from 'ai'
+import { type ModelMessage as AiMessage, jsonSchema, NoOutputGeneratedError, streamText, tool } from 'ai'
 import { assertCapability, type ModelCapabilities } from './capability.ts'
 import type { ModelEvent, ModelProvider, ModelRequest } from './provider.ts'
 
@@ -89,17 +89,34 @@ export interface AiSdkProviderOptions {
   id: string
   model: LanguageModel
   capabilities: ModelCapabilities
+  /** 最近一次出站请求地址，由工厂的诊断 fetch 填。空流时用它说清楚「发到了哪」 */
+  trace?: { lastUrl: string | undefined }
+}
+
+/** 流里一个事件都没有时给人看的话。SDK 原文「No output generated」指不到任何一环 */
+export function describeEmptyStream(url: string | undefined): string {
+  return (
+    `模型流里一个事件都没有：${url ? `POST ${url} ` : ''}返回了空的事件流。` +
+    '常见原因：base_url 路径不对、模型名网关不认、或网关没实现流式。先跑 `domi doctor --ping` 看是哪一环。'
+  )
 }
 
 export class AiSdkProvider implements ModelProvider {
   readonly id: string
   readonly capabilities: ModelCapabilities
   private readonly model: LanguageModel
+  private readonly trace: { lastUrl: string | undefined } | undefined
 
   constructor(opts: AiSdkProviderOptions) {
     this.id = opts.id
     this.model = opts.model
     this.capabilities = opts.capabilities
+    this.trace = opts.trace
+  }
+
+  private errorMessage(err: unknown): string {
+    if (NoOutputGeneratedError.isInstance(err)) return describeEmptyStream(this.trace?.lastUrl)
+    return err instanceof Error ? err.message : String(err)
   }
 
   async *generate(req: ModelRequest, signal: AbortSignal): AsyncIterable<ModelEvent> {
@@ -129,10 +146,14 @@ export class AiSdkProvider implements ModelProvider {
       model: this.model,
       messages: toAiMessages(req.messages),
       abortSignal: signal,
+      // SDK 默认把流里的错误 console.error 一遍。错误已经作为事件进了事件流，
+      // 再打一遍只会在 domid 的终端里留一段没人看的堆栈
+      onError: () => undefined,
       ...(schemas.length > 0 ? { tools } : {}),
       ...(req.providerOptions ? { providerOptions: req.providerOptions } : {}),
     } as unknown as Parameters<typeof streamText>[0]
 
+    let errored = false
     try {
       // streamText 会在**构造时同步抛错**（比如 messages 为空、prompt 不合法），
       // 所以它必须在 try 里面。放在外面的话这类错误会穿透到 loop 之外，
@@ -168,7 +189,12 @@ export class AiSdkProvider implements ModelProvider {
             }
             break
           case 'error':
-            yield { type: 'error', message: String(part.error), recoverable: true }
+            // 只报第一个。请求本身失败后 SDK 收尾时还会再补一个 NoOutputGenerated，
+            // 而 loop 记的是最后一个——那样真正的原因就被盖掉了
+            if (!errored) {
+              errored = true
+              yield { type: 'error', message: this.errorMessage(part.error), recoverable: true }
+            }
             break
           default:
             break
@@ -177,7 +203,7 @@ export class AiSdkProvider implements ModelProvider {
     } catch (e) {
       // 流在中途炸掉（网络断、上游 5xx）也要变成事件，而不是异常穿透到 loop 之外。
       // loop 收到 recoverable 的 error 会落盘并让用户可以继续（PRD-M0-002 AC-4）。
-      yield { type: 'error', message: e instanceof Error ? e.message : String(e), recoverable: true }
+      if (!errored) yield { type: 'error', message: this.errorMessage(e), recoverable: true }
     }
   }
 }
