@@ -17,6 +17,7 @@ import {
   contextLevel,
   formatCost,
   type PricingTable,
+  recoveryEvents,
   runTurn,
   type TurnResult,
 } from '@domi/kernel'
@@ -368,6 +369,20 @@ export class DomiSession {
       await this.pump()
       return { ok: false, detail: message }
     }
+  }
+
+  /**
+   * 补到最后一个一致点（PRD-M3-002 AC-3）。进程被 kill -9 之后，事件流里可能留着
+   * 没结果的工具调用、没结束的一轮——打开会话时先补上，之后的一切才站得住。
+   * 已经一致时什么都不写，所以每次打开都调也没关系。**不自动接着跑**：见 kernel/recovery.ts
+   * 返回补了几条
+   */
+  async recover(): Promise<number> {
+    const fix = recoveryEvents(await this.view())
+    if (fix.length === 0) return 0
+    await this.log.append(this.opts.sessionId, fix)
+    await this.pump()
+    return fix.length
   }
 
   /** 进程级提示落成事件：走事件流而不是侧信道，事后查轨迹时才看得见（与压缩失败同一个立场） */

@@ -62,6 +62,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...(opts.extraTools === undefined ? {} : { extraTools: opts.extraTools }),
         ...(opts.notices === undefined ? {} : { notices: opts.notices }),
       })
+      // 上一个 domid 可能是被 kill -9 的：先把这个会话补到一致点，再交出去（TASK-M3-010）。
+      // 这时还没有订阅者，补的事件由之后的订阅补发带过去
+      await s.recover()
       s.on('onEvents', (envs) => emit?.(sessionId, envs))
       s.on('onBusy', (b) => busy?.(sessionId, b))
       s.on('onMetrics', (m) => measured?.(sessionId, { ...s.modelInfo(), ...m }))
