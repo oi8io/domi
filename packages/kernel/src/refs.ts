@@ -15,8 +15,8 @@ import { type EventEnvelope, isKnownEvent, type RefLink } from '@domi/protocol'
 
 export type { RefLink } from '@domi/protocol'
 
-export const REF_OPEN = ''
-export const REF_CLOSE = ''
+export const REF_OPEN = '\uE002'
+export const REF_CLOSE = '\uE003'
 
 /** 一次引用里单条内容的上限。引用是给模型看结论的，不是搬运整段输出 */
 const MAX_ITEM_CHARS = 2000
@@ -31,7 +31,7 @@ export function refKey(ref: RefLink): string {
 }
 
 function clean(s: string): string {
-  const safe = s.replace(/[-]/g, '')
+  const safe = s.replace(/[\uE000-\uE003]/g, '')
   return safe.length > MAX_ITEM_CHARS ? `${safe.slice(0, MAX_ITEM_CHARS)}…（截断）` : safe
 }
 
