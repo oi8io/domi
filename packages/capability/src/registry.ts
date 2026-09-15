@@ -49,7 +49,7 @@ export class ToolRegistry {
       name: t.name,
       description: t.description,
       // JSON Schema 由 zod 生成，不手写——手写的那份一定会和校验用的那份漂移
-      inputSchema: z.toJSONSchema(t.schema as z.ZodType) as Record<string, unknown>,
+      inputSchema: t.inputJsonSchema ?? (z.toJSONSchema(t.schema as z.ZodType) as Record<string, unknown>),
     }))
   }
 

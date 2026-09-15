@@ -152,3 +152,24 @@ describe('PRD-M0-004 AC-4 · 输出超 100KB 头尾截断', () => {
     expect(r.truncated?.omittedBytes).toBeGreaterThan(0)
   }, 10_000)
 })
+
+describe('Tool 可以直接给出 JSON Schema（MCP 工具的 schema 本来就是 JSON Schema）', () => {
+  test('给了 inputJsonSchema 时，发给模型的就是它，原样不动', async () => {
+    const { ToolRegistry, PermissionEngine } = await import('../src/index.ts')
+    const { z } = await import('zod')
+    const original = {
+      type: 'object',
+      properties: { q: { type: 'string', description: '查询词', 'x-vendor': 1 } },
+      required: ['q'],
+    }
+    const reg = new ToolRegistry({ cwd: '/tmp', permissions: new PermissionEngine() }).register({
+      name: 'mcp.demo.search',
+      capability: 'mcp.demo.search',
+      description: 'demo',
+      schema: z.object({ q: z.string() }),
+      inputJsonSchema: original,
+      execute: async () => null,
+    })
+    expect(reg.schemas()[0]?.inputSchema).toEqual(original)
+  })
+})

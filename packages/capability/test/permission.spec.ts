@@ -57,3 +57,41 @@ describe('PRD-M0-003 AC-3 · 决策四字段齐全且来源可区分', () => {
     expect(seen[0]).toEqual({ path: 'a.txt', content: 'hello' })
   })
 })
+
+describe('通配规则 `前缀.*` —— 一条规则管住一整个 MCP server（ADR-015）', () => {
+  const rules = [
+    { name: 'gh-all', capability: 'mcp.github.*', decision: 'ask' as const },
+    { name: 'gh-read', capability: 'mcp.github.search', decision: 'allow' as const },
+    { name: 'mcp-deny', capability: 'mcp.*', decision: 'deny' as const },
+  ]
+
+  test('精确规则优先于通配', async () => {
+    const d = await new PermissionEngine({ rules }).check('mcp.github.search', {})
+    expect(d).toEqual({ decision: 'allow', source: 'config', matchedRule: 'gh-read' })
+  })
+
+  test('没有精确规则时，取前缀最长的通配', async () => {
+    const d = await new PermissionEngine({ rules }, async () => true).check('mcp.github.create_issue', {})
+    expect(d).toEqual({ decision: 'allow', source: 'user', matchedRule: 'gh-all' })
+  })
+
+  test('更短的通配兜底', async () => {
+    const d = await new PermissionEngine({ rules }).check('mcp.slack.post', {})
+    expect(d).toEqual({ decision: 'deny', source: 'config', matchedRule: 'mcp-deny' })
+  })
+
+  test('通配只按「.」分段匹配：mcp.git.* 管不到 mcp.github.x', async () => {
+    const d = await new PermissionEngine({
+      rules: [{ name: 'git', capability: 'mcp.git.*', decision: 'allow' }],
+    }).check('mcp.github.search', {})
+    expect(d).toEqual({ decision: 'deny', source: 'default', matchedRule: null })
+  })
+
+  test('单独一个 * 不是「全部放行」—— 不支持，按没有规则处理', async () => {
+    const d = await new PermissionEngine({ rules: [{ name: 'all', capability: '*', decision: 'allow' }] }).check(
+      'shell.exec',
+      {},
+    )
+    expect(d.decision).toBe('deny')
+  })
+})

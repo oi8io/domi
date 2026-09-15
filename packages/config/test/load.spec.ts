@@ -260,3 +260,56 @@ describe('ADR-014 · YAML 与旧 TOML 的过渡', () => {
     expect(() => loadConfig({ home: home('context:\n  maxTokens: "1e5"\n'), env: {} })).toThrow(ConfigParseError)
   })
 })
+
+describe('mcp —— MCP server 配置（PRD-M2-001 · ADR-015）', () => {
+  const MCP = `
+mcp:
+  allowedHosts: [mcp.example.com, "*.internal.dev"]
+  servers:
+    - name: files
+      command: npx
+      args: [-y, some-mcp-server]
+      env: { LOG: quiet }
+    - name: docs
+      url: https://mcp.example.com/mcp
+`
+
+  test('stdio 与 HTTP 两类都读得出来，缺省值补齐', () => {
+    const cfg = loadConfig({ home: home(MCP), env: {} })
+    expect(cfg.mcp.allowedHosts).toEqual(['mcp.example.com', '*.internal.dev'])
+    expect(cfg.mcp.timeoutMs).toBe(10_000)
+    expect(cfg.mcp.servers).toEqual([
+      { name: 'files', command: 'npx', args: ['-y', 'some-mcp-server'], env: { LOG: 'quiet' }, enabled: true },
+      { name: 'docs', url: 'https://mcp.example.com/mcp', args: [], env: {}, enabled: true },
+    ])
+  })
+
+  test('不写 mcp 就是没有 server，白名单为空', () => {
+    const cfg = loadConfig({ home: home(YAML), env: {} })
+    expect(cfg.mcp).toEqual({ servers: [], allowedHosts: [], timeoutMs: 10_000 })
+  })
+
+  test('command 与 url 必须二选一', () => {
+    expect(() => loadConfig({ home: home('mcp:\n  servers:\n    - name: x\n'), env: {} })).toThrow(
+      /command.*url|url.*command/,
+    )
+    expect(() =>
+      loadConfig({
+        home: home('mcp:\n  servers:\n    - name: x\n      command: a\n      url: https://a.b\n'),
+        env: {},
+      }),
+    ).toThrow(ConfigParseError)
+  })
+
+  test('名字会进工具名（mcp.<name>.<tool>），只许字母数字、- 和 _，且不能重名', () => {
+    expect(() =>
+      loadConfig({ home: home('mcp:\n  servers:\n    - name: my.server\n      command: a\n'), env: {} }),
+    ).toThrow(ConfigParseError)
+    expect(() =>
+      loadConfig({
+        home: home('mcp:\n  servers:\n    - name: a\n      command: x\n    - name: a\n      command: y\n'),
+        env: {},
+      }),
+    ).toThrow(/重名/)
+  })
+})

@@ -12,6 +12,44 @@ export const PermissionRuleSchema = z.object({
   decision: z.enum(['allow', 'deny', 'ask']),
 })
 
+/**
+ * 一个 MCP server（PRD-M2-001 · ADR-015）。command = stdio 子进程，url = Streamable HTTP，二选一。
+ * name 会进工具名 `mcp.<name>.<tool>` 与权限规则，所以只许安全字符
+ */
+export const McpServerSchema = z
+  .object({
+    name: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/, '只许字母、数字、- 和 _，最长 32'),
+    command: z.string().min(1).optional(),
+    args: z.array(z.string()).default([]),
+    env: z.record(z.string(), z.string()).default({}),
+    cwd: z.string().optional(),
+    url: z.string().url().optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+    enabled: z.boolean().default(true),
+    timeoutMs: z.number().int().positive().optional(),
+  })
+  .strict()
+  .refine((s) => (s.command === undefined) !== (s.url === undefined), {
+    message: 'command（stdio）与 url（HTTP）必须二选一',
+  })
+export type McpServerConfig = z.infer<typeof McpServerSchema>
+
+export const McpConfigSchema = z
+  .object({
+    servers: z
+      .array(McpServerSchema)
+      .default([])
+      .refine((list) => new Set(list.map((s) => s.name)).size === list.length, { message: 'server 名字重名了' }),
+    /**
+     * HTTP server 允许访问的主机（INV-11 · PRD-M2-001 AC-6）。支持 `*.example.com`。
+     * 没列出的一律拒绝——包括 localhost，本地 server 也要显式写上
+     */
+    allowedHosts: z.array(z.string()).default([]),
+    /** 每个 server 的连接超时。一个 server 慢不能拖住别的（AC-5） */
+    timeoutMs: z.number().int().positive().default(10_000),
+  })
+  .default({ servers: [], allowedHosts: [], timeoutMs: 10_000 })
+
 export const ConfigSchema = z.object({
   model: z.object({
     provider: z.string().default('anthropic'),
@@ -40,6 +78,7 @@ export const ConfigSchema = z.object({
       .optional(),
   }),
   permissions: z.object({ rules: z.array(PermissionRuleSchema).default([]) }).default({ rules: [] }),
+  mcp: McpConfigSchema,
   context: z
     .object({
       maxTokens: z.number().int().positive().default(150_000),

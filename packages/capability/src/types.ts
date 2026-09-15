@@ -36,6 +36,11 @@ export interface Tool<A = unknown, R = unknown> {
   readonly capability: CapabilityId
   readonly description: string
   readonly schema: z.ZodType<A>
+  /**
+   * 发给模型的 JSON Schema。不给就由 schema 生成。
+   * MCP 工具的 schema 本来就是 JSON Schema，转成 zod 再转回来会丢字段，所以原样给
+   */
+  readonly inputJsonSchema?: Record<string, unknown>
   execute(args: A, ctx: ToolCtx): Promise<R>
 }
 

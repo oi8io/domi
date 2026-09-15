@@ -28,7 +28,7 @@ export class PermissionEngine {
   ) {}
 
   async check(capabilityId: CapabilityId, args: unknown): Promise<Decision> {
-    const rule = this.config.rules?.find((r) => r.capability === capabilityId)
+    const rule = findRule(this.config.rules ?? [], capabilityId)
 
     if (!rule) {
       // 没有任何规则提到它 —— fail-closed（AC-4）
@@ -44,4 +44,24 @@ export class PermissionEngine {
     const allowed = await this.ask(capabilityId, args)
     return { decision: allowed ? 'allow' : 'deny', source: 'user', matchedRule: rule.name }
   }
+}
+
+/**
+ * 找规则：精确匹配优先；没有的话取前缀最长的 `前缀.*` 通配（按「.」分段，`mcp.git.*` 管不到 `mcp.github.x`）。
+ * 单独一个 `*` 不认——「全部放行」不该是一条规则能表达的东西（INV-03）。
+ */
+export function findRule(rules: readonly PermissionRule[], capabilityId: string): PermissionRule | undefined {
+  const exact = rules.find((r) => r.capability === capabilityId)
+  if (exact) return exact
+  let best: PermissionRule | undefined
+  let bestLen = -1
+  for (const r of rules) {
+    if (!r.capability.endsWith('.*')) continue
+    const prefix = r.capability.slice(0, -1) // 保留末尾的「.」
+    if (prefix.length > 1 && capabilityId.startsWith(prefix) && prefix.length > bestLen) {
+      best = r
+      bestLen = prefix.length
+    }
+  }
+  return best
 }
