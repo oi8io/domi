@@ -14,7 +14,8 @@
     "@domi/config": "workspace:*",
     "@domi/protocol": "workspace:*",
     "@domi/runtime": "workspace:*",
-    "@domi/store": "workspace:*"
+    "@domi/store": "workspace:*",
+    "@domi/mcp": "workspace:*"
   },
   "devDependencies": {
     "@domi/client-core": "workspace:*",

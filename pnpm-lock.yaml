@@ -319,6 +319,9 @@ importers:
       '@domi/config':
         specifier: workspace:*
         version: link:../config
+      '@domi/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol

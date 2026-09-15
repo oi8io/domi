@@ -28,6 +28,10 @@ export interface RuntimeHostOptions {
   defaultCwd: string
   /** 测试注入模型替身 */
   provider?: SessionOptions['provider']
+  /** 外部工具（MCP hub），每轮现取 */
+  extraTools?: SessionOptions['extraTools']
+  /** 进程级提示（MCP server 连不上之类），每个会话各落一次 */
+  notices?: SessionOptions['notices']
   newId?: () => string
 }
 
@@ -54,6 +58,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         cwd: row.cwd,
         dbPath: opts.dbPath,
         ...(opts.provider === undefined ? {} : { provider: opts.provider }),
+        ...(opts.extraTools === undefined ? {} : { extraTools: opts.extraTools }),
+        ...(opts.notices === undefined ? {} : { notices: opts.notices }),
       })
       s.on('onEvents', (envs) => emit?.(sessionId, envs))
       s.on('onBusy', (b) => busy?.(sessionId, b))

@@ -13,6 +13,7 @@ import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfigOrThrow } from '@domi/config'
+import { McpHub } from '@domi/mcp'
 import { Daemon } from './core.ts'
 import { acquireLock, LockHeldError, rewriteLock } from './lock.ts'
 import { createRuntimeHost } from './runtime-host.ts'
@@ -43,15 +44,38 @@ export async function main(env: Record<string, string | undefined> = process.env
     throw e
   }
 
-  const host = createRuntimeHost({ config, dbPath: join(home, 'events.db'), defaultCwd: process.cwd() })
+  // MCP：先开门再连 server。连接可能要好几秒（每个 server 各自超时），
+  // 不能让拉起 domid 的客户端一直等；会话每轮现取工具，连上之后自然就有了
+  const hub = new McpHub({
+    servers: config.mcp.servers,
+    allowedHosts: config.mcp.allowedHosts,
+    timeoutMs: config.mcp.timeoutMs,
+    blobDir: join(home, 'blobs'),
+  })
+  const host = createRuntimeHost({
+    config,
+    dbPath: join(home, 'events.db'),
+    defaultCwd: process.cwd(),
+    extraTools: () => hub.tools(),
+    notices: () => hub.notices().map((n) => n.message),
+  })
   const daemon = new Daemon(host)
   const server = serveWs(daemon, { port: requestedPort })
   if (server.port !== requestedPort) rewriteLock(lockPath, { pid: process.pid, port: server.port })
   process.stdout.write(`domid listening ${server.url}\n`)
+  if (config.mcp.servers.length > 0) {
+    void hub.start().then((statuses) => {
+      for (const s of statuses) {
+        const detail = s.state === 'connected' ? `${s.tools.length} 个工具（${s.era}）` : (s.error ?? '')
+        process.stdout.write(`mcp ${s.name}: ${s.state} ${detail}\n`)
+      }
+    })
+  }
 
   const shutdown = async (): Promise<void> => {
     await server.stop()
     await daemon.close()
+    await hub.close()
     host.close()
     release()
     process.exit(0)

@@ -9,7 +9,7 @@
  * M3 的做法是：daemon 里跑 DomiSession，客户端换成 Domi Protocol 的代理实现，
  * **TUI 一行不用改**——门面的方法签名就是按将来的协议形状设计的。
  */
-import { fsRead, fsWrite, PermissionEngine, shellExec, ToolRegistry } from '@domi/capability'
+import { fsRead, fsWrite, PermissionEngine, shellExec, type Tool, ToolRegistry } from '@domi/capability'
 import type { DomiConfig } from '@domi/config'
 import {
   aggregate,
@@ -85,6 +85,13 @@ export interface SessionOptions {
   clock?: { now(): number }
   /** 价目表。未在表里的模型花费显示 `—` 且不参与累计（AC-4） */
   pricing?: PricingTable
+  /**
+   * 外部工具（MCP，ADR-015）。**每轮现取**：会话建好之后才连上的 server 也能用上。
+   * 它们和内置工具走同一个 ToolRegistry、同一条权限路径（INV-03）
+   */
+  extraTools?: () => readonly Tool[]
+  /** 进程级的提示（比如某个 MCP server 连不上）。每条只在本会话落一次 error 事件 */
+  notices?: () => readonly string[]
 }
 
 export class DomiSession {
@@ -95,6 +102,7 @@ export class DomiSession {
   private readonly injectedProvider: boolean
   private readonly listeners: Partial<SessionEvents> = {}
   private lastSeq = 0
+  private noticesDelivered = 0
   private currentModel: string
   private currentProvider: string
 
@@ -307,6 +315,18 @@ export class DomiSession {
     }
   }
 
+  /** 进程级提示落成事件：走事件流而不是侧信道，事后查轨迹时才看得见（与压缩失败同一个立场） */
+  private async deliverNotices(): Promise<void> {
+    const all = this.opts.notices?.() ?? []
+    const fresh = all.slice(this.noticesDelivered)
+    if (fresh.length === 0) return
+    this.noticesDelivered = all.length
+    await this.log.append(
+      this.opts.sessionId,
+      fresh.map((message) => ({ t: 'error' as const, scope: 'mcp', message, recoverable: true })),
+    )
+  }
+
   /** 到窗口 70% 就自动压一次（AC-1）。只在 strategy = 'compact' 时生效 */
   private async maybeAutoCompact(): Promise<void> {
     if (this.opts.config.context.strategy !== 'compact') return
@@ -319,6 +339,8 @@ export class DomiSession {
 
   async submit(text: string): Promise<TurnResult> {
     this.listeners.onBusy?.(true)
+    for (const t of this.opts.extraTools?.() ?? []) this.tools.register(t)
+    await this.deliverNotices()
     await this.maybeAutoCompact()
     const policy: ContextPolicy = {
       maxTokens: this.opts.config.context.maxTokens,
