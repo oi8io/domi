@@ -28,6 +28,39 @@ describe('事件流投影', () => {
     expect(s.$streaming.get()).toBe('我在想…')
   })
 
+  test('BUG-M3-001 · 连续 reason 也合并成一条思考，而不是一个 token 一行', () => {
+    // 现场（2026-09-15，GLM 经 z.ai）：思考过程逐 token 推来，Web 和 TUI 都是一行一个字
+    seq = 0
+    const s = createSessionStore()
+    s.applyEvents([
+      env({ t: 'user.input', text: 'Hi' }),
+      env({ t: 'model.reason', text: '用户' }),
+      env({ t: 'model.reason', text: '在打' }),
+      env({ t: 'model.reason', text: '招呼' }),
+      env({ t: 'model.delta', text: '你好' }),
+      env({ t: 'model.delta', text: '！' }),
+    ])
+    expect(s.$items.get().map((i) => [i.kind, i.text])).toEqual([
+      ['user', 'Hi'],
+      ['reason', '用户在打招呼'],
+      ['assistant', '你好！'],
+    ])
+    // 流式的「当前回答」只看 assistant，思考不算
+    expect(s.$streaming.get()).toBe('你好！')
+  })
+
+  test('思考与回答交替时各自成段，不会跨段拼接', () => {
+    seq = 0
+    const s = createSessionStore()
+    s.applyEvents([
+      env({ t: 'model.reason', text: '先想' }),
+      env({ t: 'model.delta', text: '答一' }),
+      env({ t: 'model.reason', text: '再想' }),
+      env({ t: 'model.delta', text: '答二' }),
+    ])
+    expect(s.$items.get().map((i) => i.text)).toEqual(['先想', '答一', '再想', '答二'])
+  })
+
   test('工具调用之后的 delta 另起一条，不会拼到前一段上', () => {
     seq = 0
     const s = createSessionStore()

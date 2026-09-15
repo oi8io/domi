@@ -93,6 +93,16 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     $items.set([...$items.get(), item])
   }
 
+  function appendText(kind: 'assistant' | 'reason', seq: number, text: string): void {
+    const items = $items.get()
+    const last = items[items.length - 1]
+    if (last?.kind === kind) {
+      $items.set([...items.slice(0, -1), { ...last, text: last.text + text }])
+    } else {
+      push({ seq, kind, text })
+    }
+  }
+
   function applyEvent(env: EventEnvelope): void {
     const ev: AnyEvent = env.ev
     if (!isKnownEvent(ev)) return
@@ -100,19 +110,13 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
       case 'user.input':
         push({ seq: env.seq, kind: 'user', text: ev.text })
         break
+      // 思考与回答都是逐 token 推来的：紧挨着的同类片段拼成一段（BUG-M3-001）
       case 'model.reason':
-        push({ seq: env.seq, kind: 'reason', text: ev.text })
+        appendText('reason', env.seq, ev.text)
         break
-      case 'model.delta': {
-        const items = $items.get()
-        const last = items[items.length - 1]
-        if (last?.kind === 'assistant') {
-          $items.set([...items.slice(0, -1), { ...last, text: last.text + ev.text }])
-        } else {
-          push({ seq: env.seq, kind: 'assistant', text: ev.text })
-        }
+      case 'model.delta':
+        appendText('assistant', env.seq, ev.text)
         break
-      }
       case 'tool.call':
         push({ seq: env.seq, kind: 'tool-call', text: ev.name, summary: summarizeArgs(ev.args) })
         $status.set({ ...$status.get(), toolCalls: $status.get().toolCalls + 1 })
