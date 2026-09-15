@@ -12,16 +12,22 @@
 import { dirname, join } from 'node:path'
 import { OFFICIAL_SKILLS, SkillRegistry } from '@domi/capability'
 import type { DomiConfig } from '@domi/config'
+import { Notifier } from '@domi/notify'
+import { DagSpecError } from '@domi/orchestrator'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { DomiSession, MemoryService, RefError, type SessionOptions } from '@domi/runtime'
+import { DomiSession, MemoryService, RefError, type SessionOptions, TaskService } from '@domi/runtime'
 import { SqliteEventLog } from '@domi/store'
 import { AUDIT_SESSION_ID } from './auth.ts'
+
+const RUN_PREFIX = 'run-'
+
 import {
   BranchPointError,
   type DaemonHost,
   type HostAsk,
   type HostMetrics,
   InvalidRefError,
+  InvalidTaskError,
   type SessionHandle,
   SessionNotFoundError,
   type SessionSummary,
@@ -47,6 +53,8 @@ export interface RuntimeHostOptions {
 }
 
 export interface RuntimeHost extends DaemonHost {
+  /** daemon 启动后调：没结束的编排运行接着跑（M5-003）。返回恢复了哪些 */
+  resumeTasks(): Promise<string[]>
   /** daemon 自己的审计事件（被拒的连接等）。写进 AUDIT_SESSION_ID，不出现在会话列表里 */
   audit(ev: DomiEvent): Promise<void>
   close(): void
@@ -72,8 +80,24 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     ? new SkillRegistry({ dir: opts.skillsDir ?? join(home, 'skills'), official: OFFICIAL_SKILLS, watch: true })
     : undefined
 
-  return {
-    async open(sessionId: string): Promise<SessionHandle> {
+  const notifier = new Notifier(opts.config.notify, { log: (l) => process.stderr.write(`${l}\n`) })
+  /** 同一个会话只有一个 DomiSession：core、编排、子 agent 共用，推送才不会重复 */
+  const sessions = new Map<string, Promise<DomiSession>>()
+  const pushChild = (id: string, envs: EventEnvelope[]): void => emit?.(id, envs)
+
+  function live(sessionId: string, init?: { cwd: string; title: string; spawnedBy?: string }): Promise<DomiSession> {
+    const cached = sessions.get(sessionId)
+    if (cached) return cached
+    const made = (async () => {
+      if (init && !index.sessions.get(sessionId)) {
+        index.sessions.upsert({
+          id: sessionId,
+          cwd: init.cwd,
+          title: init.title,
+          model: opts.config.model.name,
+          ...(init.spawnedBy === undefined ? {} : { spawnedBy: init.spawnedBy }),
+        })
+      }
       const row = index.sessions.get(sessionId)
       if (!row) throw new SessionNotFoundError(sessionId)
       const s = new DomiSession({
@@ -86,6 +110,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...(opts.notices === undefined ? {} : { notices: opts.notices }),
         memory,
         ...(skills === undefined ? {} : { skills }),
+        childEvents: pushChild,
       })
       // 上一个 domid 可能是被 kill -9 的：先把这个会话补到一致点，再交出去（TASK-M3-010）。
       // 这时还没有订阅者，补的事件由之后的订阅补发带过去
@@ -97,16 +122,55 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         // null = 这次询问已经答完，core 那边在 answer 时已经清掉了
         if (!ask) return
         askSeq++
+        const detail = ask.form ? ask.form.message : (JSON.stringify(ask.args, null, 2) ?? String(ask.args))
         asked?.(sessionId, {
           askId: `${sessionId}#${askSeq}`,
           capabilityId: ask.capabilityId,
           // 完整内容，不截断（PRD-M0-003 AC-1）：确认框是用户做决定的地方
-          detail: ask.form ? ask.form.message : (JSON.stringify(ask.args, null, 2) ?? String(ask.args)),
+          detail,
           ...(ask.form === undefined ? {} : { form: ask.form }),
-          answer: (allowed, content) => ask.answer(allowed, content),
+          answer: (allowed, content, channel) => ask.answer(allowed, content, channel),
         })
+        // 长任务在等人（M5-004 AC-1）。通知里只说「在等什么能力」，不带参数内容
+        if (sessionId.startsWith(RUN_PREFIX) && notifier.enabled) {
+          void notifier.send({
+            kind: 'approval',
+            title: '任务在等你确认',
+            detail: `${ask.capabilityId} 需要确认`,
+            runId: sessionId,
+          })
+        }
       })
+      return s
+    })()
+    sessions.set(sessionId, made)
+    made.catch(() => sessions.delete(sessionId))
+    return made
+  }
 
+  const tasks = new TaskService({
+    dbPath: opts.dbPath,
+    defaultCwd: opts.defaultCwd,
+    openSession: (id, init) => live(id, init),
+    onEvent: (runId, evs, st) => {
+      const end = evs.find((e) => e.t === 'task.end') as { status?: string } | undefined
+      if (!end || end.status === 'cancelled' || !notifier.enabled) return
+      const failed = Object.values(st.nodes)
+        .filter((n) => n.status === 'failed')
+        .map((n) => n.id)
+      void notifier.send({
+        kind: end.status === 'done' ? 'done' : 'failed',
+        title: `任务${end.status === 'done' ? '完成' : '失败'}：${st.name}`,
+        detail:
+          end.status === 'done' ? `${Object.keys(st.nodes).length} 个节点全部完成` : `失败的节点：${failed.join('、')}`,
+        runId,
+      })
+    },
+  })
+
+  return {
+    async open(sessionId: string): Promise<SessionHandle> {
+      const s = await live(sessionId)
       let head = 0
       return {
         id: sessionId,
@@ -130,7 +194,10 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           head = all[all.length - 1]?.seq ?? 0
           return head
         },
-        close: () => s.flushAndClose(),
+        async close() {
+          sessions.delete(sessionId)
+          await s.flushAndClose()
+        },
       }
     },
 
@@ -181,6 +248,59 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
       index.sessions.restore(sessionId)
     },
+
+    tasks: {
+      async start(spec, cwd) {
+        try {
+          const r = await tasks.start(spec, cwd)
+          return { runId: r.runId, name: r.spec.name, nodes: r.spec.nodes.map((n) => n.id) }
+        } catch (e) {
+          throw e instanceof DagSpecError ? new InvalidTaskError(e.message) : e
+        }
+      },
+      list: () => tasks.list(),
+      async get(runId) {
+        const st = await tasks.state(runId)
+        if (!st) throw new SessionNotFoundError(runId)
+        return {
+          runId,
+          name: st.name,
+          status: st.status,
+          active: tasks.isRunning(runId),
+          nodes: (st.spec?.nodes ?? []).map((n) => {
+            const ns = st.nodes[n.id]
+            return {
+              id: n.id,
+              type: n.type,
+              ...(n.title === undefined ? {} : { title: n.title }),
+              needs: n.needs,
+              status: ns?.status ?? 'pending',
+              attempt: ns?.attempt ?? 0,
+              ...(ns?.output === undefined ? {} : { output: ns.output }),
+              ...(ns?.error === undefined ? {} : { error: ns.error }),
+              ...(ns?.sessionId === undefined ? {} : { sessionId: ns.sessionId }),
+              ...(ns?.ms === undefined ? {} : { ms: ns.ms }),
+            }
+          }),
+        }
+      },
+      async retry(runId, nodeId) {
+        try {
+          await tasks.retry(runId, nodeId)
+        } catch (e) {
+          throw e instanceof DagSpecError ? new InvalidTaskError(e.message) : e
+        }
+      },
+      cancel: (runId) => tasks.cancel(runId),
+    },
+
+    async auditRecord(kind, detail, client) {
+      await index.append(AUDIT_SESSION_ID, [
+        { t: 'error', scope: `audit.${kind}`, message: `[${client}] ${detail}`, recoverable: true },
+      ])
+    },
+
+    resumeTasks: () => tasks.resumeAll(),
 
     memory: {
       async list(includeDeleted) {
@@ -240,6 +360,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       measured = cb
     },
     close() {
+      tasks.close()
       skills?.close()
       memory.close()
       index.close()

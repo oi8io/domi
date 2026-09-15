@@ -1,0 +1,27 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "domi",
+  "version": "0.1.0",
+  "identifier": "dev.domi.desktop",
+  "build": {
+    "frontendDist": "../../web/dist"
+  },
+  "app": {
+    "windows": [{ "title": "domi", "width": 1100, "height": 760, "minWidth": 480, "minHeight": 400 }],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ws://127.0.0.1:* ws://localhost:*; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "icon": []
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://example.invalid/domi/latest.json"],
+      "pubkey": "REPLACE_WITH_YOUR_UPDATER_PUBLIC_KEY"
+    }
+  }
+}

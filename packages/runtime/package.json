@@ -16,6 +16,7 @@
     "@domi/protocol": "workspace:*",
     "@domi/store": "workspace:*",
     "zod": "^4.6.5",
-    "@domi/memory": "workspace:*"
+    "@domi/memory": "workspace:*",
+    "@domi/orchestrator": "workspace:*"
   }
 }

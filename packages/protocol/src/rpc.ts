@@ -73,6 +73,35 @@ const MemoryItemSchema = SemanticItemSchema.extend({
 
 const PendingChangeSchema = SoulChangeSchema.extend({ at: z.number().int(), diff: z.string() })
 
+const RunStatusSchema = z.enum(['running', 'done', 'failed', 'cancelled'])
+const RunSummarySchema = z.object({
+  runId: z.string(),
+  name: z.string(),
+  status: RunStatusSchema,
+  updatedAt: z.number().int(),
+})
+const RunDetailSchema = z.object({
+  runId: z.string(),
+  name: z.string(),
+  status: RunStatusSchema,
+  /** 进程里是不是真的在跑（status 是 running 但 daemon 没在跑它 = 等待恢复） */
+  active: z.boolean(),
+  nodes: z.array(
+    z.object({
+      id: z.string(),
+      type: z.string(),
+      title: z.string().optional(),
+      needs: z.array(z.string()),
+      status: z.enum(['pending', 'running', 'done', 'failed', 'blocked']),
+      attempt: z.number().int(),
+      output: z.string().optional(),
+      error: z.string().optional(),
+      sessionId: z.string().optional(),
+      ms: z.number().int().optional(),
+    }),
+  ),
+})
+
 /** 状态栏指标。**由 runtime 算好推过来**，客户端不自己算（PRD-M1-007 AC-3） */
 const MetricsSchema = z.object({
   provider: z.string(),
@@ -181,6 +210,44 @@ export const METHODS = {
     params: z.object({}),
     result: z.object({ changes: z.array(SoulChangeSchema) }),
   },
+  'task.start': {
+    summary:
+      '开始一次 DAG 运行（PRD-M5-002）。spec 是 YAML 原文；不合法（含环）→ INVALID_PARAMS，什么都不落。' +
+      '返回的 runId 就是运行会话的 id，订阅它就能看到 task.* 事件',
+    params: z.object({ spec: z.string().min(1), cwd: z.string().optional() }),
+    result: z.object({ runId: z.string(), name: z.string(), nodes: z.array(z.string()) }),
+  },
+  'task.list': {
+    summary: '列出运行（最近的在前）',
+    params: z.object({}),
+    result: z.object({ runs: z.array(RunSummarySchema) }),
+  },
+  'task.get': {
+    summary: '一次运行的各节点状态（事件的投影，PRD-M5-002 AC-3）',
+    params: z.object({ runId: z.string() }),
+    result: RunDetailSchema,
+  },
+  'task.retry': {
+    summary: '只重跑一个失败节点及其被挡住的下游，已完成的不动（AC-4）。运行还在跑或节点不是失败 → INVALID_PARAMS',
+    params: z.object({ runId: z.string(), nodeId: z.string() }),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  'task.cancel': {
+    summary: '取消一次还在跑的运行。已经结束的返回 ok:false',
+    params: z.object({ runId: z.string() }),
+    result: z.object({ ok: z.boolean() }),
+  },
+  'audit.record': {
+    summary: '端上发生、daemon 看不到的安全相关事情（比如桥接收到未绑定 chat 的消息），记进审计会话（M5-007 AC-4）',
+    params: z.object({
+      kind: z
+        .string()
+        .regex(/^[a-z0-9_.-]+$/)
+        .max(60),
+      detail: z.string().max(500),
+    }),
+    result: z.object({ ok: z.literal(true) }),
+  },
   'session.switchModel': {
     summary: '会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力',
     params: z.object({ sessionId: z.string(), model: z.string().min(1), provider: z.string().min(1).optional() }),
@@ -212,6 +279,8 @@ export const METHODS = {
       allowed: z.boolean(),
       /** 表单型询问的填写内容；权限确认不用带 */
       content: z.record(z.string(), z.unknown()).optional(),
+      /** 在哪个端上答的（M5-007）。不给就用握手时的客户端名 */
+      channel: z.string().max(40).optional(),
     }),
     result: z.object({ ok: z.boolean() }),
   },

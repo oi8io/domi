@@ -9,7 +9,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { SqliteEventLog } from '@domi/store'
 import { exportHtml } from './html.ts'
-import { buildTrace } from './model.ts'
+import { buildTrace, childSessionIds } from './model.ts'
 import { renderText } from './text.ts'
 
 export interface Io {
@@ -47,7 +47,20 @@ export async function runTrace(sessionId: string | undefined, htmlOut: string | 
       io.err(`会话 ${sessionId} 没有任何事件。用 \`domi session list\` 确认 id。`)
       return 1
     }
-    const tree = buildTrace(events, { pricing: PRICING })
+    // 子 agent 与编排节点的会话一起读出来，嵌在树里（PRD-M5-001 AC-4）。最多三层
+    const children = new Map<string, Awaited<ReturnType<typeof log.read>>>()
+    let frontier = childSessionIds(events)
+    for (let depth = 0; depth < 3 && frontier.length > 0; depth++) {
+      const next: string[] = []
+      for (const id of frontier) {
+        if (children.has(id)) continue
+        const sub = await log.read(id)
+        children.set(id, sub)
+        next.push(...childSessionIds(sub))
+      }
+      frontier = next
+    }
+    const tree = buildTrace(events, { pricing: PRICING, children })
 
     if (htmlOut !== undefined) {
       if (htmlOut === '') {

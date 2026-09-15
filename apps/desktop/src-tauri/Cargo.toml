@@ -1,0 +1,18 @@
+[package]
+name = "domi-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "domi 桌面端：Web 界面的一层壳"
+license = "MIT"
+
+[lib]
+name = "domi_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = [] }
+tauri-plugin-updater = "2.11"
+tauri-plugin-process = "2.3"

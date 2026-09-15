@@ -16,6 +16,8 @@ export interface Decision {
   source: 'default' | 'config' | 'user'
   /** 命中的规则；默认分支为 null */
   matchedRule: string | null
+  /** 用户在哪个端上回答的（M5-007） */
+  channel?: string
 }
 
 /** 工具向用户要输入（MCP elicitation 等）。一次问答，不是权限决定 */

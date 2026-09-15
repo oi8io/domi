@@ -21,6 +21,8 @@ export const COMMANDS = [
   'migrate',
   'memory',
   'soul',
+  'task',
+  'bridge',
 ] as const
 export type Command = (typeof COMMANDS)[number]
 
@@ -34,6 +36,8 @@ export interface ParsedCli {
     json: boolean
     yes: boolean
     ping: boolean
+    /** `domi task run x.yaml --follow` */
+    follow: boolean
     /** `domi memory list --all`：连删掉的也列 */
     all: boolean
     /** `domi --connect ws://host:port`：连远程 domid（PRD-M3-006 AC-1） */
@@ -67,6 +71,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       html: { type: 'string' },
       connect: { type: 'string' },
       all: { type: 'boolean' },
+      follow: { type: 'boolean' },
       'from-toml': { type: 'boolean' },
     },
   })
@@ -90,6 +95,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       html: typeof values.html === 'string' ? values.html : undefined,
       connect: typeof values.connect === 'string' ? values.connect : undefined,
       all: Boolean(values.all),
+      follow: Boolean(values.follow),
     },
   }
 }
@@ -117,6 +123,8 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi migrate              升级事件库结构；**先自动备份**，失败自动回滚
   domi memory list|search|delete|extract   记下的关于你的条目（L3）
   domi soul show|review|update|export|import   Soul：审阅改动、导出分享、导入别人的
+  domi task run|list|status|retry|cancel      长任务编排（DAG，跑在 domid 里）
+  domi bridge pair|telegram                   Telegram 桥接：生成配对码 / 启动桥接
 
 对话里：
   /compact                  手动压缩上下文
@@ -173,6 +181,11 @@ permissions:
       capability: memory.search
       decision: allow
 
+    # 派子 agent：子 agent 的权限只会比当前会话小（docs/adr/020）
+    - name: ask-task-spawn
+      capability: task.spawn
+      decision: ask
+
     # Skill 的正文是文字说明，读它不执行任何东西（docs/adr/019）
     - name: allow-skill-load
       capability: skill.load
@@ -213,6 +226,17 @@ mcp:
 #   embedding:             # 配了才有语义检索；anthropic 没有 embedding 接口
 #     provider: openai
 #     model: text-embedding-3-small
+
+# 长任务通知（domi task …，docs/adr/021）。只发状态，不发任何内容
+# notify:
+#   system: true                         # macOS / Linux 系统通知
+#   webhook:
+#     url: https://example.com/hook      # POST JSON；失败不影响任务
+
+# Telegram 桥接：domi bridge pair 配对，domi bridge telegram 启动。token 更推荐放 DOMI_TELEGRAM_TOKEN
+# bridge:
+#   telegram:
+#     token: "123456:ABC..."
 
 # 自定义提示词层（domi prompt dump 可以看拼装结果）。同 id 覆盖内置层，比如 builtin.conventions
 # prompt:

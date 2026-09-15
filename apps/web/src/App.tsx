@@ -12,6 +12,7 @@ import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { type PendingRef, PendingRefs } from './PendingRefs.tsx'
 import { SoulPanel } from './SoulPanel.tsx'
 import { StatusBar } from './StatusBar.tsx'
+import { TaskPanel } from './TaskPanel.tsx'
 import { Transcript } from './Transcript.tsx'
 
 interface SessionRow {
@@ -40,7 +41,7 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
   // 跨会话引用：在哪个会话里点的都攒在这里，切到别的会话发送时带上（PRD-M3-005）
   const [refs, setRefs] = useState<PendingRef[]>([])
   // 主区显示会话还是 Soul（PRD-M4）
-  const [view, setView] = useState<'session' | 'soul'>('session')
+  const [view, setView] = useState<'session' | 'soul' | 'tasks'>('session')
   const [showDeleted, setShowDeleted] = useState(false)
 
   useEffect(() => {
@@ -109,6 +110,14 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
         >
           Soul 与记忆
         </button>
+        <button
+          type="button"
+          className={`soul-link${view === 'tasks' ? ' current' : ''}`}
+          disabled={state !== 'open'}
+          onClick={() => setView(view === 'tasks' ? 'session' : 'tasks')}
+        >
+          长任务
+        </button>
         <label className="toggle">
           <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
           显示已删除
@@ -135,6 +144,8 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
       <main className="main">
         {view === 'soul' ? (
           <SoulPanel client={client} />
+        ) : view === 'tasks' ? (
+          <TaskPanel client={client} onOpen={(id) => open(id)} />
         ) : active ? (
           <SessionView
             key={active.id}

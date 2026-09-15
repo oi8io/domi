@@ -1,0 +1,10 @@
+{
+  "name": "@domi/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @domi/web build && npx --yes @tauri-apps/cli@2.11.4 dev",
+    "build": "pnpm --filter @domi/web build && npx --yes @tauri-apps/cli@2.11.4 build"
+  }
+}

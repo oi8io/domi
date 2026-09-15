@@ -1,0 +1,23 @@
+# domi task run docs/tasks-example.yaml --follow
+# 四种节点：agent-step（让模型做一步）、tool（直接调一个工具）、sub-agent（派子 agent）、human-approval（等人点头）
+# needs 写依赖；按依赖顺序一个一个跑。上游节点的结果会接在下游 agent-step / sub-agent 的提示后面
+name: 发布前检查
+nodes:
+  - id: test
+    type: tool
+    tool: shell.exec
+    args:
+      cmd: bun test
+  - id: changelog
+    type: sub-agent
+    needs: [test]
+    goal: 读最近 20 条 git log，整理成一段更新说明
+    tools: [shell.exec, fs.read]
+  - id: review
+    type: agent-step
+    needs: [changelog]
+    prompt: 看看这份更新说明有没有漏掉重要改动，给出修改建议
+  - id: approve
+    type: human-approval
+    needs: [review]
+    message: 更新说明可以发布吗？

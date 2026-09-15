@@ -16,10 +16,30 @@ export interface PermissionRule {
 
 export interface PermissionConfig {
   rules?: PermissionRule[]
+  /**
+   * 范围（M5-001 · INV-03）：子 agent 只能用父会话允许它用的能力。返回 false 的能力直接拒绝，
+   * 不看规则、不问人——范围是「能不能提」，规则是「提了之后怎么办」
+   */
+  scope?: (capabilityId: CapabilityId) => boolean
 }
 
-/** 交互式回答的来源；TUI 的确认框实现它 */
-export type Asker = (capabilityId: CapabilityId, args: unknown) => Promise<boolean>
+/** 交互式回答的来源；TUI 的确认框实现它。channel 是用户在哪个端上回答的 */
+export type Asker = (
+  capabilityId: CapabilityId,
+  args: unknown,
+) => Promise<boolean | { allowed: boolean; channel?: string }>
+
+/** 子 agent 被父范围拦下时 matchedRule 的值 */
+export const PARENT_SCOPE_RULE = 'parent-scope'
+
+/** 能力清单 → 范围函数。清单里可以写 `mcp.github.*` 这样的前缀 */
+export function scopeOf(
+  allowed: readonly string[],
+  parent?: (c: CapabilityId) => boolean,
+): (c: CapabilityId) => boolean {
+  const rules = allowed.map((capability) => ({ name: capability, capability, decision: 'allow' as const }))
+  return (c) => (parent ? parent(c) : true) && findRule(rules, c) !== undefined
+}
 
 export class PermissionEngine {
   constructor(
@@ -28,6 +48,9 @@ export class PermissionEngine {
   ) {}
 
   async check(capabilityId: CapabilityId, args: unknown): Promise<Decision> {
+    if (this.config.scope && !this.config.scope(capabilityId)) {
+      return { decision: 'deny', source: 'default', matchedRule: PARENT_SCOPE_RULE }
+    }
     const rule = findRule(this.config.rules ?? [], capabilityId)
 
     if (!rule) {
@@ -41,8 +64,15 @@ export class PermissionEngine {
       // 配置说要问，但没有人可问（比如非交互环境）——同样拒绝，不是放行
       return { decision: 'deny', source: 'default', matchedRule: rule.name }
     }
-    const allowed = await this.ask(capabilityId, args)
-    return { decision: allowed ? 'allow' : 'deny', source: 'user', matchedRule: rule.name }
+    const answer = await this.ask(capabilityId, args)
+    const allowed = typeof answer === 'boolean' ? answer : answer.allowed
+    const channel = typeof answer === 'boolean' ? undefined : answer.channel
+    return {
+      decision: allowed ? 'allow' : 'deny',
+      source: 'user',
+      matchedRule: rule.name,
+      ...(channel === undefined ? {} : { channel }),
+    }
   }
 }
 

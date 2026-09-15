@@ -98,6 +98,15 @@ export const ConfigSchema = z.object({
         .optional(),
     })
     .default({ extractEvery: 5, soul: true }),
+  /** 长任务通知（PRD-M5-004）。默认都关：系统通知与 webhook 都要显式开 */
+  notify: z
+    .object({
+      system: z.boolean().default(false),
+      webhook: z.object({ url: z.string().url(), headers: z.record(z.string(), z.string()).optional() }).optional(),
+    })
+    .default({ system: false }),
+  /** Telegram 桥接（PRD-M5-007）。token 更推荐放 DOMI_TELEGRAM_TOKEN */
+  bridge: z.object({ telegram: z.object({ token: z.string().optional() }).optional() }).default({}),
   /** Skill（PRD-M4-005）。dirs 之外还会读 ~/.domi/skills 与内置的官方 Skill */
   skills: z.object({ enabled: z.boolean().default(true) }).default({ enabled: true }),
   /**

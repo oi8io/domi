@@ -185,12 +185,41 @@ export class DomiClient {
    * 回答一次权限询问。返回 false = 没生效（已经被别的客户端答过）。
    * 不在这里清确认框：等 daemon 推 session.askDone 再清，所有客户端走同一条路
    */
-  async answer(askId: string, allowed: boolean, content?: Record<string, unknown>): Promise<boolean> {
-    const r = await this.request(
-      'session.answer',
-      content === undefined ? { askId, allowed } : { askId, allowed, content },
-    )
+  /** channel：在哪个端上答的（M5-007）。不给就由 daemon 用握手时的客户端名 */
+  async answer(askId: string, allowed: boolean, content?: Record<string, unknown>, channel?: string): Promise<boolean> {
+    const r = await this.request('session.answer', {
+      askId,
+      allowed,
+      ...(content === undefined ? {} : { content }),
+      ...(channel === undefined ? {} : { channel }),
+    })
     return r.ok
+  }
+
+  // ── 编排（PRD-M5-002）─────────────────────────────────────
+
+  startTask(spec: string, cwd?: string): Promise<ResultOf<'task.start'>> {
+    return this.request('task.start', cwd === undefined ? { spec } : { spec, cwd })
+  }
+
+  async listTasks(): Promise<ResultOf<'task.list'>['runs']> {
+    return (await this.request('task.list', {})).runs
+  }
+
+  getTask(runId: string): Promise<ResultOf<'task.get'>> {
+    return this.request('task.get', { runId })
+  }
+
+  async retryTask(runId: string, nodeId: string): Promise<void> {
+    await this.request('task.retry', { runId, nodeId })
+  }
+
+  async cancelTask(runId: string): Promise<boolean> {
+    return (await this.request('task.cancel', { runId })).ok
+  }
+
+  async recordAudit(kind: string, detail: string): Promise<void> {
+    await this.request('audit.record', { kind, detail })
   }
 
   /**

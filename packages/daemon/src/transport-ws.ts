@@ -34,7 +34,9 @@ export class NonLocalListenError extends Error {
 export function isAllowedOrigin(origin: string | null): boolean {
   if (origin === null) return true
   try {
-    return isLoopback(new URL(origin).hostname)
+    const host = new URL(origin).hostname
+    // 桌面端（Tauri）在 Windows 上的页面来源是 http://tauri.localhost（ADR-021）
+    return isLoopback(host) || host === 'tauri.localhost'
   } catch {
     return false
   }

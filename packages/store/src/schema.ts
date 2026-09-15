@@ -106,6 +106,13 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE sessions ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0',
     ],
   },
+  {
+    toVersion: 8,
+    statements: [
+      // M5-001：子 agent 的会话记父会话。不复用 parent_session_id——那一列是分支用的，会把父历史拼进上下文
+      'ALTER TABLE sessions ADD COLUMN spawned_by TEXT',
+    ],
+  },
 ]
 
 export const META_SCHEMA_VERSION = 'schema_version'

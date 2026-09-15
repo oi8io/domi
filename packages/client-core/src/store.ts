@@ -12,7 +12,7 @@ import { atom, computed } from 'nanostores'
 
 export interface TranscriptItem {
   seq: number
-  kind: 'user' | 'assistant' | 'reason' | 'tool-call' | 'tool-result' | 'permission' | 'error' | 'context'
+  kind: 'user' | 'assistant' | 'reason' | 'tool-call' | 'tool-result' | 'permission' | 'error' | 'context' | 'task'
   text: string
   ok?: boolean
   /** 工具调用的参数摘要：JSON 序列化后前 80 字符 + …（PRD-M0-005 AC-1 写死的规则） */
@@ -167,6 +167,40 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           summary: ev.summary.intent,
         })
         break
+      // 编排（M5）：运行与节点的进展都是事件，投影成对话里的一行
+      case 'task.spawn':
+        push({ seq: env.seq, kind: 'task', text: `派出子 agent：${ev.goal}`, summary: ev.childSessionId, ok: true })
+        break
+      case 'task.run':
+        push({ seq: env.seq, kind: 'task', text: `任务开始：${ev.name}` })
+        break
+      case 'task.node': {
+        const label = { started: '开始', done: '完成', failed: '失败' }[ev.status]
+        const ms = ev.ms === undefined ? '' : `（${formatElapsed(ev.ms)}）`
+        push({
+          seq: env.seq,
+          kind: 'task',
+          text: `节点 ${ev.nodeId} ${label}${ev.attempt > 1 ? `（第 ${ev.attempt} 次）` : ''}${ms}`,
+          ...(ev.status === 'started' ? {} : { ok: ev.status === 'done' }),
+          ...((ev.error ?? ev.output) === undefined ? {} : { summary: (ev.error ?? ev.output ?? '').slice(0, 200) }),
+        })
+        break
+      }
+      case 'task.resume':
+        push({
+          seq: env.seq,
+          kind: 'task',
+          text: `任务恢复：已完成 ${ev.completed.length} 个节点${ev.rerun.length > 0 ? `，重跑 ${ev.rerun.join('、')}` : ''}`,
+        })
+        break
+      case 'task.retry':
+        push({ seq: env.seq, kind: 'task', text: `重试节点 ${ev.nodeId}` })
+        break
+      case 'task.end': {
+        const label = { done: '完成', failed: '失败', cancelled: '已取消' }[ev.status]
+        push({ seq: env.seq, kind: 'task', text: `任务${label}`, ok: ev.status === 'done' })
+        break
+      }
       // 引用了哪段别的会话，要在对话里看得见（PRD-M3-005 AC-3）
       case 'ctx.ref':
         push({ seq: env.seq, kind: 'context', text: `引用了会话 ${ev.sessionId} 的第 ${ev.fromSeq}–${ev.toSeq} 条` })

@@ -24,6 +24,10 @@
         可以直接改。`domi soul review` 逐条审阅，`domi soul export/import` 分享；Web 侧栏「Soul 与记忆」，TUI `/soul` `/memory`。
         Skill：`~/.domi/skills/<名字>/SKILL.md`（模板 docs/skills/SKILL-TEMPLATE.md），config.yaml 里要有 `allow-skill-load` 规则
 
+      - **长任务**（2026-09-15）：`domi task run docs/tasks-example.yaml --follow`；Web 侧栏「长任务」。
+        domid 被杀后重启会自动接着跑。通知：config.yaml 的 `notify`。Telegram：`domi bridge pair` → 给 bot 发 `/pair <码>` →
+        `DOMI_TELEGRAM_TOKEN=… domi bridge telegram`。派子 agent 要在权限规则里放行 `task.spawn`（模板里是 ask）
+
       ⚠️ 更新代码后：`pnpm install`，并停掉已在跑的 domid（`domi` 会复用它，旧进程跑的是旧代码，见 OPT-M3-002）
 
 下一步: 用户规矩（2026-09-15）：**先推进功能，测试验证类最后统一查漏补缺**
@@ -34,12 +38,14 @@
         M3 缺陷登记里已没有 open 的 BUG。
         M4 已进入（你拍板「按轮廓先写再做」，docs/prd/M4.md）：L3 记忆、Soul、审阅否决、导出导入、Skill 的功能都已落地
         （TASK-M4-001…008）。
-        1. 下一个里程碑 M5（会干活）同样是 SKETCH，进入前要过再批准门
-        2. 最后统一：TASK-M3-008 parity e2e、TASK-M3-009 推送延迟基准、TASK-M4-009 M4 的验证补齐
+        M5 已进入（你说「开干」，docs/prd/M5.md）：子 agent、DAG 编排、断点恢复、通知、Telegram 桥接的功能都已落地，
+        桌面端写到了代码与配置（TASK-M5-001…007）。
+        1. 下一个里程碑 M6（生态）同样是 SKETCH，进入前要你拍板
+        2. 最后统一：TASK-M3-008 parity e2e、TASK-M3-009 推送延迟基准、TASK-M4-009、TASK-M5-008（含桌面端构建）
 
         仍然只有你能做的：真终端走 M3 DoD（`domi` 发长任务 → 关终端 → 浏览器看完成）、
         M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`、独立 QA、M1 dogfooding
 
-卡在: M5 的进入条件（同 M4，要你拍板）。
+卡在: M6 的进入条件（同 M4 / M5，要你拍板）。桌面端需要一台装了 Rust 的机器才能构建。
       体验类的问题按你定的规矩只记录不排期（OPT-M3-001…006），其中 OPT-M3-001（每个 token 一条事件）
       牵涉回放与压缩，动之前要单独讨论。

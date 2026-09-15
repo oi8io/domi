@@ -107,6 +107,13 @@ export async function main(env: Record<string, string | undefined> = process.env
       ...(r.origin === null ? {} : { origin: r.origin }),
     })
   }
+  // 上次没跑完的编排接着跑（M5-003）。放在开门之后：恢复过程中的询问要能推给连上来的客户端
+  void host.resumeTasks().then(
+    (ids) => {
+      if (ids.length > 0) process.stdout.write(`domid 恢复了 ${ids.length} 个未完成的任务：${ids.join(', ')}\n`)
+    },
+    (e: unknown) => process.stderr.write(`domid 恢复任务失败：${e instanceof Error ? e.message : String(e)}\n`),
+  )
   if (config.mcp.servers.length > 0) {
     void hub.start().then((statuses) => {
       for (const s of statuses) {

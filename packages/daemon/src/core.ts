@@ -101,7 +101,7 @@ export interface HostAsk {
   detail: string
   /** 表单型询问（工具要输入） */
   form?: { message: string; schema: unknown }
-  answer(allowed: boolean, content?: Record<string, unknown>): void
+  answer(allowed: boolean, content?: Record<string, unknown>, channel?: string): void
 }
 
 export type HostMetrics = NotifyParamsOf<'session.metrics'>['metrics']
@@ -120,6 +120,22 @@ export interface HostMemory {
   update(): Promise<ResultOf<'soul.update'>['changes']>
 }
 
+/** DAG 编排（PRD-M5-002）。不合法的定义 / 不能重试的状态抛 InvalidTaskError */
+export interface HostTasks {
+  start(spec: string, cwd?: string): Promise<ResultOf<'task.start'>>
+  list(): Promise<ResultOf<'task.list'>['runs']>
+  get(runId: string): Promise<ResultOf<'task.get'>>
+  retry(runId: string, nodeId: string): Promise<void>
+  cancel(runId: string): Promise<boolean>
+}
+
+export class InvalidTaskError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'InvalidTaskError'
+  }
+}
+
 /** 宿主提供的东西。测试注入假的，生产注入真的 —— core 两边都不知道 */
 export interface DaemonHost {
   open(sessionId: string): Promise<SessionHandle>
@@ -134,6 +150,9 @@ export interface DaemonHost {
    */
   branch(sessionId: string, atSeq: number): Promise<string>
   memory?: HostMemory
+  tasks?: HostTasks
+  /** 端上报来的审计事件 */
+  auditRecord?(kind: string, detail: string, client: string): Promise<void>
   /** 会话产生新事件时调用；daemon 据此推给订阅者 */
   onEvents(cb: (sessionId: string, events: EventEnvelope[]) => void): void
   onBusy?(cb: (sessionId: string, busy: boolean) => void): void
@@ -156,6 +175,8 @@ interface Subscription {
 
 export class Daemon {
   private readonly handshaked = new Set<string>()
+  /** 握手时报的客户端名。审批的 channel 缺省用它 */
+  private readonly clientNames = new Map<string, string>()
   private readonly subs = new Map<string, Subscription[]>()
   private readonly sessions = new Map<string, SessionHandle>()
   /** 正在处理中的会话。串行化与 SESSION_BUSY 都看它 */
@@ -201,6 +222,7 @@ export class Daemon {
   /** 客户端断开：只清订阅，**不动会话**——任务照常跑完（M3-002 AC-2） */
   disconnect(conn: ClientConn): void {
     this.handshaked.delete(conn.id)
+    this.clientNames.delete(conn.id)
     for (const sessionId of [...this.subs.keys()]) this.unsubscribe(sessionId, conn.id)
   }
 
@@ -226,7 +248,7 @@ export class Daemon {
       return await this.dispatch(conn, req, method, parsed.data as never)
     } catch (e) {
       if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message)
-      if (e instanceof BranchPointError || e instanceof InvalidRefError) {
+      if (e instanceof BranchPointError || e instanceof InvalidRefError || e instanceof InvalidTaskError) {
         return fail(req.id, 'INVALID_PARAMS', e.message)
       }
       return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
@@ -272,6 +294,7 @@ export class Daemon {
           return { jsonrpc: '2.0', id: req.id, error: mismatch }
         }
         this.handshaked.add(conn.id)
+        this.clientNames.set(conn.id, p.client)
         return ok(req.id, { protocolVersion: PROTOCOL_VERSION, serverVersion: DAEMON_VERSION, methods: METHOD_NAMES })
       }
 
@@ -299,6 +322,30 @@ export class Daemon {
       case 'session.branch': {
         const p = params as { sessionId: string; atSeq: number }
         return ok(req.id, { sessionId: await this.host.branch(p.sessionId, p.atSeq) })
+      }
+
+      case 'task.start':
+      case 'task.list':
+      case 'task.get':
+      case 'task.retry':
+      case 'task.cancel': {
+        const t = this.host.tasks
+        if (!t) throw new Error('这个 daemon 不支持编排（PRD-M5）')
+        const p = params as { spec?: string; cwd?: string; runId?: string; nodeId?: string }
+        if (method === 'task.start') return ok(req.id, await t.start(p.spec as string, p.cwd))
+        if (method === 'task.list') return ok(req.id, { runs: await t.list() })
+        if (method === 'task.get') return ok(req.id, await t.get(p.runId as string))
+        if (method === 'task.retry') {
+          await t.retry(p.runId as string, p.nodeId as string)
+          return ok(req.id, { ok: true })
+        }
+        return ok(req.id, { ok: await t.cancel(p.runId as string) })
+      }
+
+      case 'audit.record': {
+        const p = params as { kind: string; detail: string }
+        await this.host.auditRecord?.(p.kind, p.detail, this.clientNames.get(conn.id) ?? 'unknown')
+        return ok(req.id, { ok: true })
       }
 
       case 'memory.list':
@@ -409,12 +456,13 @@ export class Daemon {
       }
 
       case 'session.answer': {
-        const p = params as { askId: string; allowed: boolean; content?: Record<string, unknown> }
+        const p = params as { askId: string; allowed: boolean; content?: Record<string, unknown>; channel?: string }
         const ask = this.asks.get(p.askId)
         // 已经被别的客户端答过（或根本不存在）：如实说没生效，不重复作答
         if (!ask) return ok(req.id, { ok: false })
         this.asks.delete(p.askId)
-        ask.answer(p.allowed, p.content)
+        // 审批从哪个端来（M5-007 AC-3）：客户端说了算，没说就用它握手时报的名字
+        ask.answer(p.allowed, p.content, p.channel ?? this.clientNames.get(conn.id)?.replace(/^domi-/, ''))
         this.broadcast(
           ask.sessionId,
           notify('session.askDone', { sessionId: ask.sessionId, askId: p.askId, allowed: p.allowed }),

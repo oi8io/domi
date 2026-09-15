@@ -68,6 +68,32 @@ async function probe(url: string, token: string | undefined): Promise<void> {
   if (res.status === 401) throw new RemoteConnectError(url, 'auth')
 }
 
+/** 只连 daemon，不建会话（`domi task …`、桥接用） */
+export async function connectDaemon(
+  opts: ConnectOptions & { clientName?: string; reconnectMs?: number },
+): Promise<{ client: DomiClient; daemon: DaemonEndpoint }> {
+  let daemon: DaemonEndpoint
+  if (opts.connect !== undefined) {
+    await probe(opts.connect, opts.token)
+    daemon = { url: opts.connect, pid: 0, spawned: false }
+  } else {
+    daemon = await ensureDaemon({
+      home: opts.home,
+      command: opts.command ?? selfCommand(),
+      cwd: opts.cwd,
+      ...(opts.env === undefined ? {} : { env: opts.env }),
+    })
+  }
+  const protocols = authProtocols(opts.token)
+  const client = new DomiClient({
+    clientName: opts.clientName ?? 'domi-cli',
+    reconnectMs: opts.reconnectMs ?? 0,
+    connect: () => new WebSocket(daemon.url, protocols) as unknown as WireSocket,
+  })
+  await client.start()
+  return { client, daemon }
+}
+
 export async function connectChat(opts: ConnectOptions): Promise<ChatConnection> {
   let daemon: DaemonEndpoint
   if (opts.connect !== undefined) {

@@ -84,6 +84,7 @@ export class ToolRegistry {
       decision: decision.decision,
       source: decision.source,
       matchedRule: decision.matchedRule,
+      ...(decision.channel === undefined ? {} : { channel: decision.channel }),
     }
 
     if (decision.decision !== 'allow') {
@@ -137,6 +138,9 @@ export function denialMessage(capability: string, source: string, rule: string |
   if (source === 'user') return `用户拒绝了 ${capability}。${noRetry}；换一种做法或询问用户。`
   if (source === 'config') {
     return `${capability} 被权限规则 "${rule}" 禁止（不是用户当场拒绝的）。${noRetry}；不用这个能力完成任务，或说明需要它的原因。`
+  }
+  if (rule === 'parent-scope') {
+    return `${capability} 不在派你来的任务给你的能力范围里（子 agent 的权限只能比父会话小）。${noRetry}；用范围内的能力完成，或在结论里说明还需要它。`
   }
   if (rule !== null) {
     return `${capability} 需要用户确认（规则 "${rule}"），但现在没有人可以确认，按拒绝处理。${noRetry}；稍后在交互界面里再试。`

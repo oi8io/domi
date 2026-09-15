@@ -72,6 +72,18 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .memory-items .text { flex: 1 1 16em; }
 .memory-items li.deleted .text { text-decoration: line-through; color: var(--muted); }
 .soul-search { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.runs { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.run h2 { font-size: 15px; }
+.run .nodes { list-style: none; padding: 0; }
+.run .node { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.run .node-status { min-width: 4em; font-size: 12px; }
+.run .node-id { font-weight: 600; }
+.run .node-output { flex-basis: 100%; white-space: pre-wrap; font-size: 12px; max-height: 12em; overflow: auto; margin: 4px 0 0; }
+.s-done { color: var(--ok); }
+.s-failed, .s-blocked, .s-cancelled { color: var(--bad); }
+.s-running { color: var(--warn); }
+.task-start { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.task-start textarea { font-family: ui-monospace, monospace; width: 100%; box-sizing: border-box; }
 .pending-refs { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .pending-refs li { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 4px 2px 8px; border: 1px solid var(--line); border-radius: 12px; max-width: 100%; }
 .pending-refs .ref-source { color: var(--muted); }

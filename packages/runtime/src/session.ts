@@ -15,6 +15,7 @@ import {
   makeSkillLoadTool,
   PermissionEngine,
   type SkillRegistry,
+  scopeOf,
   shellExec,
   type Tool,
   ToolRegistry,
@@ -63,6 +64,7 @@ const TitleSchema = z.object({ title: z.string() })
 
 import { SqliteEventLog } from '@domi/store'
 import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
+import { MAX_SPAWN_DEPTH, makeSpawnTool } from './subagent.ts'
 
 /**
  * 一次询问。TUI / daemon 渲染它，用户回答后 resolve。
@@ -80,7 +82,8 @@ export interface PendingAsk {
   capabilityId: string
   args: unknown
   form?: { message: string; schema: unknown }
-  answer(allowed: boolean, content?: Record<string, unknown>): void
+  /** channel：用户在哪个端上回答的（tui / web / telegram），进 permission 事件（M5-007） */
+  answer(allowed: boolean, content?: Record<string, unknown>, channel?: string): void
 }
 
 export interface MetricsSnapshot {
@@ -121,6 +124,12 @@ export interface SessionOptions {
   memory?: MemoryService
   /** Skill（PRD-M4-005）。不给就没有 Skill 清单与 skill.load */
   skills?: SkillRegistry
+  /** 能力范围（M5-001）：子 agent 的会话只能用这些。不给 = 不额外收窄 */
+  scope?: (capabilityId: string) => boolean
+  /** 第几层子 agent。0 = 用户直接对话的会话；到 MAX_SPAWN_DEPTH 就不再给 task.spawn */
+  spawnDepth?: number
+  /** 子 agent 会话的事件往哪推（daemon 里是这个子会话的订阅者） */
+  childEvents?: (sessionId: string, envs: EventEnvelope[]) => void
 }
 
 export class DomiSession {
@@ -145,8 +154,9 @@ export class DomiSession {
     this.currentModel = opts.config.model.name
     this.currentProvider = opts.config.model.provider
 
-    const permissions = new PermissionEngine({ rules: opts.config.permissions.rules }, (capabilityId, args) =>
-      this.askUser(capabilityId, args),
+    const permissions = new PermissionEngine(
+      { rules: opts.config.permissions.rules, ...(opts.scope ? { scope: opts.scope } : {}) },
+      (capabilityId, args) => this.askUser(capabilityId, args),
     )
     this.tools = new ToolRegistry({
       cwd: opts.cwd,
@@ -160,6 +170,7 @@ export class DomiSession {
       .register(makeMemorySearchTool(this.log.search))
     if (opts.memory) this.tools.register(makeMemoryRecallTool(opts.memory))
     if (opts.skills) this.tools.register(makeSkillLoadTool(opts.skills))
+    if ((opts.spawnDepth ?? 0) < MAX_SPAWN_DEPTH) this.tools.register(makeSpawnTool(this))
 
     // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
     // 那份知识只在 packages/model/src/factory.ts 里（AC-4 的 diff 为 0 靠这个成立）
@@ -193,19 +204,19 @@ export class DomiSession {
     return this
   }
 
-  private askUser(capabilityId: string, args: unknown): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
+  private askUser(capabilityId: string, args: unknown): Promise<{ allowed: boolean; channel?: string }> {
+    return new Promise((resolve) => {
       const ask: PendingAsk = {
         capabilityId,
         args,
-        answer: (allowed) => {
+        answer: (allowed, _content, channel) => {
           this.listeners.onAsk?.(null)
-          resolve(allowed)
+          resolve({ allowed, ...(channel === undefined ? {} : { channel }) })
         },
       }
       if (!this.listeners.onAsk) {
         // 没有人能回答（非交互环境）→ 拒绝。与 PermissionEngine 的兜底同一个立场
-        resolve(false)
+        resolve({ allowed: false })
         return
       }
       this.listeners.onAsk(ask)
@@ -403,6 +414,112 @@ export class DomiSession {
       await this.pump()
       return { ok: false, detail: message }
     }
+  }
+
+  // ── 给子 agent 与编排用的（M5）─────────────────────────────
+
+  get id(): string {
+    return this.opts.sessionId
+  }
+
+  /** 建一个子 agent 会话（M5-001）：同一个库、同一份配置，权限在自己的范围上再收窄 */
+  createChild(c: { sessionId: string; title: string; tools: readonly string[] | undefined; depth?: number }): {
+    child: DomiSession
+    childEvents: SessionOptions['childEvents']
+  } {
+    const o = this.opts
+    const scope = c.tools === undefined ? o.scope : scopeOf(c.tools, o.scope)
+    this.log.sessions.upsert({ id: c.sessionId, cwd: o.cwd, title: c.title, spawnedBy: o.sessionId })
+    const child = new DomiSession({
+      config: o.config,
+      dbPath: o.dbPath,
+      cwd: o.cwd,
+      sessionId: c.sessionId,
+      ...(this.injectedProvider ? { provider: this.provider } : {}),
+      ...(o.memory ? { memory: o.memory } : {}),
+      ...(o.skills ? { skills: o.skills } : {}),
+      ...(o.extraTools ? { extraTools: o.extraTools } : {}),
+      ...(o.clock ? { clock: o.clock } : {}),
+      ...(o.pricing ? { pricing: o.pricing } : {}),
+      ...(scope ? { scope } : {}),
+      ...(o.childEvents ? { childEvents: o.childEvents } : {}),
+      spawnDepth: c.depth ?? (o.spawnDepth ?? 0) + 1,
+    })
+    return { child, childEvents: o.childEvents }
+  }
+
+  /** 子会话的询问转给自己的订阅者回答：人在看的是父会话 */
+  forwardAsk(ask: PendingAsk | null): void {
+    if (ask === null) return
+    if (!this.listeners.onAsk) {
+      ask.answer(false)
+      return
+    }
+    this.listeners.onAsk({
+      ...ask,
+      answer: (allowed, content, channel) => {
+        this.listeners.onAsk?.(null)
+        ask.answer(allowed, content, channel)
+      },
+    })
+  }
+
+  /**
+   * 追加任意事件并推给订阅者（编排的运行会话用：task.* 事件由 orchestrator 生成）。
+   * 不经 kernel：运行会话里没有模型对话
+   */
+  async appendEvents(evs: Parameters<SqliteEventLog['append']>[1]): Promise<void> {
+    await this.log.append(this.opts.sessionId, evs)
+    await this.pump()
+  }
+
+  /** 在这个会话里直接跑一个工具（编排的 tool 节点）。调用、权限、结果都落进本会话，和模型发起的一样可审计 */
+  async runTool(
+    name: string,
+    args: unknown,
+    signal: AbortSignal,
+  ): Promise<{ ok: boolean; payload: unknown; reason?: string }> {
+    for (const t of this.opts.extraTools?.() ?? []) this.tools.register(t)
+    const id = `node-${this.now().toString(36)}`
+    await this.appendEvents([{ t: 'tool.call', id, name, args }])
+    const t0 = this.now()
+    const r = await this.tools.run({ id, name, args }, signal)
+    await this.appendEvents([
+      ...(r.events ?? []),
+      {
+        t: 'tool.result',
+        id,
+        ok: r.ok,
+        payload: r.payload,
+        ms: Math.max(0, this.now() - t0),
+        ...(r.reason === undefined ? {} : { reason: r.reason }),
+      },
+    ])
+    return { ok: r.ok, payload: r.payload, ...(r.reason === undefined ? {} : { reason: r.reason }) }
+  }
+
+  /** 问人一个是 / 否（编排的 human-approval 节点）。没人能回答时是「否」 */
+  async askApproval(
+    message: string,
+    detail: Record<string, unknown> = {},
+  ): Promise<{ allowed: boolean; channel?: string }> {
+    return this.askUser('task.approval', { message, ...detail })
+  }
+
+  setBusy(busy: boolean): void {
+    this.busy = busy
+    this.listeners.onBusy?.(busy)
+  }
+
+  /** 最近一轮模型的最后一段回答（子 agent 的结论、agent-step 的输出） */
+  async lastAnswer(): Promise<string> {
+    const view = await this.view()
+    let text = ''
+    for (const e of view) {
+      if (e.ev.t === 'model.request' || e.ev.t === 'user.input') text = ''
+      else if (e.ev.t === 'model.delta') text += (e.ev as { text: string }).text
+    }
+    return text.trim()
   }
 
   /**

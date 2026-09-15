@@ -18,9 +18,11 @@ import { z } from 'zod'
  * v4 → v5：新增 `ctx.compact`（M2-003 LLM 压缩）。
  * v5 → v6：新增 `ctx.ref`（M3-005 跨会话引用）。
  * v6 → v7：新增 `memory.write`（M4 语义记忆与 Soul）。
+ * v7 → v8：新增 `task.spawn` / `task.run` / `task.node` / `task.resume` / `task.retry` / `task.end`（M5 编排）；
+ *          `permission` 新增可选的 `channel`（M5-007 审批从哪来）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -107,6 +109,8 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     decision: z.enum(['allow', 'deny', 'ask']),
     source: z.enum(['default', 'config', 'user']),
     matchedRule: z.string().nullable(),
+    /** 用户是在哪个端上回答的（tui / web / telegram）。只有 source:'user' 时才有 */
+    channel: z.string().optional(),
   }),
   /** M1-002：切换模型。事件流一条不动，上下文按新模型窗口重拼是 buildContext 的事 */
   z.looseObject({
@@ -217,6 +221,35 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     changes: z.array(SoulChangeSchema).optional(),
     reviews: z.array(z.object({ changeId: z.string(), decision: z.enum(['accept', 'reject']) })).optional(),
   }),
+  /** M5-001：派生子 agent。随工具结果落在父会话里；子会话的事件只在子会话里 */
+  z.looseObject({
+    t: z.literal('task.spawn'),
+    childSessionId: z.string(),
+    goal: z.string(),
+    tools: z.array(z.string()).optional(),
+  }),
+  /** M5-002：一次 DAG 运行的开头。spec 是当时的快照，之后改 YAML 文件不影响这次运行 */
+  z.looseObject({ t: z.literal('task.run'), name: z.string(), spec: z.unknown(), cwd: z.string().optional() }),
+  /** 节点状态变化。状态本身是这些事件的投影（INV-01） */
+  z.looseObject({
+    t: z.literal('task.node'),
+    nodeId: z.string(),
+    status: z.enum(['started', 'done', 'failed']),
+    attempt: z.number().int().min(1),
+    output: z.string().optional(),
+    error: z.string().optional(),
+    /** agent-step / sub-agent 节点自己的会话 */
+    sessionId: z.string().optional(),
+    ms: z.number().int().nonnegative().optional(),
+  }),
+  /** M5-003：daemon 重启后接着跑。completed 是恢复点；rerun 是中断时正在跑、要重跑的节点 */
+  z.looseObject({
+    t: z.literal('task.resume'),
+    completed: z.array(z.string()),
+    rerun: z.array(z.string()),
+  }),
+  z.looseObject({ t: z.literal('task.retry'), nodeId: z.string() }),
+  z.looseObject({ t: z.literal('task.end'), status: z.enum(['done', 'failed', 'cancelled']) }),
   z.looseObject({
     t: z.literal('error'),
     scope: z.string(),

@@ -1,0 +1,2 @@
+{"seq": 16, "sessionId": "legacy", "parentSeq": 15, "ts": 1756000000016, "schemaVersion": 8, "ev": {"t": "task.spawn", "childSessionId": "legacy.sub-1", "goal": "读一遍 README 总结", "tools": ["fs.read"]}}
+{"seq": 17, "sessionId": "legacy", "parentSeq": 16, "ts": 1756000000017, "schemaVersion": 8, "ev": {"t": "task.node", "nodeId": "test", "status": "done", "attempt": 1, "output": "3 pass", "ms": 1200}}

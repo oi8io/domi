@@ -884,6 +884,364 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `task.start`
+
+开始一次 DAG 运行（PRD-M5-002）。spec 是 YAML 原文；不合法（含环）→ INVALID_PARAMS，什么都不落。返回的 runId 就是运行会话的 id，订阅它就能看到 task.* 事件
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "spec": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cwd": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "spec"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "runId",
+    "name",
+    "nodes"
+  ]
+}
+```
+
+### `task.list`
+
+列出运行（最近的在前）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "done",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "updatedAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "runId",
+          "name",
+          "status",
+          "updatedAt"
+        ]
+      }
+    }
+  },
+  "required": [
+    "runs"
+  ]
+}
+```
+
+### `task.get`
+
+一次运行的各节点状态（事件的投影，PRD-M5-002 AC-3）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "running",
+        "done",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "active": {
+      "type": "boolean"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "needs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "done",
+              "failed",
+              "blocked"
+            ]
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "output": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "ms": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "needs",
+          "status",
+          "attempt"
+        ]
+      }
+    }
+  },
+  "required": [
+    "runId",
+    "name",
+    "status",
+    "active",
+    "nodes"
+  ]
+}
+```
+
+### `task.retry`
+
+只重跑一个失败节点及其被挡住的下游，已完成的不动（AC-4）。运行还在跑或节点不是失败 → INVALID_PARAMS
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    },
+    "nodeId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId",
+    "nodeId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `task.cancel`
+
+取消一次还在跑的运行。已经结束的返回 ok:false
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "runId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `audit.record`
+
+端上发生、daemon 看不到的安全相关事情（比如桥接收到未绑定 chat 的消息），记进审计会话（M5-007 AC-4）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "kind": {
+      "type": "string",
+      "maxLength": 60,
+      "pattern": "^[a-z0-9_.-]+$"
+    },
+    "detail": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "kind",
+    "detail"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
 ### `session.switchModel`
 
 会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力
@@ -1108,6 +1466,10 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
         "type": "string"
       },
       "additionalProperties": {}
+    },
+    "channel": {
+      "type": "string",
+      "maxLength": 40
     }
   },
   "required": [
@@ -1472,6 +1834,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                           "string",
                           "null"
                         ]
+                      },
+                      "channel": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -1959,6 +2324,167 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                       "layer",
                       "op",
                       "diff"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.spawn"
+                      },
+                      "childSessionId": {
+                        "type": "string"
+                      },
+                      "goal": {
+                        "type": "string"
+                      },
+                      "tools": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "childSessionId",
+                      "goal"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.run"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "spec": {},
+                      "cwd": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "name",
+                      "spec"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.node"
+                      },
+                      "nodeId": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "started",
+                          "done",
+                          "failed"
+                        ]
+                      },
+                      "attempt": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "output": {
+                        "type": "string"
+                      },
+                      "error": {
+                        "type": "string"
+                      },
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "nodeId",
+                      "status",
+                      "attempt"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.resume"
+                      },
+                      "completed": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "rerun": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "completed",
+                      "rerun"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.retry"
+                      },
+                      "nodeId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "nodeId"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.end"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "done",
+                          "failed",
+                          "cancelled"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "status"
                     ],
                     "additionalProperties": {}
                   },

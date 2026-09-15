@@ -24,6 +24,7 @@ const GLYPH: Record<string, string> = {
   compact: '⊟',
   error: '✗',
   answer: '◆',
+  task: '▸',
   other: '•',
 }
 

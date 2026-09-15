@@ -30,7 +30,7 @@ module.exports = {
       severity: 'error',
       // 允许的只有 runtime / client-core / config / protocol：
       // 前两个是门面与投影，后两个是配置与契约。业务实现一律不许直接 import。
-      from: { path: '^apps/(tui|web|desktop)/' },
+      from: { path: '^apps/(tui|web|desktop|bridge-telegram)/' },
       to: { path: '^packages/(kernel|store|capability|model|mcp|memory|orchestrator)/' },
     },
     {

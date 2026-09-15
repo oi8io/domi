@@ -15,7 +15,17 @@ export const COLLAPSE_BYTES = 2048
 /** AC-2：折叠态显示前多少个字符 */
 export const PREVIEW_CHARS = 200
 
-export type NodeKind = 'input' | 'think' | 'tool' | 'permission' | 'cleanup' | 'compact' | 'error' | 'answer' | 'other'
+export type NodeKind =
+  | 'input'
+  | 'think'
+  | 'tool'
+  | 'permission'
+  | 'cleanup'
+  | 'compact'
+  | 'error'
+  | 'answer'
+  | 'task'
+  | 'other'
 
 export interface TraceNode {
   seq: number
@@ -78,6 +88,22 @@ function node(seq: number, kind: NodeKind, title: string, detail: string, extra:
 
 export interface BuildOptions {
   pricing?: Record<string, { inputPer1M: number; outputPer1M: number; cacheReadPer1M?: number }>
+  /**
+   * 子会话的事件（子 agent、编排节点），按会话 id 给。有的话嵌套在派生它的那一步下面（PRD-M5-001 AC-4）；
+   * 没给就只显示一行「子会话 xxx」，不去读库——buildTrace 是纯函数
+   */
+  children?: ReadonlyMap<string, readonly EventEnvelope[]>
+}
+
+/** 从事件里找出子会话 id（调用方据此去读子会话，再交回 children） */
+export function childSessionIds(events: readonly EventEnvelope[]): string[] {
+  const out: string[] = []
+  for (const { ev } of events) {
+    if (!isKnownEvent(ev)) continue
+    if (ev.t === 'task.spawn') out.push(ev.childSessionId)
+    else if (ev.t === 'task.node' && ev.sessionId !== undefined && !out.includes(ev.sessionId)) out.push(ev.sessionId)
+  }
+  return out
 }
 
 /**
@@ -214,6 +240,62 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
               (ev.preserved.length > 0 ? `\n引用保留：${ev.preserved.join(', ')}` : ''),
           ),
         )
+        break
+
+      case 'task.spawn': {
+        // 子 agent：挂在派生它的那次工具调用下面，子会话的整棵树再挂在它下面
+        const n = node(
+          env.seq,
+          'task',
+          `子 agent：${ev.goal}`,
+          `会话 ${ev.childSessionId}${ev.tools ? `\n能力：${ev.tools.join('、')}` : ''}`,
+        )
+        const sub = opts.children?.get(ev.childSessionId)
+        if (sub) n.children = buildTrace(sub, opts).nodes
+        if (pendingTool) pendingTool.children.push(n)
+        else nodes.push(n)
+        break
+      }
+
+      case 'task.run':
+        nodes.push(node(env.seq, 'task', `任务：${ev.name}`, JSON.stringify(ev.spec, null, 2)))
+        break
+
+      case 'task.node': {
+        if (ev.status === 'started') {
+          nodes.push(node(env.seq, 'task', `节点 ${ev.nodeId} 开始（第 ${ev.attempt} 次）`, ''))
+          break
+        }
+        const n = node(
+          env.seq,
+          ev.status === 'done' ? 'task' : 'error',
+          `节点 ${ev.nodeId} ${ev.status === 'done' ? '完成' : '失败'}`,
+          ev.error ?? ev.output ?? '',
+          { ms: ev.ms ?? null },
+        )
+        const sub = ev.sessionId === undefined ? undefined : opts.children?.get(ev.sessionId)
+        if (sub) n.children = buildTrace(sub, opts).nodes
+        nodes.push(n)
+        break
+      }
+
+      case 'task.resume':
+        nodes.push(
+          node(
+            env.seq,
+            'task',
+            '恢复',
+            `已完成：${ev.completed.join('、') || '无'}\n重跑：${ev.rerun.join('、') || '无'}`,
+          ),
+        )
+        break
+
+      case 'task.retry':
+        nodes.push(node(env.seq, 'task', `重试 ${ev.nodeId}`, ''))
+        break
+
+      case 'task.end':
+        nodes.push(node(env.seq, ev.status === 'done' ? 'task' : 'error', `任务结束：${ev.status}`, ''))
         break
 
       case 'snapshot':

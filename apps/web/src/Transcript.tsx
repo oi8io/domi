@@ -37,6 +37,7 @@ const LABEL: Record<TranscriptItem['kind'], string> = {
   permission: '权限',
   error: '错误',
   context: '上下文',
+  task: '任务',
 }
 
 /** 每一轮的范围：从这一轮的用户输入，到下一轮用户输入之前。最后一轮的终点交给 daemon 截（PRD-M3-005） */

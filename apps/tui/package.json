@@ -15,7 +15,8 @@
     "nanostores": "^1.5.3",
     "react": "^19.3.0",
     "@domi/cli": "workspace:*",
-    "@domi/daemon": "workspace:*"
+    "@domi/daemon": "workspace:*",
+    "@domi/bridge-telegram": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

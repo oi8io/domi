@@ -23,6 +23,8 @@ export interface SessionRow {
   deletedAt: number | null
   parentSessionId: string | null
   parentSeq: number | null
+  /** 子 agent 会话：派生它的父会话（M5-001）。和分支的 parentSessionId 是两回事 */
+  spawnedBy: string | null
 }
 
 export interface SessionSummary extends SessionRow {
@@ -40,6 +42,7 @@ interface RawRow {
   deleted_at: number | null
   parent_session_id: string | null
   parent_seq: number | null
+  spawned_by: string | null
 }
 
 function toRow(r: RawRow): SessionRow {
@@ -53,6 +56,7 @@ function toRow(r: RawRow): SessionRow {
     deletedAt: r.deleted_at,
     parentSessionId: r.parent_session_id,
     parentSeq: r.parent_seq,
+    spawnedBy: r.spawned_by ?? null,
   }
 }
 
@@ -65,8 +69,8 @@ export class SessionRepo {
     const now = s.updatedAt ?? s.createdAt ?? 0
     this.db
       .query(
-        `INSERT INTO sessions (id, created_at, updated_at, cwd, title, model, parent_session_id, parent_seq)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO sessions (id, created_at, updated_at, cwd, title, model, parent_session_id, parent_seq, spawned_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            updated_at = excluded.updated_at,
            title = CASE WHEN excluded.title != '' THEN excluded.title ELSE sessions.title END,
@@ -81,6 +85,7 @@ export class SessionRepo {
         s.model ?? '',
         s.parentSessionId ?? null,
         s.parentSeq ?? null,
+        s.spawnedBy ?? null,
       )
   }
 
@@ -90,9 +95,20 @@ export class SessionRepo {
   }
 
   /** 默认不列软删除的。includeDeleted 只给 `domi session restore` 用 */
-  list(opts: { includeDeleted?: boolean; titleLike?: string; limit?: number } = {}): SessionSummary[] {
+  list(
+    opts: {
+      includeDeleted?: boolean
+      titleLike?: string
+      limit?: number
+      includeSpawned?: boolean
+      idPrefix?: string
+    } = {},
+  ): SessionSummary[] {
     const where: string[] = []
     if (!opts.includeDeleted) where.push('s.deleted_at IS NULL')
+    // 子 agent 的会话默认不列：它们从父会话的轨迹里点进去（M5-001 AC-4）
+    if (!opts.includeSpawned) where.push('s.spawned_by IS NULL')
+    if (opts.idPrefix) where.push("s.id LIKE ? || '%'")
     if (opts.titleLike) where.push("s.title LIKE '%' || ? || '%'")
     const sql = `
       SELECT s.*,
@@ -103,6 +119,7 @@ export class SessionRepo {
       ORDER BY s.updated_at DESC, s.created_at DESC
       LIMIT ?`
     const params: (string | number)[] = []
+    if (opts.idPrefix) params.push(opts.idPrefix)
     if (opts.titleLike) params.push(opts.titleLike)
     params.push(opts.limit ?? 50)
     const rows = this.db

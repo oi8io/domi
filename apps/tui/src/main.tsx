@@ -30,7 +30,7 @@ import { useCallback, useState } from 'react'
 import { App } from './App.tsx'
 import { parseSlash } from './commands.ts'
 import { Prompt } from './components/Prompt.tsx'
-import { connectChat } from './connect.ts'
+import { connectChat, connectDaemon } from './connect.ts'
 
 const EXIT_CONFIG_ERROR = 2
 
@@ -272,12 +272,49 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     process.exit(2)
   }
 
+  // 要连 domid 的命令：接线在端上（和对话同一条路）
+  if (!cli.flags.help && (cli.command === 'task' || cli.command === 'bridge')) {
+    process.exit(await runDaemonCommand(cli, io))
+  }
+
   // 非交互命令走 CLI 分发，不启动 Ink —— 它们要能被管道和脚本用
   if (cli.command !== 'chat' || cli.flags.help || cli.flags.version) {
     process.exit(await runCommand(cli, io))
   }
 
   return startChat(cli.flags.connect)
+}
+
+async function runDaemonCommand(cli: ParsedCli, io: { out(s: string): void; err(s: string): void }): Promise<number> {
+  const config = cli.flags.connect === undefined ? loadConfigOrThrow() : loadConfig()
+  const home = process.env.HOME || homedir()
+  if (cli.command === 'bridge') {
+    const { runBridgeCommand } = await import('./bridge-cli.ts')
+    return runBridgeCommand(cli.sub, io, {
+      config,
+      home,
+      ...(cli.flags.connect === undefined ? {} : { connect: cli.flags.connect }),
+    })
+  }
+  const token = resolveClientToken({ config, env: process.env, home })
+  try {
+    const { client } = await connectDaemon({
+      home,
+      cwd: process.cwd(),
+      model: config.model,
+      ...(cli.flags.connect === undefined ? {} : { connect: cli.flags.connect }),
+      ...(token === undefined ? {} : { token }),
+    })
+    try {
+      const { runTaskCommand } = await import('./task-cli.ts')
+      return await runTaskCommand(cli.sub, cli.args, io, client, { follow: cli.flags.follow, cwd: process.cwd() })
+    } finally {
+      client.close()
+    }
+  } catch (e) {
+    io.err(e instanceof Error ? e.message : String(e))
+    return 1
+  }
 }
 
 async function startChat(remote: string | undefined): Promise<void> {
