@@ -24,15 +24,13 @@ import {
   toYamlWithoutSecrets,
 } from './data.ts'
 import { diagnose, formatFindings } from './doctor.ts'
+import type { Io } from './io.ts'
 import { formatOnboarding } from './onboarding.ts'
 import { ping } from './ping.ts'
 
 export const VERSION = '0.1.0'
 
-export interface Io {
-  out(s: string): void
-  err(s: string): void
-}
+export type { Io } from './io.ts'
 
 /** 先看 HOME：os.homedir() 在 Bun 里不跟随运行期对 HOME 的修改，测试与「换个 HOME 跑一次」都靠这个 */
 function userHome(): string {
@@ -77,6 +75,16 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         return 127
       }
       return runTrace(cli.sub, cli.flags.html, io)
+    }
+
+    // PRD-M4。动态 import：这两个命令要拉起 runtime，其它命令不必为它付加载时间
+    case 'memory':
+    case 'soul': {
+      const { runMemory, runSoul } = await import('./soul.ts')
+      const deps = { dataDir: dataDir(), home: userHome() }
+      return cli.command === 'memory'
+        ? runMemory(cli.sub, cli.args, io, deps, { all: cli.flags.all })
+        : runSoul(cli.sub, cli.args, io, deps)
     }
 
     case 'init': {

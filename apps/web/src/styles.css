@@ -59,6 +59,19 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .row:hover .branch, .row .branch:focus-visible { opacity: 1; }
 .row .quote { position: absolute; top: 8px; right: 56px; font-size: 12px; padding: 2px 8px; opacity: 0; }
 .row:hover .quote, .row .quote:focus-visible { opacity: 1; }
+.soul-link { margin-top: 6px; }
+.soul section { margin-bottom: 20px; }
+.soul h2 { font-size: 14px; margin: 12px 0 8px; }
+.soul .meta { font-size: 12px; color: var(--muted); }
+.soul-text, .soul .changes pre { white-space: pre-wrap; overflow-x: auto; background: var(--panel, transparent); padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.soul .changes, .memory-items { list-style: none; padding: 0; margin: 0; }
+.soul .changes li { margin-bottom: 10px; }
+.soul .changes button { margin-right: 6px; }
+.memory-items li { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.memory-items .kind { font-size: 11px; color: var(--muted); min-width: 5em; }
+.memory-items .text { flex: 1 1 16em; }
+.memory-items li.deleted .text { text-decoration: line-through; color: var(--muted); }
+.soul-search { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
 .pending-refs { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .pending-refs li { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 4px 2px 8px; border: 1px solid var(--line); border-radius: 12px; max-width: 100%; }
 .pending-refs .ref-source { color: var(--muted); }

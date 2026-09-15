@@ -65,6 +65,18 @@ export interface Tool<A = unknown, R = unknown> {
  */
 export interface Skill {
   readonly name: string
+  /** 未激活时进上下文的只有这一句（PRD-M4-005 AC-2） */
+  readonly description: string
+  /** 正文。模型调 skill.load 才拿到 */
   readonly prompt: string
   readonly requiresTools: readonly string[]
+  /** 官方随包发的，还是用户目录里的（同名时用户的覆盖官方的） */
+  readonly source: 'official' | 'user'
+  /** 用户 Skill 的文件路径；官方的没有 */
+  readonly path?: string
+  /**
+   * PRD-M4-005 AC-1：类型上不许有 execute。写成 never 而不是干脆不写，
+   * 是为了让「给 Skill 加一个 execute」在编译期就报错，而不是悄悄变成一个多余字段
+   */
+  readonly execute?: never
 }

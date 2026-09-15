@@ -1,5 +1,6 @@
 export * from './ai-sdk-provider.ts'
 export * from './capability.ts'
+export * from './embedding.ts'
 export * from './factory.ts'
 export * from './provider.ts'
 export * from './retry.ts'

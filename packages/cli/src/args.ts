@@ -19,6 +19,8 @@ export const COMMANDS = [
   'eval',
   'trace',
   'migrate',
+  'memory',
+  'soul',
 ] as const
 export type Command = (typeof COMMANDS)[number]
 
@@ -32,6 +34,8 @@ export interface ParsedCli {
     json: boolean
     yes: boolean
     ping: boolean
+    /** `domi memory list --all`：连删掉的也列 */
+    all: boolean
     /** `domi --connect ws://host:port`：连远程 domid（PRD-M3-006 AC-1） */
     connect: string | undefined
     /** `domi init --from-toml`：迁移旧配置（ADR-014） */
@@ -62,6 +66,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       ping: { type: 'boolean' },
       html: { type: 'string' },
       connect: { type: 'string' },
+      all: { type: 'boolean' },
       'from-toml': { type: 'boolean' },
     },
   })
@@ -84,6 +89,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       fromToml: Boolean(values['from-toml']),
       html: typeof values.html === 'string' ? values.html : undefined,
       connect: typeof values.connect === 'string' ? values.connect : undefined,
+      all: Boolean(values.all),
     },
   }
 }
@@ -109,6 +115,8 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi trace <id>           打印一条会话的轨迹树
   domi trace <id> --html f  导出单文件 HTML（离线可开）
   domi migrate              升级事件库结构；**先自动备份**，失败自动回滚
+  domi memory list|search|delete|extract   记下的关于你的条目（L3）
+  domi soul show|review|update|export|import   Soul：审阅改动、导出分享、导入别人的
 
 对话里：
   /compact                  手动压缩上下文
@@ -118,6 +126,8 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   /sessions [--all]         列出会话（--all 含已删除的）
   /open <id>  /new          切到某个会话 / 新建一个
   /delete <id>  /restore <id>  软删除 / 恢复会话
+  /soul                     看 Soul 待审阅的改动；/soul accept|reject <id>
+  /memory [关键词]          看记下的关于你的条目；/extract 立刻从当前会话抽取
 
 选项：
   -h, --help      看这个
@@ -163,6 +173,11 @@ permissions:
       capability: memory.search
       decision: allow
 
+    # Skill 的正文是文字说明，读它不执行任何东西（docs/adr/019）
+    - name: allow-skill-load
+      capability: skill.load
+      decision: allow
+
     # 看网页、点界面：每一步都问你（ADR-016）。想放宽的话按工具名精确放行，
     # 比如 capability: mcp.computer.screenshot，别整组 allow
     - name: confirm-browser
@@ -190,6 +205,14 @@ mcp:
     # 其它 server 照着写：stdio 用 command/args，HTTP 用 url
     # - name: docs
     #   url: https://mcp.example.com/mcp
+
+# 记忆与 Soul（docs/adr/018、019）。Soul 在 ~/.domi/soul/soul.md，可以直接手改
+# memory:
+#   extractEvery: 5        # 每几轮抽取一次，0 = 只手动（domi memory extract <会话>）
+#   soul: true             # false = 不更新 Soul、也不放进提示词
+#   embedding:             # 配了才有语义检索；anthropic 没有 embedding 接口
+#     provider: openai
+#     model: text-embedding-3-small
 
 # 自定义提示词层（domi prompt dump 可以看拼装结果）。同 id 覆盖内置层，比如 builtin.conventions
 # prompt:

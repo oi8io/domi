@@ -9,7 +9,16 @@
  * M3 的做法是：daemon 里跑 DomiSession，客户端换成 Domi Protocol 的代理实现，
  * **TUI 一行不用改**——门面的方法签名就是按将来的协议形状设计的。
  */
-import { fsRead, fsWrite, PermissionEngine, shellExec, type Tool, ToolRegistry } from '@domi/capability'
+import {
+  fsRead,
+  fsWrite,
+  makeSkillLoadTool,
+  PermissionEngine,
+  type SkillRegistry,
+  shellExec,
+  type Tool,
+  ToolRegistry,
+} from '@domi/capability'
 import type { DomiConfig } from '@domi/config'
 import {
   aggregate,
@@ -37,7 +46,7 @@ import {
   type ModelProvider,
   StructuredOutputError,
 } from '@domi/model'
-import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers } from '@domi/prompt'
+import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
 import type { EventEnvelope, RefLink } from '@domi/protocol'
 import { z } from 'zod'
 
@@ -53,6 +62,7 @@ registerCompactStrategy()
 const TitleSchema = z.object({ title: z.string() })
 
 import { SqliteEventLog } from '@domi/store'
+import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
 
 /**
  * 一次询问。TUI / daemon 渲染它，用户回答后 resolve。
@@ -107,6 +117,10 @@ export interface SessionOptions {
   extraTools?: () => readonly Tool[]
   /** 进程级的提示（比如某个 MCP server 连不上）。每条只在本会话落一次 error 事件 */
   notices?: () => readonly string[]
+  /** 记忆与 Soul（PRD-M4）。daemon 里所有会话共用一个；不给就没有抽取、Soul 不进提示词 */
+  memory?: MemoryService
+  /** Skill（PRD-M4-005）。不给就没有 Skill 清单与 skill.load */
+  skills?: SkillRegistry
 }
 
 export class DomiSession {
@@ -144,6 +158,8 @@ export class DomiSession {
       .register(shellExec)
       // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用
       .register(makeMemorySearchTool(this.log.search))
+    if (opts.memory) this.tools.register(makeMemoryRecallTool(opts.memory))
+    if (opts.skills) this.tools.register(makeSkillLoadTool(opts.skills))
 
     // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
     // 那份知识只在 packages/model/src/factory.ts 里（AC-4 的 diff 为 0 靠这个成立）
@@ -449,7 +465,16 @@ export class DomiSession {
    * 每轮现拼（便宜），换了模型也跟着变；cache 边界不合法时 assemble 当场抛错
    */
   private prompt(): { system: string; dynamic: string } {
-    const layers = mergeLayers(BUILTIN_LAYERS, layersFromConfig(this.opts.config.prompt.layers))
+    const extra: PromptLayer[] = []
+    const soul = this.opts.memory?.promptText() ?? ''
+    // Soul 很少变，放稳定前缀里（ADR-019）；空的时候不放，免得多一段没内容的说明
+    if (soul !== '')
+      extra.push({ id: 'builtin.soul', role: 'system', priority: 400, cacheable: true, render: () => soul })
+    const catalog = this.opts.skills?.catalog() ?? ''
+    if (catalog !== '') {
+      extra.push({ id: 'builtin.skills', role: 'system', priority: 450, cacheable: true, render: () => catalog })
+    }
+    const layers = mergeLayers([...BUILTIN_LAYERS, ...extra], layersFromConfig(this.opts.config.prompt.layers))
     const a = assemble(layers, { cwd: this.opts.cwd, model: this.currentModel })
     const text = (role: 'system' | 'user'): string =>
       a.messages
@@ -500,6 +525,8 @@ export class DomiSession {
       this.busy = false
       await this.pump()
       this.listeners.onBusy?.(false)
+      // 攒够轮数就抽取记忆、更新 Soul。不等它：抽取要调一次模型，不该拖住这一轮的结束
+      void this.opts.memory?.afterTurn(this.opts.sessionId)
     }
   }
 

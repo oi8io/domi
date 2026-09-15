@@ -16,6 +16,7 @@ import { type AppendRange, type Clock, type EventLog, type ReadOpts, systemClock
 import { serializeRedacted } from './redact.ts'
 import { DDL, META_SCHEMA_VERSION, MIGRATIONS, PRAGMAS } from './schema.ts'
 import { SearchRepo } from './search.ts'
+import { SemanticRepo } from './semantic.ts'
 import { flattenLineage, SessionRepo } from './sessions.ts'
 
 export interface SqliteEventLogOptions {
@@ -130,6 +131,8 @@ export class SqliteEventLog implements EventLog {
       // 检索索引随写入增量建（PRD-M2-004）。放在同一个事务里，
       // 是因为「事件写进去了但搜不到」比「两者都没写」更难查
       this.search.index(sessionId, indexable)
+      // L3 投影同理：事件写进去了、表里没有，比两者都没有更难查
+      for (const r of indexable) if (r.type === 'memory.write') this.semantic.apply(r.ev, ts)
       return { from: base + 1, to: base + evs.length }
     })
 
@@ -169,6 +172,11 @@ export class SqliteEventLog implements EventLog {
   /** 会话元数据仓库。事件与会话是两张表，但同一个连接同一个事务边界 */
   get sessions(): SessionRepo {
     return new SessionRepo(this.db)
+  }
+
+  /** L3 语义记忆的投影（PRD-M4-001）。派生数据，可从 _memory 会话重放 */
+  get semantic(): SemanticRepo {
+    return new SemanticRepo(this.db)
   }
 
   /** 全文检索索引（PRD-M2-004）。派生数据，删掉可重建 */

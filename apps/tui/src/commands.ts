@@ -16,6 +16,10 @@ export type SlashCommand =
   | { kind: 'new' }
   | { kind: 'delete'; sessionId: string }
   | { kind: 'restore'; sessionId: string }
+  | { kind: 'soul' }
+  | { kind: 'soul-review'; changeId: string; decision: 'accept' | 'reject' }
+  | { kind: 'memory'; query: string }
+  | { kind: 'extract' }
   | { kind: 'invalid'; message: string }
 
 /** lastSeq = 当前对话里最后一条的 seq；`/branch` 不带数字时从这里分 */
@@ -64,6 +68,18 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       const kind = cmd.slice(1) as 'open' | 'delete' | 'restore'
       return { kind, sessionId: rest[0] }
     }
+    // 记忆与 Soul（PRD-M4）
+    case '/soul': {
+      if (rest[0] === undefined) return { kind: 'soul' }
+      if ((rest[0] === 'accept' || rest[0] === 'reject') && rest[1]) {
+        return { kind: 'soul-review', changeId: rest[1], decision: rest[0] }
+      }
+      return { kind: 'invalid', message: '用法：/soul 看待审阅的改动；/soul accept|reject <改动 id>' }
+    }
+    case '/memory':
+      return { kind: 'memory', query: rest.join(' ') }
+    case '/extract':
+      return { kind: 'extract' }
     default:
       return { kind: 'submit', text }
   }

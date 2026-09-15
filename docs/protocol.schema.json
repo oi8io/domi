@@ -193,6 +193,530 @@
         ]
       }
     },
+    "memory.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "includeDeleted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "fact",
+                    "preference",
+                    "entity"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "sourceRefs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "seq": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "sessionId",
+                      "seq"
+                    ]
+                  }
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "deleted": {
+                  "type": "boolean"
+                },
+                "score": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "text",
+                "sourceRefs",
+                "createdAt",
+                "deleted"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      }
+    },
+    "memory.search": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "keyword",
+              "semantic+keyword"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "fact",
+                    "preference",
+                    "entity"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "sourceRefs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "seq": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "sessionId",
+                      "seq"
+                    ]
+                  }
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "deleted": {
+                  "type": "boolean"
+                },
+                "score": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "text",
+                "sourceRefs",
+                "createdAt",
+                "deleted"
+              ]
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "items"
+        ]
+      }
+    },
+    "memory.delete": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
+    },
+    "memory.extract": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "fact",
+                    "preference",
+                    "entity"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "sourceRefs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "seq": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "sessionId",
+                      "seq"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "text",
+                "sourceRefs"
+              ]
+            }
+          },
+          "soulChanges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "section": {
+                  "type": "string",
+                  "enum": [
+                    "工作习惯",
+                    "技术偏好",
+                    "沟通风格",
+                    "领域知识",
+                    "对用户的模型",
+                    "失败教训"
+                  ]
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "update",
+                    "remove"
+                  ]
+                },
+                "before": {
+                  "type": "string"
+                },
+                "after": {
+                  "type": "string"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "section",
+                "op",
+                "sources"
+              ]
+            }
+          }
+        },
+        "required": [
+          "added",
+          "soulChanges"
+        ]
+      }
+    },
+    "soul.get": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "text"
+        ]
+      }
+    },
+    "soul.changes": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "section": {
+                  "type": "string",
+                  "enum": [
+                    "工作习惯",
+                    "技术偏好",
+                    "沟通风格",
+                    "领域知识",
+                    "对用户的模型",
+                    "失败教训"
+                  ]
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "update",
+                    "remove"
+                  ]
+                },
+                "before": {
+                  "type": "string"
+                },
+                "after": {
+                  "type": "string"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "at": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "diff": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "section",
+                "op",
+                "sources",
+                "at",
+                "diff"
+              ]
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      }
+    },
+    "soul.review": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "changeId": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "reject"
+            ]
+          }
+        },
+        "required": [
+          "changeId",
+          "decision"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "detail"
+        ]
+      }
+    },
+    "soul.update": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "section": {
+                  "type": "string",
+                  "enum": [
+                    "工作习惯",
+                    "技术偏好",
+                    "沟通风格",
+                    "领域知识",
+                    "对用户的模型",
+                    "失败教训"
+                  ]
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "add",
+                    "update",
+                    "remove"
+                  ]
+                },
+                "before": {
+                  "type": "string"
+                },
+                "after": {
+                  "type": "string"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "section",
+                "op",
+                "sources"
+              ]
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      }
+    },
     "session.switchModel": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1013,6 +1537,183 @@
                             "sessionId",
                             "fromSeq",
                             "toSeq"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "string",
+                              "const": "memory.write"
+                            },
+                            "layer": {
+                              "type": "string",
+                              "enum": [
+                                "L3",
+                                "L4"
+                              ]
+                            },
+                            "op": {
+                              "type": "string",
+                              "enum": [
+                                "add",
+                                "delete",
+                                "extracted",
+                                "update",
+                                "review"
+                              ]
+                            },
+                            "diff": {
+                              "type": "string"
+                            },
+                            "item": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "fact",
+                                    "preference",
+                                    "entity"
+                                  ]
+                                },
+                                "text": {
+                                  "type": "string"
+                                },
+                                "sourceRefs": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "sessionId": {
+                                        "type": "string"
+                                      },
+                                      "seq": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 9007199254740991
+                                      }
+                                    },
+                                    "required": [
+                                      "sessionId",
+                                      "seq"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "kind",
+                                "text",
+                                "sourceRefs"
+                              ]
+                            },
+                            "itemId": {
+                              "type": "string"
+                            },
+                            "range": {
+                              "type": "object",
+                              "properties": {
+                                "sessionId": {
+                                  "type": "string"
+                                },
+                                "fromSeq": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "toSeq": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "sessionId",
+                                "fromSeq",
+                                "toSeq"
+                              ]
+                            },
+                            "changes": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "section": {
+                                    "type": "string",
+                                    "enum": [
+                                      "工作习惯",
+                                      "技术偏好",
+                                      "沟通风格",
+                                      "领域知识",
+                                      "对用户的模型",
+                                      "失败教训"
+                                    ]
+                                  },
+                                  "op": {
+                                    "type": "string",
+                                    "enum": [
+                                      "add",
+                                      "update",
+                                      "remove"
+                                    ]
+                                  },
+                                  "before": {
+                                    "type": "string"
+                                  },
+                                  "after": {
+                                    "type": "string"
+                                  },
+                                  "sources": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "section",
+                                  "op",
+                                  "sources"
+                                ]
+                              }
+                            },
+                            "reviews": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "changeId": {
+                                    "type": "string"
+                                  },
+                                  "decision": {
+                                    "type": "string",
+                                    "enum": [
+                                      "accept",
+                                      "reject"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "changeId",
+                                  "decision"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "layer",
+                            "op",
+                            "diff"
                           ],
                           "additionalProperties": {}
                         },

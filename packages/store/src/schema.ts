@@ -50,6 +50,32 @@ CREATE TABLE IF NOT EXISTS fts_progress (
   indexed_seq INTEGER NOT NULL
 ) STRICT;
 
+-- L3 语义记忆的投影 —— PRD-M4-001 · docs/adr/018。
+-- 真相是 _memory 会话里的 memory.write 事件；这几张表删掉可以重放重建，所以和 FTS 一样不进 MIGRATIONS。
+-- 删除是 deleted_at，不是 DELETE：投影也保留「这条曾经有过」，检索时过滤掉
+CREATE TABLE IF NOT EXISTS semantic_items (
+  id          TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,
+  text        TEXT NOT NULL,
+  source_refs TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  deleted_at  INTEGER,
+  embedding   BLOB,
+  embed_model TEXT
+) STRICT;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS semantic_fts USING fts5(
+  id UNINDEXED,
+  body,
+  tokenize='trigram'
+);
+
+-- 每个会话抽取到了第几条（视图编号）
+CREATE TABLE IF NOT EXISTS memory_progress (
+  session_id    TEXT PRIMARY KEY,
+  extracted_seq INTEGER NOT NULL
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS meta (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL

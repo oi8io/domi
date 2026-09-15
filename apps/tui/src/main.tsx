@@ -171,6 +171,38 @@ function Root({
             await client.restoreSession(cmd.sessionId)
             setNotice(`已恢复会话 ${cmd.sessionId}（/open ${cmd.sessionId} 打开）`)
             return
+          case 'soul': {
+            const [{ path }, changes] = await Promise.all([client.getSoul(), client.soulChanges()])
+            setNotice(
+              changes.length === 0
+                ? `没有待审阅的改动。Soul 在 ${path}，可以直接编辑`
+                : [
+                    `待审阅 ${changes.length} 处（/soul accept|reject <id>）：`,
+                    ...changes.map((c) => `${c.id}\n${c.diff}`),
+                  ].join('\n'),
+            )
+            return
+          }
+          case 'soul-review': {
+            const r = await client.reviewSoul(cmd.changeId, cmd.decision)
+            setNotice(r.detail)
+            return
+          }
+          case 'memory': {
+            const r =
+              cmd.query === ''
+                ? { mode: 'keyword', items: (await client.listMemory()).items }
+                : await client.searchMemory(cmd.query)
+            setNotice(
+              r.items.length === 0 ? '没有相关的条目' : r.items.map((i) => `${i.id}  [${i.kind}] ${i.text}`).join('\n'),
+            )
+            return
+          }
+          case 'extract': {
+            const r = await client.extractMemory(sessionId)
+            setNotice(`从这个会话新记下 ${r.added.length} 条，Soul 改了 ${r.soulChanges.length} 处`)
+            return
+          }
           case 'submit': {
             const r = await client.submit(sessionId, cmd.text, pendingRefs)
             setPendingRefs([])
@@ -216,6 +248,20 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     err: (t: string) => {
       process.stderr.write(`${t}\n`)
     },
+    // 只有真终端才给「问人」的能力：管道里跑的 domi soul import 应该失败，而不是读到 EOF 当成回答
+    ...(process.stdin.isTTY
+      ? {
+          ask: async (q: string): Promise<string> => {
+            const { createInterface } = await import('node:readline/promises')
+            const rl = createInterface({ input: process.stdin, output: process.stdout })
+            try {
+              return await rl.question(q)
+            } finally {
+              rl.close()
+            }
+          },
+        }
+      : {}),
   }
 
   let cli: ParsedCli

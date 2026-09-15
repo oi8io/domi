@@ -17,9 +17,10 @@ import { z } from 'zod'
  * v3 → v4：新增 `ctx.cleanup`（M2-002 确定性上下文清理）。
  * v4 → v5：新增 `ctx.compact`（M2-003 LLM 压缩）。
  * v5 → v6：新增 `ctx.ref`（M3-005 跨会话引用）。
+ * v6 → v7：新增 `memory.write`（M4 语义记忆与 Soul）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 6
+export const SCHEMA_VERSION = 7
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -34,6 +35,32 @@ export const RefLinkSchema = z.object({
   toSeq: z.number().int().min(1),
 })
 export type RefLink = z.infer<typeof RefLinkSchema>
+
+/** L3 语义记忆的一条（PRD-M4-001）。sourceRefs 指回支撑它的原始事件（AC-2） */
+export const SemanticItemSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['fact', 'preference', 'entity']),
+  text: z.string(),
+  sourceRefs: z.array(z.object({ sessionId: z.string(), seq: z.number().int().min(1) })),
+})
+export type SemanticItem = z.infer<typeof SemanticItemSchema>
+
+export const SOUL_SECTIONS = ['工作习惯', '技术偏好', '沟通风格', '领域知识', '对用户的模型', '失败教训'] as const
+export type SoulSection = (typeof SOUL_SECTIONS)[number]
+
+/**
+ * Soul 的一处改动（PRD-M4-002 / 003 · docs/adr/019）。before / after 是那一行的完整文字（含 src 注释），
+ * add 没有 before，remove 没有 after
+ */
+export const SoulChangeSchema = z.object({
+  id: z.string(),
+  section: z.enum(SOUL_SECTIONS),
+  op: z.enum(['add', 'update', 'remove']),
+  before: z.string().optional(),
+  after: z.string().optional(),
+  sources: z.array(z.string()),
+})
+export type SoulChange = z.infer<typeof SoulChangeSchema>
 
 /**
  * 每个分支都用 `z.looseObject`（zod 4 里 `.passthrough()` 的替代）：
@@ -171,6 +198,24 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     sessionId: z.string(),
     fromSeq: z.number().int().min(1),
     toSeq: z.number().int().min(1),
+  }),
+  /**
+   * M4：记忆层的写入。事件是真相，L3 表与 soul.md 的「domi 写过什么」都是它的投影（INV-01 · docs/adr/018/019）。
+   *   L3 add        新增一条（item）          L3 delete  删除一条（itemId）
+   *   L3 extracted  某会话抽取到了第几条（range），不重复抽
+   *   L4 update     Soul 的一批改动（changes）  L4 review  审阅结论（reviews）
+   * diff 是给人看的文字版，轨迹里直接能读
+   */
+  z.looseObject({
+    t: z.literal('memory.write'),
+    layer: z.enum(['L3', 'L4']),
+    op: z.enum(['add', 'delete', 'extracted', 'update', 'review']),
+    diff: z.string(),
+    item: SemanticItemSchema.optional(),
+    itemId: z.string().optional(),
+    range: RefLinkSchema.optional(),
+    changes: z.array(SoulChangeSchema).optional(),
+    reviews: z.array(z.object({ changeId: z.string(), decision: z.enum(['accept', 'reject']) })).optional(),
   }),
   z.looseObject({
     t: z.literal('error'),

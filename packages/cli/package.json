@@ -12,6 +12,7 @@
     "@domi/config": "workspace:*",
     "@domi/observability": "workspace:*",
     "@domi/prompt": "workspace:*",
+    "@domi/runtime": "workspace:*",
     "@domi/store": "workspace:*",
     "@domi/model": "workspace:*",
     "@domi/eval": "workspace:*",

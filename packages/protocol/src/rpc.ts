@@ -16,7 +16,7 @@
  *    客户端不轮询——轮询会把「断开期间发生了什么」这个问题变成不可解。
  */
 import { z } from 'zod'
-import { EventEnvelopeSchema, RefLinkSchema } from './event.ts'
+import { EventEnvelopeSchema, RefLinkSchema, SemanticItemSchema, SoulChangeSchema } from './event.ts'
 
 /**
  * 协议版本。**只在不兼容变更时 +1。**
@@ -63,6 +63,15 @@ const SessionSummarySchema = z.object({
   /** 分支会话：从哪个会话分出来的（TASK-M3-014） */
   parentId: z.string().optional(),
 })
+
+/** L3 条目（带时间与删除状态） */
+const MemoryItemSchema = SemanticItemSchema.extend({
+  createdAt: z.number().int(),
+  deleted: z.boolean(),
+  score: z.number().optional(),
+})
+
+const PendingChangeSchema = SoulChangeSchema.extend({ at: z.number().int(), diff: z.string() })
 
 /** 状态栏指标。**由 runtime 算好推过来**，客户端不自己算（PRD-M1-007 AC-3） */
 const MetricsSchema = z.object({
@@ -131,6 +140,46 @@ export const METHODS = {
       '新会话带着到这一条为止的历史，之后两边各走各的，事件一条不复制；越界 → INVALID_PARAMS',
     params: z.object({ sessionId: z.string(), atSeq: z.number().int().min(1) }),
     result: z.object({ sessionId: z.string() }),
+  },
+  'memory.list': {
+    summary: '列出 L3 语义记忆（PRD-M4-001）。includeDeleted 给「看看删过什么」用',
+    params: z.object({ includeDeleted: z.boolean().optional() }),
+    result: z.object({ items: z.array(MemoryItemSchema) }),
+  },
+  'memory.search': {
+    summary: '检索 L3：关键词，配了 embedding 时再加语义。mode 说明实际用了哪种',
+    params: z.object({ query: z.string().min(1), limit: z.number().int().min(1).max(50).optional() }),
+    result: z.object({ mode: z.enum(['keyword', 'semantic+keyword']), items: z.array(MemoryItemSchema) }),
+  },
+  'memory.delete': {
+    summary: '删除一条 L3（追加删除事件，之后检索不到）。不存在或已删 → ok:false',
+    params: z.object({ id: z.string() }),
+    result: z.object({ ok: z.boolean() }),
+  },
+  'memory.extract': {
+    summary: '立刻从某个会话抽取 L3（不等攒够轮数），有新条目时顺带更新 Soul',
+    params: z.object({ sessionId: z.string() }),
+    result: z.object({ added: z.array(SemanticItemSchema), soulChanges: z.array(SoulChangeSchema) }),
+  },
+  'soul.get': {
+    summary: 'Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）',
+    params: z.object({}),
+    result: z.object({ path: z.string(), text: z.string() }),
+  },
+  'soul.changes': {
+    summary: '上次审阅以来 Soul 的改动（PRD-M4-003 AC-2）',
+    params: z.object({}),
+    result: z.object({ changes: z.array(PendingChangeSchema) }),
+  },
+  'soul.review': {
+    summary: '接受或否决一处改动。否决会撤回文件里的那一处并记进 .rejected，之后不再提议（AC-3）',
+    params: z.object({ changeId: z.string(), decision: z.enum(['accept', 'reject']) }),
+    result: z.object({ ok: z.boolean(), detail: z.string() }),
+  },
+  'soul.update': {
+    summary: '用现有的全部 L3 条目重新过一遍 Soul（一次最多改 10 处）',
+    params: z.object({}),
+    result: z.object({ changes: z.array(SoulChangeSchema) }),
   },
   'session.switchModel': {
     summary: '会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力',

@@ -9,8 +9,10 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import { embedMany } from 'ai'
 import { AiSdkProvider } from './ai-sdk-provider.ts'
 import { CAPABILITIES, type ModelCapabilities, type ProviderKind } from './capability.ts'
+import { type EmbeddingConfig, EmbeddingUnsupportedError, type EmbedFn } from './embedding.ts'
 import type { ModelProvider } from './provider.ts'
 
 export interface ProviderConfig {
@@ -160,4 +162,32 @@ export function createProvider(cfg: ProviderConfig): ModelProvider {
   })()
 
   return new AiSdkProvider({ id: cfg.provider, model: model as never, capabilities, trace })
+}
+
+/** Embedding（PRD-M4-001 AC-3 · docs/adr/018）。anthropic 没有这个接口，配了就在构造时报错 */
+export function createEmbedder(cfg: EmbeddingConfig): EmbedFn {
+  const apiKey = cfg.apiKey ?? ''
+  assertAsciiKey(apiKey)
+  const common = { apiKey, ...(cfg.baseUrl ? { baseURL: cfg.baseUrl } : {}) }
+  const model = (() => {
+    switch (cfg.provider) {
+      case 'anthropic':
+        throw new EmbeddingUnsupportedError(cfg.provider)
+      case 'openai':
+        return createOpenAI(common).embeddingModel(cfg.model)
+      case 'google':
+        return createGoogleGenerativeAI(common).embeddingModel(cfg.model)
+      default:
+        return createOpenAICompatible({
+          ...common,
+          name: cfg.provider,
+          baseURL: cfg.baseUrl ?? 'http://localhost:11434/v1',
+        }).embeddingModel(cfg.model)
+    }
+  })()
+  return async (texts) => {
+    if (texts.length === 0) return []
+    const r = await embedMany({ model, values: [...texts] })
+    return r.embeddings.map((e) => Float32Array.from(e))
+  }
 }

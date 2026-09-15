@@ -80,6 +80,27 @@ export const ConfigSchema = z.object({
   permissions: z.object({ rules: z.array(PermissionRuleSchema).default([]) }).default({ rules: [] }),
   mcp: McpConfigSchema,
   /**
+   * 记忆与 Soul（PRD-M4-001/002 · docs/adr/018/019）。
+   * extractEvery：每几轮用户输入抽取一次 L3，0 = 不自动抽（仍可手动 `domi memory extract`）。
+   * embedding：配了才有语义检索；apiKey / baseUrl 不写就沿用 model 的（同一个 provider 时）
+   */
+  memory: z
+    .object({
+      extractEvery: z.number().int().min(0).default(5),
+      soul: z.boolean().default(true),
+      embedding: z
+        .object({
+          provider: z.string(),
+          model: z.string(),
+          baseUrl: z.string().optional(),
+          apiKey: z.string().optional(),
+        })
+        .optional(),
+    })
+    .default({ extractEvery: 5, soul: true }),
+  /** Skill（PRD-M4-005）。dirs 之外还会读 ~/.domi/skills 与内置的官方 Skill */
+  skills: z.object({ enabled: z.boolean().default(true) }).default({ enabled: true }),
+  /**
    * 自定义提示词层（PRD-M1-003 AC-3 · BUG-M3-012）。同 id 覆盖内置层（builtin.identity 之类），
    * 其余按 priority 插进去；不写 priority 落在 500（内置层之后、工作区信息之前）
    */

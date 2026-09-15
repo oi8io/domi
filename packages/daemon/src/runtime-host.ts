@@ -8,9 +8,12 @@
  * 没有客户端在线时，任务就停在询问上等——这和「断开不影响任务」不矛盾：
  * 执行一个需要确认的操作，本来就该等人，而不是替人答。
  */
+
+import { dirname, join } from 'node:path'
+import { OFFICIAL_SKILLS, SkillRegistry } from '@domi/capability'
 import type { DomiConfig } from '@domi/config'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { DomiSession, RefError, type SessionOptions } from '@domi/runtime'
+import { DomiSession, MemoryService, RefError, type SessionOptions } from '@domi/runtime'
 import { SqliteEventLog } from '@domi/store'
 import { AUDIT_SESSION_ID } from './auth.ts'
 import {
@@ -36,6 +39,11 @@ export interface RuntimeHostOptions {
   /** 进程级提示（MCP server 连不上之类），每个会话各落一次 */
   notices?: SessionOptions['notices']
   newId?: () => string
+  /** Soul 与 Skill 所在的目录。默认是 dbPath 旁边的 soul/ 与 skills/（即 ~/.domi 下） */
+  soulDir?: string
+  skillsDir?: string
+  /** 测试注入：记忆抽取用的模型。不给就用 provider（再不给就按配置建） */
+  memoryProvider?: SessionOptions['provider']
 }
 
 export interface RuntimeHost extends DaemonHost {
@@ -52,6 +60,17 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
   let measured: ((sessionId: string, m: HostMetrics) => void) | null = null
   let askSeq = 0
   const newId = opts.newId ?? (() => `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+  const home = dirname(opts.dbPath)
+  const memoryProvider = opts.memoryProvider ?? opts.provider
+  const memory = new MemoryService({
+    config: opts.config,
+    dbPath: opts.dbPath,
+    soulDir: opts.soulDir ?? join(home, 'soul'),
+    ...(memoryProvider === undefined ? {} : { provider: memoryProvider }),
+  })
+  const skills = opts.config.skills.enabled
+    ? new SkillRegistry({ dir: opts.skillsDir ?? join(home, 'skills'), official: OFFICIAL_SKILLS, watch: true })
+    : undefined
 
   return {
     async open(sessionId: string): Promise<SessionHandle> {
@@ -65,6 +84,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...(opts.provider === undefined ? {} : { provider: opts.provider }),
         ...(opts.extraTools === undefined ? {} : { extraTools: opts.extraTools }),
         ...(opts.notices === undefined ? {} : { notices: opts.notices }),
+        memory,
+        ...(skills === undefined ? {} : { skills }),
       })
       // 上一个 domid 可能是被 kill -9 的：先把这个会话补到一致点，再交出去（TASK-M3-010）。
       // 这时还没有订阅者，补的事件由之后的订阅补发带过去
@@ -161,6 +182,47 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       index.sessions.restore(sessionId)
     },
 
+    memory: {
+      async list(includeDeleted) {
+        return memory.list({ includeDeleted }).map((i) => ({
+          id: i.id,
+          kind: i.kind,
+          text: i.text,
+          sourceRefs: i.sourceRefs,
+          createdAt: i.createdAt,
+          deleted: i.deletedAt !== null,
+        }))
+      },
+      async search(query, limit) {
+        const r = await memory.search(query, limit)
+        return {
+          mode: r.mode,
+          items: r.items.map((i) => ({
+            id: i.id,
+            kind: i.kind,
+            text: i.text,
+            sourceRefs: i.sourceRefs,
+            createdAt: i.createdAt,
+            deleted: false,
+            score: i.score,
+          })),
+        }
+      },
+      remove: (id) => memory.remove(id),
+      async extract(sessionId) {
+        if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+        const r = await memory.extract(sessionId)
+        return { added: r.added, soulChanges: r.soul }
+      },
+      async soul() {
+        const { readFileSync, existsSync } = await import('node:fs')
+        return { path: memory.soulPath, text: existsSync(memory.soulPath) ? readFileSync(memory.soulPath, 'utf8') : '' }
+      },
+      changes: () => memory.pendingChanges(),
+      review: (id, decision) => memory.review(id, decision),
+      update: () => memory.updateSoul(),
+    },
+
     async audit(ev) {
       await index.append(AUDIT_SESSION_ID, [ev])
     },
@@ -178,6 +240,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       measured = cb
     },
     close() {
+      skills?.close()
+      memory.close()
       index.close()
     },
   }

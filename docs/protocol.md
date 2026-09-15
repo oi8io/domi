@@ -264,6 +264,626 @@
 }
 ```
 
+### `memory.list`
+
+列出 L3 语义记忆（PRD-M4-001）。includeDeleted 给「看看删过什么」用
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "includeDeleted": {
+      "type": "boolean"
+    }
+  }
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "preference",
+              "entity"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "sessionId",
+                "seq"
+              ]
+            }
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "text",
+          "sourceRefs",
+          "createdAt",
+          "deleted"
+        ]
+      }
+    }
+  },
+  "required": [
+    "items"
+  ]
+}
+```
+
+### `memory.search`
+
+检索 L3：关键词，配了 embedding 时再加语义。mode 说明实际用了哪种
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "minLength": 1
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "keyword",
+        "semantic+keyword"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "preference",
+              "entity"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "sessionId",
+                "seq"
+              ]
+            }
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "text",
+          "sourceRefs",
+          "createdAt",
+          "deleted"
+        ]
+      }
+    }
+  },
+  "required": [
+    "mode",
+    "items"
+  ]
+}
+```
+
+### `memory.delete`
+
+删除一条 L3（追加删除事件，之后检索不到）。不存在或已删 → ok:false
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `memory.extract`
+
+立刻从某个会话抽取 L3（不等攒够轮数），有新条目时顺带更新 Soul
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "added": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "preference",
+              "entity"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sourceRefs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "sessionId",
+                "seq"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "text",
+          "sourceRefs"
+        ]
+      }
+    },
+    "soulChanges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "工作习惯",
+              "技术偏好",
+              "沟通风格",
+              "领域知识",
+              "对用户的模型",
+              "失败教训"
+            ]
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "add",
+              "update",
+              "remove"
+            ]
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "section",
+          "op",
+          "sources"
+        ]
+      }
+    }
+  },
+  "required": [
+    "added",
+    "soulChanges"
+  ]
+}
+```
+
+### `soul.get`
+
+Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "path",
+    "text"
+  ]
+}
+```
+
+### `soul.changes`
+
+上次审阅以来 Soul 的改动（PRD-M4-003 AC-2）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "工作习惯",
+              "技术偏好",
+              "沟通风格",
+              "领域知识",
+              "对用户的模型",
+              "失败教训"
+            ]
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "add",
+              "update",
+              "remove"
+            ]
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "at": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "diff": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "section",
+          "op",
+          "sources",
+          "at",
+          "diff"
+        ]
+      }
+    }
+  },
+  "required": [
+    "changes"
+  ]
+}
+```
+
+### `soul.review`
+
+接受或否决一处改动。否决会撤回文件里的那一处并记进 .rejected，之后不再提议（AC-3）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "changeId": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "accept",
+        "reject"
+      ]
+    }
+  },
+  "required": [
+    "changeId",
+    "decision"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "detail": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "ok",
+    "detail"
+  ]
+}
+```
+
+### `soul.update`
+
+用现有的全部 L3 条目重新过一遍 Soul（一次最多改 10 处）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "工作习惯",
+              "技术偏好",
+              "沟通风格",
+              "领域知识",
+              "对用户的模型",
+              "失败教训"
+            ]
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "add",
+              "update",
+              "remove"
+            ]
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "section",
+          "op",
+          "sources"
+        ]
+      }
+    }
+  },
+  "required": [
+    "changes"
+  ]
+}
+```
+
 ### `session.switchModel`
 
 会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力
@@ -1162,6 +1782,183 @@
                       "sessionId",
                       "fromSeq",
                       "toSeq"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "memory.write"
+                      },
+                      "layer": {
+                        "type": "string",
+                        "enum": [
+                          "L3",
+                          "L4"
+                        ]
+                      },
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "add",
+                          "delete",
+                          "extracted",
+                          "update",
+                          "review"
+                        ]
+                      },
+                      "diff": {
+                        "type": "string"
+                      },
+                      "item": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "fact",
+                              "preference",
+                              "entity"
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "sourceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "sessionId": {
+                                  "type": "string"
+                                },
+                                "seq": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "sessionId",
+                                "seq"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "text",
+                          "sourceRefs"
+                        ]
+                      },
+                      "itemId": {
+                        "type": "string"
+                      },
+                      "range": {
+                        "type": "object",
+                        "properties": {
+                          "sessionId": {
+                            "type": "string"
+                          },
+                          "fromSeq": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "toSeq": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "sessionId",
+                          "fromSeq",
+                          "toSeq"
+                        ]
+                      },
+                      "changes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "section": {
+                              "type": "string",
+                              "enum": [
+                                "工作习惯",
+                                "技术偏好",
+                                "沟通风格",
+                                "领域知识",
+                                "对用户的模型",
+                                "失败教训"
+                              ]
+                            },
+                            "op": {
+                              "type": "string",
+                              "enum": [
+                                "add",
+                                "update",
+                                "remove"
+                              ]
+                            },
+                            "before": {
+                              "type": "string"
+                            },
+                            "after": {
+                              "type": "string"
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "section",
+                            "op",
+                            "sources"
+                          ]
+                        }
+                      },
+                      "reviews": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "changeId": {
+                              "type": "string"
+                            },
+                            "decision": {
+                              "type": "string",
+                              "enum": [
+                                "accept",
+                                "reject"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "changeId",
+                            "decision"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "layer",
+                      "op",
+                      "diff"
                     ],
                     "additionalProperties": {}
                   },

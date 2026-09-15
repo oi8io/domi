@@ -23,6 +23,7 @@ import {
   ok,
   PROTOCOL_VERSION,
   type RefLink,
+  type ResultOf,
   type RpcNotification,
   type RpcRequest,
   type RpcResponse,
@@ -105,6 +106,20 @@ export interface HostAsk {
 
 export type HostMetrics = NotifyParamsOf<'session.metrics'>['metrics']
 
+export type MemoryItemSummary = ResultOf<'memory.list'>['items'][number]
+
+/** 记忆与 Soul（PRD-M4）。宿主没有它时，这几个方法回 INTERNAL「不支持」 */
+export interface HostMemory {
+  list(includeDeleted: boolean): Promise<MemoryItemSummary[]>
+  search(query: string, limit: number): Promise<ResultOf<'memory.search'>>
+  remove(id: string): Promise<boolean>
+  extract(sessionId: string): Promise<ResultOf<'memory.extract'>>
+  soul(): Promise<ResultOf<'soul.get'>>
+  changes(): Promise<ResultOf<'soul.changes'>['changes']>
+  review(changeId: string, decision: 'accept' | 'reject'): Promise<ResultOf<'soul.review'>>
+  update(): Promise<ResultOf<'soul.update'>['changes']>
+}
+
 /** 宿主提供的东西。测试注入假的，生产注入真的 —— core 两边都不知道 */
 export interface DaemonHost {
   open(sessionId: string): Promise<SessionHandle>
@@ -118,6 +133,7 @@ export interface DaemonHost {
    * 会话不存在抛 SessionNotFoundError；越界抛 BranchPointError
    */
   branch(sessionId: string, atSeq: number): Promise<string>
+  memory?: HostMemory
   /** 会话产生新事件时调用；daemon 据此推给订阅者 */
   onEvents(cb: (sessionId: string, events: EventEnvelope[]) => void): void
   onBusy?(cb: (sessionId: string, busy: boolean) => void): void
@@ -217,6 +233,34 @@ export class Daemon {
     }
   }
 
+  private async memoryCall(method: MethodName, params: unknown): Promise<unknown> {
+    const m = this.host.memory
+    if (!m) throw new Error('这个 daemon 没有开启记忆（PRD-M4）')
+    const p = params as Record<string, unknown>
+    switch (method) {
+      case 'memory.list':
+        return { items: await m.list(p.includeDeleted === true) }
+      case 'memory.search':
+        return m.search(p.query as string, (p.limit as number | undefined) ?? 10)
+      case 'memory.delete':
+        return { ok: await m.remove(p.id as string) }
+      case 'memory.extract':
+        if (this.isBusy(p.sessionId as string)) {
+          // 不在这里 fail：dispatch 外层只认异常。忙的时候抽取读到的是半轮，结果不可信
+          throw new Error('这个会话正在处理，等这一轮结束再抽取')
+        }
+        return m.extract(p.sessionId as string)
+      case 'soul.get':
+        return m.soul()
+      case 'soul.changes':
+        return { changes: await m.changes() }
+      case 'soul.review':
+        return m.review(p.changeId as string, p.decision as 'accept' | 'reject')
+      default:
+        return { changes: await m.update() }
+    }
+  }
+
   private async dispatch(conn: ClientConn, req: RpcRequest, method: MethodName, params: never): Promise<RpcResponse> {
     switch (method) {
       case 'handshake': {
@@ -256,6 +300,16 @@ export class Daemon {
         const p = params as { sessionId: string; atSeq: number }
         return ok(req.id, { sessionId: await this.host.branch(p.sessionId, p.atSeq) })
       }
+
+      case 'memory.list':
+      case 'memory.search':
+      case 'memory.delete':
+      case 'memory.extract':
+      case 'soul.get':
+      case 'soul.changes':
+      case 'soul.review':
+      case 'soul.update':
+        return ok(req.id, await this.memoryCall(method, params))
 
       case 'session.switchModel': {
         const p = params as { sessionId: string; model: string; provider?: string }

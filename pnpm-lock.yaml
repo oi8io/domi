@@ -292,6 +292,9 @@ importers:
       '@domi/prompt':
         specifier: workspace:*
         version: link:../prompt
+      '@domi/runtime':
+        specifier: workspace:*
+        version: link:../runtime
       '@domi/store':
         specifier: workspace:*
         version: link:../store
@@ -316,6 +319,9 @@ importers:
 
   packages/daemon:
     dependencies:
+      '@domi/capability':
+        specifier: workspace:*
+        version: link:../capability
       '@domi/config':
         specifier: workspace:*
         version: link:../config

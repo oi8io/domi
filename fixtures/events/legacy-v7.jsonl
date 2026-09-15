@@ -1,0 +1,1 @@
+{"seq": 15, "sessionId": "legacy", "parentSeq": 14, "ts": 1756000000015, "schemaVersion": 7, "ev": {"t": "memory.write", "layer": "L3", "op": "add", "diff": "+ [preference] 偏好 bun", "item": {"id": "m-1", "kind": "preference", "text": "偏好 bun", "sourceRefs": [{"sessionId": "legacy", "seq": 1}]}}}

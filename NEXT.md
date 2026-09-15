@@ -20,6 +20,10 @@
         `DOMI_TOKEN=<token> domi --connect ws://那台机器:7437`；浏览器用 `?daemon=ws://…#token=…`。
         没有 TLS，跨公网请走 SSH 隧道（ADR-017）
 
+      - **Soul 与记忆**（2026-09-15）：对话攒够 5 轮自动抽取（`memory.extractEvery`），Soul 在 `~/.domi/soul/soul.md`，
+        可以直接改。`domi soul review` 逐条审阅，`domi soul export/import` 分享；Web 侧栏「Soul 与记忆」，TUI `/soul` `/memory`。
+        Skill：`~/.domi/skills/<名字>/SKILL.md`（模板 docs/skills/SKILL-TEMPLATE.md），config.yaml 里要有 `allow-skill-load` 规则
+
       ⚠️ 更新代码后：`pnpm install`，并停掉已在跑的 domid（`domi` 会复用它，旧进程跑的是旧代码，见 OPT-M3-002）
 
 下一步: 用户规矩（2026-09-15）：**先推进功能，测试验证类最后统一查漏补缺**
@@ -28,13 +32,14 @@
           TASK-M3-012 跨会话引用，Web「引用这一轮」/ TUI `/ref`；TUI 会话命令 /sessions /open /new /delete /restore；
           BUG-M3-003 本轮耗时、BUG-M3-008 陈锁并发接管、BUG-M3-012 配置提示词层、BUG-M3-015 提示词从未发给模型）
         M3 缺陷登记里已没有 open 的 BUG。
-        1. 进 M4（Soul）：PRD 要求先把 M4 章节从 SKETCH 重写成 COMMITTED 并过 PM 门禁——等你拍板（见「卡在」）
-        2. 最后统一：TASK-M3-008 parity e2e（Playwright）；TASK-M3-009 推送延迟基准
+        M4 已进入（你拍板「按轮廓先写再做」，docs/prd/M4.md）：L3 记忆、Soul、审阅否决、导出导入、Skill 的功能都已落地
+        （TASK-M4-001…008）。
+        1. 下一个里程碑 M5（会干活）同样是 SKETCH，进入前要过再批准门
+        2. 最后统一：TASK-M3-008 parity e2e、TASK-M3-009 推送延迟基准、TASK-M4-009 M4 的验证补齐
 
         仍然只有你能做的：真终端走 M3 DoD（`domi` 发长任务 → 关终端 → 浏览器看完成）、
         M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`、独立 QA、M1 dogfooding
 
-卡在: M4 的进入条件。PRD 写的是「此时 domi 已积累两个月真实使用数据，届时才知道该沉淀什么」，
-      现在没有这份数据。要么按现有轮廓先写 docs/prd/M4.md（范围、不做什么、反悔条件）照做，要么先 dogfooding 一段。
+卡在: M5 的进入条件（同 M4，要你拍板）。
       体验类的问题按你定的规矩只记录不排期（OPT-M3-001…006），其中 OPT-M3-001（每个 token 一条事件）
       牵涉回放与压缩，动之前要单独讨论。

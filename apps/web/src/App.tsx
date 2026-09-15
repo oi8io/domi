@@ -10,6 +10,7 @@ import { useStore } from '@nanostores/react'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { type PendingRef, PendingRefs } from './PendingRefs.tsx'
+import { SoulPanel } from './SoulPanel.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { Transcript } from './Transcript.tsx'
 
@@ -38,6 +39,8 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
   const [active, setActive] = useState<{ id: string; store: SessionStore } | null>(null)
   // 跨会话引用：在哪个会话里点的都攒在这里，切到别的会话发送时带上（PRD-M3-005）
   const [refs, setRefs] = useState<PendingRef[]>([])
+  // 主区显示会话还是 Soul（PRD-M4）
+  const [view, setView] = useState<'session' | 'soul'>('session')
   const [showDeleted, setShowDeleted] = useState(false)
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
   }, [state, refresh])
 
   const open = (id: string): void => {
+    setView('session')
     if (active) client.unwatch(active.id)
     const store = createSessionStore()
     setActive({ id, store })
@@ -97,6 +101,14 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
         <button type="button" className="new" disabled={state !== 'open'} onClick={() => void create()}>
           新建会话
         </button>
+        <button
+          type="button"
+          className={`soul-link${view === 'soul' ? ' current' : ''}`}
+          disabled={state !== 'open'}
+          onClick={() => setView(view === 'soul' ? 'session' : 'soul')}
+        >
+          Soul 与记忆
+        </button>
         <label className="toggle">
           <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
           显示已删除
@@ -121,7 +133,9 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
         </ul>
       </aside>
       <main className="main">
-        {active ? (
+        {view === 'soul' ? (
+          <SoulPanel client={client} />
+        ) : active ? (
           <SessionView
             key={active.id}
             client={client}

@@ -119,6 +119,40 @@ export class DomiClient {
     await this.request('session.restore', { sessionId })
   }
 
+  // ── 记忆与 Soul（PRD-M4）──────────────────────────────────
+
+  listMemory(includeDeleted = false): Promise<ResultOf<'memory.list'>> {
+    return this.request('memory.list', includeDeleted ? { includeDeleted: true } : {})
+  }
+
+  searchMemory(query: string, limit?: number): Promise<ResultOf<'memory.search'>> {
+    return this.request('memory.search', limit === undefined ? { query } : { query, limit })
+  }
+
+  async deleteMemory(id: string): Promise<boolean> {
+    return (await this.request('memory.delete', { id })).ok
+  }
+
+  extractMemory(sessionId: string): Promise<ResultOf<'memory.extract'>> {
+    return this.request('memory.extract', { sessionId })
+  }
+
+  getSoul(): Promise<ResultOf<'soul.get'>> {
+    return this.request('soul.get', {})
+  }
+
+  async soulChanges(): Promise<ResultOf<'soul.changes'>['changes']> {
+    return (await this.request('soul.changes', {})).changes
+  }
+
+  reviewSoul(changeId: string, decision: 'accept' | 'reject'): Promise<ResultOf<'soul.review'>> {
+    return this.request('soul.review', { changeId, decision })
+  }
+
+  async updateSoul(): Promise<ResultOf<'soul.update'>['changes']> {
+    return (await this.request('soul.update', {})).changes
+  }
+
   /** 从第 atSeq 条分出新会话，返回新会话 id（TASK-M3-014） */
   async branchSession(sessionId: string, atSeq: number): Promise<string> {
     const r = await this.request('session.branch', { sessionId, atSeq })
