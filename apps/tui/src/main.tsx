@@ -14,7 +14,14 @@
  */
 import { homedir } from 'node:os'
 import { formatOnboarding, type ParsedCli, parseCli, runCommand } from '@domi/cli'
-import { answerFromKey, createSessionStore, type DomiClient, focusIdOf, type SessionStore } from '@domi/client-core'
+import {
+  answerFromKey,
+  createSessionStore,
+  type DomiClient,
+  focusIdOf,
+  type RefLink,
+  type SessionStore,
+} from '@domi/client-core'
 import { ConfigParseError, loadConfig, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
 import { resolveClientToken } from '@domi/daemon'
 import { useStore } from '@nanostores/react'
@@ -50,6 +57,8 @@ function Root({
   // 分支后切到新会话：换一个 store 重新订阅，旧会话在 daemon 里不受影响
   const [{ sessionId, store }, setActive] = useState({ sessionId: initialSessionId, store: initialStore })
   const [notice, setNotice] = useState<string | null>(null)
+  // `/ref` 记下的引用，下一句话带上（PRD-M3-005）
+  const [pendingRefs, setPendingRefs] = useState<RefLink[]>([])
   const [draft, setDraft] = useState('')
   // 提交到 daemon 回 accepted、再到第一条 busy 通知之间有个空档，这段时间也不许再提交
   const [sending, setSending] = useState(false)
@@ -108,8 +117,17 @@ function Root({
             setNotice(`已切到分支 ${id}（从第 ${cmd.atSeq} 条分出）`)
             return
           }
-          case 'submit':
-            return client.submit(sessionId, cmd.text)
+          case 'ref': {
+            const next = [...pendingRefs, cmd.ref]
+            setPendingRefs(next)
+            setNotice(`下一句话会带上 ${next.length} 段引用（最近一段：会话 ${cmd.ref.sessionId}）`)
+            return
+          }
+          case 'submit': {
+            const r = await client.submit(sessionId, cmd.text, pendingRefs)
+            setPendingRefs([])
+            return r
+          }
         }
       })()
       // SESSION_BUSY、越界之类的结构化错误原样给人看（PRD-M3-004 AC-3）

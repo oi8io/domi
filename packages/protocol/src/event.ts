@@ -16,12 +16,24 @@ import { z } from 'zod'
  * v2 → v3：新增 `model.switch` / `snapshot` / `revert`（M1-002、M1-011）。
  * v3 → v4：新增 `ctx.cleanup`（M2-002 确定性上下文清理）。
  * v4 → v5：新增 `ctx.compact`（M2-003 LLM 压缩）。
+ * v5 → v6：新增 `ctx.ref`（M3-005 跨会话引用）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
+
+/**
+ * 指向另一个会话里一段事件的链接（PRD-M3-005 AC-2）。seq 是那个会话的**视图**编号（含父链，见 session.subscribe），
+ * 闭区间。事件只增不改，所以这段内容永远不会变——存链接就够了，不必拷贝
+ */
+export const RefLinkSchema = z.object({
+  sessionId: z.string(),
+  fromSeq: z.number().int().min(1),
+  toSeq: z.number().int().min(1),
+})
+export type RefLink = z.infer<typeof RefLinkSchema>
 
 /**
  * 每个分支都用 `z.looseObject`（zod 4 里 `.passthrough()` 的替代）：
@@ -149,6 +161,16 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
       openQuestions: z.array(z.string()),
       nextSteps: z.array(z.string()),
     }),
+  }),
+  /**
+   * M3-005：这一轮引用了另一个会话的一段轨迹。紧挨在它引用给的那条 user.input 前面落盘。
+   * 只存链接；内容在拼上下文时按链接读出来（AC-2）
+   */
+  z.looseObject({
+    t: z.literal('ctx.ref'),
+    sessionId: z.string(),
+    fromSeq: z.number().int().min(1),
+    toSeq: z.number().int().min(1),
   }),
   z.looseObject({
     t: z.literal('error'),

@@ -268,6 +268,36 @@ describe('询问与指标投影进 store', () => {
     expect(sock.sent.at(-1)).toMatchObject({ params: { askId: 'f1', allowed: true, content: { env: 'prod' } } })
   })
 
+  test('submit 带引用：refs 原样进 session.submit；ctx.ref 投影成一条上下文', async () => {
+    const { client, sock, store } = await connected()
+    void client.submit('s1', '接着做', [{ sessionId: 'A', fromSeq: 1, toSeq: 6 }]).catch(() => undefined)
+    expect(sock.sent.at(-1)).toMatchObject({
+      method: 'session.submit',
+      params: { sessionId: 's1', text: '接着做', refs: [{ sessionId: 'A', fromSeq: 1, toSeq: 6 }] },
+    })
+    void client.submit('s1', '不带引用').catch(() => undefined)
+    expect((sock.sent.at(-1) as { params: object }).params).toEqual({ sessionId: 's1', text: '不带引用' })
+
+    sock.push({
+      jsonrpc: '2.0',
+      method: 'session.events',
+      params: {
+        sessionId: 's1',
+        events: [
+          {
+            seq: 1,
+            sessionId: 's1',
+            parentSeq: null,
+            ts: 0,
+            schemaVersion: 6,
+            ev: { t: 'ctx.ref', sessionId: 'A', fromSeq: 1, toSeq: 6 },
+          },
+        ],
+      },
+    })
+    expect(store.$items.get().at(-1)).toMatchObject({ kind: 'context', text: '引用了会话 A 的第 1–6 条' })
+  })
+
   test('branchSession 发 session.branch，返回新会话 id', async () => {
     const { client, sock } = await connected()
     const orig = sock.send.bind(sock)

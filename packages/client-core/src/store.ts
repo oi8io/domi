@@ -158,6 +158,10 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           summary: ev.summary.intent,
         })
         break
+      // 引用了哪段别的会话，要在对话里看得见（PRD-M3-005 AC-3）
+      case 'ctx.ref':
+        push({ seq: env.seq, kind: 'context', text: `引用了会话 ${ev.sessionId} 的第 ${ev.fromSeq}–${ev.toSeq} 条` })
+        break
       // 切换模型要在对话里看得见：之后的回答换了人答（parity 第 10 项）
       case 'model.switch': {
         const lost = ev.lostCapabilities ?? []

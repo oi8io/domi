@@ -9,6 +9,7 @@ import { type ConnectionState, createSessionStore, type DomiClient, type Session
 import { useStore } from '@nanostores/react'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { ConfirmDialog } from './ConfirmDialog.tsx'
+import { type PendingRef, PendingRefs } from './PendingRefs.tsx'
 import { StatusBar } from './StatusBar.tsx'
 import { Transcript } from './Transcript.tsx'
 
@@ -35,6 +36,8 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
   const lastError = useStore(client.$lastError)
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [active, setActive] = useState<{ id: string; store: SessionStore } | null>(null)
+  // 跨会话引用：在哪个会话里点的都攒在这里，切到别的会话发送时带上（PRD-M3-005）
+  const [refs, setRefs] = useState<PendingRef[]>([])
   const [showDeleted, setShowDeleted] = useState(false)
 
   useEffect(() => {
@@ -126,6 +129,8 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
             store={active.store}
             onDeleted={() => void removed()}
             onBranched={(id) => void branched(id)}
+            refs={refs}
+            onRefsChange={setRefs}
           />
         ) : (
           <p className="empty">从左边选一个会话，或者新建一个。</p>
@@ -141,6 +146,8 @@ export function SessionView({
   store,
   onDeleted,
   onBranched,
+  refs = [],
+  onRefsChange,
 }: {
   client: DomiClient
   sessionId: string
@@ -148,6 +155,9 @@ export function SessionView({
   onDeleted?: () => void
   /** 分支建好了，交给上层去刷新列表并打开它 */
   onBranched?: (sessionId: string) => void
+  /** 待发送的引用；发出去之后清空 */
+  refs?: readonly PendingRef[]
+  onRefsChange?: (refs: PendingRef[]) => void
 }) {
   const items = useStore(store.$items)
   const status = useStore(store.$status)
@@ -159,10 +169,11 @@ export function SessionView({
     e.preventDefault()
     const t = text.trim()
     if (t === '') return
-    client.submit(sessionId, t).then(
+    client.submit(sessionId, t, refs).then(
       () => {
         setText('')
         setNotice(null)
+        if (refs.length > 0) onRefsChange?.([])
       },
       // SESSION_BUSY 之类的结构化错误原样给人看（PRD-M3-004 AC-3）
       (err: Error) => setNotice(err.message),
@@ -197,10 +208,20 @@ export function SessionView({
         {...(onDeleted === undefined ? {} : { onDeleted })}
       />
       <StatusBar status={status} />
-      <Transcript items={items} {...(onBranched === undefined ? {} : { onBranch: branch })} />
+      <Transcript
+        items={items}
+        {...(onBranched === undefined ? {} : { onBranch: branch })}
+        {...(onRefsChange === undefined
+          ? {}
+          : {
+              onQuote: (q) =>
+                onRefsChange([...refs, { sessionId, fromSeq: q.fromSeq, toSeq: q.toSeq, label: q.label }]),
+            })}
+      />
       {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
       <form className="composer" onSubmit={submit}>
         {notice !== null && <p className="error">{notice}</p>}
+        <PendingRefs refs={refs} onRemove={(i) => onRefsChange?.(refs.filter((_, j) => j !== i))} />
         <textarea
           value={text}
           placeholder={status.busy ? '正在处理上一条…' : '说点什么'}

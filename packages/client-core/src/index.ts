@@ -1,3 +1,3 @@
-export { authProtocols } from '@domi/protocol'
+export { authProtocols, type RefLink } from '@domi/protocol'
 export * from './client.ts'
 export * from './store.ts'

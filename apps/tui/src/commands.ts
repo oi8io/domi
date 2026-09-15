@@ -3,11 +3,14 @@
  * 结果由事件自己显示在对话里（ctx.compact / model.switch），不另塞界面状态。
  * 单独成文件是为了能测：Ink 的按键在无 TTY 环境里验不了（docs/adr/001）
  */
+import type { RefLink } from '@domi/client-core'
+
 export type SlashCommand =
   | { kind: 'submit'; text: string }
   | { kind: 'compact' }
   | { kind: 'model'; model: string; provider?: string }
   | { kind: 'branch'; atSeq: number }
+  | { kind: 'ref'; ref: RefLink }
   | { kind: 'invalid'; message: string }
 
 /** lastSeq = 当前对话里最后一条的 seq；`/branch` 不带数字时从这里分 */
@@ -29,6 +32,19 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
         }
       }
       return { kind: 'branch', atSeq: at }
+    }
+    case '/ref': {
+      // PRD-M3-005。会话 id 从 `domi session list` 里看；区间不给就是整个会话（终点由 daemon 截到末尾）
+      const usage = { kind: 'invalid' as const, message: '用法：/ref <会话 id> [起-止]，下一句话会带上这段引用' }
+      if (!rest[0]) return usage
+      if (rest[1] === undefined) {
+        return { kind: 'ref', ref: { sessionId: rest[0], fromSeq: 1, toSeq: Number.MAX_SAFE_INTEGER } }
+      }
+      const m = rest[1].match(/^(\d+)(?:-(\d+))?$/)
+      const from = Number(m?.[1])
+      const to = m?.[2] === undefined ? from : Number(m[2])
+      if (!m || from < 1 || to < from) return usage
+      return { kind: 'ref', ref: { sessionId: rest[0], fromSeq: from, toSeq: to } }
     }
     default:
       return { kind: 'submit', text }

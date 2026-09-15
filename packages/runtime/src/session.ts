@@ -37,7 +37,7 @@ import {
   type ModelProvider,
   StructuredOutputError,
 } from '@domi/model'
-import type { EventEnvelope } from '@domi/protocol'
+import type { EventEnvelope, RefLink } from '@domi/protocol'
 import { z } from 'zod'
 
 /**
@@ -57,6 +57,14 @@ import { SqliteEventLog } from '@domi/store'
  * 一次询问。TUI / daemon 渲染它，用户回答后 resolve。
  * 两种：权限确认（只要是/否），与工具要输入（form 不为空，回答可带内容）
  */
+/** 引用指向的会话不存在、或区间不成立（PRD-M3-005）。daemon 把它翻译成 INVALID_PARAMS */
+export class RefError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RefError'
+  }
+}
+
 export interface PendingAsk {
   capabilityId: string
   args: unknown
@@ -407,7 +415,33 @@ export class DomiSession {
     await this.compactNow('threshold')
   }
 
-  async submit(text: string): Promise<TurnResult> {
+  /**
+   * 校验并规整跨会话引用（PRD-M3-005）：会话要存在、起点要在它的范围内；
+   * 终点超出就截到末尾——「引用这一轮」时客户端不知道这一轮最后一条的 seq。
+   * 规整后的区间就是落进事件的链接，之后不会再变
+   */
+  async checkRefs(refs: readonly RefLink[]): Promise<RefLink[]> {
+    const out: RefLink[] = []
+    for (const r of refs) {
+      if (!this.log.sessions.get(r.sessionId)) throw new RefError(`引用的会话不存在：${r.sessionId}`)
+      const head = this.log.viewOffset(r.sessionId) + (await this.log.head(r.sessionId))
+      if (r.fromSeq < 1 || r.fromSeq > head) {
+        throw new RefError(`引用越界：会话 ${r.sessionId} 只有 ${head} 条，没有第 ${r.fromSeq} 条`)
+      }
+      if (r.toSeq < r.fromSeq) throw new RefError(`引用的区间反了：${r.fromSeq}–${r.toSeq}`)
+      out.push({ sessionId: r.sessionId, fromSeq: r.fromSeq, toSeq: Math.min(r.toSeq, head) })
+    }
+    return out
+  }
+
+  /** 按链接读出被引用的那一段（对方会话的视图编号） */
+  private async readRef(ref: RefLink): Promise<EventEnvelope[]> {
+    const all = await this.log.readLineage(ref.sessionId)
+    return all.filter((e) => e.seq >= ref.fromSeq && e.seq <= ref.toSeq)
+  }
+
+  /** refs 应当先经过 checkRefs；这里不再校验 */
+  async submit(text: string, opts: { refs?: readonly RefLink[] } = {}): Promise<TurnResult> {
     this.listeners.onBusy?.(true)
     for (const t of this.opts.extraTools?.() ?? []) this.tools.register(t)
     await this.deliverNotices()
@@ -429,9 +463,10 @@ export class DomiSession {
           clock: this.opts.clock ?? { now: () => Date.now() },
           policy,
           model: this.currentModel,
+          refs: { resolve: (ref) => this.readRef(ref) },
         },
         this.opts.sessionId,
-        text,
+        opts.refs && opts.refs.length > 0 ? { text, refs: opts.refs } : text,
       )
     } finally {
       clearInterval(timer)

@@ -16,7 +16,7 @@
  *    客户端不轮询——轮询会把「断开期间发生了什么」这个问题变成不可解。
  */
 import { z } from 'zod'
-import { EventEnvelopeSchema } from './event.ts'
+import { EventEnvelopeSchema, RefLinkSchema } from './event.ts'
 
 /**
  * 协议版本。**只在不兼容变更时 +1。**
@@ -141,8 +141,10 @@ export const METHODS = {
     result: z.object({ sessionId: z.string() }),
   },
   'session.submit': {
-    summary: '提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃',
-    params: z.object({ sessionId: z.string(), text: z.string() }),
+    summary:
+      '提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃。' +
+      'refs 引用其他会话的片段（PRD-M3-005）：接受之前校验，会话不存在或起点越界 → INVALID_PARAMS；终点超出时截到末尾',
+    params: z.object({ sessionId: z.string(), text: z.string(), refs: z.array(RefLinkSchema).max(20).optional() }),
     result: z.object({ accepted: z.literal(true) }),
   },
   'session.subscribe': {

@@ -19,6 +19,7 @@ import {
   type NotifyParamsOf,
   type ParamsOf,
   PROTOCOL_VERSION,
+  type RefLink,
   type ResultOf,
   type RpcError,
 } from '@domi/protocol'
@@ -138,8 +139,12 @@ export class DomiClient {
     return r.sessionId
   }
 
-  submit(sessionId: string, text: string): Promise<ResultOf<'session.submit'>> {
-    return this.request('session.submit', { sessionId, text })
+  /** refs：引用其他会话的片段（PRD-M3-005），终点可以给得大，daemon 会截到末尾 */
+  submit(sessionId: string, text: string, refs?: readonly RefLink[]): Promise<ResultOf<'session.submit'>> {
+    return this.request(
+      'session.submit',
+      refs && refs.length > 0 ? { sessionId, text, refs: [...refs] } : { sessionId, text },
+    )
   }
 
   /**

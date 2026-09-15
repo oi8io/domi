@@ -11,7 +11,7 @@ import { StubProvider } from '@domi/model'
 import type { EventEnvelope } from '@domi/protocol'
 import { SqliteEventLog } from '@domi/store'
 import { z } from 'zod'
-import { DomiSession, type PendingAsk } from '../src/index.ts'
+import { DomiSession, type PendingAsk, RefError } from '../src/index.ts'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -313,4 +313,49 @@ describe('BUG-M3-010 / TASK-M3-014 · 分支会话看得到父会话的历史', 
     expect(JSON.stringify(await check.read('base'))).not.toContain('分支上的问题')
     check.close()
   }, 15_000)
+})
+describe('TASK-M3-012 · 跨会话引用', () => {
+  test('B 引用 A 的一段：内容进了 B 的请求，落下的是链接；终点超出就截到 A 的末尾', async () => {
+    const db = join(tmp(), 'e.db')
+    const cwd = tmp()
+    const a = new DomiSession({
+      config,
+      sessionId: 'A',
+      cwd,
+      dbPath: db,
+      clock,
+      provider: new StubProvider([[{ type: 'delta', text: '用 bun test' }]]),
+    })
+    await a.submit('测试怎么跑？')
+    const headA = (await a.pumpAll()).length
+    await a.flushAndClose()
+
+    const provider = new StubProvider([[{ type: 'delta', text: '好' }]])
+    const b = new DomiSession({ config, sessionId: 'B', cwd, dbPath: db, clock, provider })
+    const refs = await b.checkRefs([{ sessionId: 'A', fromSeq: 1, toSeq: 999 }])
+    expect(refs).toEqual([{ sessionId: 'A', fromSeq: 1, toSeq: headA }])
+    await b.submit('照 A 的结论把 CI 配上', { refs })
+    expect(JSON.stringify(provider.calls[0]?.messages)).toContain('用 bun test')
+    const view = await b.pumpAll()
+    expect(view[0]?.ev).toEqual({ t: 'ctx.ref', sessionId: 'A', fromSeq: 1, toSeq: headA })
+    expect(view[1]?.ev).toMatchObject({ t: 'user.input', text: '照 A 的结论把 CI 配上' })
+    await b.flushAndClose()
+  })
+
+  test('引用不存在的会话、或起点越界：提交之前就报错', async () => {
+    const db = join(tmp(), 'e.db')
+    const b = new DomiSession({
+      config,
+      sessionId: 'B',
+      cwd: tmp(),
+      dbPath: db,
+      clock,
+      provider: new StubProvider([[{ type: 'delta', text: '好' }]]),
+    })
+    await expect(b.checkRefs([{ sessionId: 'nope', fromSeq: 1, toSeq: 2 }])).rejects.toThrow(RefError)
+    await b.submit('先有点内容')
+    await expect(b.checkRefs([{ sessionId: 'B', fromSeq: 99, toSeq: 100 }])).rejects.toThrow(RefError)
+    await expect(b.checkRefs([{ sessionId: 'B', fromSeq: 3, toSeq: 2 }])).rejects.toThrow(RefError)
+    await b.flushAndClose()
+  })
 })

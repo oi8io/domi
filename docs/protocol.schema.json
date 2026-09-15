@@ -264,6 +264,33 @@
           },
           "text": {
             "type": "string"
+          },
+          "refs": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "fromSeq": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "toSeq": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "sessionId",
+                "fromSeq",
+                "toSeq"
+              ]
+            }
           }
         },
         "required": [
@@ -957,6 +984,35 @@
                             "tokensAfter",
                             "trigger",
                             "summary"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "string",
+                              "const": "ctx.ref"
+                            },
+                            "sessionId": {
+                              "type": "string"
+                            },
+                            "fromSeq": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "toSeq": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "sessionId",
+                            "fromSeq",
+                            "toSeq"
                           ],
                           "additionalProperties": {}
                         },

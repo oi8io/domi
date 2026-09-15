@@ -24,8 +24,9 @@
 
 下一步: 用户规矩（2026-09-15）：**先推进功能，测试验证类最后统一查漏补缺**
         （已完成：TASK-M3-016 elicitation 接确认框；TASK-M3-014 会话分支，Web「分支」按钮 / TUI `/branch`；
-          TASK-M3-010 kill -9 后打开会话自动补到一致点；TASK-M3-011 远程连接 + token，见 ADR-017）
-        1. TASK-M3-012 跨会话引用；然后进 M4（Soul）
+          TASK-M3-010 kill -9 后打开会话自动补到一致点；TASK-M3-011 远程连接 + token，见 ADR-017；
+          TASK-M3-012 跨会话引用，Web「引用这一轮」/ TUI `/ref`）
+        1. 进 M4（Soul）：先按 PRD 规定把 M4 章节重写成 COMMITTED 并过 PM 门禁
         2. TUI 里补会话列表 / 恢复 / 删除入口（parity 第 5、6、8 项的 TUI 列）
         3. 最后统一：TASK-M3-008 parity e2e（Playwright）；TASK-M3-009 推送延迟基准
         5. 缺陷登记里 open 的：BUG-M3-003（状态栏缺本轮耗时）、BUG-M3-008（陈锁并发接管）、

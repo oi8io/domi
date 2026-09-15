@@ -9,6 +9,7 @@
  * M0 只实现 'full'，'incremental' 占位且调用即报错，**不静默降级**。
  */
 import { type EventEnvelope, isKnownEvent, type ModelMessage, type ModelMessages, type ToolCall } from '@domi/protocol'
+import { refKey, renderRef } from './refs.ts'
 
 export type ContextStrategyName = 'full' | 'incremental' | (string & {})
 
@@ -17,6 +18,11 @@ export interface ContextPolicy {
   includeReasoning: boolean
   /** 默认 'full'。见 SPEC-M0-002 / docs/adr/005 */
   strategy?: ContextStrategyName
+  /**
+   * 跨会话引用的内容，按 refKey 索引（PRD-M3-005）。由调用方读好放进来——kernel 不碰 IO。
+   * 缺了的引用照样拼，内容换成一句「读不到」
+   */
+  refs?: ReadonlyMap<string, readonly EventEnvelope[]>
 }
 
 export type ContextStrategy = (events: readonly EventEnvelope[], policy: ContextPolicy) => ModelMessages
@@ -70,6 +76,8 @@ const fullStrategy: ContextStrategy = (events, policy) => {
   const out: ModelMessages = []
   let text = ''
   let calls: ToolCall[] = []
+  /** 还没交出去的引用：拼进下一条用户消息的前面 */
+  let quoted: string[] = []
 
   const flush = (): void => {
     if (text === '' && calls.length === 0) return
@@ -85,7 +93,11 @@ const fullStrategy: ContextStrategy = (events, policy) => {
     switch (ev.t) {
       case 'user.input':
         flush()
-        out.push({ role: 'user', content: ev.text })
+        out.push({ role: 'user', content: quoted.length > 0 ? `${quoted.join('\n\n')}\n\n${ev.text}` : ev.text })
+        quoted = []
+        break
+      case 'ctx.ref':
+        quoted.push(renderRef(ev, policy.refs?.get(refKey(ev))))
         break
       case 'model.reason':
         if (policy.includeReasoning) text += ev.text

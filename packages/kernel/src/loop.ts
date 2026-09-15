@@ -10,10 +10,11 @@
  * 计数器本身**不进事件流**：它们是投影，能从事件流算出来。
  * 进事件流的只有终止那一刻的快照。
  */
-import type { DomiEvent } from '@domi/protocol'
+import type { DomiEvent, EventEnvelope, RefLink } from '@domi/protocol'
 import { buildContext, type ContextPolicy } from './build-context.ts'
 import type { Clock, EventSink, ToolCallRequest, ToolRunner } from './ports.ts'
 import { notRunResult } from './recovery.ts'
+import { type RefResolver, refKey } from './refs.ts'
 
 export interface LoopLimits {
   /** 单轮工具调用次数上限（PRD-M0-002 AC-2） */
@@ -52,6 +53,14 @@ export interface LoopDeps {
   model: string
   limits?: Partial<LoopLimits>
   providerOptions?: Record<string, unknown>
+  /** 跨会话引用的读取端口（PRD-M3-005）。事件流里有 ctx.ref 时用它把内容读出来 */
+  refs?: RefResolver
+}
+
+/** 一次用户输入。refs 是这句话引用的其他会话片段 */
+export interface TurnInput {
+  text: string
+  refs?: readonly RefLink[]
 }
 
 export type StopReason = 'completed' | 'max_tool_calls' | 'max_arg_parse_retries' | 'wall_clock' | 'stream_error'
@@ -64,9 +73,13 @@ export interface TurnResult {
 export async function runTurn(
   deps: LoopDeps,
   sessionId: string,
-  userText: string,
+  input: string | TurnInput,
   signal?: AbortSignal,
 ): Promise<TurnResult> {
+  const { text: userText, refs = [] } = typeof input === 'string' ? { text: input } : input
+  if (refs.length > 0 && !deps.refs) {
+    throw new Error('这一轮带了跨会话引用，但 LoopDeps 没有 refs 端口，读不出引用的内容')
+  }
   const limits = { ...DEFAULT_LIMITS, ...deps.limits }
   const ac = new AbortController()
   signal?.addEventListener('abort', () => ac.abort(), { once: true })
@@ -96,7 +109,13 @@ export async function runTurn(
     return { stopReason: reason, counters: c }
   }
 
-  await deps.sink.append(sessionId, [{ t: 'user.input', text: userText }])
+  // 引用紧挨在它所属的那句话前面，同一批落盘：轨迹里看得见是哪句话引用了什么（AC-3）
+  await deps.sink.append(sessionId, [
+    ...refs.map((r) => ({ t: 'ctx.ref' as const, sessionId: r.sessionId, fromSeq: r.fromSeq, toSeq: r.toSeq })),
+    { t: 'user.input', text: userText },
+  ])
+  /** 同一轮里多次拼上下文，引用内容只读一次（它不会变：事件只增不改） */
+  const resolved = new Map<string, readonly EventEnvelope[]>()
 
   for (;;) {
     if (deps.clock.now() - startedAt >= limits.maxWallClockMs) {
@@ -104,7 +123,19 @@ export async function runTurn(
     }
 
     const events = await deps.sink.read(sessionId)
-    const messages = buildContext(events, deps.policy)
+    if (deps.refs) {
+      for (const { ev } of events) {
+        if (ev.t !== 'ctx.ref') continue
+        const { sessionId: from, fromSeq, toSeq } = ev as unknown as RefLink
+        const link: RefLink = { sessionId: from, fromSeq, toSeq }
+        const key = refKey(link)
+        if (resolved.has(key)) continue
+        // 读不到（会话被清除了）不让这一轮失败：buildContext 会在那个位置放一句说明
+        const got = await deps.refs.resolve(link).catch(() => undefined)
+        if (got !== undefined) resolved.set(key, got)
+      }
+    }
+    const messages = buildContext(events, resolved.size > 0 ? { ...deps.policy, refs: resolved } : deps.policy)
 
     const pending: ToolCallRequest[] = []
     const produced: DomiEvent[] = []

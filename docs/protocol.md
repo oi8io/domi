@@ -351,7 +351,7 @@
 
 ### `session.submit`
 
-提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃
+提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃。refs 引用其他会话的片段（PRD-M3-005）：接受之前校验，会话不存在或起点越界 → INVALID_PARAMS；终点超出时截到末尾
 
 **params**
 
@@ -365,6 +365,33 @@
     },
     "text": {
       "type": "string"
+    },
+    "refs": {
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "fromSeq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "toSeq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "sessionId",
+          "fromSeq",
+          "toSeq"
+        ]
+      }
     }
   },
   "required": [
@@ -1106,6 +1133,35 @@
                       "tokensAfter",
                       "trigger",
                       "summary"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.ref"
+                      },
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "fromSeq": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "toSeq": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "sessionId",
+                      "fromSeq",
+                      "toSeq"
                     ],
                     "additionalProperties": {}
                   },

@@ -114,6 +114,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   /compact                  手动压缩上下文
   /model <名字> [provider]  会话中途切换模型（历史不动，只追加一条切换记录）
   /branch [seq]             从某一条（默认最后一条）分出一个新会话并切过去
+  /ref <会话 id> [起-止]    引用另一个会话的一段，下一句话带上（不给区间就是整个会话）
 
 选项：
   -h, --help      看这个

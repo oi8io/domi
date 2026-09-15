@@ -9,8 +9,9 @@ import { createSessionStore, DomiClient, type TranscriptItem, type WireSocket } 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { App, SessionTools, SessionView } from '../src/App.tsx'
 import { ConfirmDialog } from '../src/ConfirmDialog.tsx'
+import { PendingRefs } from '../src/PendingRefs.tsx'
 import { StatusBar } from '../src/StatusBar.tsx'
-import { groupRows, Transcript } from '../src/Transcript.tsx'
+import { groupRows, Transcript, turnRanges } from '../src/Transcript.tsx'
 
 const neverConnects = (): WireSocket => {
   throw new Error('渲染测试不该发起连接')
@@ -190,6 +191,34 @@ describe('表单型询问（TASK-M3-016）', () => {
       s: 'hi',
     })
     expect(formValues(schema, {})).toEqual({ ok: false })
+  })
+})
+
+describe('跨会话引用（PRD-M3-005）', () => {
+  test('用户那一行有「引用这一轮」，带着这一轮的起止 seq', () => {
+    const items: TranscriptItem[] = [
+      { seq: 1, kind: 'user', text: '第一问' },
+      { seq: 3, kind: 'assistant', text: '答' },
+      { seq: 5, kind: 'user', text: '第二问' },
+      { seq: 7, kind: 'assistant', text: '答' },
+    ]
+    expect(turnRanges(items)).toEqual([
+      { seq: 1, fromSeq: 1, toSeq: 4 },
+      { seq: 5, fromSeq: 5, toSeq: Number.MAX_SAFE_INTEGER },
+    ])
+    const html = renderToStaticMarkup(<Transcript items={items} onQuote={() => undefined} />)
+    expect(html.match(/class="quote"/g)?.length).toBe(2)
+    expect(renderToStaticMarkup(<Transcript items={items} />)).not.toContain('class="quote"')
+  })
+
+  test('待发送的引用显示在输入框上方，可以去掉', () => {
+    const html = renderToStaticMarkup(
+      <PendingRefs refs={[{ sessionId: 'A', fromSeq: 1, toSeq: 4, label: '第一问' }]} onRemove={() => undefined} />,
+    )
+    expect(html).toContain('引用 A')
+    expect(html).toContain('第一问')
+    expect(html).toContain('去掉')
+    expect(renderToStaticMarkup(<PendingRefs refs={[]} onRemove={() => undefined} />)).toBe('')
   })
 })
 

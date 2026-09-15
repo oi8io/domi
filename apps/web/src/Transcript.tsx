@@ -39,6 +39,21 @@ const LABEL: Record<TranscriptItem['kind'], string> = {
   context: '上下文',
 }
 
+/** 每一轮的范围：从这一轮的用户输入，到下一轮用户输入之前。最后一轮的终点交给 daemon 截（PRD-M3-005） */
+export function turnRanges(items: readonly TranscriptItem[]): Array<{ seq: number; fromSeq: number; toSeq: number }> {
+  const users = items.filter((i) => i.kind === 'user')
+  return users.map((u, i) => {
+    const next = users[i + 1]
+    return { seq: u.seq, fromSeq: u.seq, toSeq: next === undefined ? Number.MAX_SAFE_INTEGER : next.seq - 1 }
+  })
+}
+
+export interface QuoteRequest {
+  fromSeq: number
+  toSeq: number
+  label: string
+}
+
 /** 「从这里分支」。分支点是这一行最后一条事件：工具行带上结果，免得分出去的会话里有调用没结果 */
 function BranchButton({ seq, onBranch }: { seq: number; onBranch: (seq: number) => void }) {
   return (
@@ -51,12 +66,16 @@ function BranchButton({ seq, onBranch }: { seq: number; onBranch: (seq: number) 
 export function Transcript({
   items,
   onBranch,
+  onQuote,
 }: {
   items: readonly TranscriptItem[]
   /** 不给就不画分支按钮（只读视图） */
   onBranch?: (seq: number) => void
+  /** 「引用这一轮」，画在每一轮的用户输入上。不给就不画 */
+  onQuote?: (q: QuoteRequest) => void
 }) {
   if (items.length === 0) return <p className="empty">还没有事件。</p>
+  const turns = new Map(turnRanges(items).map((t) => [t.seq, t]))
   return (
     <ol className="transcript">
       {groupRows(items).map((row) =>
@@ -83,6 +102,19 @@ export function Transcript({
             <div className="text">{row.item.text}</div>
             {row.item.summary !== undefined && <div className="summary">{row.item.summary}</div>}
             {onBranch !== undefined && <BranchButton seq={row.item.seq} onBranch={onBranch} />}
+            {onQuote !== undefined && row.item.kind === 'user' && (
+              <button
+                type="button"
+                className="quote"
+                title="在别的会话里引用这一轮"
+                onClick={() => {
+                  const t = turns.get(row.item.seq)
+                  if (t) onQuote({ fromSeq: t.fromSeq, toSeq: t.toSeq, label: row.item.text.slice(0, 40) })
+                }}
+              >
+                引用这一轮
+              </button>
+            )}
           </li>
         ),
       )}

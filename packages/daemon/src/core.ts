@@ -22,6 +22,7 @@ import {
   notify,
   ok,
   PROTOCOL_VERSION,
+  type RefLink,
   type RpcNotification,
   type RpcRequest,
   type RpcResponse,
@@ -54,6 +55,14 @@ export class BranchPointError extends Error {
   }
 }
 
+/** 跨会话引用不成立。翻译成 INVALID_PARAMS */
+export class InvalidRefError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'InvalidRefError'
+  }
+}
+
 /** 一个已连接的客户端。传输层实现它，core 只管往里写 */
 export interface ClientConn {
   readonly id: string
@@ -63,7 +72,9 @@ export interface ClientConn {
 /** daemon 需要的会话能力。runtime 的 DomiSession 满足它——但 core 不 import runtime */
 export interface SessionHandle {
   readonly id: string
-  submit(text: string): Promise<unknown>
+  submit(text: string, refs?: readonly RefLink[]): Promise<unknown>
+  /** 校验并规整引用；不成立时抛 InvalidRefError。在接受提交之前调 */
+  checkRefs?(refs: readonly RefLink[]): Promise<RefLink[]>
   switchModel(model: string, provider?: string): Promise<{ lost: string[] }>
   compactNow(trigger: 'manual' | 'threshold'): Promise<{ ok: boolean; detail: string }>
   readEvents(fromSeq: number): Promise<EventEnvelope[]>
@@ -199,7 +210,9 @@ export class Daemon {
       return await this.dispatch(conn, req, method, parsed.data as never)
     } catch (e) {
       if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message)
-      if (e instanceof BranchPointError) return fail(req.id, 'INVALID_PARAMS', e.message)
+      if (e instanceof BranchPointError || e instanceof InvalidRefError) {
+        return fail(req.id, 'INVALID_PARAMS', e.message)
+      }
       return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
     }
   }
@@ -295,7 +308,7 @@ export class Daemon {
       }
 
       case 'session.submit': {
-        const p = params as { sessionId: string; text: string }
+        const p = params as { sessionId: string; text: string; refs?: RefLink[] }
         // **检查与占位之间不许有 await。**
         // 第一版把 `this.busy.add` 放在 `await this.session(...)` 之后，
         // 于是十个并发请求全都在任何一个占住之前通过了检查——十个全被接受。
@@ -307,8 +320,14 @@ export class Daemon {
         this.busy.add(p.sessionId)
 
         let session: SessionHandle | null
+        let refs: RefLink[] = []
         try {
           session = await this.session(p.sessionId)
+          // 引用要在接受之前校验：接受之后的错误只会被吞掉，用户以为引用成功了
+          if (session && p.refs && p.refs.length > 0) {
+            if (!session.checkRefs) throw new InvalidRefError('这个 daemon 不支持跨会话引用')
+            refs = await session.checkRefs(p.refs)
+          }
         } catch (e) {
           this.busy.delete(p.sessionId)
           throw e
@@ -321,7 +340,7 @@ export class Daemon {
         // **不 await**：提交是异步的，客户端拿到 accepted 就该回去等事件推送。
         // await 的话，一次长任务会把这条连接的响应通道占住
         void session
-          .submit(p.text)
+          .submit(p.text, refs.length > 0 ? refs : undefined)
           .catch(() => undefined)
           .finally(() => this.busy.delete(p.sessionId))
         return ok(req.id, { accepted: true })

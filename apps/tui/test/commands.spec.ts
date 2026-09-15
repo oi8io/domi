@@ -13,6 +13,17 @@ describe('斜杠命令', () => {
     expect(parseSlash('/model', 3).kind).toBe('invalid')
   })
 
+  test('/ref 会话 [起-止]：记下一个引用，下一句话带上（PRD-M3-005）', () => {
+    expect(parseSlash('/ref s-abc', 3)).toEqual({
+      kind: 'ref',
+      ref: { sessionId: 's-abc', fromSeq: 1, toSeq: Number.MAX_SAFE_INTEGER },
+    })
+    expect(parseSlash('/ref s-abc 4-9', 3)).toEqual({ kind: 'ref', ref: { sessionId: 's-abc', fromSeq: 4, toSeq: 9 } })
+    expect(parseSlash('/ref s-abc 7', 3)).toEqual({ kind: 'ref', ref: { sessionId: 's-abc', fromSeq: 7, toSeq: 7 } })
+    expect(parseSlash('/ref', 3)).toMatchObject({ kind: 'invalid' })
+    expect(parseSlash('/ref s 9-4', 3)).toMatchObject({ kind: 'invalid' })
+  })
+
   test('/branch 不带数字从最后一条分，带数字从那一条分（parity 第 7 项）', () => {
     expect(parseSlash('/branch', 12)).toEqual({ kind: 'branch', atSeq: 12 })
     expect(parseSlash('/branch 5', 12)).toEqual({ kind: 'branch', atSeq: 5 })

@@ -10,7 +10,7 @@
  */
 import type { DomiConfig } from '@domi/config'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { DomiSession, type SessionOptions } from '@domi/runtime'
+import { DomiSession, RefError, type SessionOptions } from '@domi/runtime'
 import { SqliteEventLog } from '@domi/store'
 import { AUDIT_SESSION_ID } from './auth.ts'
 import {
@@ -18,6 +18,7 @@ import {
   type DaemonHost,
   type HostAsk,
   type HostMetrics,
+  InvalidRefError,
   type SessionHandle,
   SessionNotFoundError,
   type SessionSummary,
@@ -88,7 +89,14 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       let head = 0
       return {
         id: sessionId,
-        submit: (text) => s.submit(text),
+        submit: (text, refs) => s.submit(text, refs === undefined ? {} : { refs }),
+        async checkRefs(refs) {
+          try {
+            return await s.checkRefs(refs)
+          } catch (e) {
+            throw e instanceof RefError ? new InvalidRefError(e.message) : e
+          }
+        },
         switchModel: (model, provider) => s.switchModel(model, provider === undefined ? {} : { provider }),
         compactNow: (trigger) => s.compactNow(trigger),
         async readEvents(fromSeq) {

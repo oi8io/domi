@@ -219,4 +219,37 @@ describe('RuntimeHost', () => {
       'SESSION_NOT_FOUND',
     )
   })
+
+  test('TASK-M3-012 · session.submit 带 refs：内容进上下文；坏引用在接受之前就 INVALID_PARAMS', async () => {
+    const ids = ['A', 'B']
+    const provider = new StubProvider([[{ type: 'delta', text: 'A 的结论' }]], { onExhausted: 'repeat-last' })
+    const { daemon } = setup(provider, () => ids.shift() as string)
+    const c = new Conn('c')
+    await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    await call(daemon, c, 'session.create')
+    await call(daemon, c, 'session.create')
+    await call(daemon, c, 'session.subscribe', { sessionId: 'A', fromSeq: 0 })
+    await call(daemon, c, 'session.submit', { sessionId: 'A', text: 'A 的问题' })
+    for (let i = 0; i < 100 && !c.events().some((e) => e.ev.t === 'model.delta'); i++) await Bun.sleep(10)
+    await Bun.sleep(50)
+
+    const bad = await call(daemon, c, 'session.submit', {
+      sessionId: 'B',
+      text: 'x',
+      refs: [{ sessionId: 'nope', fromSeq: 1, toSeq: 2 }],
+    })
+    expect(bad.error?.code).toBe('INVALID_PARAMS')
+
+    await call(daemon, c, 'session.subscribe', { sessionId: 'B', fromSeq: 0 })
+    const r = await call(daemon, c, 'session.submit', {
+      sessionId: 'B',
+      text: '接着 A 做',
+      refs: [{ sessionId: 'A', fromSeq: 1, toSeq: 50 }],
+    })
+    expect(r.result).toEqual({ accepted: true })
+    const inB = () => c.events().filter((e) => e.sessionId === 'B')
+    for (let i = 0; i < 100 && inB().filter((e) => e.ev.t === 'model.delta').length === 0; i++) await Bun.sleep(10)
+    expect(inB()[0]?.ev).toMatchObject({ t: 'ctx.ref', sessionId: 'A', fromSeq: 1 })
+    expect(JSON.stringify(provider.calls.at(-1)?.messages)).toContain('A 的结论')
+  })
 })
