@@ -1,30 +1,31 @@
-在做: **M2 的代码侧做完了。** 七条需求里，五条实现 + 两条（MCP）按你的决定移到 M3。
-      `pnpm check` 一条命令跑完：typecheck + **15 道守卫** + **533 个测试** + L1 轨迹回放，全绿。
-      另有 `pnpm smoke`（单二进制冒烟）与 `pnpm bench:cache`（真实 cache 实测，要 key）。
+在做: **M3 骨架轮做完了**（范围见 `docs/prd/M3.md` §3）。
+      `pnpm check`：typecheck（现在含 apps/tui 与 apps/web）+ **16 道守卫** + **585 个测试** + L1 回放，全绿。
 
-      M2 这一轮交付的：
-      - **L1 确定性回放**（M2-008）：`domi eval record/run`，不联网不花钱、已进 CI；
-        仓库带一条示范 fixture，**新克隆下来不需要 key 就能跑通**
-      - **确定性上下文清理**（M2-002）：去重/截断/清已解决的错误/砍堆栈，十条 fixture 平均削减 59.8%
-      - **LLM 压缩**（M2-003）：保边压中 + 五字段结构化摘要；`/compact` 手动、窗口 70% 自动。
-        只追加一条 `ctx.compact`，**原始事件逐条 sha256 不变**，所以重放等价性是免费的
-      - **轨迹显示**（M2-005）：`domi trace <id>`，`--html` 导出单文件页面；
-        里面**一行 JS 都没有**，折叠靠原生 `<details>`，「无外部请求」是结构上不可能违反的
-      - **注入防护**（M2-006）：十六条载荷，**每一条断言的都是权限层拒绝**，不依赖模型是否被骗到
-      - **schema 迁移**（M2-007）：`domi migrate` 先备份再迁移，失败 byte 级还原
-      - **L2 跨会话检索**（M2-004）：`memory.search` 工具，中文可搜，找不到就说找不到（不返回 top-k）；
-        十万条事件下 P95 8.6ms（门槛 300ms），基线进 CI
+      这一轮交付的：
+      - **Domi Protocol**（M3-001）：zod 方法表是唯一来源；握手不匹配就停，不降级；
+        文档与 JSON Schema 由表生成，新守卫 `guard:protocol` 断言无 diff
+      - **daemon**（M3-002 / M3-004）：core 与传输分离；断点续订（补发期间的新事件不重不乱序）；
+        单实例锁；同会话串行、正忙回 `SESSION_BUSY`；`client-core-no-store` 守唯一写入者
+      - **传输与进程**：Bun 原生 WebSocket（`docs/adr/012`）；`pnpm domid` 起独立进程，
+        只监听 127.0.0.1、外站 Origin 一律 403（M3-006 AC-2 的默认值）
+      - **DomiClient**（client-core）：握手、断线重连、按 seq 续订与去重，浏览器可跑
+      - **Web 骨架**（M3-003）：`pnpm web`，React 19.3 + Vite 8.3（`docs/adr/013`）；
+        能连、能列会话、能看事件流与轨迹、能提交
+      - **`docs/parity-checklist.md`**：AC-1 的判据本身，十项里目前没有一项两端 e2e 齐全
 
-下一步: **只剩你能做的事了**
-        1. M0 走查：真终端跑 `demos/m0-loop.md` 的 13 条（TASK-M0-021 卡在 review）。
-           走 Anthropic 兼容网关即可，`domi doctor --ping` 会把失败分成四类
-        2. `pnpm bench:cache --yes` 跑一次（TASK-M2-003 卡在 review）——**预期 0%**，脚本会先告诉你为什么
-        3. 独立 QA：把 `docs/qa/PROMPT.md` 整块贴进一个空会话即可。
-           其中第四步的前四条**不需要 key、不联网**，隔壁小哥也能跑
-        4. M1 dogfooding 连续 5 个工作日 —— M1 DoD 的判据，代码替不了
+      试一下：终端一 `pnpm domid`，终端二 `pnpm web`，浏览器开 http://127.0.0.1:5173
 
-卡在: 没有卡住的决定了。MCP 按你的决定进 M3（`docs/adr/011`），预算 19→14 / 15→20，合计不变。
-      仍未验收（都写在 `docs/qa/M1-reconciliation.md`，原文没删）：
-      - M1-008 AC-1 的 `npx domi` —— 要真发布到 npm 才能验
-      - M1-004 AC-1/AC-2 —— 等上面第 2 条那次真实运行
-      - M2-004 AC-1 的**向量检索**那一半 —— 按 `docs/adr/010` 在 M4 和向量方案一起定
+下一步: M3 下一轮（按 parity 清单表后的顺序）
+        1. 协议补缺口：session.restore / branch / delete / switchModel、metrics 通知、
+           session.ask ↔ 权限询问真正接线（现在 session.answer 如实返回 ok:false）
+        2. TUI 改成 DomiClient 的客户端（现在 TUI 仍是进程内直接用 DomiSession）
+        3. Playwright + parity e2e 逐行补；Tailwind / shadcn 随第一个复用组件引入
+        4. M3-002 AC-3（kill -9 恢复）、M3-005、M3-006 认证与 `--connect`、MCP（ADR-011）
+        5. 补 `docs/tasks/M3.md`——这一轮按 `docs/prd/M3.md` 的范围表直接做了，没有拆任务文件
+
+        仍然只有你能做的：M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`（TASK-M2-003）、
+        独立 QA（`docs/qa/PROMPT.md`）、M1 连续 5 个工作日 dogfooding
+
+卡在: 没有卡住的决定。
+      已知问题：`domi session restore <id>` 只打印「已恢复」，没有真正调用 restore（`packages/cli/src/run.ts`）。
+      仍未验收的旧项照旧记在 `docs/qa/M1-reconciliation.md`。
