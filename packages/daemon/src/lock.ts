@@ -8,7 +8,7 @@
  * 锁文件里写 pid 与端口，因为**第二个进程真正想知道的不是"我抢输了"，
  * 而是"那我该连到哪里去"**。
  */
-import { closeSync, existsSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 
 export interface LockInfo {
   pid: number
@@ -32,6 +32,32 @@ function sleepSync(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }
 
+/** 接管守卫存在超过这么久，就认为拿着它的进程在接管途中崩了 */
+const TAKEOVER_STALE_MS = 2_000
+
+/**
+ * 接管陈锁的守卫（BUG-M3-008）。
+ * 「看到持有者死了 → 删锁 → 建锁」不是原子的：A 删完建好新锁之后，B 还会按它之前读到的旧内容把 A 的新锁删掉，
+ * 两个都以为自己赢了。所以删陈锁这件事本身也要先抢一把 O_EXCL 的锁，只有一个进程能做。
+ * 没抢到守卫的进程稍等后从头再来——那时它看到的是赢家的新锁，老老实实认输。
+ * 守卫自己也可能因为接管途中崩溃而残留，超过 TAKEOVER_STALE_MS 就清掉（这是唯一剩下的窗口，而且只在崩溃时出现）
+ */
+function tryTakeoverGuard(path: string): (() => void) | null {
+  const guard = `${path}.takeover`
+  try {
+    closeSync(openSync(guard, 'wx'))
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+    try {
+      if (Date.now() - statSync(guard).mtimeMs > TAKEOVER_STALE_MS) rmSync(guard, { force: true })
+    } catch {
+      // 守卫刚好被别人删了：下一轮再抢
+    }
+    return null
+  }
+  return () => rmSync(guard, { force: true })
+}
+
 /** 抢锁。抢到返回释放函数；没抢到抛 LockHeldError 并带上持有者信息 */
 export function acquireLock(path: string, info: Omit<LockInfo, 'startedAt'>): () => void {
   const payload = JSON.stringify({ ...info, startedAt: Date.now() })
@@ -50,15 +76,41 @@ export function acquireLock(path: string, info: Omit<LockInfo, 'startedAt'>): ()
       held = readLock(path)
     }
     if (held && isAlive(held.pid)) throw new LockHeldError(held)
-    // 持有者已经死了，或者锁文件一直是坏的 —— 这是**崩溃留下的陈锁**，不是竞争。清掉重来一次
-    try {
-      rmSync(path)
-    } catch (rmErr) {
-      // 删不掉就只能认输
-      if (held) throw new LockHeldError(held)
-      throw rmErr
+    // 持有者已经死了，或者锁文件一直是坏的 —— 这是**崩溃留下的陈锁**，不是竞争。
+    // 清它之前先拿接管守卫；拿不到说明别人正在接管，等一下从头再看
+    const releaseGuard = tryTakeoverGuard(path)
+    if (!releaseGuard) {
+      sleepSync(20)
+      return acquireLock(path, info)
     }
-    return acquireLock(path, info)
+    try {
+      // 拿到守卫之后再读一遍：守卫之前的那次读可能已经过时（别人刚接管完）
+      let now = readLock(path)
+      // 读不出内容：可能是别人刚绕过守卫（文件不存在时直接建）建出来、还没写完。同样给宽限期
+      for (let waited = 0; now === null && existsSync(path) && waited < UNREADABLE_GRACE_MS; waited += 25) {
+        sleepSync(25)
+        now = readLock(path)
+      }
+      if (now && isAlive(now.pid)) throw new LockHeldError(now)
+      try {
+        rmSync(path, { force: true })
+      } catch (rmErr) {
+        // 删不掉就只能认输
+        if (now) throw new LockHeldError(now)
+        throw rmErr
+      }
+      // 这里不递归：递归进去会再找守卫，而守卫在自己手里。删完到建之间有人抢先建了，就是输了
+      try {
+        const fd = openSync(path, 'wx')
+        writeFileSync(fd, payload, 'utf8')
+        closeSync(fd)
+      } catch (again) {
+        if ((again as NodeJS.ErrnoException).code !== 'EEXIST') throw again
+        throw new LockHeldError(readLock(path) ?? { pid: -1, port: 0, startedAt: Date.now() })
+      }
+    } finally {
+      releaseGuard()
+    }
   }
 
   let released = false

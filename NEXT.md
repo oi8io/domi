@@ -25,15 +25,16 @@
 下一步: 用户规矩（2026-09-15）：**先推进功能，测试验证类最后统一查漏补缺**
         （已完成：TASK-M3-016 elicitation 接确认框；TASK-M3-014 会话分支，Web「分支」按钮 / TUI `/branch`；
           TASK-M3-010 kill -9 后打开会话自动补到一致点；TASK-M3-011 远程连接 + token，见 ADR-017；
-          TASK-M3-012 跨会话引用，Web「引用这一轮」/ TUI `/ref`）
-        1. 进 M4（Soul）：先按 PRD 规定把 M4 章节重写成 COMMITTED 并过 PM 门禁
-        3. 最后统一：TASK-M3-008 parity e2e（Playwright）；TASK-M3-009 推送延迟基准
-        5. 缺陷登记里 open 的：BUG-M3-003（状态栏缺本轮耗时）、BUG-M3-008（陈锁并发接管）、
-           BUG-M3-012（配置里的提示词层从未被读取）
+          TASK-M3-012 跨会话引用，Web「引用这一轮」/ TUI `/ref`；TUI 会话命令 /sessions /open /new /delete /restore；
+          BUG-M3-003 本轮耗时、BUG-M3-008 陈锁并发接管、BUG-M3-012 配置提示词层、BUG-M3-015 提示词从未发给模型）
+        M3 缺陷登记里已没有 open 的 BUG。
+        1. 进 M4（Soul）：PRD 要求先把 M4 章节从 SKETCH 重写成 COMMITTED 并过 PM 门禁——等你拍板（见「卡在」）
+        2. 最后统一：TASK-M3-008 parity e2e（Playwright）；TASK-M3-009 推送延迟基准
 
         仍然只有你能做的：真终端走 M3 DoD（`domi` 发长任务 → 关终端 → 浏览器看完成）、
         M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`、独立 QA、M1 dogfooding
 
-卡在: 没有卡住的决定。
+卡在: M4 的进入条件。PRD 写的是「此时 domi 已积累两个月真实使用数据，届时才知道该沉淀什么」，
+      现在没有这份数据。要么按现有轮廓先写 docs/prd/M4.md（范围、不做什么、反悔条件）照做，要么先 dogfooding 一段。
       体验类的问题按你定的规矩只记录不排期（OPT-M3-001…006），其中 OPT-M3-001（每个 token 一条事件）
       牵涉回放与压缩，动之前要单独讨论。

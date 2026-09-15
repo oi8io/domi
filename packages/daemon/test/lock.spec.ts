@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { acquireLock, isAlive, LockHeldError, readLock } from '../src/index.ts'
 
 const dirs: string[] = []
@@ -113,4 +113,21 @@ describe('崩溃留下的陈锁不该把人永远挡在外面', () => {
     writeFileSync(path, '这不是 JSON', 'utf8')
     expect(readLock(path)).toBeNull()
   })
+
+  test('BUG-M3-008 · 多个进程同时接管同一把陈锁：只有一个赢', async () => {
+    const path = tmp()
+    const d = dirname(path)
+    writeFileSync(path, JSON.stringify({ pid: 9_999_999, port: 1, startedAt: 1 }))
+    const script = join(d, 'grab.ts')
+    writeFileSync(
+      script,
+      `import { acquireLock, LockHeldError } from ${JSON.stringify(join(import.meta.dir, '../src/lock.ts'))}
+try { acquireLock(${JSON.stringify(path)}, { pid: process.pid, port: 2 }); console.log('won'); await Bun.sleep(800) }
+catch (e) { console.log(e instanceof LockHeldError ? 'lost' : 'error ' + e) }`,
+    )
+    const procs = Array.from({ length: 8 }, () => Bun.spawn(['bun', script], { stdout: 'pipe', stderr: 'pipe' }))
+    const outs = await Promise.all(procs.map(async (p) => (await new Response(p.stdout).text()).trim()))
+    expect(outs.filter((o) => o === 'won')).toHaveLength(1)
+    expect(outs.filter((o) => o === 'lost')).toHaveLength(7)
+  }, 30_000)
 })
