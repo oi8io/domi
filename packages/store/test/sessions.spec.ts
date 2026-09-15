@@ -100,6 +100,29 @@ describe('AC-3 · 分支', () => {
     l.close()
   })
 
+  test('TASK-M3-014 · 视图 seq 换算回「是谁的第几条」：分支的分支也对', async () => {
+    const l = log()
+    await l.append('base', turn(1)) // base 1,2
+    await l.append('base', turn(2)) // base 3,4
+    await l.fork('base', 3, 'b1') // b1 视图：base1..3 + 自己
+    await l.append('b1', turn(3)) // b1 自己 1,2 → 视图 4,5
+    await l.fork('b1', 2, 'b2') // fork 的 atSeq 是父会话**自己的** seq：b1 的第 2 条 = 视图第 5 条
+    await l.append('b2', turn(4))
+
+    expect(l.resolveViewSeq('b1', 2)).toEqual({ sessionId: 'base', seq: 2 })
+    expect(l.resolveViewSeq('b1', 4)).toEqual({ sessionId: 'b1', seq: 1 })
+    expect(l.resolveViewSeq('b2', 5)).toEqual({ sessionId: 'b1', seq: 2 })
+    expect(l.resolveViewSeq('b2', 6)).toEqual({ sessionId: 'b2', seq: 1 })
+    expect(l.resolveViewSeq('b2', 99)).toBeNull()
+    expect(l.resolveViewSeq('b2', 0)).toBeNull()
+    // 视图前缀的长度：祖先那一段有多少条
+    expect(l.viewOffset('base')).toBe(0)
+    expect(l.viewOffset('b1')).toBe(3)
+    expect(l.viewOffset('b2')).toBe(5)
+    expect((await l.readLineage('b2')).map((e) => e.seq)).toEqual([1, 2, 3, 4, 5, 6, 7])
+    l.close()
+  })
+
   test('父链成环时报错而不是死循环', async () => {
     const l = log()
     await l.append('a', turn(1))

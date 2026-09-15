@@ -105,13 +105,17 @@ export class DomiSession {
   /** 注入的替身不随切换重建——测试要的就是同一个实例 */
   private readonly injectedProvider: boolean
   private readonly listeners: Partial<SessionEvents> = {}
+  /** 已推送到的**自己的** seq（不是视图 seq） */
   private lastSeq = 0
+  /** 视图前缀长度：分支会话先接上父链那一段（TASK-M3-014）。对一个会话是常数 */
+  private readonly offset: number
   private noticesDelivered = 0
   private currentModel: string
   private currentProvider: string
 
   constructor(private readonly opts: SessionOptions) {
     this.log = new SqliteEventLog({ path: opts.dbPath, cwd: opts.cwd })
+    this.offset = this.log.viewOffset(opts.sessionId)
     this.currentModel = opts.config.model.name
     this.currentProvider = opts.config.model.provider
 
@@ -204,13 +208,22 @@ export class DomiSession {
 
   /** 把自上次以来的新事件推给订阅者。轮询而非推送是 M0 的简化，M3 换成协议推送 */
   async pump(): Promise<void> {
-    const fresh = await this.log.read(this.opts.sessionId, { fromSeq: this.lastSeq + 1 })
-    if (fresh.length === 0) return
-    this.lastSeq = fresh[fresh.length - 1]!.seq
+    const own = await this.log.read(this.opts.sessionId, { fromSeq: this.lastSeq + 1 })
+    if (own.length === 0) return
+    this.lastSeq = own[own.length - 1]!.seq
+    // 推出去的是视图 seq：客户端看到的分支是一条从 1 开始的连续流，不知道也不必知道拼接
+    const fresh =
+      this.offset === 0
+        ? own
+        : own.map((e) => ({
+            ...e,
+            seq: e.seq + this.offset,
+            parentSeq: (e.parentSeq ?? 0) + this.offset,
+          }))
     this.listeners.onEvents?.(fresh)
 
     if (this.listeners.onMetrics) {
-      const all = await this.log.read(this.opts.sessionId)
+      const all = await this.view()
       const m = aggregate(all, {
         pricing: this.opts.pricing ?? {},
         maxContextTokens: this.opts.config.context.maxTokens,
@@ -279,7 +292,7 @@ export class DomiSession {
    * 它只是个标题。
    */
   async generateTitle(): Promise<string> {
-    const events = await this.log.read(this.opts.sessionId)
+    const events = await this.view()
     const firstInput = events.find((e) => e.ev.t === 'user.input')
     const fallbackSource = firstInput ? (firstInput.ev as { text: string }).text : ''
     const fallback = fallbackSource.slice(0, 40)
@@ -306,7 +319,15 @@ export class DomiSession {
 
   /** 测试与轨迹面板用：读出这个会话的全部事件（不走增量推送） */
   async pumpAll(): Promise<EventEnvelope[]> {
-    return this.log.read(this.opts.sessionId)
+    return this.view()
+  }
+
+  /**
+   * 会话的**视图**：分支 = 父链到分叉点 + 自己（BUG-M3-010）。
+   * 上下文、压缩、指标、标题、订阅全都看这一份；只有追加写的是自己
+   */
+  private view(): Promise<EventEnvelope[]> {
+    return this.offset === 0 ? this.log.read(this.opts.sessionId) : this.log.readLineage(this.opts.sessionId)
   }
 
   /**
@@ -317,7 +338,7 @@ export class DomiSession {
    * 大不了这一轮上下文长一点。这和标题生成是同一条降级原则。
    */
   async compactNow(trigger: 'threshold' | 'manual' = 'manual'): Promise<{ ok: boolean; detail: string }> {
-    const events = await this.log.read(this.opts.sessionId)
+    const events = await this.view()
     try {
       const r = await compact(events, {
         trigger,
@@ -364,7 +385,7 @@ export class DomiSession {
   /** 到窗口 70% 就自动压一次（AC-1）。只在 strategy = 'compact' 时生效 */
   private async maybeAutoCompact(): Promise<void> {
     if (this.opts.config.context.strategy !== 'compact') return
-    const events = await this.log.read(this.opts.sessionId)
+    const events = await this.view()
     const used = aggregate(events, { maxContextTokens: this.opts.config.context.maxTokens }).tokens
     const total = used.input + used.output
     if (!shouldCompact(total, this.opts.config.context.maxTokens)) return
@@ -387,7 +408,7 @@ export class DomiSession {
     try {
       return await runTurn(
         {
-          sink: this.log,
+          sink: this.sink,
           provider: this.provider,
           tools: this.tools,
           clock: this.opts.clock ?? { now: () => Date.now() },
@@ -402,6 +423,24 @@ export class DomiSession {
       await this.pump()
       this.listeners.onBusy?.(false)
     }
+  }
+
+  /**
+   * kernel 看到的事件口：写进自己，读的是视图。
+   * 视图 seq = 自己的 seq + offset，所以 head 也要加上，loop 里用 head 算的位置才对得上
+   */
+  private readonly sink = {
+    append: async (id: string, evs: Parameters<SqliteEventLog['append']>[1]) => {
+      const r = await this.log.append(id, evs)
+      return { from: r.from + this.offset, to: r.to + this.offset }
+    },
+    read: async (_id: string, o?: { fromSeq?: number; toSeq?: number }): Promise<EventEnvelope[]> => {
+      const all = await this.view()
+      const from = o?.fromSeq ?? 1
+      const to = o?.toSeq ?? Number.MAX_SAFE_INTEGER
+      return all.filter((e) => e.seq >= from && e.seq <= to)
+    },
+    head: async (id: string): Promise<number> => (await this.log.head(id)) + this.offset,
   }
 
   /**

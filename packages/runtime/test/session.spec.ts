@@ -267,3 +267,50 @@ describe('TASK-M3-016 · 工具向用户要输入（elicitation）走询问通�
     await lonely.flushAndClose()
   })
 })
+
+describe('BUG-M3-010 / TASK-M3-014 · 分支会话看得到父会话的历史', () => {
+  test('上下文包含分叉点之前的父链；推送与 pumpAll 用连续的视图 seq；父会话不受影响', async () => {
+    const db = join(tmp(), 'e.db')
+    const cwd = tmp()
+    const base = new DomiSession({
+      config,
+      sessionId: 'base',
+      cwd,
+      dbPath: db,
+      clock,
+      provider: new StubProvider([[{ type: 'delta', text: '甲' }], [{ type: 'delta', text: '乙' }]]),
+    })
+    await base.submit('第一问') // user.input, model.request, model.delta …
+    const firstTurn = (await base.pumpAll()).length
+    await base.submit('第二问')
+    await base.flushAndClose()
+
+    const forker = new SqliteEventLog({ path: db })
+    await forker.fork('base', firstTurn, 'br')
+    forker.close()
+
+    const provider = new StubProvider([[{ type: 'delta', text: '分支的回答' }]])
+    const br = new DomiSession({ config, sessionId: 'br', cwd, dbPath: db, clock, provider })
+    const pushed: number[] = []
+    br.on('onEvents', (envs) => pushed.push(...envs.map((e) => e.seq)))
+    await br.submit('分支上的问题')
+
+    const sent = JSON.stringify(provider.calls[0]?.messages)
+    expect(sent).toContain('第一问')
+    expect(sent).toContain('甲')
+    expect(sent).not.toContain('第二问') // 分叉点之后的主线不该出现
+    expect(sent).toContain('分支上的问题')
+
+    const view = await br.pumpAll()
+    expect(view.map((e) => e.seq)).toEqual(view.map((_, i) => i + 1))
+    expect(view.length).toBeGreaterThan(firstTurn)
+    // 推送出去的是视图 seq：从前缀之后接着编
+    expect(pushed[0]).toBe(firstTurn + 1)
+    expect(pushed.at(-1)).toBe(view.length)
+    await br.flushAndClose()
+
+    const check = new SqliteEventLog({ path: db })
+    expect(JSON.stringify(await check.read('base'))).not.toContain('分支上的问题')
+    check.close()
+  }, 15_000)
+})

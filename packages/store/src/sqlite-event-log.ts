@@ -206,6 +206,42 @@ export class SqliteEventLog implements EventLog {
     return flattenLineage(chunks)
   }
 
+  /**
+   * 视图前缀的长度：祖先们一共贡献了多少条（TASK-M3-014）。
+   * 祖先的那一段读到分叉点为止、之后再不会变，所以对一个会话来说这是常数——
+   * 自己的第 n 条在视图里永远是第 offset+n 条
+   */
+  viewOffset(sessionId: string): number {
+    const chain = this.sessions.lineage(sessionId)
+    let n = 0
+    for (const link of chain.slice(0, -1)) n += this.countUpTo(link.id, link.upToSeq)
+    return n
+  }
+
+  /** 视图里的第 viewSeq 条，实际是哪个会话自己的第几条。越界返回 null */
+  resolveViewSeq(sessionId: string, viewSeq: number): { sessionId: string; seq: number } | null {
+    if (!Number.isInteger(viewSeq) || viewSeq < 1) return null
+    let rest = viewSeq
+    for (const link of this.sessions.lineage(sessionId)) {
+      const rows = this.db
+        .query<{ seq: number }, [string, number]>(
+          'SELECT seq FROM events WHERE session_id = ? AND seq <= ? ORDER BY seq ASC',
+        )
+        .all(link.id, link.upToSeq ?? Number.MAX_SAFE_INTEGER)
+      if (rest <= rows.length) return { sessionId: link.id, seq: rows[rest - 1]!.seq }
+      rest -= rows.length
+    }
+    return null
+  }
+
+  private countUpTo(sessionId: string, upTo: number | null): number {
+    return (
+      this.db
+        .query<{ n: number }, [string, number]>('SELECT COUNT(*) AS n FROM events WHERE session_id = ? AND seq <= ?')
+        .get(sessionId, upTo ?? Number.MAX_SAFE_INTEGER)?.n ?? 0
+    )
+  }
+
   async head(sessionId: string): Promise<number> {
     return (
       this.db
