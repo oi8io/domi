@@ -1,7 +1,7 @@
 # 011 MCP 推迟到 M3
 
 - 日期：2026-09-14
-- 状态：已采纳
+- 状态：已采纳；2026-09-15 按本文的重评条件结束推迟，见 `docs/adr/015`（v2 已于 2026-07-27 GA，只是拆成了 `@modelcontextprotocol/client` 等新包名）
 - 上位：`docs/adr/010` §「已知风险：MCP SDK 的版本分裂」· `docs/prd/M2.md` §5.1
 
 **Context**：ADR-010 把「MCP SDK 版本」列为进入 M2 前必须拍板的一条，并列了三条路：

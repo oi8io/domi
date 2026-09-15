@@ -20,6 +20,8 @@
 
 ## 已知风险：MCP SDK 的版本分裂
 
+> **2026-09-15 更正**：下面的判断只查了 `@modelcontextprotocol/sdk`。v2 拆成了 `@modelcontextprotocol/client` / `server` / `core`，2.0.0 已于 2026-07-27 GA。选型结论见 `docs/adr/015`。
+
 `PRD-M2-001` 明确要求对齐 **2026-07-28** 规范（无状态化，取消 `initialize` 握手与 `Mcp-Session-Id`）。但截至 2026-09-14：
 
 - `@modelcontextprotocol/sdk` 的 **latest 是 1.30.0**（旧的有状态规范）
