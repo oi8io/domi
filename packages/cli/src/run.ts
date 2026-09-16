@@ -74,7 +74,8 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         io.err('评估层不可用（packages/eval 不在这份安装里）。其它命令不受影响。')
         return 127
       }
-      return runEval(cli.sub, cli.args, io)
+      // eval 的子命令自己解析选项（--rounds / --tasks / --out …），给它原始参数（BUG-M6-001）
+      return runEval(cli.sub, cli.rawArgs, io)
     }
 
     // PRD-M2-005。同 eval：动态 import，删掉 packages/trace 也只是这一条命令退化

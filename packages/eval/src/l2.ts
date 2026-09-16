@@ -25,6 +25,10 @@ export const L2TaskSchema = z
     /** 这一题放行哪些能力（工作区是临时目录，放行是安全的） */
     allow: z.array(z.string()).default(['fs.read', 'fs.write', 'shell.exec']),
     timeoutMs: z.number().int().positive().default(180_000),
+    /** 模型开始之前在工作区里跑的准备命令（装依赖）。git 历史出的题会带（PRD-M7-008） */
+    setup: z.string().optional(),
+    /** 题目出处（git 历史出的题） */
+    source: z.object({ repo: z.string(), commit: z.string(), parent: z.string() }).optional(),
   })
   .strict()
 export type L2Task = z.infer<typeof L2TaskSchema> & { dir: string }
@@ -102,7 +106,7 @@ function checkTask(task: L2Task, workspace: string, bun: string): { pass: boolea
     stdout: 'pipe',
     stderr: 'pipe',
     env: { PATH: process.env.PATH ?? '', HOME: workspace, NO_COLOR: '1' },
-    timeout: 60_000,
+    timeout: Math.min(task.timeoutMs, 600_000),
   })
   const output = `${new TextDecoder().decode(r.stdout)}${new TextDecoder().decode(r.stderr)}`.trim().slice(-2000)
   return { pass: r.exitCode === 0, output }
@@ -120,7 +124,18 @@ export async function runOne(task: L2Task, round: number, opts: L2Options): Prom
   const t0 = now()
   let events: readonly EventEnvelope[] = []
   let error: string | undefined
+  if (task.setup) {
+    const s = Bun.spawnSync(['sh', '-c', task.setup], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: 600_000,
+    })
+    if (s.exitCode !== 0)
+      error = `准备命令失败（${task.setup}）：${new TextDecoder().decode(s.stderr).trim().slice(-500)}`
+  }
   try {
+    if (error !== undefined) throw new Error(error)
     events = await opts.run({ task, workspace, dbPath: join(base, 'events.db'), sessionId, signal: ac.signal })
   } catch (e) {
     error = e instanceof Error ? e.message : String(e)

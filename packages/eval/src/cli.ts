@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { SqliteEventLog } from '@domi/store'
 import { type Fixture, parse, record, serialize } from './fixture.ts'
 import { formatL2Report, L2_DIR, loadL2Tasks, runL2 } from './l2.ts'
+import { mineTasks } from './mine.ts'
 import { formatResult, replay } from './replay.ts'
 
 export interface Io {
@@ -27,8 +28,10 @@ export const EVAL_HELP = `domi eval —— L1 确定性轨迹回放（不联网�
 
   domi eval record <sessionId>   把一条真实会话导出成 fixture
   domi eval run [fixture...]     回放 fixture，断言工具调用序列与录制一致
-  domi eval l2 [题 id...] [--rounds N]
+  domi eval l2 [题 id...] [--rounds N] [--tasks <目录>]
                                  L2：用真实模型跑 eval/l2 的题集（花钱、不进 CI），默认 3 轮
+  domi eval mine <仓库> [--since 2026-01-01] [--limit 50] [--test-cmd "bun test {files}"] [--setup "..."] [--out eval/mined/<名字>]
+                                 从 git 历史出题：父提交上测试失败、放入该提交的改动后通过的才收（不花钱，但要跑测试）
 
 fixture 默认读写 ${FIXTURE_DIR}/ 。回放全程不发出任何网络请求。`
 
@@ -111,8 +114,10 @@ async function cmdRun(paths: readonly string[], io: Io): Promise<number> {
 async function cmdL2(args: readonly string[], io: Io): Promise<number> {
   const roundsArg = args.indexOf('--rounds')
   const rounds = roundsArg >= 0 ? Number(args[roundsArg + 1]) : 3
-  const only = args.filter((a, i) => !a.startsWith('--') && (roundsArg < 0 || i !== roundsArg + 1))
-  const tasks = loadL2Tasks(undefined, only)
+  const tasksArg = args.indexOf('--tasks')
+  const valueAt = new Set([roundsArg + 1, tasksArg + 1].filter((i) => i > 0))
+  const only = args.filter((a, i) => !a.startsWith('--') && !valueAt.has(i))
+  const tasks = loadL2Tasks(tasksArg >= 0 ? args[tasksArg + 1] : undefined, only)
   if (tasks.length === 0) {
     io.err('eval/l2/tasks 下没有题（或者给的题 id 都不存在）')
     return 1
@@ -159,6 +164,46 @@ const L2_PRICING = {
   'claude-haiku-4-5': { inputPer1M: 1, outputPer1M: 5, cacheReadPer1M: 0.1 },
 }
 
+function flag(args: readonly string[], name: string): string | undefined {
+  const i = args.indexOf(name)
+  return i >= 0 ? args[i + 1] : undefined
+}
+
+async function cmdMine(args: readonly string[], io: Io): Promise<number> {
+  const values = new Set(
+    ['--since', '--limit', '--test-cmd', '--setup', '--out'].map((f) => args.indexOf(f) + 1).filter((i) => i > 0),
+  )
+  const repo = args.find((a, i) => !a.startsWith('--') && !values.has(i))
+  if (!repo) {
+    io.err('用法：domi eval mine <仓库路径> [--since 日期] [--limit N] [--test-cmd "..."] [--setup "..."] [--out 目录]')
+    return 2
+  }
+  const name =
+    repo
+      .replace(/[\\/]+$/, '')
+      .split(/[\\/]/)
+      .pop() || 'repo'
+  const out = flag(args, '--out') ?? join('eval', 'mined', name)
+  const limit = flag(args, '--limit')
+  try {
+    const r = mineTasks({
+      repo,
+      out,
+      since: flag(args, '--since'),
+      limit: limit === undefined ? undefined : Number(limit),
+      testCmd: flag(args, '--test-cmd'),
+      setup: flag(args, '--setup'),
+      onProgress: (l) => io.out(l),
+    })
+    const kept = r.filter((x) => x.kept).length
+    io.out(`\n收下 ${kept} / ${r.length} 题 → ${join(out, 'tasks')}\n报告：${join(out, 'mine-report.md')}`)
+    return kept > 0 ? 0 : 1
+  } catch (e) {
+    io.err(e instanceof Error ? e.message : String(e))
+    return 1
+  }
+}
+
 export async function runEval(sub: string | undefined, args: readonly string[], io: Io): Promise<number> {
   switch (sub) {
     case 'record':
@@ -167,6 +212,8 @@ export async function runEval(sub: string | undefined, args: readonly string[], 
       return cmdRun(args, io)
     case 'l2':
       return cmdL2(args, io)
+    case 'mine':
+      return cmdMine(args, io)
     case undefined:
     case 'help':
       io.out(EVAL_HELP)

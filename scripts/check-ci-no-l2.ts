@@ -1,7 +1,7 @@
 /**
  * PRD-M6-005 AC-4 · L2 不进 CI 门禁（INV-08）
  *
- * L2 要真实模型、要花钱、结果不确定。它一旦进了门禁，红灯就会被当成噪音。
+ * L2 要真实模型、要花钱、结果不确定；从 git 历史出题（M7-008）要跑大量测试。它一旦进了门禁，红灯就会被当成噪音。
  * 查三处：CI workflow、根 package.json 里被 `check` 串起来的脚本、`pnpm eval`（只许是 L1）。
  *
  * 用法：bun run scripts/check-ci-no-l2.ts [--inject]
@@ -9,7 +9,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const L2 = /\beval\s+l2\b|eval\/l2|runL2\b/
+const L2 = /\beval\s+(l2|mine)\b|eval\/l2|runL2\b|mineTasks\b/
 const problems: string[] = []
 
 const WORKFLOWS = join('.github', 'workflows')
@@ -22,6 +22,11 @@ if (process.argv.includes('--inject')) {
   workflows.push({
     file: '.github/workflows/injected.yml',
     text: 'steps:\n  - run: bun apps/tui/src/main.tsx eval l2 --rounds 3\n',
+  })
+  // git 历史出题（PRD-M7-008 AC-4）同样不许进门禁
+  workflows.push({
+    file: '.github/workflows/injected-mine.yml',
+    text: 'steps:\n  - run: bun apps/tui/src/main.tsx eval mine . --limit 5\n',
   })
 }
 for (const w of workflows) {

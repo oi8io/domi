@@ -33,6 +33,11 @@ export interface ParsedCli {
   command: Command
   sub: string | undefined
   args: string[]
+  /**
+   * 子命令之后的原始参数（带 --选项 与它们的值）。自己解析选项的子命令用它（domi eval l2 --rounds 3）：
+   * parseArgs 不认识的选项会被当成布尔、值掉进 args，选项本身就丢了
+   */
+  rawArgs: string[]
   flags: {
     help: boolean
     version: boolean
@@ -66,6 +71,17 @@ export class UnknownCommandError extends Error {
   }
 }
 
+/** 去掉命令与子命令这两个词之后的原始参数 */
+function rawAfter(argv: readonly string[], words: ReadonlyArray<string | undefined>): string[] {
+  const out = [...argv]
+  for (const w of words) {
+    if (w === undefined) continue
+    const i = out.indexOf(w)
+    if (i >= 0) out.splice(i, 1)
+  }
+  return out
+}
+
 export function parseCli(argv: readonly string[]): ParsedCli {
   const { values, positionals } = parseArgs({
     args: [...argv],
@@ -97,6 +113,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
     command: command as Command,
     sub: positionals[1],
     args: positionals.slice(2),
+    rawArgs: rawAfter(argv, [first, positionals[1]]),
     flags: {
       help: Boolean(values.help),
       version: Boolean(values.version),
