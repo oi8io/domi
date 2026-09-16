@@ -9,15 +9,16 @@
   },
   "dependencies": {
     "@domi/capability": "workspace:*",
+    "@domi/codeintel": "workspace:*",
     "@domi/config": "workspace:*",
     "@domi/kernel": "workspace:*",
+    "@domi/memory": "workspace:*",
     "@domi/model": "workspace:*",
+    "@domi/orchestrator": "workspace:*",
+    "@domi/plugin": "workspace:*",
     "@domi/prompt": "workspace:*",
     "@domi/protocol": "workspace:*",
     "@domi/store": "workspace:*",
-    "zod": "^4.6.5",
-    "@domi/memory": "workspace:*",
-    "@domi/orchestrator": "workspace:*",
-    "@domi/plugin": "workspace:*"
+    "zod": "^4.6.5"
   }
 }

@@ -29,6 +29,7 @@ import {
   type Tool,
   ToolRegistry,
 } from '@domi/capability'
+import { DiagnosticsService, makeDiagnosticsTool, makeOutlineTool } from '@domi/codeintel'
 import type { DomiConfig } from '@domi/config'
 import {
   aggregate,
@@ -159,6 +160,8 @@ export interface SessionOptions {
 export class DomiSession {
   private readonly log: SqliteEventLog
   private readonly tools: ToolRegistry
+  /** 类型诊断（M7-007）：每个 tsconfig 一个常驻 LanguageService */
+  private readonly diagnostics = new DiagnosticsService()
   /** 后台命令（M7-001）。会话关闭时一起杀掉 */
   private readonly jobs: JobTable
   /** 仓库根与工作区信任（M7-002）。null = 本会话还没决定 */
@@ -220,6 +223,9 @@ export class DomiSession {
       .register(fsGrep)
       .register(makeShellOutputTool(this.jobs))
       .register(makeShellKillTool(this.jobs))
+      // M7-007 代码结构理解：只读，TypeScript 第一次用到才加载
+      .register(makeOutlineTool())
+      .register(makeDiagnosticsTool(this.diagnostics))
     // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用。以插件形态注册（PRD-M6-001 AC-3）
     for (const t of memorySearchPlugin.tools?.({ search: this.log.search }) ?? []) this.tools.register(t)
     if (opts.memory) this.tools.register(makeMemoryRecallTool(opts.memory))
@@ -861,6 +867,7 @@ export class DomiSession {
    */
   async flushAndClose(): Promise<void> {
     this.jobs.killAll()
+    this.diagnostics.dispose()
     await this.pump()
     this.log.close()
   }
