@@ -8,6 +8,7 @@
 import { type ConnectionState, createSessionStore, type DomiClient, type SessionStore } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { ChangesPanel } from './ChangesPanel.tsx'
 import { ConfirmDialog } from './ConfirmDialog.tsx'
 import { type PendingRef, PendingRefs } from './PendingRefs.tsx'
 import { PluginPanel } from './PluginPanel.tsx'
@@ -74,6 +75,20 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
     open(id)
   }
 
+  // 隔离会话（M7-006）：在给定仓库（不填 = domid 的默认目录）里建 worktree
+  const [repoPath, setRepoPath] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
+  const createIsolated = async (): Promise<void> => {
+    try {
+      const r = await client.createIsolatedSession(repoPath.trim() === '' ? undefined : repoPath.trim())
+      setCreateError(null)
+      await refresh()
+      open(r.sessionId)
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   const branched = async (id: string): Promise<void> => {
     await refresh()
     open(id)
@@ -103,6 +118,24 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
         <button type="button" className="new" disabled={state !== 'open'} onClick={() => void create()}>
           新建会话
         </button>
+        <form
+          className="isolate"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void createIsolated()
+          }}
+        >
+          <input
+            value={repoPath}
+            placeholder="仓库路径（留空 = domid 所在目录）"
+            onChange={(e) => setRepoPath(e.target.value)}
+            disabled={state !== 'open'}
+          />
+          <button type="submit" disabled={state !== 'open'} title="在 git worktree 里干活，不碰你的工作区">
+            新建隔离会话
+          </button>
+        </form>
+        {createError !== null && <p className="error">{createError}</p>}
         <button
           type="button"
           className={`soul-link${view === 'soul' ? ' current' : ''}`}
@@ -251,6 +284,9 @@ export function SessionView({
         onNotice={setNotice}
       />
       <StatusBar status={status} />
+      {status.worktree !== undefined && (
+        <ChangesPanel client={client} sessionId={sessionId} busy={status.busy} items={items} />
+      )}
       <Transcript
         items={items}
         {...(onBranched === undefined ? {} : { onBranch: branch })}

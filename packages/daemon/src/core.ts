@@ -131,6 +131,23 @@ export interface HostTasks {
   cancel(runId: string): Promise<boolean>
 }
 
+/** 宿主拒绝了一个请求（参数本身合法，但当前状态不允许，比如不是隔离会话）。→ INVALID_PARAMS */
+export class HostRequestError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'HostRequestError'
+  }
+}
+
+/** 隔离工作区（PRD-M7-006） */
+export interface HostWorktrees {
+  create(cwd: string | undefined): Promise<ResultOf<'session.create'>>
+  diff(sessionId: string): Promise<ResultOf<'worktree.diff'>>
+  discard(sessionId: string, path: string): Promise<string>
+  restore(sessionId: string, trash: string): Promise<string>
+  apply(sessionId: string, mode: 'squash' | 'merge' | 'branch', message?: string): Promise<ResultOf<'worktree.apply'>>
+}
+
 export class InvalidTaskError extends Error {
   constructor(message: string) {
     super(message)
@@ -153,6 +170,7 @@ export interface DaemonHost {
   branch(sessionId: string, atSeq: number): Promise<string>
   memory?: HostMemory
   tasks?: HostTasks
+  worktrees?: HostWorktrees
   plugins?: {
     list(): Promise<ResultOf<'plugin.list'>>
     /** 没有这个面板时返回 null */
@@ -255,7 +273,12 @@ export class Daemon {
       return await this.dispatch(conn, req, method, parsed.data as never)
     } catch (e) {
       if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message)
-      if (e instanceof BranchPointError || e instanceof InvalidRefError || e instanceof InvalidTaskError) {
+      if (
+        e instanceof BranchPointError ||
+        e instanceof InvalidRefError ||
+        e instanceof InvalidTaskError ||
+        e instanceof HostRequestError
+      ) {
         return fail(req.id, 'INVALID_PARAMS', e.message)
       }
       return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
@@ -395,8 +418,33 @@ export class Daemon {
       }
 
       case 'session.create': {
-        const p = params as { cwd?: string }
+        const p = params as { cwd?: string; isolate?: boolean }
+        if (p.isolate) {
+          if (!this.host.worktrees) return fail(req.id, 'INTERNAL', '这个 domid 不支持隔离工作区')
+          return ok(req.id, await this.host.worktrees.create(p.cwd))
+        }
         return ok(req.id, { sessionId: await this.host.create(p.cwd) })
+      }
+
+      case 'worktree.diff':
+      case 'worktree.discard':
+      case 'worktree.restore':
+      case 'worktree.apply': {
+        const w = this.host.worktrees
+        if (!w) return fail(req.id, 'INTERNAL', '这个 domid 不支持隔离工作区')
+        const p = params as {
+          sessionId: string
+          path?: string
+          trash?: string
+          mode?: 'squash' | 'merge' | 'branch'
+          message?: string
+        }
+        if (method === 'worktree.diff') return ok(req.id, await w.diff(p.sessionId))
+        // 改工作区的操作和会话里的一轮互斥：模型正在改文件时丢弃 / 带回，结果说不清
+        if (this.isBusy(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正在处理，等这一轮结束再操作')
+        if (method === 'worktree.discard') return ok(req.id, { trash: await w.discard(p.sessionId, p.path as string) })
+        if (method === 'worktree.restore') return ok(req.id, { path: await w.restore(p.sessionId, p.trash as string) })
+        return ok(req.id, await w.apply(p.sessionId, p.mode ?? 'squash', p.message))
       }
 
       case 'session.subscribe': {

@@ -17,12 +17,22 @@ import { DagSpecError } from '@domi/orchestrator'
 import type { PluginHost } from '@domi/plugin'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
 import {
+  applyWorktree,
+  createWorktree,
   DomiSession,
+  discardFile,
+  ensureWorktree,
   MemoryService,
   officialSkillsPlugin,
   RefError,
+  removeWorktree,
+  restoreDiscard,
   type SessionOptions,
   TaskService,
+  WorktreeError,
+  type WorktreeInfo,
+  worktreeDiff,
+  worktreeFromEvents,
 } from '@domi/runtime'
 import { SqliteEventLog } from '@domi/store'
 import { AUDIT_SESSION_ID } from './auth.ts'
@@ -34,6 +44,7 @@ import {
   type DaemonHost,
   type HostAsk,
   type HostMetrics,
+  HostRequestError,
   InvalidRefError,
   InvalidTaskError,
   type SessionHandle,
@@ -101,6 +112,21 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
   const sessions = new Map<string, Promise<DomiSession>>()
   const pushChild = (id: string, envs: EventEnvelope[]): void => emit?.(id, envs)
 
+  /** 这个会话的隔离工作区（从事件流里找；不是隔离会话 → null） */
+  async function worktreeOf(sessionId: string): Promise<WorktreeInfo | null> {
+    if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+    return worktreeFromEvents(await index.read(sessionId))
+  }
+
+  /** WorktreeError → INVALID_PARAMS */
+  async function wt<T>(fn: () => T | Promise<T>): Promise<T> {
+    try {
+      return await fn()
+    } catch (e) {
+      throw e instanceof WorktreeError ? new HostRequestError(e.message) : e
+    }
+  }
+
   function live(sessionId: string, init?: { cwd: string; title: string; spawnedBy?: string }): Promise<DomiSession> {
     const cached = sessions.get(sessionId)
     if (cached) return cached
@@ -116,6 +142,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       }
       const row = index.sessions.get(sessionId)
       if (!row) throw new SessionNotFoundError(sessionId)
+      // 隔离会话被删过又恢复时 worktree 目录已经清掉了：按分支重新挂上（M7-006）
+      const tree = await worktreeOf(sessionId)
+      if (tree) await wt(() => ensureWorktree(tree))
       const s = new DomiSession({
         config: opts.config,
         sessionId,
@@ -260,7 +289,65 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
 
     async remove(sessionId) {
       if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+      // 隔离会话：worktree 里有没提交的改动就不删（PRD-M7-006 AC-4）；删目录不删分支
+      const tree = await worktreeOf(sessionId)
+      if (tree) await wt(() => removeWorktree(tree))
       index.sessions.softDelete(sessionId, Date.now())
+    },
+
+    worktrees: {
+      async create(cwd) {
+        const id = newId()
+        const { info, cwd: inTree } = await wt(() => createWorktree(cwd ?? opts.defaultCwd, id, home))
+        index.sessions.upsert({ id, cwd: inTree, model: opts.config.model.name })
+        await index.append(id, [{ t: 'worktree.create', ...info }])
+        return { sessionId: id, worktree: { path: info.path, branch: info.branch } }
+      },
+      async diff(sessionId) {
+        const tree = await worktreeOf(sessionId)
+        if (!tree) throw new HostRequestError(`${sessionId} 不是隔离会话`)
+        const files = await wt(() => worktreeDiff(tree))
+        return { repo: tree.repo, branch: tree.branch, base: tree.base, files }
+      },
+      async discard(sessionId, path) {
+        const tree = await worktreeOf(sessionId)
+        if (!tree) throw new HostRequestError(`${sessionId} 不是隔离会话`)
+        const trash = await wt(() => discardFile(tree, path, home))
+        await (await live(sessionId)).appendEvents([{ t: 'worktree.discard', path, trash }])
+        return trash
+      },
+      async restore(sessionId, trash) {
+        const tree = await worktreeOf(sessionId)
+        if (!tree) throw new HostRequestError(`${sessionId} 不是隔离会话`)
+        const path = await wt(() => restoreDiscard(tree, trash, home))
+        await (await live(sessionId)).appendEvents([{ t: 'worktree.restore', path, trash }])
+        return path
+      },
+      async apply(sessionId, mode, message) {
+        const tree = await worktreeOf(sessionId)
+        if (!tree) throw new HostRequestError(`${sessionId} 不是隔离会话`)
+        const s = await live(sessionId)
+        const title = index.sessions.get(sessionId)?.title ?? ''
+        const msg = message ?? (title === '' ? `domi 会话 ${sessionId} 的改动` : title)
+        const target =
+          mode === 'branch'
+            ? `只留在分支 ${tree.branch}`
+            : `${mode === 'squash' ? '压成一个提交' : '合并'}到 ${tree.repo} 当前分支`
+        // 人工批准（AC-3）：没批准，原仓库一个字节不动
+        const { allowed } = await s.askApproval(
+          `把隔离工作区的改动${target}？`,
+          { message: msg, repo: tree.repo, mode },
+          'worktree.apply',
+        )
+        if (!allowed) {
+          const r = { ok: false, message: '没有批准，原仓库没有改动' }
+          await s.appendEvents([{ t: 'worktree.apply', mode, ...r }])
+          return r
+        }
+        const r = await wt(() => applyWorktree(tree, mode, msg))
+        await s.appendEvents([{ t: 'worktree.apply', mode, ...r }])
+        return r
+      },
     },
 
     async restore(sessionId) {

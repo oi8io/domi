@@ -577,8 +577,9 @@ export class DomiSession {
   async askApproval(
     message: string,
     detail: Record<string, unknown> = {},
+    capabilityId = 'task.approval',
   ): Promise<{ allowed: boolean; channel?: string }> {
-    return this.askUser('task.approval', { message, ...detail })
+    return this.askUser(capabilityId, { message, ...detail })
   }
 
   /** 事件流里最后一条 mode.switch 决定当前模式（重开会话后仍在计划模式） */

@@ -287,9 +287,49 @@ export const METHODS = {
     result: z.object({ mode: z.enum(['plan', 'act']), changed: z.boolean() }),
   },
   'session.create': {
-    summary: '新建会话',
-    params: z.object({ cwd: z.string().optional() }),
-    result: z.object({ sessionId: z.string() }),
+    summary: '新建会话。isolate：在 cwd 所在的 git 仓库里建隔离工作区（PRD-M7-006），会话在 worktree 里干活',
+    params: z.object({ cwd: z.string().optional(), isolate: z.boolean().optional() }),
+    result: z.object({
+      sessionId: z.string(),
+      worktree: z.object({ path: z.string(), branch: z.string() }).optional(),
+    }),
+  },
+  'worktree.diff': {
+    summary: '隔离会话相对起点的改动，按文件（含未跟踪文件）。不是隔离会话 → INVALID_PARAMS',
+    params: z.object({ sessionId: z.string() }),
+    result: z.object({
+      repo: z.string(),
+      branch: z.string(),
+      base: z.string(),
+      files: z.array(
+        z.object({
+          path: z.string(),
+          status: z.enum(['added', 'modified', 'deleted', 'renamed']),
+          patch: z.string(),
+          truncated: z.boolean().optional(),
+        }),
+      ),
+    }),
+  },
+  'worktree.discard': {
+    summary: '丢弃一个文件的改动（恢复成起点）。内容先进回收站，返回编号，可以用 worktree.restore 撤销',
+    params: z.object({ sessionId: z.string(), path: z.string().min(1) }),
+    result: z.object({ trash: z.string() }),
+  },
+  'worktree.restore': {
+    summary: '撤销一次丢弃',
+    params: z.object({ sessionId: z.string(), trash: z.string() }),
+    result: z.object({ path: z.string() }),
+  },
+  'worktree.apply': {
+    summary:
+      '把改动带回原仓库：squash（默认，压成一个提交）/ merge / branch（只留分支）。会先问人（worktree.apply 询问），没批准原仓库一个字节不动',
+    params: z.object({
+      sessionId: z.string(),
+      mode: z.enum(['squash', 'merge', 'branch']).optional(),
+      message: z.string().min(1).optional(),
+    }),
+    result: z.object({ ok: z.boolean(), commit: z.string().optional(), message: z.string() }),
   },
   'session.submit': {
     summary:

@@ -145,3 +145,15 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .statusbar .verify-verified { color: #16a34a; }
 .statusbar .verify-failed { color: #dc2626; }
 .tools .mode-toggle.on { background: #0891b2; color: #fff; border-color: #0891b2; }
+
+.isolate { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+.isolate input { font-size: 12px; }
+.changes-panel { border: 1px solid var(--border, #ddd); border-radius: 6px; padding: 6px 10px; margin: 6px 0; }
+.changes-toggle { font-size: 13px; }
+.change-files { list-style: none; padding: 0; margin: 6px 0; }
+.change { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 2px 0; }
+.change-path { background: none; border: none; cursor: pointer; font-family: ui-monospace, monospace; text-align: left; }
+.change-mark { font-size: 11px; padding: 0 4px; border-radius: 3px; background: #eee; }
+.c-added .change-mark { background: #dcfce7; }
+.c-deleted .change-mark { background: #fee2e2; }
+.patch { width: 100%; max-height: 360px; overflow: auto; font-size: 12px; background: #f8f8f8; padding: 6px; margin: 0; }

@@ -174,6 +174,30 @@ export class DomiClient {
     return r.changed
   }
 
+  /** 隔离会话（M7-006）：在 cwd 所在仓库建 git worktree，会话在里面干活 */
+  async createIsolatedSession(
+    cwd?: string,
+  ): Promise<{ sessionId: string; worktree?: { path: string; branch: string } | undefined }> {
+    return this.request('session.create', cwd === undefined ? { isolate: true } : { cwd, isolate: true })
+  }
+
+  worktreeDiff(sessionId: string) {
+    return this.request('worktree.diff', { sessionId })
+  }
+
+  async discardChange(sessionId: string, path: string): Promise<string> {
+    return (await this.request('worktree.discard', { sessionId, path })).trash
+  }
+
+  async restoreChange(sessionId: string, trash: string): Promise<string> {
+    return (await this.request('worktree.restore', { sessionId, trash })).path
+  }
+
+  /** 带回原仓库。会先弹一次确认（worktree.apply 询问） */
+  applyChanges(sessionId: string, mode: 'squash' | 'merge' | 'branch' = 'squash', message?: string) {
+    return this.request('worktree.apply', message === undefined ? { sessionId, mode } : { sessionId, mode, message })
+  }
+
   async createSession(cwd?: string): Promise<string> {
     const r = await this.request('session.create', cwd === undefined ? {} : { cwd })
     return r.sessionId

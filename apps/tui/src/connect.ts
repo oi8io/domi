@@ -38,6 +38,8 @@ export interface ConnectOptions {
   connect?: string
   /** 连接时带的 token（DOMI_TOKEN / 配置 / 本机 domid 生成的文件） */
   token?: string
+  /** `domi --isolate`：在隔离工作区（git worktree）里开会话（PRD-M7-006） */
+  isolate?: boolean
 }
 
 /** 远程连不上。说清楚是哪一步，别让人对着「一直在重连」猜 */
@@ -114,7 +116,9 @@ export async function connectChat(opts: ConnectOptions): Promise<ChatConnection>
     connect: () => new WebSocket(daemon.url, protocols) as unknown as WireSocket,
   })
   await client.start()
-  const sessionId = await client.createSession(opts.cwd)
+  const sessionId = opts.isolate
+    ? (await client.createIsolatedSession(opts.cwd)).sessionId
+    : await client.createSession(opts.cwd)
   // 模型名先按本地配置显示；daemon 推来第一份 metrics 后以它为准
   const store = createSessionStore({ model: opts.model.name, provider: opts.model.provider })
   await client.watch(sessionId, store)

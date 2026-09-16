@@ -21,6 +21,10 @@ export type SlashCommand =
   | { kind: 'memory'; query: string }
   | { kind: 'extract' }
   | { kind: 'mode'; mode: 'plan' | 'act' }
+  | { kind: 'changes'; path?: string }
+  | { kind: 'discard'; path: string }
+  | { kind: 'undo'; trash: string }
+  | { kind: 'apply'; mode: 'squash' | 'merge' | 'branch' }
   | { kind: 'invalid'; message: string }
 
 /** lastSeq = 当前对话里最后一条的 seq；`/branch` 不带数字时从这里分 */
@@ -85,6 +89,21 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       return { kind: 'mode', mode: 'plan' } // PRD-M7-005
     case '/act':
       return { kind: 'mode', mode: 'act' }
+    // 隔离会话的改动审阅（PRD-M7-006）
+    case '/changes':
+      return rest[0] ? { kind: 'changes', path: rest[0] } : { kind: 'changes' }
+    case '/discard':
+      return rest[0] ? { kind: 'discard', path: rest[0] } : { kind: 'invalid', message: '用法：/discard <文件>' }
+    case '/undo':
+      return rest[0] && /^\d+$/.test(rest[0])
+        ? { kind: 'undo', trash: rest[0] }
+        : { kind: 'invalid', message: '用法：/undo <回收站编号>（/discard 时给出的）' }
+    case '/apply': {
+      const mode = rest[0] ?? 'squash'
+      return mode === 'squash' || mode === 'merge' || mode === 'branch'
+        ? { kind: 'apply', mode }
+        : { kind: 'invalid', message: '用法：/apply [squash|merge|branch]' }
+    }
     default:
       return { kind: 'submit', text }
   }

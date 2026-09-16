@@ -35,6 +35,8 @@ import { connectChat, connectDaemon } from './connect.ts'
 const EXIT_CONFIG_ERROR = 2
 
 /** 终端里能直接回答的表单：只有一个布尔字段时，y 就是 true。其它返回 null（去 Web 端填） */
+const CHANGE_MARK = { added: '+', modified: '~', deleted: '-', renamed: '>' } as const
+
 export function tuiFormAnswer(schema: unknown): Record<string, unknown> | null {
   if ((schema as Record<string, unknown> | null)?.['x-domi-accept-empty'] === true) return {}
   const props = Object.entries((schema as { properties?: Record<string, { type?: string }> })?.properties ?? {})
@@ -117,6 +119,38 @@ function Root({
             return client.request('session.compact', { sessionId })
           case 'model':
             return client.switchModel(sessionId, cmd.model, cmd.provider)
+          case 'changes': {
+            const d = await client.worktreeDiff(sessionId)
+            if (cmd.path !== undefined) {
+              const f = d.files.find((x) => x.path === cmd.path)
+              setNotice(f ? f.patch || '（二进制或空文件）' : `${cmd.path} 没有改动`)
+              return
+            }
+            setNotice(
+              d.files.length === 0
+                ? `隔离工作区（${d.branch}）里还没有改动`
+                : [
+                    `${d.branch} 相对 ${d.base.slice(0, 8)} 的改动（/changes <文件> 看 diff，/apply 带回）：`,
+                    ...d.files.map((f) => `  ${CHANGE_MARK[f.status]} ${f.path}`),
+                  ].join('\n'),
+            )
+            return
+          }
+          case 'discard': {
+            const trash = await client.discardChange(sessionId, cmd.path)
+            setNotice(`已丢弃 ${cmd.path} 的改动（/undo ${trash} 撤销）`)
+            return
+          }
+          case 'undo': {
+            const path = await client.restoreChange(sessionId, cmd.trash)
+            setNotice(`已恢复 ${path} 的改动`)
+            return
+          }
+          case 'apply': {
+            const r = await client.applyChanges(sessionId, cmd.mode)
+            setNotice(r.message)
+            return
+          }
           case 'mode': {
             const changed = await client.setMode(sessionId, cmd.mode)
             if (!changed) setNotice(cmd.mode === 'plan' ? '已经是计划模式了' : '已经是执行模式了')
@@ -288,7 +322,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     process.exit(await runCommand(cli, io))
   }
 
-  return startChat(cli.flags.connect)
+  return startChat(cli.flags.connect, cli.flags.isolate)
 }
 
 async function runDaemonCommand(cli: ParsedCli, io: { out(s: string): void; err(s: string): void }): Promise<number> {
@@ -323,7 +357,7 @@ async function runDaemonCommand(cli: ParsedCli, io: { out(s: string): void; err(
   }
 }
 
-async function startChat(remote: string | undefined): Promise<void> {
+async function startChat(remote: string | undefined, isolate = false): Promise<void> {
   let config: ReturnType<typeof loadConfigOrThrow>
   try {
     // 连远程时模型在对面跑，本机不需要模型凭据
@@ -349,6 +383,7 @@ async function startChat(remote: string | undefined): Promise<void> {
       model: config.model,
       ...(remote === undefined ? {} : { connect: remote }),
       ...(token === undefined ? {} : { token }),
+      ...(isolate ? { isolate: true } : {}),
     })
     render(<Root store={conn.store} client={conn.client} sessionId={conn.sessionId} />)
   } catch (e) {

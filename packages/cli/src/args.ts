@@ -47,6 +47,8 @@ export interface ParsedCli {
     connect: string | undefined
     /** `domi init --from-toml`：迁移旧配置（ADR-014） */
     fromToml: boolean
+    /** `domi --isolate`：在隔离工作区（git worktree）里开会话（PRD-M7-006） */
+    isolate: boolean
     /** `domi init --project`：在仓库里建 .domi/ 与 AGENT.md 模板（PRD-M7-002 AC-5） */
     project: boolean
     /** `domi trust <路径> --revoke` */
@@ -82,6 +84,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       'from-toml': { type: 'boolean' },
       project: { type: 'boolean' },
       revoke: { type: 'boolean' },
+      isolate: { type: 'boolean' },
     },
   })
 
@@ -102,6 +105,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       ping: Boolean(values.ping),
       fromToml: Boolean(values['from-toml']),
       project: Boolean(values.project),
+      isolate: Boolean(values.isolate),
       revoke: Boolean(values.revoke),
       html: typeof values.html === 'string' ? values.html : undefined,
       connect: typeof values.connect === 'string' ? values.connect : undefined,
@@ -115,6 +119,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
 
 用法：
   domi                      进入对话（最常用，不需要子命令）
+  domi --isolate            在隔离工作区里开会话（git worktree，不碰你的工作区；改完审阅后再带回）
   domi --connect ws://主机:端口
                             连另一台机器上的 domid（token 放在环境变量 DOMI_TOKEN）
   domi doctor               体检；每条问题都给一条可直接粘贴执行的命令
@@ -148,6 +153,9 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   /branch [seq]             从某一条（默认最后一条）分出一个新会话并切过去
   /ref <会话 id> [起-止]    引用另一个会话的一段，下一句话带上（不给区间就是整个会话）
   /plan  /act               计划模式（只读，想好方案提交审批）/ 回到执行模式
+  /changes [文件]           隔离会话的改动清单（给文件名就显示它的 diff）
+  /discard <文件>           丢弃一个文件的改动（/undo <编号> 撤销）
+  /apply [squash|merge|branch]  把改动带回原仓库（会先问你）
   /sessions [--all]         列出会话（--all 含已删除的）
   /open <id>  /new          切到某个会话 / 新建一个
   /delete <id>  /restore <id>  软删除 / 恢复会话

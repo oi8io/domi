@@ -46,6 +46,8 @@ export interface StatusSnapshot {
    * 算法在 packages/kernel/src/metrics.ts，三端共用同一份。
    */
   metrics: MetricsSnapshot | null
+  /** 隔离会话的工作区（M7-006）。从 worktree.create 事件投影 */
+  worktree?: { path: string; branch: string; repo: string } | undefined
 }
 
 export interface AskSnapshot {
@@ -242,6 +244,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         })
         break
       case 'worktree.create':
+        $status.set({ ...$status.get(), worktree: { path: ev.path, branch: ev.branch, repo: ev.repo } })
         push({ seq: env.seq, kind: 'context', text: `在隔离工作区里干活：${ev.branch}`, summary: ev.path })
         break
       case 'worktree.apply':
@@ -307,6 +310,12 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
       }
       case 'model.usage':
         $status.set({ ...$status.get(), lastUsage: ev.raw })
+        break
+      case 'worktree.discard':
+        push({ seq: env.seq, kind: 'context', text: `丢弃了 ${ev.path} 的改动`, summary: `撤销：回收站 ${ev.trash}` })
+        break
+      case 'worktree.restore':
+        push({ seq: env.seq, kind: 'context', text: `恢复了 ${ev.path} 的改动` })
         break
       case 'error':
         push({ seq: env.seq, kind: 'error', text: ev.message, ok: false })

@@ -1507,7 +1507,7 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 
 ### `session.create`
 
-新建会话
+新建会话。isolate：在 cwd 所在的 git 仓库里建隔离工作区（PRD-M7-006），会话在 worktree 里干活
 
 **params**
 
@@ -1518,6 +1518,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
   "properties": {
     "cwd": {
       "type": "string"
+    },
+    "isolate": {
+      "type": "boolean"
     }
   }
 }
@@ -1532,10 +1535,245 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
   "properties": {
     "sessionId": {
       "type": "string"
+    },
+    "worktree": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "branch"
+      ]
     }
   },
   "required": [
     "sessionId"
+  ]
+}
+```
+
+### `worktree.diff`
+
+隔离会话相对起点的改动，按文件（含未跟踪文件）。不是隔离会话 → INVALID_PARAMS
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "repo": {
+      "type": "string"
+    },
+    "branch": {
+      "type": "string"
+    },
+    "base": {
+      "type": "string"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "deleted",
+              "renamed"
+            ]
+          },
+          "patch": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "status",
+          "patch"
+        ]
+      }
+    }
+  },
+  "required": [
+    "repo",
+    "branch",
+    "base",
+    "files"
+  ]
+}
+```
+
+### `worktree.discard`
+
+丢弃一个文件的改动（恢复成起点）。内容先进回收站，返回编号，可以用 worktree.restore 撤销
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "sessionId",
+    "path"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "trash": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "trash"
+  ]
+}
+```
+
+### `worktree.restore`
+
+撤销一次丢弃
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "trash": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "trash"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "path"
+  ]
+}
+```
+
+### `worktree.apply`
+
+把改动带回原仓库：squash（默认，压成一个提交）/ merge / branch（只留分支）。会先问人（worktree.apply 询问），没批准原仓库一个字节不动
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "squash",
+        "merge",
+        "branch"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "commit": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "ok",
+    "message"
   ]
 }
 ```
