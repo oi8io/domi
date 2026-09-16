@@ -16,7 +16,7 @@ export interface ModelPrice {
   inputPer1M: number
   outputPer1M: number
   /** 缓存读通常便宜一个数量级；没给就按 input 价算 */
-  cacheReadPer1M?: number
+  cacheReadPer1M?: number | undefined
 }
 
 export type PricingTable = Record<string, ModelPrice>

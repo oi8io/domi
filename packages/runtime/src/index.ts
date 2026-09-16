@@ -1,3 +1,4 @@
+export * from './budget.ts'
 export * from './builtin-plugins.ts'
 export * from './hooks.ts'
 export * from './memory-service.ts'

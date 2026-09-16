@@ -38,6 +38,15 @@ export const DagSpec = z
   .object({
     name: z.string().min(1),
     description: z.string().optional(),
+    /** 每个 agent-step 节点的用量上限（PRD-M7-009） */
+    budget: z
+      .object({
+        tokens: z.number().int().positive().optional(),
+        costUsd: z.number().positive().optional(),
+        toolCalls: z.number().int().positive().optional(),
+      })
+      .strict()
+      .optional(),
     nodes: z.array(DagNode).min(1),
   })
   .strict()

@@ -140,6 +140,20 @@ export const ConfigSchema = z.object({
       maxNudges: z.number().int().min(0).max(10).default(2),
     })
     .default({ enabled: true, maxNudges: 2 }),
+  /**
+   * 价目表（美元 / 百万 token）。状态栏的花费与预算的金额上限靠它；不在表里的模型花费显示 `—`，金额上限不生效。
+   * 写了的会和内置的几项合并（同名以这里为准）
+   */
+  pricing: z
+    .record(
+      z.string(),
+      z.object({
+        inputPer1M: z.number().nonnegative(),
+        outputPer1M: z.number().nonnegative(),
+        cacheReadPer1M: z.number().nonnegative().optional(),
+      }),
+    )
+    .default({}),
   /** 每个会话的用量上限（PRD-M7-009）。不写就不限；协议 session.budget 可以按会话覆盖 */
   budget: z
     .object({
@@ -193,3 +207,16 @@ export const ConfigSchema = z.object({
 })
 
 export type DomiConfig = z.infer<typeof ConfigSchema>
+
+/** 内置价目（与 trace / eval 同一份口径）。用户在 config.yaml 的 pricing 里写的覆盖这些 */
+export type ModelPriceConfig = { inputPer1M: number; outputPer1M: number; cacheReadPer1M?: number | undefined }
+
+export const BUILTIN_PRICING: Record<string, ModelPriceConfig> = {
+  'claude-sonnet-4-5': { inputPer1M: 3, outputPer1M: 15, cacheReadPer1M: 0.3 },
+  'claude-opus-4-1': { inputPer1M: 15, outputPer1M: 75, cacheReadPer1M: 1.5 },
+  'claude-haiku-4-5': { inputPer1M: 1, outputPer1M: 5, cacheReadPer1M: 0.1 },
+}
+
+export function pricingOf(config: Pick<DomiConfig, 'pricing'>): Record<string, ModelPriceConfig> {
+  return { ...BUILTIN_PRICING, ...(config.pricing ?? {}) }
+}

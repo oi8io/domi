@@ -24,6 +24,8 @@ export interface NodeContext {
   inputs: Array<{ nodeId: string; output: string }>
   cwd?: string
   signal: AbortSignal
+  /** 运行定义里的用量上限（M7-009） */
+  budget?: { tokens?: number | undefined; costUsd?: number | undefined; toolCalls?: number | undefined }
 }
 
 export type NodeExecutor = (node: DagNode, ctx: NodeContext) => Promise<NodeResult>
@@ -76,6 +78,7 @@ export async function drive(deps: RunnerDeps, runId: string, signal: AbortSignal
         attempt,
         inputs: node.needs.map((d) => ({ nodeId: d, output: st.nodes[d]?.output ?? '' })),
         ...(st.cwd === undefined ? {} : { cwd: st.cwd }),
+        ...(st.spec?.budget === undefined ? {} : { budget: st.spec.budget }),
         signal,
       })
     } catch (e) {

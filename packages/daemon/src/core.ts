@@ -79,6 +79,8 @@ export interface SessionHandle {
   switchModel(model: string, provider?: string): Promise<{ lost: string[] }>
   /** 计划 / 执行模式（M7-005）。老宿主没有 */
   setMode?(mode: 'plan' | 'act'): Promise<{ mode: 'plan' | 'act'; changed: boolean }>
+  /** 用量上限（M7-009） */
+  setBudget?(b: { tokens?: number; costUsd?: number; toolCalls?: number }): Promise<void>
   compactNow(trigger: 'manual' | 'threshold'): Promise<{ ok: boolean; detail: string }>
   readEvents(fromSeq: number): Promise<EventEnvelope[]>
   head(): Promise<number>
@@ -406,6 +408,15 @@ export class Daemon {
         const session = await this.session(p.sessionId)
         if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
         return ok(req.id, await session.switchModel(p.model, p.provider))
+      }
+
+      case 'session.budget': {
+        const p = params as { sessionId: string; budget: { tokens?: number; costUsd?: number; toolCalls?: number } }
+        const session = await this.session(p.sessionId)
+        if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
+        if (!session.setBudget) return fail(req.id, 'INTERNAL', '这个 domid 不支持用量上限')
+        await session.setBudget(p.budget)
+        return ok(req.id, { ok: true })
       }
 
       case 'session.mode': {

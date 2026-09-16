@@ -69,6 +69,7 @@ registerCompactStrategy()
 const TitleSchema = z.object({ title: z.string() })
 
 import { SqliteEventLog } from '@domi/store'
+import { BUDGET_DECISION_SCHEMA, type BudgetLimits, makeBudgetGate } from './budget.ts'
 import { memorySearchPlugin } from './builtin-plugins.ts'
 import { HookRunner } from './hooks.ts'
 import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
@@ -151,6 +152,8 @@ export interface SessionOptions {
   scope?: (capabilityId: string) => boolean
   /** 第几层子 agent。0 = 用户直接对话的会话；到 MAX_SPAWN_DEPTH 就不再给 task.spawn */
   spawnDepth?: number
+  /** 这个会话自己的用量上限（M7-009，长任务节点用）。覆盖配置里的 budget */
+  budget?: BudgetLimits
   /** 计划批准后转长任务（M7-005）。daemon 里接 TaskService；不给就不能转 */
   startTask?: (spec: unknown, cwd: string) => Promise<string>
   /** 子 agent 会话的事件往哪推（daemon 里是这个子会话的订阅者） */
@@ -213,6 +216,21 @@ export class DomiSession {
       jobs: this.jobs,
       outputDir,
       ...(this.hooks.empty ? {} : { hooks: this.hooks.toolHooks() }),
+      // 预算闸门（M7-009）：每次调用之前算用量，到顶问人
+      gate: makeBudgetGate({
+        base: () => ({ ...(opts.config.budget ?? {}), ...(opts.budget ?? {}) }),
+        events: () => this.view(),
+        pricing: opts.pricing ?? {},
+        ask: async (message, detail) => {
+          const r = await this.askInput('budget.exceeded', { message, requestedSchema: BUDGET_DECISION_SCHEMA }, detail)
+          if (r.action !== 'accept') return { action: 'stop' }
+          const limit =
+            typeof r.content?.limit === 'number' && Number.isFinite(r.content.limit) ? r.content.limit : undefined
+          return r.content?.action === 'raise' && limit !== undefined
+            ? { action: 'raise', limit }
+            : { action: 'continue' }
+        },
+      }),
     })
       .register(fsRead)
       .register(fsWrite)
@@ -308,8 +326,11 @@ export class DomiSession {
   private askInput(
     capability: string,
     req: { message: string; requestedSchema?: unknown },
+    detail?: Record<string, unknown>,
   ): Promise<{ action: 'accept' | 'decline'; content?: Record<string, unknown> }> {
-    const capabilityId = `${capability.split('.').slice(0, -1).join('.') || capability}.input`
+    // 运行时自己问的（预算到顶）用原名；工具要输入时显示为「同组.input」
+    const capabilityId =
+      detail !== undefined ? capability : `${capability.split('.').slice(0, -1).join('.') || capability}.input`
     return new Promise((resolve) => {
       if (!this.listeners.onAsk) {
         resolve({ action: 'decline' })
@@ -317,7 +338,7 @@ export class DomiSession {
       }
       this.listeners.onAsk({
         capabilityId,
-        args: { message: req.message },
+        args: { message: req.message, ...detail },
         form: { message: req.message, schema: req.requestedSchema ?? { type: 'object', properties: {} } },
         answer: (allowed, content) => {
           this.listeners.onAsk?.(null)
@@ -620,6 +641,19 @@ export class DomiSession {
 
   getMode(): 'plan' | 'act' {
     return this.mode
+  }
+
+  /**
+   * 设这个会话的用量上限（PRD-M7-009）。落成 budget.decided（action: raise），重开会话后照样生效
+   */
+  async setBudget(limits: BudgetLimits): Promise<void> {
+    const evs: DomiEvent[] = []
+    for (const [kind, limit] of Object.entries(limits) as Array<[keyof BudgetLimits, number | undefined]>) {
+      if (limit !== undefined) evs.push({ t: 'budget.decided', action: 'raise', kind, limit })
+    }
+    if (evs.length === 0) return
+    await this.log.append(this.opts.sessionId, evs)
+    await this.pump()
   }
 
   setBusy(busy: boolean): void {

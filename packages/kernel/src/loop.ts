@@ -72,7 +72,14 @@ export interface TurnInput {
   refs?: readonly RefLink[]
 }
 
-export type StopReason = 'completed' | 'max_tool_calls' | 'max_arg_parse_retries' | 'wall_clock' | 'stream_error'
+export type StopReason =
+  | 'completed'
+  | 'max_tool_calls'
+  | 'max_arg_parse_retries'
+  | 'wall_clock'
+  | 'stream_error'
+  /** 用量到顶、用户选择停止（PRD-M7-009）。工具端以 reason 'budget_stop' 报上来 */
+  | 'budget'
 
 export interface TurnResult {
   stopReason: StopReason
@@ -227,6 +234,9 @@ export async function runTurn(
       // 轨迹按 seq 读下来必须还原成真实的因果顺序
       await deps.sink.append(sessionId, [...(outcome.events ?? []), result])
 
+      if (outcome.reason === 'budget_stop') {
+        return stop('budget', '用量到了上限，用户选择停止，这一轮到此结束。', pending.slice(i + 1))
+      }
       if (outcome.reason === 'invalid_args') {
         argParseRetries++
         if (argParseRetries > limits.maxArgParseRetries) {

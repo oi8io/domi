@@ -11,7 +11,7 @@
 
 import { dirname, join } from 'node:path'
 import { SkillRegistry } from '@domi/capability'
-import type { DomiConfig } from '@domi/config'
+import { type DomiConfig, pricingOf } from '@domi/config'
 import { Notifier } from '@domi/notify'
 import { DagSpecError } from '@domi/orchestrator'
 import type { PluginHost } from '@domi/plugin'
@@ -156,6 +156,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         memory,
         ...(skills === undefined ? {} : { skills }),
         childEvents: pushChild,
+        // 花费与预算的金额上限（M7-009）
+        pricing: pricingOf(opts.config),
         // 计划批准后转长任务（M7-005）：同一个 TaskService
         startTask: async (spec, cwd) => (await tasks.start(JSON.stringify(spec), cwd)).runId,
       })
@@ -231,6 +233,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         },
         switchModel: (model, provider) => s.switchModel(model, provider === undefined ? {} : { provider }),
         setMode: (mode) => s.setMode(mode),
+        setBudget: (b) => s.setBudget(b),
         compactNow: (trigger) => s.compactNow(trigger),
         async readEvents(fromSeq) {
           const all = await s.pumpAll()

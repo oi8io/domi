@@ -119,6 +119,10 @@ function Root({
             return client.request('session.compact', { sessionId })
           case 'model':
             return client.switchModel(sessionId, cmd.model, cmd.provider)
+          case 'budget':
+            await client.setBudget(sessionId, cmd.budget)
+            setNotice('已设上限：到 80% 会提醒，到顶暂停问你')
+            return
           case 'changes': {
             const d = await client.worktreeDiff(sessionId)
             if (cmd.path !== undefined) {

@@ -168,6 +168,11 @@ export class DomiClient {
     return r.lost
   }
 
+  /** 会话的用量上限（M7-009） */
+  async setBudget(sessionId: string, budget: { tokens?: number; costUsd?: number; toolCalls?: number }): Promise<void> {
+    await this.request('session.budget', { sessionId, budget })
+  }
+
   /** 计划模式 / 执行模式（M7-005）。切换本身以 mode.switch 事件出现在对话里 */
   async setMode(sessionId: string, mode: 'plan' | 'act'): Promise<boolean> {
     const r = await this.request('session.mode', { sessionId, mode })

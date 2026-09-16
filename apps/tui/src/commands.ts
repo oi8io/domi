@@ -21,6 +21,7 @@ export type SlashCommand =
   | { kind: 'memory'; query: string }
   | { kind: 'extract' }
   | { kind: 'mode'; mode: 'plan' | 'act' }
+  | { kind: 'budget'; budget: { tokens?: number; costUsd?: number; toolCalls?: number } }
   | { kind: 'changes'; path?: string }
   | { kind: 'discard'; path: string }
   | { kind: 'undo'; trash: string }
@@ -89,6 +90,19 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       return { kind: 'mode', mode: 'plan' } // PRD-M7-005
     case '/act':
       return { kind: 'mode', mode: 'act' }
+    // 用量上限（PRD-M7-009）：/budget tokens 200000 · /budget cost 2 · /budget calls 100
+    case '/budget': {
+      const key = { tokens: 'tokens', cost: 'costUsd', calls: 'toolCalls' }[rest[0] ?? ''] as
+        | 'tokens'
+        | 'costUsd'
+        | 'toolCalls'
+        | undefined
+      const n = Number(rest[1])
+      if (!key || !Number.isFinite(n) || n <= 0 || (key !== 'costUsd' && !Number.isInteger(n))) {
+        return { kind: 'invalid', message: '用法：/budget tokens <数量> | /budget cost <美元> | /budget calls <次数>' }
+      }
+      return { kind: 'budget', budget: { [key]: n } }
+    }
     // 隔离会话的改动审阅（PRD-M7-006）
     case '/changes':
       return rest[0] ? { kind: 'changes', path: rest[0] } : { kind: 'changes' }

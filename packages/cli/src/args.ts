@@ -170,6 +170,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   /branch [seq]             从某一条（默认最后一条）分出一个新会话并切过去
   /ref <会话 id> [起-止]    引用另一个会话的一段，下一句话带上（不给区间就是整个会话）
   /plan  /act               计划模式（只读，想好方案提交审批）/ 回到执行模式
+  /budget tokens|cost|calls <数>  这个会话的用量上限（到 80% 提醒，到顶暂停问你）
   /changes [文件]           隔离会话的改动清单（给文件名就显示它的 diff）
   /discard <文件>           丢弃一个文件的改动（/undo <编号> 撤销）
   /apply [squash|merge|branch]  把改动带回原仓库（会先问你）

@@ -281,6 +281,20 @@ export const METHODS = {
     params: z.object({ sessionId: z.string(), model: z.string().min(1), provider: z.string().min(1).optional() }),
     result: z.object({ lost: z.array(z.string()) }),
   },
+  'session.budget': {
+    summary: '设这个会话的用量上限（PRD-M7-009）：到 80% 提醒，到顶暂停问人。落成 budget.decided，重开会话后照样生效',
+    params: z.object({
+      sessionId: z.string(),
+      budget: z
+        .object({
+          tokens: z.number().int().positive().optional(),
+          costUsd: z.number().positive().optional(),
+          toolCalls: z.number().int().positive().optional(),
+        })
+        .strict(),
+    }),
+    result: z.object({ ok: z.literal(true) }),
+  },
   'session.mode': {
     summary: '切换计划模式 / 执行模式（PRD-M7-005）。只追加一条 mode.switch；和当前一样时什么都不写',
     params: z.object({ sessionId: z.string(), mode: z.enum(['plan', 'act']) }),
