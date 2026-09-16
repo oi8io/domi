@@ -138,6 +138,11 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       return 0
     }
 
+    case 'hook': {
+      const { runHook } = await import('./hook.ts')
+      return runHook(cli.sub, cli.args, io)
+    }
+
     case 'trust': {
       const { TrustStore, findRepoRoot } = await import('@domi/runtime')
       const store = new TrustStore(join(dataDir(), 'trust.json'))

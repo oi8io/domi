@@ -16,6 +16,7 @@ import type { Clock, EventSink, ToolCallRequest, ToolRunner } from './ports.ts'
 import { type PromptParts, withPrompt } from './preamble.ts'
 import { notRunResult } from './recovery.ts'
 import { type RefResolver, refKey } from './refs.ts'
+import type { VerifyState } from './verify.ts'
 
 export interface LoopLimits {
   /** 单轮工具调用次数上限（PRD-M0-002 AC-2） */
@@ -58,6 +59,11 @@ export interface LoopDeps {
   refs?: RefResolver
   /** 拼好的提示词（BUG-M3-015）。不给就只发对话本身（回放与大部分单测走这条） */
   prompt?: PromptParts
+  /**
+   * 模型要结束这一轮时问一次（PRD-M7-004）：返回的事件先落盘；again = 再来一轮（比如改了还没验证）。
+   * 不给就直接结束
+   */
+  beforeComplete?: (events: readonly EventEnvelope[]) => Promise<{ again: boolean; events: DomiEvent[] }>
 }
 
 /** 一次用户输入。refs 是这句话引用的其他会话片段 */
@@ -70,6 +76,8 @@ export type StopReason = 'completed' | 'max_tool_calls' | 'max_arg_parse_retries
 
 export interface TurnResult {
   stopReason: StopReason
+  /** 本轮结束时的验证状态（M7-004）。由 runtime 填，kernel 不管 */
+  verify?: VerifyState
   counters: { toolCalls: number; argParseRetries: number; elapsedMs: number }
 }
 
@@ -188,7 +196,14 @@ export async function runTurn(
       return stop('stream_error', `模型流中断：${streamError.message}`, pending)
     }
 
-    if (pending.length === 0) return { stopReason: 'completed', counters: counters() }
+    if (pending.length === 0) {
+      if (deps.beforeComplete) {
+        const r = await deps.beforeComplete(await deps.sink.read(sessionId))
+        if (r.events.length > 0) await deps.sink.append(sessionId, r.events)
+        if (r.again) continue
+      }
+      return { stopReason: 'completed', counters: counters() }
+    }
 
     for (const [i, call] of pending.entries()) {
       if (toolCalls >= limits.maxToolCalls) {

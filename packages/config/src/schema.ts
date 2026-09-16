@@ -111,6 +111,43 @@ export const ConfigSchema = z.object({
   plugins: z
     .object({ enabled: z.boolean().default(true), allowUnsandboxed: z.boolean().default(false) })
     .default({ enabled: true, allowUnsandboxed: false }),
+  /**
+   * 钩子（PRD-M7-003 · ADR-025）。**只从这个文件读**，仓库里的任何文件都注册不了钩子。
+   * pre：权限允许之后、执行之前，非 0 退出 = 拦下；post：执行之后，输出附在结果上；stop：一轮结束后
+   */
+  hooks: z
+    .array(
+      z
+        .object({
+          name: z.string().min(1),
+          on: z.enum(['pre', 'post', 'stop']),
+          /** 能力 id，支持 前缀.*；stop 钩子不看它 */
+          match: z.string().default('*'),
+          run: z.string().min(1),
+          timeoutMs: z.number().int().positive().max(600_000).default(10_000),
+        })
+        .strict(),
+    )
+    .default([]),
+  /**
+   * 完成前验证（PRD-M7-004）。command：这个环境里「验证」的命令（也会按内置模式表识别 test / check / tsc / lint 等）；
+   * maxNudges：改了没验、模型却要结束时，最多追加几次提示
+   */
+  verify: z
+    .object({
+      enabled: z.boolean().default(true),
+      command: z.string().optional(),
+      maxNudges: z.number().int().min(0).max(10).default(2),
+    })
+    .default({ enabled: true, maxNudges: 2 }),
+  /** 每个会话的用量上限（PRD-M7-009）。不写就不限；协议 session.budget 可以按会话覆盖 */
+  budget: z
+    .object({
+      tokens: z.number().int().positive().optional(),
+      costUsd: z.number().positive().optional(),
+      toolCalls: z.number().int().positive().optional(),
+    })
+    .default({}),
   /** Skill（PRD-M4-005）。dirs 之外还会读 ~/.domi/skills 与内置的官方 Skill */
   skills: z.object({ enabled: z.boolean().default(true) }).default({ enabled: true }),
   /**

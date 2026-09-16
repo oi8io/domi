@@ -29,6 +29,31 @@ export interface ToolOutcome {
   events?: DomiEvent[]
 }
 
+/** 一次调用的描述（给钩子与预算闸门看） */
+export interface ToolCallInfo {
+  id: string
+  name: string
+  capability: string
+  args: unknown
+}
+
+/**
+ * 钩子端口（PRD-M7-003）。pre 在权限允许之后、执行之前；post 在执行之后。
+ * 实现在 runtime（它要起进程），这里只定形状
+ */
+export interface ToolHooks {
+  pre?(call: ToolCallInfo): Promise<{ block: boolean; reason?: string; events: DomiEvent[] }>
+  post?(
+    call: ToolCallInfo,
+    result: { ok: boolean; payload: unknown },
+  ): Promise<{ events: DomiEvent[]; notes: Array<{ hook: string; exitCode: number | null; output: string }> }>
+}
+
+/**
+ * 预算闸门（PRD-M7-009）：每次调用之前、权限之前问一次。stop = 这次不执行，本轮该结束了
+ */
+export type ToolGate = (call: ToolCallInfo) => Promise<{ stop: boolean; message?: string; events: DomiEvent[] }>
+
 export interface ToolRegistryOptions {
   cwd: string
   permissions: PermissionEngine
@@ -38,6 +63,8 @@ export interface ToolRegistryOptions {
   jobs?: JobStarter
   /** 超长输出落盘目录 */
   outputDir?: string
+  hooks?: ToolHooks
+  gate?: ToolGate
 }
 
 export class ToolRegistry {
@@ -92,6 +119,21 @@ export class ToolRegistry {
       }
     }
 
+    const info: ToolCallInfo = { id: call.id, name: call.name, capability: tool.capability, args: parsed.data }
+    const gateEvents: DomiEvent[] = []
+    if (this.opts.gate) {
+      const g = await this.opts.gate(info)
+      gateEvents.push(...g.events)
+      if (g.stop) {
+        return {
+          ok: false,
+          reason: 'budget_stop',
+          events: gateEvents,
+          payload: { message: g.message ?? '用量到了上限，用户选择停止。不要再调用工具，总结目前的进展后结束。' },
+        }
+      }
+    }
+
     const decision = await this.opts.permissions.check(tool.capability, parsed.data)
     const permissionEvent: DomiEvent = {
       t: 'permission',
@@ -109,7 +151,7 @@ export class ToolRegistry {
         // PRD-M0-003 AC-2 的 user_denied 只给**用户当场拒绝**。规则拒绝、默认拒绝另起一个名字——
         // 说成「用户拒绝了」，用户会以为自己误操作，模型会以为用户不想让它做（BUG-M3-013）
         reason: byUser ? 'user_denied' : 'permission_denied',
-        events: [permissionEvent],
+        events: [...gateEvents, permissionEvent],
         // 给模型的是一句人话，不是异常——它需要知道"被拒了"、被谁拒的，并据此改计划
         payload: {
           message: denialMessage(tool.capability, decision.source, decision.matchedRule),
@@ -120,7 +162,21 @@ export class ToolRegistry {
       }
     }
 
-    const events: DomiEvent[] = [permissionEvent]
+    const events: DomiEvent[] = [...gateEvents, permissionEvent]
+    if (this.opts.hooks?.pre) {
+      const pre = await this.opts.hooks.pre(info)
+      events.push(...pre.events)
+      if (pre.block) {
+        return {
+          ok: false,
+          reason: 'hook_blocked',
+          events,
+          payload: {
+            message: `${pre.reason ?? '被钩子拦下'}\n（这是用户配置的检查，不是权限问题。按它说的改，不要原样重试。）`,
+          },
+        }
+      }
+    }
     const elicit = this.opts.elicit
     const ctx: ToolCtx = {
       cwd: this.opts.cwd,
@@ -137,17 +193,31 @@ export class ToolRegistry {
         : {}),
     }
 
+    let outcome: ToolOutcome
     try {
       const payload = await (tool as Tool<unknown, unknown>).execute(parsed.data, ctx)
-      return { ok: true, payload, events }
+      outcome = { ok: true, payload, events }
     } catch (e) {
-      return {
+      outcome = {
         ok: false,
         reason: e instanceof Error ? e.name : 'tool_threw',
         events,
         payload: { message: e instanceof Error ? e.message : String(e) },
       }
     }
+    if (this.opts.hooks?.post) {
+      const post = await this.opts.hooks.post(info, { ok: outcome.ok, payload: outcome.payload })
+      events.push(...post.events)
+      // 钩子输出附在结果上：它和结果一样是数据（INV-06），在上下文里同样带边界
+      if (post.notes.length > 0) {
+        const p = outcome.payload
+        outcome.payload =
+          p !== null && typeof p === 'object' && !Array.isArray(p)
+            ? { ...(p as Record<string, unknown>), hooks: post.notes }
+            : { result: p, hooks: post.notes }
+      }
+    }
+    return outcome
   }
 }
 

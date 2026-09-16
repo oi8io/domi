@@ -3334,6 +3334,22 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
+        },
+        "verify": {
+          "type": "string",
+          "enum": [
+            "clean",
+            "unverified",
+            "verified",
+            "failed"
+          ]
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "act"
+          ]
         }
       },
       "required": [

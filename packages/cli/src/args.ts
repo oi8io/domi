@@ -25,6 +25,7 @@ export const COMMANDS = [
   'bridge',
   'plugin',
   'trust',
+  'hook',
 ] as const
 export type Command = (typeof COMMANDS)[number]
 
@@ -139,6 +140,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi task run|list|status|retry|cancel      长任务编排（DAG，跑在 domid 里）
   domi bridge pair|telegram                   Telegram 桥接：生成配对码 / 启动桥接
   domi plugin list|install|remove|scaffold    插件：安装时逐条确认权限，代码跑在沙箱里
+  domi hook commit-msg|secrets                示例钩子（在 config.yaml 的 hooks 里引用）
 
 对话里：
   /compact                  手动压缩上下文
@@ -262,6 +264,33 @@ mcp:
 # plugins:
 #   enabled: true            # false = 一个插件都不加载
 #   allowUnsandboxed: false  # 没有 bwrap / sandbox-exec 时是否仍加载带代码的插件（不建议）
+
+# 钩子（docs/adr/025）：工具调用前（pre，非 0 退出 = 拦下）、后（post）、一轮结束后（stop）跑你的命令。
+# **只认这个文件**，仓库里的任何文件都注册不了钩子。环境变量里有 DOMI_TOOL / DOMI_CMD / DOMI_PATH 等
+# hooks:
+#   - name: commit-msg          # 提交信息里不许有 Co-Authored-By 之类的署名行
+#     on: pre
+#     match: shell.exec
+#     run: domi hook commit-msg
+#   - name: secrets             # 暂存区里有疑似凭据就不许提交
+#     on: pre
+#     match: shell.exec
+#     run: domi hook secrets
+#   - name: format              # 改完文件自动格式化，输出附在工具结果上
+#     on: post
+#     match: fs.write
+#     run: npx biome format --write "$DOMI_PATH"
+#     timeoutMs: 20000
+
+# 完成前验证（PRD-M7-004）：改了文件却没跑过验证就想结束时，domi 会提醒模型去验证
+# verify:
+#   command: pnpm check      # 不写就按 test / check / tsc / lint 等常见命令识别
+#   maxNudges: 2
+
+# 每个会话的用量上限（PRD-M7-009）：到 80% 提醒，到顶暂停问你
+# budget:
+#   costUsd: 2
+#   toolCalls: 200
 
 # 自定义提示词层（domi prompt dump 可以看拼装结果）。同 id 覆盖内置层，比如 builtin.conventions
 # prompt:

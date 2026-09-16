@@ -39,6 +39,9 @@ import {
   recoveryEvents,
   runTurn,
   type TurnResult,
+  type VerifyState,
+  verifyNudges,
+  verifyState,
 } from '@domi/kernel'
 import { compact, registerCleanStrategy, registerCompactStrategy, SummarySchema, shouldCompact } from '@domi/memory'
 import {
@@ -50,7 +53,7 @@ import {
   StructuredOutputError,
 } from '@domi/model'
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
-import type { EventEnvelope, RefLink } from '@domi/protocol'
+import type { DomiEvent, EventEnvelope, RefLink } from '@domi/protocol'
 import { z } from 'zod'
 
 /**
@@ -66,9 +69,20 @@ const TitleSchema = z.object({ title: z.string() })
 
 import { SqliteEventLog } from '@domi/store'
 import { memorySearchPlugin } from './builtin-plugins.ts'
+import { HookRunner } from './hooks.ts'
 import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
 import { findRepoRoot, hasProjectContent, projectSkillsDir, rulesFiles, rulesText, TrustStore } from './project.ts'
 import { MAX_SPAWN_DEPTH, makeSpawnTool } from './subagent.ts'
+
+/** 这一轮（最后一条 user.input 之后）有没有改过文件 */
+function changedThisTurn(events: readonly EventEnvelope[]): boolean {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const ev = (events[i] as EventEnvelope).ev as { t: string; phase?: string }
+    if (ev.t === 'user.input') return false
+    if (ev.t === 'fs.snapshot' && ev.phase === 'after') return true
+  }
+  return false
+}
 
 /**
  * 一次询问。TUI / daemon 渲染它，用户回答后 resolve。
@@ -97,6 +111,9 @@ export interface MetricsSnapshot {
   contextPercent: number
   contextLevel: 'ok' | 'warn' | 'danger'
   unpricedModels: string[]
+  /** 本轮验证状态（M7-004） */
+  verify: VerifyState
+  mode: 'plan' | 'act'
 }
 
 export interface SessionEvents {
@@ -147,6 +164,8 @@ export class DomiSession {
   private readonly trustStore: TrustStore
   /** Skill 清单 = 共享注册表 + 仓库 .domi/skills/（信任之后才叠） */
   private readonly skillSource: SkillOverlay | undefined
+  /** 用户配置的钩子（M7-003）。只从 config 来 */
+  private readonly hooks: HookRunner
   private provider: ModelProvider
   /** 注入的替身不随切换重建——测试要的就是同一个实例 */
   private readonly injectedProvider: boolean
@@ -157,6 +176,8 @@ export class DomiSession {
   private readonly offset: number
   private noticesDelivered = 0
   private busy = false
+  /** 计划模式（M7-005）。从事件流里最后一条 mode.switch 恢复 */
+  private mode: 'plan' | 'act' = 'act'
   private currentModel: string
   private currentProvider: string
 
@@ -171,6 +192,7 @@ export class DomiSession {
       (capabilityId, args) => this.askUser(capabilityId, args),
     )
     const outputDir = join(dirname(opts.dbPath), 'outputs', opts.sessionId)
+    this.hooks = new HookRunner(opts.config.hooks ?? [], { sessionId: opts.sessionId, cwd: opts.cwd })
     this.jobs = new JobTable({ outputDir })
     this.tools = new ToolRegistry({
       cwd: opts.cwd,
@@ -178,6 +200,7 @@ export class DomiSession {
       elicit: (tool, req) => this.askInput(tool.capability, req),
       jobs: this.jobs,
       outputDir,
+      ...(this.hooks.empty ? {} : { hooks: this.hooks.toolHooks() }),
     })
       .register(fsRead)
       .register(fsWrite)
@@ -309,6 +332,8 @@ export class DomiSession {
         contextPercent: m.contextPercent,
         contextLevel: contextLevel(m.contextPercent),
         unpricedModels: m.unpricedModels,
+        verify: verifyState(all, { command: this.opts.config.verify?.command }),
+        mode: this.mode,
       })
     }
   }
@@ -670,6 +695,37 @@ export class DomiSession {
     return { system: text('system'), dynamic: text('user') }
   }
 
+  /**
+   * 完成前验证（PRD-M7-004 AC-2）：这一轮改了文件、之后没有成功的验证，模型却要结束——追加一条提示再来一轮。
+   * 到上限就如实结束，最后一条提示标 final
+   */
+  private async verifyGate(events: readonly EventEnvelope[]): Promise<{ again: boolean; events: DomiEvent[] }> {
+    const v = this.opts.config.verify
+    if (!v?.enabled || this.mode === 'plan') return { again: false, events: [] }
+    const state = verifyState(events, { command: v.command })
+    if (state === 'verified' || state === 'clean' || !changedThisTurn(events)) return { again: false, events: [] }
+    const n = verifyNudges(events)
+    const how = v.command ? `（${v.command}）` : '（测试 / 类型检查 / lint，看仓库的规矩文件怎么说）'
+    if (n >= v.maxNudges) {
+      return {
+        again: false,
+        events: [
+          {
+            t: 'verify.required',
+            attempt: n,
+            final: true,
+            message: `已经提醒过 ${n} 次，这一轮在没有通过验证的情况下结束。`,
+          },
+        ],
+      }
+    }
+    const message =
+      state === 'unverified'
+        ? `你这一轮改了文件，但还没有成功跑过验证。结束前先跑这个项目的验证命令${how}，确认通过；确实没法验证的话，说明原因再结束。`
+        : `最近一次验证没有通过。修好再结束；如果失败与这次改动无关，说明原因再结束。`
+    return { again: true, events: [{ t: 'verify.required', attempt: n + 1, message }] }
+  }
+
   /** 按链接读出被引用的那一段（对方会话的视图编号） */
   private async readRef(ref: RefLink): Promise<EventEnvelope[]> {
     const all = await this.log.readLineage(ref.sessionId)
@@ -693,7 +749,7 @@ export class DomiSession {
       void this.pump()
     }, 30)
     try {
-      return await runTurn(
+      const result = await runTurn(
         {
           sink: this.sink,
           provider: this.provider,
@@ -703,12 +759,18 @@ export class DomiSession {
           model: this.currentModel,
           refs: { resolve: (ref) => this.readRef(ref) },
           prompt: this.prompt(),
+          beforeComplete: (events) => this.verifyGate(events),
         },
         this.opts.sessionId,
         opts.refs && opts.refs.length > 0 ? { text, refs: opts.refs } : text,
       )
+      return { ...result, verify: verifyState(await this.view(), { command: this.opts.config.verify?.command }) }
     } finally {
       clearInterval(timer)
+      if (!this.hooks.empty) {
+        const stopEvents = await this.hooks.stop()
+        if (stopEvents.length > 0) await this.log.append(this.opts.sessionId, stopEvents)
+      }
       this.busy = false
       await this.pump()
       this.listeners.onBusy?.(false)

@@ -1,4 +1,4 @@
-import { formatElapsed, formatTokens, type StatusSnapshot } from '@domi/client-core'
+import { formatElapsed, formatTokens, type StatusSnapshot, VERIFY_LABEL } from '@domi/client-core'
 import { Box, Text } from 'ink'
 
 /**
@@ -13,6 +13,8 @@ export const CONTEXT_COLOR = {
   warn: 'yellow',
   danger: 'red',
 } as const
+
+export const VERIFY_COLOR = { unverified: 'yellow', verified: 'green', failed: 'red' } as const
 
 export function StatusBar({ status }: { status: StatusSnapshot }): React.ReactElement {
   const m = status.metrics
@@ -29,6 +31,12 @@ export function StatusBar({ status }: { status: StatusSnapshot }): React.ReactEl
       <Text dimColor>
         {`${status.provider}/${status.model} · ${tokens} · ${cost} · ${turn}${status.toolCalls} 次工具 · `}
         <Text color={CONTEXT_COLOR[level]}>{`ctx ${pct}%`}</Text>
+        {m?.mode === 'plan' ? <Text color="cyan">{' · 计划模式'}</Text> : ''}
+        {m?.verify !== undefined && m.verify !== 'clean' ? (
+          <Text color={VERIFY_COLOR[m.verify]}>{` · ${VERIFY_LABEL[m.verify]}`}</Text>
+        ) : (
+          ''
+        )}
         {status.busy ? ' · 运行中' : ''}
       </Text>
     </Box>

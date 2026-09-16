@@ -28,6 +28,10 @@ export interface MetricsSnapshot {
   unpricedModels: string[]
   /** 最近一轮用了多久。老 daemon 不推这个 */
   turnMs?: number | undefined
+  /** 本轮验证状态（M7-004）。老 daemon 不推 */
+  verify?: 'clean' | 'unverified' | 'verified' | 'failed' | undefined
+  /** 计划模式（M7-005） */
+  mode?: 'plan' | 'act' | undefined
 }
 
 export interface StatusSnapshot {
@@ -55,6 +59,9 @@ export interface AskSnapshot {
 }
 
 /** 状态栏的「本轮」段。一分钟以内到 0.1 秒，以上到秒 */
+/** 验证状态的显示文字（TUI 与 Web 共用） */
+export const VERIFY_LABEL = { unverified: '已改未验', verified: '已验证', failed: '验证失败' } as const
+
 export function formatElapsed(ms: number): string {
   if (ms < 60_000) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`
   const s = Math.floor(ms / 1000)
@@ -191,6 +198,80 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           seq: env.seq,
           kind: 'task',
           text: `任务恢复：已完成 ${ev.completed.length} 个节点${ev.rerun.length > 0 ? `，重跑 ${ev.rerun.join('、')}` : ''}`,
+        })
+        break
+      case 'hook.run':
+        if (ev.blocked || ev.on !== 'pre')
+          push({
+            seq: env.seq,
+            kind: 'permission',
+            text: `钩子 ${ev.name}${ev.timedOut ? ' 超时' : ev.blocked ? ' 拦下了调用' : `（${ev.on}，退出码 ${ev.exitCode}）`}`,
+            ok: !ev.blocked,
+            ...(ev.output ? { summary: ev.output.slice(0, 200) } : {}),
+          })
+        break
+      case 'workspace.trust':
+        push({
+          seq: env.seq,
+          kind: 'permission',
+          text: ev.trusted ? `信任这个仓库：${ev.root}` : `没有加载这个仓库的规矩文件（未信任）：${ev.root}`,
+          ok: ev.trusted,
+        })
+        break
+      case 'verify.required':
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: ev.final ? '没有通过验证就结束了' : '提醒模型先验证再结束',
+          summary: ev.message,
+        })
+        break
+      case 'mode.switch':
+        push({ seq: env.seq, kind: 'context', text: ev.to === 'plan' ? '进入计划模式（只读）' : '进入执行模式' })
+        break
+      case 'plan.proposed':
+        push({ seq: env.seq, kind: 'task', text: '提交了计划，等你审批', summary: ev.plan.slice(0, 400) })
+        break
+      case 'plan.decided':
+        push({
+          seq: env.seq,
+          kind: 'task',
+          text: ev.approved ? `计划已批准${ev.runId ? `，转成长任务 ${ev.runId}` : ''}` : '计划被驳回',
+          ok: ev.approved,
+          ...(ev.comment ? { summary: ev.comment } : {}),
+        })
+        break
+      case 'worktree.create':
+        push({ seq: env.seq, kind: 'context', text: `在隔离工作区里干活：${ev.branch}`, summary: ev.path })
+        break
+      case 'worktree.apply':
+        push({
+          seq: env.seq,
+          kind: 'task',
+          text: `改动${ev.ok ? '已' : '没能'}带回原仓库（${ev.mode}）`,
+          ok: ev.ok,
+          ...(ev.message ? { summary: ev.message } : {}),
+        })
+        break
+      case 'budget.warn':
+        push({ seq: env.seq, kind: 'context', text: `用量到了上限的 80%（${ev.kind}：${ev.used} / ${ev.limit}）` })
+        break
+      case 'budget.decided':
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: `用量到顶，你选择了：${{ continue: '继续', stop: '停止', raise: '提高上限' }[ev.action]}`,
+        })
+        break
+      case 'review.findings':
+        push({
+          seq: env.seq,
+          kind: 'task',
+          text: `审阅发现 ${ev.findings.length} 条问题`,
+          summary: ev.findings
+            .slice(0, 5)
+            .map((f) => `${f.file}${f.line ? `:${f.line}` : ''} ${f.problem}`)
+            .join('；'),
         })
         break
       case 'plugin.error':

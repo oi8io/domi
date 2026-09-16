@@ -294,6 +294,81 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
         nodes.push(node(env.seq, 'error', `插件 ${ev.plugin} 出错`, `${ev.tool ? `${ev.tool}: ` : ''}${ev.message}`))
         break
 
+      // ── M7 ──
+      case 'hook.run': {
+        const state = ev.timedOut ? '超时' : ev.blocked ? '拦下' : `退出码 ${ev.exitCode}`
+        const n = node(
+          env.seq,
+          'permission',
+          `钩子 ${ev.name}（${ev.on}）`,
+          `${state} · ${ev.ms}ms${ev.output ? `\n${ev.output}` : ''}`,
+        )
+        if (pendingTool && ev.on !== 'stop') pendingTool.children.push(n)
+        else nodes.push(n)
+        break
+      }
+      case 'workspace.trust':
+        nodes.push(
+          node(env.seq, 'permission', ev.trusted ? '信任这个仓库' : '不信任这个仓库', `${ev.root}（${ev.source}）`),
+        )
+        break
+      case 'verify.required':
+        nodes.push(
+          node(env.seq, 'other', ev.final ? '没有通过验证就结束了' : `提醒验证（第 ${ev.attempt} 次）`, ev.message),
+        )
+        break
+      case 'mode.switch':
+        nodes.push(node(env.seq, 'other', ev.to === 'plan' ? '进入计划模式' : '进入执行模式', ev.reason ?? ''))
+        break
+      case 'plan.proposed':
+        nodes.push(node(env.seq, 'task', '提交计划', ev.plan))
+        break
+      case 'plan.decided':
+        nodes.push(
+          node(
+            env.seq,
+            'task',
+            ev.approved ? '计划已批准' : '计划被驳回',
+            `${ev.comment ?? ''}${ev.runId ? `（长任务 ${ev.runId}）` : ''}`,
+          ),
+        )
+        break
+      case 'worktree.create':
+        nodes.push(node(env.seq, 'other', '隔离工作区', `${ev.path}（分支 ${ev.branch}，基于 ${ev.base.slice(0, 8)}）`))
+        break
+      case 'worktree.discard':
+        nodes.push(node(env.seq, 'other', `丢弃改动：${ev.path}`, ''))
+        break
+      case 'worktree.restore':
+        nodes.push(node(env.seq, 'other', `恢复改动：${ev.path}`, ''))
+        break
+      case 'worktree.apply':
+        nodes.push(
+          node(
+            env.seq,
+            ev.ok ? 'other' : 'error',
+            `带回原仓库（${ev.mode}）${ev.ok ? '' : '失败'}`,
+            ev.message ?? ev.commit ?? '',
+          ),
+        )
+        break
+      case 'budget.warn':
+        nodes.push(node(env.seq, 'other', `用量到 80%：${ev.kind}`, `${ev.used} / ${ev.limit}`))
+        break
+      case 'budget.decided':
+        nodes.push(node(env.seq, 'other', `用量到顶：${ev.action}`, ev.limit === undefined ? '' : `新上限 ${ev.limit}`))
+        break
+      case 'review.findings':
+        nodes.push(
+          node(
+            env.seq,
+            'task',
+            `审阅发现 ${ev.findings.length} 条`,
+            ev.findings.map((f) => `[${f.severity}] ${f.file}${f.line ? `:${f.line}` : ''} ${f.problem}`).join('\n'),
+          ),
+        )
+        break
+
       case 'task.retry':
         nodes.push(node(env.seq, 'task', `重试 ${ev.nodeId}`, ''))
         break

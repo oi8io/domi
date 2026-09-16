@@ -118,6 +118,10 @@ const MetricsSchema = z.object({
   unpricedModels: z.array(z.string()),
   /** 最近一轮用了多久（毫秒）；进行中的一轮算到推送那一刻（PRD-M1-007 AC-1） */
   turnMs: z.number().int().nonnegative().optional(),
+  /** 本轮的验证状态（PRD-M7-004 AC-3）：clean 没改文件 / unverified 改了没验 / verified / failed */
+  verify: z.enum(['clean', 'unverified', 'verified', 'failed']).optional(),
+  /** 计划模式 / 执行模式（PRD-M7-005） */
+  mode: z.enum(['plan', 'act']).optional(),
 })
 
 const AskSchema = z.object({

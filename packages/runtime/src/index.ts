@@ -1,4 +1,5 @@
 export * from './builtin-plugins.ts'
+export * from './hooks.ts'
 export * from './memory-service.ts'
 export * from './project.ts'
 export * from './session.ts'
