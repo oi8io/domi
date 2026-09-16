@@ -1,6 +1,7 @@
 export * from './builtin-plugins.ts'
 export * from './hooks.ts'
 export * from './memory-service.ts'
+export * from './plan.ts'
 export * from './project.ts'
 export * from './session.ts'
 export * from './subagent.ts'

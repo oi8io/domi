@@ -1451,6 +1451,60 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `session.mode`
+
+切换计划模式 / 执行模式（PRD-M7-005）。只追加一条 mode.switch；和当前一样时什么都不写
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "act"
+      ]
+    }
+  },
+  "required": [
+    "sessionId",
+    "mode"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "plan",
+        "act"
+      ]
+    },
+    "changed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "mode",
+    "changed"
+  ]
+}
+```
+
 ### `session.create`
 
 新建会话

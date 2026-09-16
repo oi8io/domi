@@ -46,7 +46,7 @@ export class RemoteConnectError extends Error {
     super(
       why === 'auth'
         ? `${url} 拒绝了连接：token 不对或没带。
-` + '把服务端的 token 设进 DOMI_TOKEN 再试；服务端没配 token 的话，它在那台机器的 ~/.domi/daemon.token 里。'
+把服务端的 token 设进 DOMI_TOKEN 再试；服务端没配 token 的话，它在那台机器的 ~/.domi/daemon.token 里。`
         : `连不上 ${url}${detail ? `（${detail}）` : ''}。确认对面的 domid 在跑、监听的是这个地址和端口。`,
     )
     this.name = 'RemoteConnectError'

@@ -243,6 +243,13 @@ export function SessionView({
         onNotice={setNotice}
         {...(onDeleted === undefined ? {} : { onDeleted })}
       />
+      <ModeToggle
+        client={client}
+        sessionId={sessionId}
+        busy={status.busy}
+        mode={status.metrics?.mode ?? 'act'}
+        onNotice={setNotice}
+      />
       <StatusBar status={status} />
       <Transcript
         items={items}
@@ -269,6 +276,41 @@ export function SessionView({
         </button>
       </form>
     </section>
+  )
+}
+
+/** 计划模式开关（PRD-M7-005）：计划模式下 domi 只读代码，想好方案提交审批，批准后才动手 */
+export function ModeToggle({
+  client,
+  sessionId,
+  busy,
+  mode,
+  onNotice,
+}: {
+  client: DomiClient
+  sessionId: string
+  busy: boolean
+  mode: 'plan' | 'act'
+  onNotice: (msg: string | null) => void
+}) {
+  const toggle = (): void => {
+    client.setMode(sessionId, mode === 'plan' ? 'act' : 'plan').then(
+      () => onNotice(null),
+      (err: Error) => onNotice(err.message),
+    )
+  }
+  return (
+    <div className="tools">
+      <button
+        type="button"
+        className={mode === 'plan' ? 'mode-toggle on' : 'mode-toggle'}
+        disabled={busy}
+        onClick={toggle}
+        title="计划模式下 domi 只读代码，想好方案后提交给你审批，批准后才动手"
+      >
+        {mode === 'plan' ? '计划模式：开（点击回到执行模式）' : '进入计划模式'}
+      </button>
+    </div>
   )
 }
 

@@ -168,6 +168,12 @@ export class DomiClient {
     return r.lost
   }
 
+  /** 计划模式 / 执行模式（M7-005）。切换本身以 mode.switch 事件出现在对话里 */
+  async setMode(sessionId: string, mode: 'plan' | 'act'): Promise<boolean> {
+    const r = await this.request('session.mode', { sessionId, mode })
+    return r.changed
+  }
+
   async createSession(cwd?: string): Promise<string> {
     const r = await this.request('session.create', cwd === undefined ? {} : { cwd })
     return r.sessionId

@@ -225,6 +225,11 @@ export class ToolRegistry {
 export function denialMessage(capability: string, source: string, rule: string | null): string {
   const noRetry = '不要重试同一个调用'
   if (source === 'user') return `用户拒绝了 ${capability}。${noRetry}；换一种做法或询问用户。`
+  if (source === 'mode') {
+    return capability === 'plan.submit'
+      ? `现在不是计划模式，不需要提交计划。直接做事。`
+      : `现在是计划模式，只能读，不能用 ${capability}。${noRetry}；把要做的改动写进计划，用 plan.submit 提交给用户审批。`
+  }
   if (source === 'config') {
     return `${capability} 被权限规则 "${rule}" 禁止（不是用户当场拒绝的）。${noRetry}；不用这个能力完成任务，或说明需要它的原因。`
   }

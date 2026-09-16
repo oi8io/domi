@@ -1176,6 +1176,48 @@
         ]
       }
     },
+    "session.mode": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "act"
+            ]
+          }
+        },
+        "required": [
+          "sessionId",
+          "mode"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "plan",
+              "act"
+            ]
+          },
+          "changed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode",
+          "changed"
+        ]
+      }
+    },
     "session.create": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

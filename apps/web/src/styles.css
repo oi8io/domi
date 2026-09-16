@@ -144,3 +144,4 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 1
 .statusbar .verify-unverified { color: #ca8a04; }
 .statusbar .verify-verified { color: #16a34a; }
 .statusbar .verify-failed { color: #dc2626; }
+.tools .mode-toggle.on { background: #0891b2; color: #fff; border-color: #0891b2; }

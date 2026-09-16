@@ -20,6 +20,7 @@ export type SlashCommand =
   | { kind: 'soul-review'; changeId: string; decision: 'accept' | 'reject' }
   | { kind: 'memory'; query: string }
   | { kind: 'extract' }
+  | { kind: 'mode'; mode: 'plan' | 'act' }
   | { kind: 'invalid'; message: string }
 
 /** lastSeq = 当前对话里最后一条的 seq；`/branch` 不带数字时从这里分 */
@@ -80,6 +81,10 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       return { kind: 'memory', query: rest.join(' ') }
     case '/extract':
       return { kind: 'extract' }
+    case '/plan':
+      return { kind: 'mode', mode: 'plan' } // PRD-M7-005
+    case '/act':
+      return { kind: 'mode', mode: 'act' }
     default:
       return { kind: 'submit', text }
   }

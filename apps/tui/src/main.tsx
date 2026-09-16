@@ -36,6 +36,7 @@ const EXIT_CONFIG_ERROR = 2
 
 /** 终端里能直接回答的表单：只有一个布尔字段时，y 就是 true。其它返回 null（去 Web 端填） */
 export function tuiFormAnswer(schema: unknown): Record<string, unknown> | null {
+  if ((schema as Record<string, unknown> | null)?.['x-domi-accept-empty'] === true) return {}
   const props = Object.entries((schema as { properties?: Record<string, { type?: string }> })?.properties ?? {})
   if (props.length === 0) return {}
   if (props.length === 1 && props[0]?.[1].type === 'boolean') return { [props[0][0]]: true }
@@ -116,6 +117,11 @@ function Root({
             return client.request('session.compact', { sessionId })
           case 'model':
             return client.switchModel(sessionId, cmd.model, cmd.provider)
+          case 'mode': {
+            const changed = await client.setMode(sessionId, cmd.mode)
+            if (!changed) setNotice(cmd.mode === 'plan' ? '已经是计划模式了' : '已经是执行模式了')
+            return
+          }
           case 'branch': {
             const id = await client.branchSession(sessionId, cmd.atSeq)
             const { model, provider } = store.$status.get()

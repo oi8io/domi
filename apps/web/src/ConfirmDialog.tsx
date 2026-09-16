@@ -104,18 +104,23 @@ export function ConfirmDialog({
   const form = ask.form
   if (form) {
     const required = new Set((form.schema as { required?: string[] } | undefined)?.required ?? [])
-    const submit = (e: FormEvent<HTMLFormElement>): void => {
-      e.preventDefault()
+    // 审批类表单（字段都可选，例如计划审批）：驳回时也把填的意见带上
+    const approval = (form.schema as Record<string, unknown> | undefined)?.['x-domi-accept-empty'] === true
+    const read = (el: HTMLFormElement): Record<string, unknown> => {
       const raw: Record<string, string> = {}
-      new FormData(e.currentTarget).forEach((v, k) => {
+      new FormData(el).forEach((v, k) => {
         raw[k] = String(v)
       })
-      onAnswer(true, formValues(form.schema, raw))
+      return formValues(form.schema, raw)
+    }
+    const submit = (e: FormEvent<HTMLFormElement>): void => {
+      e.preventDefault()
+      onAnswer(true, read(e.currentTarget))
     }
     return (
       <form className="confirm" role="dialog" aria-labelledby="confirm-title" onSubmit={submit}>
         <p id="confirm-title" className="confirm-title">
-          <code>{ask.capabilityId}</code> 需要你提供信息
+          <code>{ask.capabilityId}</code> {approval ? '等你审批' : '需要你提供信息'}
         </p>
         <p className="confirm-message">{form.message}</p>
         <div className="confirm-fields">
@@ -124,11 +129,15 @@ export function ConfirmDialog({
           ))}
         </div>
         <div className="confirm-actions">
-          <button type="button" className="deny" onClick={() => onAnswer(false)}>
-            拒绝
+          <button
+            type="button"
+            className="deny"
+            onClick={(e) => onAnswer(false, approval && e.currentTarget.form ? read(e.currentTarget.form) : undefined)}
+          >
+            {approval ? '驳回' : '拒绝'}
           </button>
           <button type="submit" className="allow">
-            提交
+            {approval ? '批准' : '提交'}
           </button>
         </div>
       </form>

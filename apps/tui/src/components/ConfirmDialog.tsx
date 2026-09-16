@@ -58,7 +58,12 @@ export function RevertDialog({ ask }: { ask: RevertAsk }): React.ReactElement {
 }
 
 /** 终端里答不了的表单（多于一个字段，或不是布尔） */
+/** 表单 schema 上的标记：终端里直接同意时用空内容（字段都是可选的） */
+export const TUI_ACCEPT_EMPTY = 'x-domi-accept-empty'
+
 export function formNeedsWeb(schema: unknown): boolean {
+  // 表单里全是可选项（例如计划审批的「意见」「转长任务」）：终端里 y 就是「按默认值同意」
+  if ((schema as Record<string, unknown> | null)?.[TUI_ACCEPT_EMPTY] === true) return false
   const props = Object.values((schema as { properties?: Record<string, { type?: string }> })?.properties ?? {})
   return !(props.length === 0 || (props.length === 1 && props[0]?.type === 'boolean'))
 }

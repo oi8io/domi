@@ -71,6 +71,7 @@ import { SqliteEventLog } from '@domi/store'
 import { memorySearchPlugin } from './builtin-plugins.ts'
 import { HookRunner } from './hooks.ts'
 import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
+import { makePlanSubmitTool } from './plan.ts'
 import { findRepoRoot, hasProjectContent, projectSkillsDir, rulesFiles, rulesText, TrustStore } from './project.ts'
 import { MAX_SPAWN_DEPTH, makeSpawnTool } from './subagent.ts'
 
@@ -149,6 +150,8 @@ export interface SessionOptions {
   scope?: (capabilityId: string) => boolean
   /** 第几层子 agent。0 = 用户直接对话的会话；到 MAX_SPAWN_DEPTH 就不再给 task.spawn */
   spawnDepth?: number
+  /** 计划批准后转长任务（M7-005）。daemon 里接 TaskService；不给就不能转 */
+  startTask?: (spec: unknown, cwd: string) => Promise<string>
   /** 子 agent 会话的事件往哪推（daemon 里是这个子会话的订阅者） */
   childEvents?: (sessionId: string, envs: EventEnvelope[]) => void
 }
@@ -178,6 +181,8 @@ export class DomiSession {
   private busy = false
   /** 计划模式（M7-005）。从事件流里最后一条 mode.switch 恢复 */
   private mode: 'plan' | 'act' = 'act'
+  private modeLoaded = false
+  private planTool!: ReturnType<typeof makePlanSubmitTool>
   private currentModel: string
   private currentProvider: string
 
@@ -188,7 +193,11 @@ export class DomiSession {
     this.currentProvider = opts.config.model.provider
 
     const permissions = new PermissionEngine(
-      { rules: opts.config.permissions.rules, ...(opts.scope ? { scope: opts.scope } : {}) },
+      {
+        rules: opts.config.permissions.rules,
+        ...(opts.scope ? { scope: opts.scope } : {}),
+        mode: () => this.mode,
+      },
       (capabilityId, args) => this.askUser(capabilityId, args),
     )
     const outputDir = join(dirname(opts.dbPath), 'outputs', opts.sessionId)
@@ -223,6 +232,17 @@ export class DomiSession {
       : undefined
     if (this.skillSource) this.tools.register(makeSkillLoadTool(this.skillSource))
     if ((opts.spawnDepth ?? 0) < MAX_SPAWN_DEPTH) this.tools.register(makeSpawnTool(this))
+    // plan.submit 一直在册，但只有计划模式下能用（权限层按模式放行 / 拒绝）；执行模式下不发给模型
+    this.planTool = makePlanSubmitTool({
+      approved: () => {
+        this.mode = 'act'
+        this.tools.unregister('plan.submit')
+        return [{ t: 'mode.switch', to: 'act', reason: '计划已批准' }]
+      },
+      ...(opts.startTask
+        ? { startTask: (spec: unknown) => (opts.startTask as NonNullable<typeof opts.startTask>)(spec, opts.cwd) }
+        : {}),
+    })
 
     // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
     // 那份知识只在 packages/model/src/factory.ts 里（AC-4 的 diff 为 0 靠这个成立）
@@ -295,7 +315,8 @@ export class DomiSession {
         form: { message: req.message, schema: req.requestedSchema ?? { type: 'object', properties: {} } },
         answer: (allowed, content) => {
           this.listeners.onAsk?.(null)
-          resolve(allowed ? { action: 'accept', ...(content === undefined ? {} : { content }) } : { action: 'decline' })
+          // 拒绝时也带上内容（计划审批的驳回意见）；转给 MCP server 之前会剥掉（hub.ts）
+          resolve({ action: allowed ? 'accept' : 'decline', ...(content === undefined ? {} : { content }) })
         },
       })
     })
@@ -560,6 +581,40 @@ export class DomiSession {
     return this.askUser('task.approval', { message, ...detail })
   }
 
+  /** 事件流里最后一条 mode.switch 决定当前模式（重开会话后仍在计划模式） */
+  private async loadMode(): Promise<void> {
+    if (this.modeLoaded) return
+    this.modeLoaded = true
+    const view = await this.view()
+    for (let i = view.length - 1; i >= 0; i--) {
+      const ev = (view[i] as EventEnvelope).ev as { t: string; to?: 'plan' | 'act' }
+      if (ev.t === 'mode.switch' && ev.to) {
+        this.applyMode(ev.to)
+        break
+      }
+    }
+  }
+
+  private applyMode(to: 'plan' | 'act'): void {
+    this.mode = to
+    if (to === 'plan') this.tools.register(this.planTool)
+    else this.tools.unregister('plan.submit')
+  }
+
+  /** 切换计划 / 执行模式（PRD-M7-005）。和当前一样时什么都不写 */
+  async setMode(to: 'plan' | 'act', reason?: string): Promise<{ mode: 'plan' | 'act'; changed: boolean }> {
+    await this.loadMode()
+    if (this.mode === to) return { mode: to, changed: false }
+    this.applyMode(to)
+    await this.log.append(this.opts.sessionId, [{ t: 'mode.switch', to, ...(reason === undefined ? {} : { reason }) }])
+    await this.pump()
+    return { mode: to, changed: true }
+  }
+
+  getMode(): 'plan' | 'act' {
+    return this.mode
+  }
+
   setBusy(busy: boolean): void {
     this.busy = busy
     this.listeners.onBusy?.(busy)
@@ -738,6 +793,7 @@ export class DomiSession {
     this.listeners.onBusy?.(true)
     for (const t of this.opts.extraTools?.(this.opts.cwd) ?? []) this.tools.register(t)
     await this.deliverNotices()
+    await this.loadMode()
     await this.ensureTrust()
     await this.maybeAutoCompact()
     const policy: ContextPolicy = {

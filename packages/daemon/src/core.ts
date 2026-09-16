@@ -77,6 +77,8 @@ export interface SessionHandle {
   /** 校验并规整引用；不成立时抛 InvalidRefError。在接受提交之前调 */
   checkRefs?(refs: readonly RefLink[]): Promise<RefLink[]>
   switchModel(model: string, provider?: string): Promise<{ lost: string[] }>
+  /** 计划 / 执行模式（M7-005）。老宿主没有 */
+  setMode?(mode: 'plan' | 'act'): Promise<{ mode: 'plan' | 'act'; changed: boolean }>
   compactNow(trigger: 'manual' | 'threshold'): Promise<{ ok: boolean; detail: string }>
   readEvents(fromSeq: number): Promise<EventEnvelope[]>
   head(): Promise<number>
@@ -381,6 +383,15 @@ export class Daemon {
         const session = await this.session(p.sessionId)
         if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
         return ok(req.id, await session.switchModel(p.model, p.provider))
+      }
+
+      case 'session.mode': {
+        const p = params as { sessionId: string; mode: 'plan' | 'act' }
+        if (this.isBusy(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正在处理，等这一轮结束再切')
+        const session = await this.session(p.sessionId)
+        if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
+        if (!session.setMode) return fail(req.id, 'INTERNAL', '这个 domid 不支持计划模式')
+        return ok(req.id, await session.setMode(p.mode))
       }
 
       case 'session.create': {

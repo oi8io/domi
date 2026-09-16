@@ -182,7 +182,11 @@ export class McpHub {
       }
       // 先问发起这次调用的会话；不在任何调用里（比如老 server 事后单独发来的请求）才走 hub 级的处理器
       const call = callContext.getStore()
-      if (call) return (await call.elicit(view)) as ElicitResult
+      if (call) {
+        const r = await call.elicit(view)
+        // MCP 规范里只有 accept 带内容
+        return (r.action === 'accept' ? r : { action: r.action }) as ElicitResult
+      }
       if (!this.opts.onElicit) return { action: 'decline' }
       return this.opts.onElicit(server, view)
     })

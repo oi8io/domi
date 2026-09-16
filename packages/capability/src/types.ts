@@ -13,7 +13,7 @@ export type CapabilityId = BuiltinCapabilityId | (string & {})
 export interface Decision {
   decision: 'allow' | 'deny' | 'ask'
   /** 这条决定从哪来。default 永远是 deny（fail-closed） */
-  source: 'default' | 'config' | 'user'
+  source: 'default' | 'config' | 'user' | 'mode'
   /** 命中的规则；默认分支为 null */
   matchedRule: string | null
   /** 用户在哪个端上回答的（M5-007） */

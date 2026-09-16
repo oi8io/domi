@@ -127,6 +127,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         memory,
         ...(skills === undefined ? {} : { skills }),
         childEvents: pushChild,
+        // 计划批准后转长任务（M7-005）：同一个 TaskService
+        startTask: async (spec, cwd) => (await tasks.start(JSON.stringify(spec), cwd)).runId,
       })
       // 上一个 domid 可能是被 kill -9 的：先把这个会话补到一致点，再交出去（TASK-M3-010）。
       // 这时还没有订阅者，补的事件由之后的订阅补发带过去
@@ -199,6 +201,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           }
         },
         switchModel: (model, provider) => s.switchModel(model, provider === undefined ? {} : { provider }),
+        setMode: (mode) => s.setMode(mode),
         compactNow: (trigger) => s.compactNow(trigger),
         async readEvents(fromSeq) {
           const all = await s.pumpAll()

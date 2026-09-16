@@ -147,6 +147,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   /model <名字> [provider]  会话中途切换模型（历史不动，只追加一条切换记录）
   /branch [seq]             从某一条（默认最后一条）分出一个新会话并切过去
   /ref <会话 id> [起-止]    引用另一个会话的一段，下一句话带上（不给区间就是整个会话）
+  /plan  /act               计划模式（只读，想好方案提交审批）/ 回到执行模式
   /sessions [--all]         列出会话（--all 含已删除的）
   /open <id>  /new          切到某个会话 / 新建一个
   /delete <id>  /restore <id>  软删除 / 恢复会话
