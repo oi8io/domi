@@ -49,9 +49,10 @@
         M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`、独立 QA、M1 dogfooding、
         M6 DoD（外部贡献者插件；L2 三次重复完整跑一轮）、在 GitHub 上开那 5 个 good first issue（草稿在 docs/good-first-issues.md）
 
-        **M7「会写代码」PRD 已写**（2026-09-16，`docs/PRD.md` v1.8 §M7 · `docs/prd/M7.md`，SKETCH）：
-        让 domi 能接手真实仓库里的编程任务。等你在 docs/prd/M7.md §6 的四个问题上拍板后进入。
+        **M7「会写代码」已进入**（2026-09-16，你拍板全做 001–010；`docs/prd/M7.md` · `docs/spec/M7.md` · ADR-024/025/026 · `docs/tasks/M7.md`）：
+        规矩文件认 `AGENT.md`（兼认 `AGENTS.md`），项目级 Skill 放 `<仓库>/.domi/skills/`；worktree 在 `~/.domi/worktrees/`；
+        ripgrep 装了自动用。按 TASK-M7-001 → 010 顺序推进。
 
-卡在: M7 的再批准门（要你拍板）。桌面端打包修复（BUG-M5-001）等你在 Mac 上重跑构建确认。桌面端需要一台装了 Rust 的机器才能构建；macOS 沙箱需要一台 Mac 验证。
+卡在: 桌面端打包修复（BUG-M5-001）等你在 Mac 上重跑构建确认。桌面端需要一台装了 Rust 的机器才能构建；macOS 沙箱需要一台 Mac 验证。
       没有其它功能上的阻塞。体验类的问题按你定的规矩只记录不排期（OPT-M3-001…006），其中 OPT-M3-001（每个 token 一条事件）
       牵涉回放与压缩，动之前要单独讨论。
