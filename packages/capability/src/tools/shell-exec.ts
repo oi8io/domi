@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { z } from 'zod'
 import type { Tool } from '../types.ts'
 
@@ -10,6 +12,10 @@ const KEEP_TAIL_BYTES = 20 * 1024
 export const ShellExecArgs = z.object({
   cmd: z.string(),
   timeoutMs: z.number().int().positive().optional(),
+  background: z
+    .boolean()
+    .optional()
+    .describe('后台运行：立刻返回 jobId，之后用 shell.output 看输出、shell.kill 终止。适合开发服务器、长时间的构建'),
 })
 export type ShellExecArgs = z.infer<typeof ShellExecArgs>
 
@@ -20,6 +26,11 @@ export interface ShellExecResult {
   stdout: string
   stderr: string
   truncated?: { omittedBytes: number; totalBytes: number }
+  /** 输出被截断时，全文所在的文件（可以用 fs.read 读） */
+  fullOutput?: string
+  /** 后台运行时：job id（exitCode 为 null、输出为空，之后用 shell.output 取） */
+  jobId?: string
+  background?: true
 }
 
 /**
@@ -42,9 +53,25 @@ export function truncateOutput(s: string): { text: string; omitted: number; tota
 export const shellExec: Tool<ShellExecArgs, ShellExecResult> = {
   name: 'shell.exec',
   capability: 'shell.exec',
-  description: '在工作目录内执行 shell 命令。默认 120 秒超时，超时会杀掉整个进程组。',
+  description:
+    '在工作目录内执行 shell 命令。默认 120 秒超时，超时会杀掉整个进程组。输出超过 100KB 时只返回头尾，全文落盘。' +
+    '长时间运行的命令用 background: true。找文件、搜代码请用 fs.glob / fs.grep。',
   schema: ShellExecArgs,
   execute(args, ctx) {
+    if (args.background) {
+      if (!ctx.jobs) return Promise.reject(new Error('这个环境不支持后台命令'))
+      const { jobId, logFile } = ctx.jobs.start(args.cmd, ctx.cwd)
+      return Promise.resolve({
+        cmd: args.cmd,
+        exitCode: null,
+        timedOut: false,
+        stdout: '',
+        stderr: '',
+        jobId,
+        background: true as const,
+        ...(logFile === undefined ? {} : { fullOutput: logFile }),
+      })
+    }
     const timeoutMs = args.timeoutMs ?? SHELL_DEFAULT_TIMEOUT_MS
     return new Promise<ShellExecResult>((resolve) => {
       // detached：让子进程自成进程组，超时时才能用 kill(-pid) 连孙子进程一起杀。
@@ -100,7 +127,25 @@ export const shellExec: Tool<ShellExecArgs, ShellExecResult> = {
           stdout: o.text,
           stderr: e.text,
         }
-        resolve(omitted > 0 ? { ...res, truncated: { omittedBytes: omitted, totalBytes: o.total + e.total } } : res)
+        if (omitted === 0) {
+          resolve(res)
+          return
+        }
+        let fullOutput: string | undefined
+        if (ctx.outputDir) {
+          try {
+            mkdirSync(ctx.outputDir, { recursive: true })
+            fullOutput = join(ctx.outputDir, `${(ctx.callId ?? `call-${Date.now()}`).replace(/[^\w.-]/g, '_')}.log`)
+            writeFileSync(fullOutput, `$ ${args.cmd}\n--- stdout ---\n${out}\n--- stderr ---\n${err}\n`)
+          } catch {
+            fullOutput = undefined
+          }
+        }
+        resolve({
+          ...res,
+          truncated: { omittedBytes: omitted, totalBytes: o.total + e.total },
+          ...(fullOutput === undefined ? {} : { fullOutput }),
+        })
       }
 
       child.on('close', (code) => finish(code))

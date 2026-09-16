@@ -24,6 +24,7 @@ export const COMMANDS = [
   'task',
   'bridge',
   'plugin',
+  'trust',
 ] as const
 export type Command = (typeof COMMANDS)[number]
 
@@ -45,6 +46,10 @@ export interface ParsedCli {
     connect: string | undefined
     /** `domi init --from-toml`：迁移旧配置（ADR-014） */
     fromToml: boolean
+    /** `domi init --project`：在仓库里建 .domi/ 与 AGENT.md 模板（PRD-M7-002 AC-5） */
+    project: boolean
+    /** `domi trust <路径> --revoke` */
+    revoke: boolean
     /** `domi trace <id> --html <路径>`；带值的选项必须在这里声明，
      * 否则 strict:false 会把它当布尔，路径掉进 positionals 里（这个坑踩过一次） */
     html: string | undefined
@@ -74,6 +79,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       all: { type: 'boolean' },
       follow: { type: 'boolean' },
       'from-toml': { type: 'boolean' },
+      project: { type: 'boolean' },
+      revoke: { type: 'boolean' },
     },
   })
 
@@ -93,6 +100,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       yes: Boolean(values.yes),
       ping: Boolean(values.ping),
       fromToml: Boolean(values['from-toml']),
+      project: Boolean(values.project),
+      revoke: Boolean(values.revoke),
       html: typeof values.html === 'string' ? values.html : undefined,
       connect: typeof values.connect === 'string' ? values.connect : undefined,
       all: Boolean(values.all),
@@ -111,6 +120,9 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi doctor --ping        额外发一次真实请求，区分「key 不对 / 网关没通 / 模型名错」
   domi init                 打印一份 config.yaml 模板
   domi init --from-toml     把旧的 config.toml 换成 YAML 打印出来（注释带不过来）
+  domi init --project       在当前仓库建 .domi/（项目级 Skill）与 AGENT.md 模板
+  domi trust [路径] [--revoke]  信任 / 取消信任一个仓库（信任后它的 AGENT.md 与 .domi/skills 才会被读）
+  domi trust list           列出答过的仓库
   domi session list         列出会话
   domi session restore <id> 恢复软删除的会话
   domi data export <目录>    导出全部事件流与配置（JSONL + YAML，无私有格式）

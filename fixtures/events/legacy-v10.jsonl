@@ -1,0 +1,13 @@
+{"seq": 19, "sessionId": "legacy", "parentSeq": 18, "ts": 1757000000000, "schemaVersion": 10, "ev": {"t": "workspace.trust", "root": "/home/u/proj", "trusted": true, "source": "user"}}
+{"seq": 20, "sessionId": "legacy", "parentSeq": 19, "ts": 1757000000001, "schemaVersion": 10, "ev": {"t": "hook.run", "name": "no-coauthor", "on": "pre", "capabilityId": "shell.exec", "ms": 12, "exitCode": 1, "blocked": true, "timedOut": false, "output": "提交信息里不能有 Co-Authored-By"}}
+{"seq": 21, "sessionId": "legacy", "parentSeq": 20, "ts": 1757000000002, "schemaVersion": 10, "ev": {"t": "verify.required", "attempt": 1, "message": "你改了文件但还没有跑验证"}}
+{"seq": 22, "sessionId": "legacy", "parentSeq": 21, "ts": 1757000000003, "schemaVersion": 10, "ev": {"t": "mode.switch", "to": "plan"}}
+{"seq": 23, "sessionId": "legacy", "parentSeq": 22, "ts": 1757000000004, "schemaVersion": 10, "ev": {"t": "plan.proposed", "plan": "1. 读代码 2. 改 3. 测", "steps": [{"id": "read", "goal": "读代码"}, {"id": "edit", "goal": "改", "dependsOn": ["read"]}]}}
+{"seq": 24, "sessionId": "legacy", "parentSeq": 23, "ts": 1757000000005, "schemaVersion": 10, "ev": {"t": "plan.decided", "approved": true, "comment": "可以"}}
+{"seq": 25, "sessionId": "legacy", "parentSeq": 24, "ts": 1757000000006, "schemaVersion": 10, "ev": {"t": "worktree.create", "repo": "/home/u/proj", "path": "/home/u/.domi/worktrees/ab12/s-1", "branch": "domi/s-1", "base": "0123456789abcdef0123456789abcdef01234567"}}
+{"seq": 26, "sessionId": "legacy", "parentSeq": 25, "ts": 1757000000007, "schemaVersion": 10, "ev": {"t": "worktree.discard", "path": "src/a.ts", "trash": "1"}}
+{"seq": 27, "sessionId": "legacy", "parentSeq": 26, "ts": 1757000000008, "schemaVersion": 10, "ev": {"t": "worktree.restore", "path": "src/a.ts", "trash": "1"}}
+{"seq": 28, "sessionId": "legacy", "parentSeq": 27, "ts": 1757000000009, "schemaVersion": 10, "ev": {"t": "worktree.apply", "mode": "squash", "ok": true, "commit": "89abcdef"}}
+{"seq": 29, "sessionId": "legacy", "parentSeq": 28, "ts": 1757000000010, "schemaVersion": 10, "ev": {"t": "budget.warn", "kind": "toolCalls", "used": 8, "limit": 10}}
+{"seq": 30, "sessionId": "legacy", "parentSeq": 29, "ts": 1757000000011, "schemaVersion": 10, "ev": {"t": "budget.decided", "action": "raise", "kind": "toolCalls", "limit": 20}}
+{"seq": 31, "sessionId": "legacy", "parentSeq": 30, "ts": 1757000000012, "schemaVersion": 10, "ev": {"t": "review.findings", "findings": [{"file": "src/a.ts", "line": 3, "severity": "high", "problem": "没有处理空输入", "basis": "PRD-X AC-2"}]}}

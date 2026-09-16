@@ -21,9 +21,12 @@ import { z } from 'zod'
  * v7 → v8：新增 `task.spawn` / `task.run` / `task.node` / `task.resume` / `task.retry` / `task.end`（M5 编排）；
  *          `permission` 新增可选的 `channel`（M5-007 审批从哪来）。
  * v8 → v9：新增 `plugin.error`（M6-003 插件崩溃 / 超时 / 协议错乱）。
+ * v9 → v10：M7 会写代码——新增 `workspace.trust` `hook.run` `verify.required` `mode.switch` `plan.proposed` `plan.decided`
+ *          `worktree.create` `worktree.discard` `worktree.restore` `worktree.apply` `budget.warn` `budget.decided` `review.findings`；
+ *          `permission.source` 新增取值 `mode`（计划模式拒绝的）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 9
+export const SCHEMA_VERSION = 10
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -108,7 +111,8 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     t: z.literal('permission'),
     capabilityId: z.string(),
     decision: z.enum(['allow', 'deny', 'ask']),
-    source: z.enum(['default', 'config', 'user']),
+    /** mode：计划模式下只读之外的能力一律拒绝（M7-005） */
+    source: z.enum(['default', 'config', 'user', 'mode']),
     matchedRule: z.string().nullable(),
     /** 用户是在哪个端上回答的（tui / web / telegram）。只有 source:'user' 时才有 */
     channel: z.string().optional(),
@@ -253,6 +257,91 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
   /** M6-003：插件进程出了问题（崩溃、超时、输出不是协议）。daemon 不受影响，这一次工具调用失败 */
   z.looseObject({ t: z.literal('plugin.error'), plugin: z.string(), tool: z.string().optional(), message: z.string() }),
   z.looseObject({ t: z.literal('task.end'), status: z.enum(['done', 'failed', 'cancelled']) }),
+  /** M7-002：这个仓库的规矩文件与项目目录能不能进提示词。stored = 以前答过；default = 没人能回答，按不信任 */
+  z.looseObject({
+    t: z.literal('workspace.trust'),
+    root: z.string(),
+    trusted: z.boolean(),
+    source: z.enum(['user', 'stored', 'default']),
+  }),
+  /** M7-003：跑了一个用户配置的钩子 */
+  z.looseObject({
+    t: z.literal('hook.run'),
+    name: z.string(),
+    on: z.enum(['pre', 'post', 'stop']),
+    capabilityId: z.string().optional(),
+    ms: z.number().int().nonnegative(),
+    exitCode: z.number().int().nullable(),
+    blocked: z.boolean(),
+    timedOut: z.boolean(),
+    output: z.string().optional(),
+  }),
+  /** M7-004：改了文件还没验证，模型却要结束这一轮——运行时追加的提示。final = 到上限了，如实结束 */
+  z.looseObject({
+    t: z.literal('verify.required'),
+    attempt: z.number().int().nonnegative(),
+    message: z.string(),
+    final: z.boolean().optional(),
+  }),
+  /** M7-005：计划模式 / 执行模式 */
+  z.looseObject({ t: z.literal('mode.switch'), to: z.enum(['plan', 'act']), reason: z.string().optional() }),
+  z.looseObject({
+    t: z.literal('plan.proposed'),
+    plan: z.string(),
+    steps: z
+      .array(z.object({ id: z.string(), goal: z.string(), dependsOn: z.array(z.string()).optional() }))
+      .optional(),
+  }),
+  z.looseObject({
+    t: z.literal('plan.decided'),
+    approved: z.boolean(),
+    comment: z.string().optional(),
+    asTask: z.boolean().optional(),
+    runId: z.string().optional(),
+  }),
+  /** M7-006：隔离会话的 git worktree */
+  z.looseObject({
+    t: z.literal('worktree.create'),
+    repo: z.string(),
+    path: z.string(),
+    branch: z.string(),
+    base: z.string(),
+  }),
+  z.looseObject({ t: z.literal('worktree.discard'), path: z.string(), trash: z.string() }),
+  z.looseObject({ t: z.literal('worktree.restore'), path: z.string(), trash: z.string() }),
+  z.looseObject({
+    t: z.literal('worktree.apply'),
+    mode: z.enum(['squash', 'merge', 'branch']),
+    ok: z.boolean(),
+    commit: z.string().optional(),
+    message: z.string().optional(),
+  }),
+  /** M7-009：用量到了上限的 80%（每种各一次）与到顶后用户的决定 */
+  z.looseObject({
+    t: z.literal('budget.warn'),
+    kind: z.enum(['tokens', 'costUsd', 'toolCalls']),
+    used: z.number(),
+    limit: z.number(),
+  }),
+  z.looseObject({
+    t: z.literal('budget.decided'),
+    action: z.enum(['continue', 'stop', 'raise']),
+    kind: z.enum(['tokens', 'costUsd', 'toolCalls']),
+    limit: z.number().optional(),
+  }),
+  /** M7-010：审阅子 agent 的结构化发现 */
+  z.looseObject({
+    t: z.literal('review.findings'),
+    findings: z.array(
+      z.object({
+        file: z.string(),
+        line: z.number().int().positive().optional(),
+        severity: z.enum(['high', 'medium', 'low']),
+        problem: z.string(),
+        basis: z.string(),
+      }),
+    ),
+  }),
   z.looseObject({
     t: z.literal('error'),
     scope: z.string(),

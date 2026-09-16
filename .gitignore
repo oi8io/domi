@@ -5,7 +5,10 @@ dist/
 .idea/
 .vscode/
 *.log
-.domi/
+# 仓库的 .domi/ 只提交项目级 Skill 与说明（docs/adr/025），其余是运行时文件
+.domi/*
+!.domi/skills/
+!.domi/README.md
 coverage/
 
 # 架构守卫测试的临时违规 fixture（测试跑完会删；意外残留时不许提交）
@@ -31,3 +34,4 @@ _tmp_*
 
 # Tauri 构建产物
 apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/

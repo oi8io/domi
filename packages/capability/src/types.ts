@@ -32,6 +32,18 @@ export interface ElicitResponse {
   content?: Record<string, unknown>
 }
 
+/** 过期写保护的记录本（实现见 tools/stamps.ts）。接口放这里，免得 types ↔ tools 互相引用 */
+export interface StampBook {
+  record(absPath: string, content: string): void
+  has(absPath: string): boolean
+  check(absPath: string, current: string | null, displayPath: string): void
+}
+
+/** 后台命令表（实现见 tools/shell-jobs.ts） */
+export interface JobStarter {
+  start(cmd: string, cwd: string): { jobId: string; logFile?: string }
+}
+
 export interface ToolCtx {
   /** 工作目录，所有文件访问的根。越界一律拒绝（PRD-M0-003 AC-5） */
   cwd: string
@@ -44,6 +56,14 @@ export interface ToolCtx {
   emit(ev: DomiEvent): void
   /** 向用户要输入。没有这个通道（非交互环境）时为 undefined，调用方应按 decline 处理 */
   elicit?(req: ElicitRequest): Promise<ElicitResponse>
+  /** 本会话读写过的文件指纹（过期写保护，PRD-M7-001 AC-2）。没有就不做检查 */
+  stamps?: StampBook
+  /** 后台命令表（PRD-M7-001 AC-4）。没有就不支持 background */
+  jobs?: JobStarter
+  /** 超长输出落盘的目录（~/.domi/outputs/<会话>）。fs.read 对它单独放行只读 */
+  outputDir?: string
+  /** 这次调用的 id（落盘文件名用） */
+  callId?: string
 }
 
 export interface Tool<A = unknown, R = unknown> {
@@ -72,8 +92,8 @@ export interface Skill {
   /** 正文。模型调 skill.load 才拿到 */
   readonly prompt: string
   readonly requiresTools: readonly string[]
-  /** 官方随包发的，还是用户目录里的（同名时用户的覆盖官方的） */
-  readonly source: 'official' | 'user'
+  /** 官方随包发的、用户目录里的、还是仓库 .domi/skills/ 里的（同名时 项目 > 用户 > 插件 > 官方） */
+  readonly source: 'official' | 'user' | 'project'
   /** 用户 Skill 的文件路径；官方的没有 */
   readonly path?: string
   /**

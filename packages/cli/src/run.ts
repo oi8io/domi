@@ -106,6 +106,17 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
     }
 
     case 'init': {
+      if (cli.flags.project) {
+        const { initProject } = await import('@domi/runtime')
+        const r = initProject(process.cwd())
+        io.out(
+          r.created.length === 0
+            ? `${r.root} 里已经有 .domi/ 和规矩文件了，什么都没改。`
+            : `在 ${r.root} 里新建了：\n${r.created.map((c) => `  ${c}`).join('\n')}\n` +
+                '规矩写进 AGENT.md，项目级 Skill 放 .domi/skills/<名字>/SKILL.md。第一次在这里打开会话时 domi 会问你是否信任这个仓库。',
+        )
+        return 0
+      }
       if (!cli.flags.fromToml) {
         io.out(CONFIG_TEMPLATE)
         return 0
@@ -124,6 +135,29 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
           true,
         ),
       )
+      return 0
+    }
+
+    case 'trust': {
+      const { TrustStore, findRepoRoot } = await import('@domi/runtime')
+      const store = new TrustStore(join(dataDir(), 'trust.json'))
+      if (cli.sub === 'list') {
+        const rows = store.list()
+        io.out(
+          rows.length === 0
+            ? '还没有答过任何仓库。'
+            : rows.map((r) => `${r.trusted ? '信任  ' : '不信任'}  ${r.root}`).join('\n'),
+        )
+        return 0
+      }
+      const root = findRepoRoot(cli.sub ?? process.cwd())
+      if (cli.flags.revoke) {
+        store.set(root, false)
+        io.out(`不再信任 ${root}：它的 AGENT.md 与 .domi/skills 不会进提示词（下一个会话起生效）。`)
+      } else {
+        store.set(root, true)
+        io.out(`已信任 ${root}：它的 AGENT.md 与 .domi/skills 会进提示词（下一个会话起生效）。`)
+      }
       return 0
     }
 
@@ -152,6 +186,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         provider: cfg.model.provider,
         model: cfg.model.name,
         plugins: await pluginDoctor(cfg.plugins.allowUnsandboxed),
+        ripgrep: Bun.which('rg'),
       })
       io.out(formatFindings(findings))
       return findings.every((f) => f.ok) ? 0 : 1

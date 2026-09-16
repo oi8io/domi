@@ -1,7 +1,23 @@
 import { readFileSync, statSync } from 'node:fs'
+import { isAbsolute, relative } from 'node:path'
 import { z } from 'zod'
-import { resolveWithinRoot } from '../paths.ts'
-import type { Tool } from '../types.ts'
+import { PathEscapeError, resolveWithinRoot } from '../paths.ts'
+import type { Tool, ToolCtx } from '../types.ts'
+
+/**
+ * 读路径：工作目录内，或本会话的输出落盘目录（SPEC-M7-001：被截断的命令输出全文在那里）。
+ * 只有读放行这个目录，写不放行
+ */
+export function resolveReadable(ctx: Pick<ToolCtx, 'cwd' | 'outputDir'>, p: string): string {
+  try {
+    return resolveWithinRoot(ctx.cwd, p)
+  } catch (e) {
+    if (!(e instanceof PathEscapeError) || !ctx.outputDir || !isAbsolute(p)) throw e
+    const rel = relative(ctx.outputDir, p)
+    if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) throw e
+    return resolveWithinRoot(ctx.outputDir, p)
+  }
+}
 
 /** 超过这个大小就不返回全文，只给结构化提示（PRD-M0-004 AC-1） */
 export const FS_READ_MAX_BYTES = 1024 * 1024
@@ -29,9 +45,11 @@ export const fsRead: Tool<FsReadArgs, FsReadResult> = {
   description: '读取工作目录内的文件，支持行范围。超过 1MB 的文件只返回片段与总行数。',
   schema: FsReadArgs,
   async execute(args, ctx) {
-    const abs = resolveWithinRoot(ctx.cwd, args.path)
+    const abs = resolveReadable(ctx, args.path)
     const size = statSync(abs).size
-    const lines = readFileSync(abs, 'utf8').split('\n')
+    const raw = readFileSync(abs, 'utf8')
+    ctx.stamps?.record(abs, raw)
+    const lines = raw.split('\n')
     const total = lines.length
 
     const tooBig = size > FS_READ_MAX_BYTES

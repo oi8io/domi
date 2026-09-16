@@ -1985,7 +1985,8 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                         "enum": [
                           "default",
                           "config",
-                          "user"
+                          "user",
+                          "mode"
                         ]
                       },
                       "matchedRule": {
@@ -2668,6 +2669,429 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                     "required": [
                       "t",
                       "status"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "workspace.trust"
+                      },
+                      "root": {
+                        "type": "string"
+                      },
+                      "trusted": {
+                        "type": "boolean"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "stored",
+                          "default"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "root",
+                      "trusted",
+                      "source"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "hook.run"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "on": {
+                        "type": "string",
+                        "enum": [
+                          "pre",
+                          "post",
+                          "stop"
+                        ]
+                      },
+                      "capabilityId": {
+                        "type": "string"
+                      },
+                      "ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "exitCode": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "blocked": {
+                        "type": "boolean"
+                      },
+                      "timedOut": {
+                        "type": "boolean"
+                      },
+                      "output": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "name",
+                      "on",
+                      "ms",
+                      "exitCode",
+                      "blocked",
+                      "timedOut"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "verify.required"
+                      },
+                      "attempt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "final": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "attempt",
+                      "message"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "mode.switch"
+                      },
+                      "to": {
+                        "type": "string",
+                        "enum": [
+                          "plan",
+                          "act"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "to"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "plan.proposed"
+                      },
+                      "plan": {
+                        "type": "string"
+                      },
+                      "steps": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "goal": {
+                              "type": "string"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "goal"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "plan"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "plan.decided"
+                      },
+                      "approved": {
+                        "type": "boolean"
+                      },
+                      "comment": {
+                        "type": "string"
+                      },
+                      "asTask": {
+                        "type": "boolean"
+                      },
+                      "runId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "approved"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "worktree.create"
+                      },
+                      "repo": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "branch": {
+                        "type": "string"
+                      },
+                      "base": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "repo",
+                      "path",
+                      "branch",
+                      "base"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "worktree.discard"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "trash": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "trash"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "worktree.restore"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "trash": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "trash"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "worktree.apply"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "squash",
+                          "merge",
+                          "branch"
+                        ]
+                      },
+                      "ok": {
+                        "type": "boolean"
+                      },
+                      "commit": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "mode",
+                      "ok"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "budget.warn"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "tokens",
+                          "costUsd",
+                          "toolCalls"
+                        ]
+                      },
+                      "used": {
+                        "type": "number"
+                      },
+                      "limit": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "kind",
+                      "used",
+                      "limit"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "budget.decided"
+                      },
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "continue",
+                          "stop",
+                          "raise"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "tokens",
+                          "costUsd",
+                          "toolCalls"
+                        ]
+                      },
+                      "limit": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "action",
+                      "kind"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "review.findings"
+                      },
+                      "findings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "file": {
+                              "type": "string"
+                            },
+                            "line": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "severity": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            },
+                            "problem": {
+                              "type": "string"
+                            },
+                            "basis": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "file",
+                            "severity",
+                            "problem",
+                            "basis"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "findings"
                     ],
                     "additionalProperties": {}
                   },

@@ -9,11 +9,20 @@
  * M3 的做法是：daemon 里跑 DomiSession，客户端换成 Domi Protocol 的代理实现，
  * **TUI 一行不用改**——门面的方法签名就是按将来的协议形状设计的。
  */
+
+import { dirname, join } from 'node:path'
 import {
+  fsEdit,
+  fsGlob,
+  fsGrep,
   fsRead,
   fsWrite,
+  JobTable,
+  makeShellKillTool,
+  makeShellOutputTool,
   makeSkillLoadTool,
   PermissionEngine,
+  SkillOverlay,
   type SkillRegistry,
   scopeOf,
   shellExec,
@@ -58,6 +67,7 @@ const TitleSchema = z.object({ title: z.string() })
 import { SqliteEventLog } from '@domi/store'
 import { memorySearchPlugin } from './builtin-plugins.ts'
 import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
+import { findRepoRoot, hasProjectContent, projectSkillsDir, rulesFiles, rulesText, TrustStore } from './project.ts'
 import { MAX_SPAWN_DEPTH, makeSpawnTool } from './subagent.ts'
 
 /**
@@ -129,6 +139,14 @@ export interface SessionOptions {
 export class DomiSession {
   private readonly log: SqliteEventLog
   private readonly tools: ToolRegistry
+  /** 后台命令（M7-001）。会话关闭时一起杀掉 */
+  private readonly jobs: JobTable
+  /** 仓库根与工作区信任（M7-002）。null = 本会话还没决定 */
+  private readonly repoRoot: string
+  private trusted: boolean | null = null
+  private readonly trustStore: TrustStore
+  /** Skill 清单 = 共享注册表 + 仓库 .domi/skills/（信任之后才叠） */
+  private readonly skillSource: SkillOverlay | undefined
   private provider: ModelProvider
   /** 注入的替身不随切换重建——测试要的就是同一个实例 */
   private readonly injectedProvider: boolean
@@ -152,18 +170,35 @@ export class DomiSession {
       { rules: opts.config.permissions.rules, ...(opts.scope ? { scope: opts.scope } : {}) },
       (capabilityId, args) => this.askUser(capabilityId, args),
     )
+    const outputDir = join(dirname(opts.dbPath), 'outputs', opts.sessionId)
+    this.jobs = new JobTable({ outputDir })
     this.tools = new ToolRegistry({
       cwd: opts.cwd,
       permissions,
       elicit: (tool, req) => this.askInput(tool.capability, req),
+      jobs: this.jobs,
+      outputDir,
     })
       .register(fsRead)
       .register(fsWrite)
       .register(shellExec)
+      // M7-001 编码工具：不新增能力类别（edit 归 fs.write，glob / grep / 输出查询归 fs.read，终止归 shell.exec）
+      .register(fsEdit)
+      .register(fsGlob)
+      .register(fsGrep)
+      .register(makeShellOutputTool(this.jobs))
+      .register(makeShellKillTool(this.jobs))
     // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用。以插件形态注册（PRD-M6-001 AC-3）
     for (const t of memorySearchPlugin.tools?.({ search: this.log.search }) ?? []) this.tools.register(t)
     if (opts.memory) this.tools.register(makeMemoryRecallTool(opts.memory))
-    if (opts.skills) this.tools.register(makeSkillLoadTool(opts.skills))
+    this.repoRoot = findRepoRoot(opts.cwd)
+    this.trustStore = new TrustStore(join(dirname(opts.dbPath), 'trust.json'))
+    this.skillSource = opts.skills
+      ? new SkillOverlay(opts.skills, () =>
+          this.trusted ? projectSkillsDir(this.repoRoot, dirname(opts.dbPath)) : null,
+        )
+      : undefined
+    if (this.skillSource) this.tools.register(makeSkillLoadTool(this.skillSource))
     if ((opts.spawnDepth ?? 0) < MAX_SPAWN_DEPTH) this.tools.register(makeSpawnTool(this))
 
     // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
@@ -542,6 +577,41 @@ export class DomiSession {
     )
   }
 
+  /**
+   * 工作区信任（PRD-M7-002 AC-3）：仓库里有规矩文件或 .domi/ 时，第一轮之前决定能不能加载。
+   * 以前答过就沿用；没人能回答就按不信任且**不记住**（下次有人时再问）。每个会话只落一次事件
+   */
+  private async ensureTrust(): Promise<void> {
+    if (this.trusted !== null) return
+    if (!hasProjectContent(this.repoRoot, this.opts.cwd, dirname(this.opts.dbPath))) {
+      this.trusted = false
+      return
+    }
+    const stored = this.trustStore.get(this.repoRoot)
+    let source: 'user' | 'stored' | 'default'
+    if (stored !== undefined) {
+      this.trusted = stored
+      source = 'stored'
+    } else if (!this.listeners.onAsk) {
+      this.trusted = false
+      source = 'default'
+    } else {
+      const files = rulesFiles(this.repoRoot, this.opts.cwd).map((f) => f.slice(this.repoRoot.length + 1))
+      const { allowed } = await this.askUser('workspace.trust', {
+        root: this.repoRoot,
+        message: '要信任这个仓库吗？信任后，它自带的规矩文件与项目级 Skill 会放进提示词（不会执行任何东西）',
+        files,
+        projectDir: `${this.repoRoot}/.domi`,
+      })
+      this.trusted = allowed
+      source = 'user'
+      this.trustStore.set(this.repoRoot, allowed, this.now())
+    }
+    await this.log.append(this.opts.sessionId, [
+      { t: 'workspace.trust', root: this.repoRoot, trusted: this.trusted, source },
+    ])
+  }
+
   /** 到窗口 70% 就自动压一次（AC-1）。只在 strategy = 'compact' 时生效 */
   private async maybeAutoCompact(): Promise<void> {
     if (this.opts.config.context.strategy !== 'compact') return
@@ -581,7 +651,12 @@ export class DomiSession {
     // Soul 很少变，放稳定前缀里（ADR-019）；空的时候不放，免得多一段没内容的说明
     if (soul !== '')
       extra.push({ id: 'builtin.soul', role: 'system', priority: 400, cacheable: true, render: () => soul })
-    const catalog = this.opts.skills?.catalog() ?? ''
+    // 仓库自带的规矩（M7-002）：信任之后才放。每轮现读，改了下一轮生效
+    const rules = this.trusted ? rulesText(this.repoRoot, this.opts.cwd) : ''
+    if (rules !== '') {
+      extra.push({ id: 'project.rules', role: 'system', priority: 320, cacheable: true, render: () => rules })
+    }
+    const catalog = this.skillSource?.catalog() ?? ''
     if (catalog !== '') {
       extra.push({ id: 'builtin.skills', role: 'system', priority: 450, cacheable: true, render: () => catalog })
     }
@@ -607,6 +682,7 @@ export class DomiSession {
     this.listeners.onBusy?.(true)
     for (const t of this.opts.extraTools?.(this.opts.cwd) ?? []) this.tools.register(t)
     await this.deliverNotices()
+    await this.ensureTrust()
     await this.maybeAutoCompact()
     const policy: ContextPolicy = {
       maxTokens: this.opts.config.context.maxTokens,
@@ -665,6 +741,7 @@ export class DomiSession {
    * 不关的话 kill 掉进程，最后一轮虽然在 WAL 里，但下次打开要走恢复流程。
    */
   async flushAndClose(): Promise<void> {
+    this.jobs.killAll()
     await this.pump()
     this.log.close()
   }

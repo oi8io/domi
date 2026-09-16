@@ -129,18 +129,22 @@ export class SkillRegistry {
 
   /** 未激活时进提示词的清单：只有名字与描述 */
   catalog(): string {
-    const list = this.list()
-    if (list.length === 0) return ''
-    return [
-      '可用的 Skill（做事的方法说明，不是工具）。任务对得上时，先调 skill.load 读正文再动手：',
-      ...list.map((s) => `- ${s.name}：${s.description}`),
-    ].join('\n')
+    return formatCatalog(this.list())
   }
 
   close(): void {
     this.watcher?.close()
     if (this.timer) clearTimeout(this.timer)
   }
+}
+
+/** 清单文本（共享注册表与项目叠加层共用） */
+export function formatCatalog(list: readonly Skill[]): string {
+  if (list.length === 0) return ''
+  return [
+    '可用的 Skill（做事的方法说明，不是工具）。任务对得上时，先调 skill.load 读正文再动手：',
+    ...list.map((s) => `- ${s.name}${s.source === 'project' ? '（本仓库）' : ''}：${s.description}`),
+  ].join('\n')
 }
 
 export const SkillLoadArgs = z.object({ name: z.string().describe('Skill 的名字，见系统提示里的清单') })
@@ -151,7 +155,7 @@ export type SkillLoadArgs = z.infer<typeof SkillLoadArgs>
  * 正文作为工具结果进上下文，所以同样带边界、同样是数据
  */
 export function makeSkillLoadTool(
-  registry: SkillRegistry,
+  registry: Pick<SkillRegistry, 'get' | 'list'>,
 ): Tool<SkillLoadArgs, { name: string; requiresTools: readonly string[]; body: string } | { error: string }> {
   return {
     name: 'skill.load',

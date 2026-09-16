@@ -31,6 +31,8 @@ export const fsWrite: Tool<FsWriteArgs, FsWriteResult> = {
     const abs = resolveWithinRoot(ctx.cwd, args.path)
     const existed = existsSync(abs)
     const before = existed ? readFileSync(abs, 'utf8') : null
+    // 读过之后被外部改了 → 拒绝（PRD-M7-001 AC-2）。在任何事件与写入之前
+    ctx.stamps?.check(abs, before, args.path)
 
     // 前后两条指纹事件是 PRD-M0-004 AC-2 的全部意义：据此可重建 diff。
     // before 为 null 表示文件原本不存在——这个区别在回滚时是关键的。
@@ -46,6 +48,7 @@ export const fsWrite: Tool<FsWriteArgs, FsWriteResult> = {
     writeFileSync(abs, args.content, 'utf8')
     const bytes = Buffer.byteLength(args.content, 'utf8')
     const digest = sha256(args.content)
+    ctx.stamps?.record(abs, args.content)
 
     ctx.emit({ t: 'fs.snapshot', path: args.path, phase: 'after', sha256: digest, bytes })
 

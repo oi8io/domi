@@ -12,7 +12,8 @@
 import type { DomiEvent, ToolSchema } from '@domi/protocol'
 import { z } from 'zod'
 import type { PermissionEngine } from './permission.ts'
-import type { ElicitRequest, ElicitResponse, Tool, ToolCtx } from './types.ts'
+import { FileStamps } from './tools/stamps.ts'
+import type { ElicitRequest, ElicitResponse, JobStarter, Tool, ToolCtx } from './types.ts'
 
 export interface ToolCallRequest {
   id: string
@@ -33,10 +34,16 @@ export interface ToolRegistryOptions {
   permissions: PermissionEngine
   /** 工具向用户要输入时走这里；带上是哪个工具在问，确认框才能说清楚 */
   elicit?: (tool: { name: string; capability: string }, req: ElicitRequest) => Promise<ElicitResponse>
+  /** 后台命令表（M7-001）。不给就不支持 background */
+  jobs?: JobStarter
+  /** 超长输出落盘目录 */
+  outputDir?: string
 }
 
 export class ToolRegistry {
   private readonly tools = new Map<string, Tool<never, unknown>>()
+  /** 本会话读写过的文件指纹：同一个 registry 的所有调用共用一份 */
+  readonly stamps = new FileStamps()
 
   constructor(private readonly opts: ToolRegistryOptions) {}
 
@@ -44,6 +51,14 @@ export class ToolRegistry {
   register<A, R>(tool: Tool<A, R>): this {
     this.tools.set(tool.name, tool as unknown as Tool<never, unknown>)
     return this
+  }
+
+  has(name: string): boolean {
+    return this.tools.has(name)
+  }
+
+  unregister(name: string): void {
+    this.tools.delete(name)
   }
 
   schemas(): ToolSchema[] {
@@ -113,6 +128,10 @@ export class ToolRegistry {
       emit: (ev) => {
         events.push(ev)
       },
+      stamps: this.stamps,
+      callId: call.id,
+      ...(this.opts.jobs ? { jobs: this.opts.jobs } : {}),
+      ...(this.opts.outputDir ? { outputDir: this.opts.outputDir } : {}),
       ...(elicit
         ? { elicit: (req: ElicitRequest) => elicit({ name: tool.name, capability: tool.capability }, req) }
         : {}),

@@ -34,6 +34,8 @@ export interface DoctorInput {
   ping?: PingResult | undefined
   /** 插件沙箱（PRD-M6-003）。没给就不查 */
   plugins?: { sandbox: 'bwrap' | 'sandbox-exec' | 'none'; allowUnsandboxed: boolean; withCode: number } | undefined
+  /** fs.grep 的后端（PRD-M7-001）：ripgrep 的路径，没装是 null。没给就不查 */
+  ripgrep?: string | null | undefined
 }
 
 export interface PingResult {
@@ -118,6 +120,19 @@ export function diagnose(input: DoctorInput): Finding[] {
           fix: '$ git --version   # 装上 git 后重启 domi',
         },
   )
+
+  if (input.ripgrep !== undefined) {
+    // 没装 rg 不算问题：fs.grep 退回内置实现，只是慢（用户拍板：没装也能用，装了自动用）
+    out.push({
+      ok: true,
+      title: '代码搜索',
+      detail:
+        input.ripgrep === null
+          ? '内置实现（没找到 ripgrep；大仓库里会慢，装上后自动改用：brew install ripgrep / apt install ripgrep）'
+          : `ripgrep（${input.ripgrep}）`,
+      fix: null,
+    })
+  }
 
   out.push(
     input.baseUrl
