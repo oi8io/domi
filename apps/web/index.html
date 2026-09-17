@@ -1,9 +1,34 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>domi</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231f6feb'/><text x='16' y='22' text-anchor='middle' font-family='monospace' font-size='16' font-weight='bold' fill='white'>d</text></svg>"
+    />
+    <script>
+      // 首帧之前应用主题，避免闪一下。色板取值与 packages/client-core/src/tokens.ts 一致（theme.spec 断言）
+      ;(function () {
+        var P = {
+          blue: { dark: ['#58a6ff', '#1f6feb'], light: ['#0969da', '#0969da'] },
+          green: { dark: ['#3fb950', '#238636'], light: ['#1a7f37', '#1a7f37'] },
+          orange: { dark: ['#f0883e', '#bd561d'], light: ['#bc4c00', '#bc4c00'] },
+          purple: { dark: ['#a371f7', '#8957e5'], light: ['#8250df', '#8250df'] },
+          pink: { dark: ['#db61a2', '#bf4b8a'], light: ['#bf3989', '#bf3989'] },
+        }
+        var t = null, a = null
+        try { t = localStorage.getItem('domi.theme'); a = localStorage.getItem('domi.accent') } catch (e) {}
+        var dark = t === 'dark' || (t !== 'light' && !(window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches))
+        var mode = dark ? 'dark' : 'light'
+        var c = (P[a] || P.blue)[mode]
+        var r = document.documentElement
+        r.setAttribute('data-theme', mode)
+        r.style.setProperty('--accent', c[0])
+        r.style.setProperty('--accent-emphasis', c[1])
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

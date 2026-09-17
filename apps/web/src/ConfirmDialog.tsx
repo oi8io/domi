@@ -1,12 +1,13 @@
 /**
- * 确认框 —— 与 TUI 的 ConfirmDialog 同一个立场（PRD-M0-003 · INV-03）：
+ * 确认卡 —— 与 TUI 的 ConfirmDialog 同一个立场（PRD-M0-003 · INV-03），样式是原型的内嵌 .perm-prompt（PRD-M8-008 AC-1）：
  * 显示**完整**的待执行内容；默认焦点在「拒绝」上，误按回车不等于同意。
  *
  * 工具要输入时（TASK-M3-016，比如 MCP elicitation）按 JSON Schema 画一个简单表单：
  * 文本、数字、布尔、枚举四种，够 MCP 规范里 elicitation 允许的那几种原始类型。
  */
 import type { AskSnapshot } from '@domi/client-core'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactElement } from 'react'
+import { Button } from './components/ui/button.tsx'
 
 interface FieldSchema {
   type?: string
@@ -41,13 +42,14 @@ export function formValues(schema: unknown, raw: Record<string, string>): Record
 function Field({ name, field, required }: { name: string; field: FieldSchema; required: boolean }) {
   const label = field.title ?? name
   const id = `ask-field-${name}`
-  let input: React.ReactElement
+  let input: ReactElement
   if (field.enum) {
     input = (
       <select
         id={id}
         name={name}
         required={required}
+        className="field-input"
         defaultValue={field.default === undefined ? '' : String(field.default)}
       >
         {!required && <option value="">（不填）</option>}
@@ -59,13 +61,22 @@ function Field({ name, field, required }: { name: string; field: FieldSchema; re
       </select>
     )
   } else if (field.type === 'boolean') {
-    input = <input id={id} type="checkbox" name={name} defaultChecked={field.default === true} />
+    input = (
+      <input
+        id={id}
+        type="checkbox"
+        name={name}
+        className="justify-self-start accent-[var(--accent)]"
+        defaultChecked={field.default === true}
+      />
+    )
   } else if (field.type === 'integer' || field.type === 'number') {
     input = (
       <input
         id={id}
         type="number"
         name={name}
+        className="field-input"
         step={field.type === 'integer' ? 1 : 'any'}
         required={required}
         defaultValue={field.default === undefined ? undefined : String(field.default)}
@@ -77,22 +88,29 @@ function Field({ name, field, required }: { name: string; field: FieldSchema; re
         id={id}
         type="text"
         name={name}
+        className="field-input"
         required={required}
         defaultValue={field.default === undefined ? undefined : String(field.default)}
       />
     )
   }
   return (
-    <div className="field">
-      <label className="field-label" htmlFor={id}>
+    <div className="grid gap-1">
+      <label className="text-xs text-mut" htmlFor={id}>
         {label}
         {required && ' *'}
       </label>
       {input}
-      {field.description && <span className="field-hint">{field.description}</span>}
+      {field.description && <span className="text-xs text-mut">{field.description}</span>}
     </div>
   )
 }
+
+const CARD = 'my-2 overflow-hidden rounded-md border border-warn bg-warn-d'
+const TITLE = 'px-3.5 pt-2 pb-1 text-[13px] font-semibold text-warn'
+const DETAIL =
+  'mx-3.5 mb-2 max-h-[40vh] overflow-auto rounded-sm border border-border2 bg-code px-2.5 py-2 font-mono text-xs break-all whitespace-pre-wrap'
+const ACTIONS = 'flex justify-end gap-2 px-3.5 pb-2.5'
 
 export function ConfirmDialog({
   ask,
@@ -118,46 +136,44 @@ export function ConfirmDialog({
       onAnswer(true, read(e.currentTarget))
     }
     return (
-      <form className="confirm" role="dialog" aria-labelledby="confirm-title" onSubmit={submit}>
-        <p id="confirm-title" className="confirm-title">
-          <code>{ask.capabilityId}</code> {approval ? '等你审批' : '需要你提供信息'}
+      <form className={CARD} role="dialog" aria-labelledby="confirm-title" onSubmit={submit}>
+        <p id="confirm-title" className={TITLE}>
+          {approval ? '等你审批' : '需要你提供信息'} · <code className="font-normal">{ask.capabilityId}</code>
         </p>
-        <p className="confirm-message">{form.message}</p>
-        <div className="confirm-fields">
+        <p className="mx-3.5 mb-2 text-[13px] whitespace-pre-wrap">{form.message}</p>
+        <div className="mx-3.5 mb-3 grid gap-2.5">
           {fieldsOf(form.schema).map(([name, field]) => (
             <Field key={name} name={name} field={field} required={required.has(name)} />
           ))}
         </div>
-        <div className="confirm-actions">
-          <button
-            type="button"
-            className="deny"
+        <div className={ACTIONS}>
+          <Button
             onClick={(e) => onAnswer(false, approval && e.currentTarget.form ? read(e.currentTarget.form) : undefined)}
           >
             {approval ? '驳回' : '拒绝'}
-          </button>
-          <button type="submit" className="allow">
+          </Button>
+          <Button type="submit" variant="primary">
             {approval ? '批准' : '提交'}
-          </button>
+          </Button>
         </div>
       </form>
     )
   }
 
   return (
-    <div className="confirm" role="alertdialog" aria-labelledby="confirm-title">
-      <p id="confirm-title" className="confirm-title">
-        domi 想执行 <code>{ask.capabilityId}</code>，需要你确认
+    <div className={CARD} role="alertdialog" aria-labelledby="confirm-title">
+      <p id="confirm-title" className={TITLE}>
+        权限请求 · <code className="font-normal">{ask.capabilityId}</code>
       </p>
-      <pre className="confirm-detail">{ask.detail}</pre>
-      <div className="confirm-actions">
-        {/* biome-ignore lint/a11y/noAutofocus: 默认焦点必须在拒绝上，这是 fail-closed 在交互层的延续 */}
-        <button type="button" className="deny" autoFocus onClick={() => onAnswer(false)}>
+      <pre className={DETAIL}>{ask.detail}</pre>
+      <div className={ACTIONS}>
+        {/* 默认焦点必须在拒绝上，这是 fail-closed 在交互层的延续 */}
+        <Button autoFocus onClick={() => onAnswer(false)}>
           拒绝
-        </button>
-        <button type="button" className="allow" onClick={() => onAnswer(true)}>
+        </Button>
+        <Button variant="primary" onClick={() => onAnswer(true)}>
           允许
-        </button>
+        </Button>
       </div>
     </div>
   )

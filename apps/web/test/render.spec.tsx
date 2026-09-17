@@ -11,6 +11,7 @@ import { App, SessionTools, SessionView } from '../src/App.tsx'
 import { ConfirmDialog } from '../src/ConfirmDialog.tsx'
 import { PendingRefs } from '../src/PendingRefs.tsx'
 import { StatusBar } from '../src/StatusBar.tsx'
+import { ModelSwitch } from '../src/session/SessionView.tsx'
 import { groupRows, Transcript, turnRanges } from '../src/Transcript.tsx'
 
 const neverConnects = (): WireSocket => {
@@ -34,7 +35,7 @@ describe('轨迹：工具调用与结果配对', () => {
     expect(html).toContain('成功')
     expect(html).toContain('运行中')
     // 折叠用原生 details，不需要任何 JS 状态
-    expect(html.match(/<details>/g)?.length).toBe(2)
+    expect(html.match(/<details class="group\/tool"/g)?.length).toBe(2)
   })
 
   test('孤立的 tool-result 不会被吞掉', () => {
@@ -62,7 +63,7 @@ describe('状态来自 client-core，页面不自己算', () => {
     store.setBusy(true)
     const client = new DomiClient({ clientName: 't', connect: neverConnects })
     const html = renderToStaticMarkup(<SessionView client={client} sessionId="s" store={store} />)
-    expect(html).toMatch(/<button type="submit" disabled="">/)
+    expect(html).toMatch(/<button type="submit"[^>]*disabled=""[^>]*data-action="send"/)
   })
 
   test('连接状态与握手失败原因直接显示', () => {
@@ -109,9 +110,10 @@ describe('状态栏（parity 第 9 项）', () => {
     })
     const html = renderToStaticMarkup(<StatusBar status={store.$status.get()} />)
     expect(html).toContain('anthropic/glm')
-    expect(html).toContain('1.2k/30 tok')
-    expect(html).toContain('0 次工具')
-    expect(html).toContain('class="ctx ctx-warn"')
+    const text = html.replace(/<[^>]+>/g, '')
+    expect(text).toContain('1.2k/30 tok')
+    expect(text).toContain('0 次工具')
+    expect(html).toContain('data-ctx="warn"')
     expect(html).toContain('ctx 72%')
   })
 
@@ -125,7 +127,9 @@ describe('状态栏（parity 第 9 项）', () => {
       unpricedModels: [],
       turnMs: 2_340,
     })
-    expect(renderToStaticMarkup(<StatusBar status={store.$status.get()} />)).toContain('本轮 2.3s')
+    expect(renderToStaticMarkup(<StatusBar status={store.$status.get()} />).replace(/<[^>]+>/g, '')).toContain(
+      '本轮 2.3s',
+    )
   })
 
   test('还没有指标时不瞎编数字', () => {
@@ -138,15 +142,19 @@ describe('状态栏（parity 第 9 项）', () => {
 describe('会话级操作（parity 第 8、10 项）', () => {
   test('有切换模型与删除入口；忙的时候都不可用', () => {
     const client = new DomiClient({ clientName: 't', connect: neverConnects })
-    const idle = renderToStaticMarkup(
-      <SessionTools client={client} sessionId="s" busy={false} onNotice={() => undefined} />,
-    )
-    expect(idle).toContain('切换模型')
+    const tools = (busy: boolean): string =>
+      renderToStaticMarkup(
+        <>
+          <ModelSwitch client={client} sessionId="s" busy={busy} current="glm" onNotice={() => undefined} />
+          <SessionTools client={client} sessionId="s" busy={busy} onNotice={() => undefined} />
+        </>,
+      )
+    const idle = tools(false)
+    expect(idle).toContain('title="切换模型"')
     expect(idle).toContain('删除会话')
-    const busy = renderToStaticMarkup(
-      <SessionTools client={client} sessionId="s" busy={true} onNotice={() => undefined} />,
-    )
-    expect(busy.match(/disabled=""/g)?.length).toBe(3)
+    expect(idle).not.toContain('disabled=""')
+    // 两个入口在忙的时候都不可点（切换模型的输入框在弹层里，弹层打不开）
+    expect(tools(true).match(/disabled=""/g)?.length).toBe(2)
   })
 })
 
@@ -220,8 +228,8 @@ describe('跨会话引用（PRD-M3-005）', () => {
       { seq: 5, fromSeq: 5, toSeq: Number.MAX_SAFE_INTEGER },
     ])
     const html = renderToStaticMarkup(<Transcript items={items} onQuote={() => undefined} />)
-    expect(html.match(/class="quote"/g)?.length).toBe(2)
-    expect(renderToStaticMarkup(<Transcript items={items} />)).not.toContain('class="quote"')
+    expect(html.match(/data-action="quote"/g)?.length).toBe(2)
+    expect(renderToStaticMarkup(<Transcript items={items} />)).not.toContain('data-action="quote"')
   })
 
   test('待发送的引用显示在输入框上方，可以去掉', () => {
@@ -242,9 +250,9 @@ describe('会话分支（parity 第 7 项）', () => {
       { seq: 3, kind: 'assistant', text: '答' },
     ]
     const html = renderToStaticMarkup(<Transcript items={items} onBranch={() => undefined} />)
-    expect(html.match(/class="branch"/g)?.length).toBe(2)
+    expect(html.match(/data-action="branch"/g)?.length).toBe(2)
     expect(html).toContain('title="从第 3 条分支出一个新会话"')
     // 不给回调就不画按钮（比如只读视图）
-    expect(renderToStaticMarkup(<Transcript items={items} />)).not.toContain('class="branch"')
+    expect(renderToStaticMarkup(<Transcript items={items} />)).not.toContain('data-action="branch"')
   })
 })

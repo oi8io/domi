@@ -1,0 +1,334 @@
+/*
+ * domi Web 的设计 token —— PRD-M8-001 · SPEC-M8-001 · ADR-027
+ * 取值与 docs/ui-redesign/HANDOFF.md §1、packages/client-core/src/tokens.ts 一致（测试断言）。
+ * 深浅两套变量挂在 <html data-theme>；accent 与 accent-emphasis 由 theme/store.ts 写到 <html> 的内联样式上，
+ * 派生色（hover / 选中底 / 强调边框）用 color-mix 从 accent 算，所以换色只写两个变量。
+ * 字体不从网络加载（INV-11：出站只去用户配置的端点），JetBrains Mono 装了就用。
+ */
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --bg2: #161b22;
+  --panel: #1c2128;
+  --panel-h: #22272e;
+  --border: #30363d;
+  --border2: #21262d;
+  --ink: #e6edf3;
+  --ink2: #c9d1d9;
+  --mut: #8b949e;
+  --mut2: #6e7681;
+  --accent: #58a6ff;
+  --accent-emphasis: #1f6feb;
+  --ok: #3fb950;
+  --bad: #f85149;
+  --warn: #d29922;
+  --info: #a371f7;
+  --tool: #f0883e;
+  --code-bg: #0d1117;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --tint: 12%;
+  --tint-b: 35%;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg2: #f6f8fa;
+  --panel: #f6f8fa;
+  --panel-h: #eaeef2;
+  --border: #d0d7de;
+  --border2: #e5e9ee;
+  --ink: #1f2328;
+  --ink2: #424a53;
+  --mut: #656d76;
+  --mut2: #8b949e;
+  --accent: #0969da;
+  --accent-emphasis: #0969da;
+  --ok: #1a7f37;
+  --bad: #d1242f;
+  --warn: #9a6700;
+  --info: #8250df;
+  --tool: #bc4c00;
+  --code-bg: #f6f8fa;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --tint: 8%;
+  --tint-b: 30%;
+}
+
+:root {
+  --accent-h: color-mix(in srgb, var(--accent) 82%, white);
+  --accent-d: color-mix(in srgb, var(--accent) var(--tint), transparent);
+  --accent-b: color-mix(in srgb, var(--accent) var(--tint-b), transparent);
+  --ok-d: color-mix(in srgb, var(--ok) var(--tint), transparent);
+  --bad-d: color-mix(in srgb, var(--bad) var(--tint), transparent);
+  --warn-d: color-mix(in srgb, var(--warn) var(--tint), transparent);
+  --info-d: color-mix(in srgb, var(--info) var(--tint), transparent);
+  --tool-d: color-mix(in srgb, var(--tool) var(--tint), transparent);
+  --r: 8px;
+  --r-sm: 6px;
+  --r-lg: 12px;
+  --sidebar-w: 260px;
+  --dur: 150ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* shadcn/ui 期望的名字，指向同一组变量，不维护第二份色板 */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--panel);
+  --card-foreground: var(--ink);
+  --popover: var(--bg2);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent-emphasis);
+  --primary-foreground: #ffffff;
+  --secondary: var(--panel);
+  --secondary-foreground: var(--ink2);
+  --muted: var(--panel);
+  --muted-foreground: var(--mut);
+  --destructive: var(--bad);
+  --input: var(--border);
+  --ring: var(--accent);
+  --radius: var(--r);
+}
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --ease-ui: cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-blink: blink 1.5s infinite;
+
+  @keyframes blink {
+    50% {
+      opacity: 0.4;
+    }
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg2: var(--bg2);
+  --color-panel: var(--panel);
+  --color-panel-h: var(--panel-h);
+  --color-border: var(--border);
+  --color-border2: var(--border2);
+  --color-ink: var(--ink);
+  --color-ink2: var(--ink2);
+  --color-mut: var(--mut);
+  --color-mut2: var(--mut2);
+  --color-accent: var(--accent);
+  --color-accent-h: var(--accent-h);
+  --color-accent-d: var(--accent-d);
+  --color-accent-b: var(--accent-b);
+  --color-accent-e: var(--accent-emphasis);
+  --color-ok: var(--ok);
+  --color-ok-d: var(--ok-d);
+  --color-bad: var(--bad);
+  --color-bad-d: var(--bad-d);
+  --color-warn: var(--warn);
+  --color-warn-d: var(--warn-d);
+  --color-info: var(--info);
+  --color-info-d: var(--info-d);
+  --color-tool: var(--tool);
+  --color-tool-d: var(--tool-d);
+  --color-code: var(--code-bg);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --shadow-pop: var(--shadow);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    transition:
+      background var(--dur),
+      color var(--dur);
+  }
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--mut2);
+  }
+  code,
+  pre,
+  kbd {
+    font-family: var(--font-mono);
+  }
+}
+
+@layer components {
+  /* 表单控件（原型 .fi / .fs / .fta） */
+  .field-input {
+    width: 100%;
+    padding: 6px 10px;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-size: 13px;
+  }
+  .field-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-d);
+  }
+  /* 状态栏 pill（原型 .pill） */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--ink2);
+    font-size: 11.5px;
+    white-space: nowrap;
+  }
+  .pill b {
+    font-weight: 600;
+    color: var(--ink);
+  }
+  /* 栏目小标题（原型 .nav-section / .pd-history-label） */
+  .caps {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--mut2);
+  }
+  /* 旧面板（Soul / 任务 / 插件 / 改动）在各自的任务里重写之前的过渡样式 */
+  .legacy button {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-size: 12.5px;
+    color: var(--ink2);
+    background: transparent;
+  }
+  .legacy button:hover:not(:disabled) {
+    background: var(--panel-h);
+  }
+  .legacy button.danger {
+    color: var(--bad);
+  }
+  .legacy button.allow {
+    background: var(--accent-emphasis);
+    border-color: var(--accent-emphasis);
+    color: #fff;
+  }
+  .legacy input,
+  .legacy textarea,
+  .legacy select {
+    padding: 6px 10px;
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-size: 13px;
+  }
+  .legacy textarea {
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+  .legacy h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 14px 0 8px;
+  }
+  .legacy pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 12px;
+    background: var(--code-bg);
+    border: 1px solid var(--border2);
+    border-radius: var(--r-sm);
+    padding: 8px 10px;
+    max-height: 360px;
+    overflow: auto;
+  }
+  .legacy ul,
+  .legacy ol {
+    list-style: none;
+  }
+  .legacy li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: baseline;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border2);
+  }
+  .legacy li:last-child {
+    border-bottom: none;
+  }
+  .legacy .meta,
+  .legacy .empty,
+  .legacy label {
+    font-size: 12px;
+    color: var(--mut);
+  }
+  .legacy .error {
+    color: var(--bad);
+    font-size: 13px;
+  }
+  .legacy .s-done {
+    color: var(--ok);
+  }
+  .legacy .s-failed,
+  .legacy .s-blocked,
+  .legacy .s-cancelled {
+    color: var(--bad);
+  }
+  .legacy .s-running {
+    color: var(--accent);
+  }
+  .legacy form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin: 10px 0;
+  }
+  .legacy .task-start {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .legacy .plugin-frame {
+    width: 100%;
+    min-height: 320px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: #fff;
+  }
+}

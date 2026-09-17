@@ -1,50 +1,48 @@
 /**
- * Web 端骨架 —— PRD-M3-003
+ * Web 端的壳 —— PRD-M8-002（原型 .shell：260px 侧栏 + 主区）。
  *
- * 能连上、能列会话、能看到事件流与轨迹、能提交输入。**只渲染**：
- * 状态全在 client-core 的 atom 里，这个文件里没有一行是在算「事件意味着什么」。
+ * 视图由 hash 路由决定；会话的订阅跟着路由走。**只渲染**：
+ * 状态全在 client-core 的 atom 里，这个文件里没有一行是在算「事件意味着什么」（INV-04）。
  * 与 TUI 的逐项对等见 docs/parity-checklist.md。
  */
-import { type ConnectionState, createSessionStore, type DomiClient, type SessionStore } from '@domi/client-core'
+import { createSessionStore, type DomiClient, type SessionStore } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
-import { type FormEvent, useCallback, useEffect, useState } from 'react'
-import { ChangesPanel } from './ChangesPanel.tsx'
-import { ConfirmDialog } from './ConfirmDialog.tsx'
-import { type PendingRef, PendingRefs } from './PendingRefs.tsx'
-import { PluginPanel } from './PluginPanel.tsx'
-import { SoulPanel } from './SoulPanel.tsx'
-import { StatusBar } from './StatusBar.tsx'
-import { TaskPanel } from './TaskPanel.tsx'
-import { Transcript } from './Transcript.tsx'
+import { useCallback, useEffect, useState } from 'react'
+import type { ProjectRow, SessionRow } from './layout/data.ts'
+import { Sidebar } from './layout/Sidebar.tsx'
+import type { PendingRef } from './PendingRefs.tsx'
+import { $route, navigate, type Route } from './router.ts'
+import { SessionView } from './session/SessionView.tsx'
+import { HomeView } from './views/HomeView.tsx'
+import { ProjectsView, ProjectView } from './views/ProjectsView.tsx'
+import { SessionsView } from './views/SessionsView.tsx'
+import { SettingsView } from './views/SettingsView.tsx'
+import { TasksView } from './views/TasksView.tsx'
 
-interface SessionRow {
-  id: string
-  title: string
-  model: string
-  eventCount: number
-  deleted: boolean
-  parentId?: string | undefined
-}
+export { ModeToggle, SessionTools, SessionView } from './session/SessionView.tsx'
 
-const STATE_LABEL: Record<ConnectionState, string> = {
-  idle: '未连接',
-  connecting: '连接中…',
-  open: '已连接',
-  reconnecting: '断线，重连中…',
-  incompatible: '协议版本不兼容',
-  closed: '已断开',
-}
-
-export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: string }) {
+export function App({
+  client,
+  daemonUrl,
+  route: fixedRoute,
+}: {
+  client: DomiClient
+  daemonUrl?: string
+  /** 测试用：固定路由，不读 location */
+  route?: Route
+}) {
   const state = useStore(client.$state)
   const lastError = useStore(client.$lastError)
+  const liveRoute = useStore($route)
+  const route = fixedRoute ?? liveRoute
+  const online = state === 'open'
   const [sessions, setSessions] = useState<SessionRow[]>([])
-  const [active, setActive] = useState<{ id: string; store: SessionStore } | null>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
+  // 项目接口（TASK-M8-004）落地前一直是空的
+  const [projects] = useState<ProjectRow[]>([])
+  const projectsAvailable = false
   // 跨会话引用：在哪个会话里点的都攒在这里，切到别的会话发送时带上（PRD-M3-005）
   const [refs, setRefs] = useState<PendingRef[]>([])
-  // 主区显示会话还是 Soul（PRD-M4）
-  const [view, setView] = useState<'session' | 'soul' | 'tasks' | 'plugins'>('session')
-  const [showDeleted, setShowDeleted] = useState(false)
 
   useEffect(() => {
     client.start().catch(() => undefined)
@@ -53,367 +51,121 @@ export function App({ client, daemonUrl }: { client: DomiClient; daemonUrl: stri
 
   const refresh = useCallback(async (): Promise<void> => {
     const r = await client.listSessions({ includeDeleted: showDeleted })
-    setSessions(r.sessions)
+    setSessions(r.sessions as SessionRow[])
   }, [client, showDeleted])
 
   useEffect(() => {
-    if (state !== 'open') return
+    if (!online) return
     refresh().catch(() => undefined)
-  }, [state, refresh])
+  }, [online, refresh])
 
-  const open = (id: string): void => {
-    setView('session')
-    if (active) client.unwatch(active.id)
+  // 会话订阅跟着路由走
+  const sessionId = route.view === 'session' ? route.id : null
+  const [active, setActive] = useState<{ id: string; store: SessionStore } | null>(null)
+  useEffect(() => {
+    if (sessionId === null || !online) return
     const store = createSessionStore()
-    setActive({ id, store })
-    client.watch(id, store).catch(() => undefined)
+    setActive({ id: sessionId, store })
+    client.watch(sessionId, store).catch(() => undefined)
+    return () => client.unwatch(sessionId)
+  }, [client, sessionId, online])
+  const activeStatus = useStore((active?.store ?? EMPTY).$status)
+  const activeRow = sessions.find((s) => s.id === sessionId)
+
+  const chats = sessions.filter((s) => !s.deleted && s.kind !== 'task')
+  const opened = (): void => {
+    refresh().catch(() => undefined)
   }
 
-  const create = async (): Promise<void> => {
-    const id = await client.createSession()
-    await refresh()
-    open(id)
-  }
-
-  // 隔离会话（M7-006）：在给定仓库（不填 = domid 的默认目录）里建 worktree
-  const [repoPath, setRepoPath] = useState('')
-  const [createError, setCreateError] = useState<string | null>(null)
-  const createIsolated = async (): Promise<void> => {
-    try {
-      const r = await client.createIsolatedSession(repoPath.trim() === '' ? undefined : repoPath.trim())
-      setCreateError(null)
-      await refresh()
-      open(r.sessionId)
-    } catch (e) {
-      setCreateError(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  const branched = async (id: string): Promise<void> => {
-    await refresh()
-    open(id)
-  }
-
-  const removed = async (): Promise<void> => {
-    if (active) client.unwatch(active.id)
-    setActive(null)
-    await refresh()
-  }
-
-  const restore = async (id: string): Promise<void> => {
-    await client.restoreSession(id)
-    await refresh()
-  }
-
-  return (
-    <div className="shell">
-      <aside className="sidebar">
-        <header className="brand">
-          <span className="logo">domi</span>
-          <span className={`conn conn-${state}`} title={daemonUrl}>
-            {STATE_LABEL[state]}
-          </span>
-        </header>
-        {lastError !== null && <p className="error">{lastError}</p>}
-        <button type="button" className="new" disabled={state !== 'open'} onClick={() => void create()}>
-          新建会话
-        </button>
-        <form
-          className="isolate"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void createIsolated()
-          }}
-        >
-          <input
-            value={repoPath}
-            placeholder="仓库路径（留空 = domid 所在目录）"
-            onChange={(e) => setRepoPath(e.target.value)}
-            disabled={state !== 'open'}
-          />
-          <button type="submit" disabled={state !== 'open'} title="在 git worktree 里干活，不碰你的工作区">
-            新建隔离会话
-          </button>
-        </form>
-        {createError !== null && <p className="error">{createError}</p>}
-        <button
-          type="button"
-          className={`soul-link${view === 'soul' ? ' current' : ''}`}
-          disabled={state !== 'open'}
-          onClick={() => setView(view === 'soul' ? 'session' : 'soul')}
-        >
-          Soul 与记忆
-        </button>
-        <button
-          type="button"
-          className={`soul-link${view === 'tasks' ? ' current' : ''}`}
-          disabled={state !== 'open'}
-          onClick={() => setView(view === 'tasks' ? 'session' : 'tasks')}
-        >
-          长任务
-        </button>
-        <button
-          type="button"
-          className={`soul-link${view === 'plugins' ? ' current' : ''}`}
-          disabled={state !== 'open'}
-          onClick={() => setView(view === 'plugins' ? 'session' : 'plugins')}
-        >
-          插件
-        </button>
-        <label className="toggle">
-          <input type="checkbox" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} />
-          显示已删除
-        </label>
-        <ul className="sessions">
-          {sessions.map((s) => (
-            <li key={s.id} className={s.deleted ? 'deleted' : ''}>
-              <button type="button" className={active?.id === s.id ? 'current' : ''} onClick={() => open(s.id)}>
-                <span className="title">{s.title || s.id}</span>
-                <span className="meta">
-                  {s.model} · {s.eventCount} 条事件{s.parentId === undefined ? '' : ' · 分支'}
-                  {s.deleted ? ' · 已删除' : ''}
-                </span>
-              </button>
-              {s.deleted && (
-                <button type="button" className="restore" onClick={() => void restore(s.id)}>
-                  恢复
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </aside>
-      <main className="main">
-        {view === 'soul' ? (
-          <SoulPanel client={client} />
-        ) : view === 'plugins' ? (
-          <PluginPanel client={client} />
-        ) : view === 'tasks' ? (
-          <TaskPanel client={client} onOpen={(id) => open(id)} />
-        ) : active ? (
+  let main: React.ReactNode
+  switch (route.view) {
+    case 'session':
+      main =
+        active !== null && active.id === route.id ? (
           <SessionView
             key={active.id}
             client={client}
             sessionId={active.id}
             store={active.store}
-            onDeleted={() => void removed()}
-            onBranched={(id) => void branched(id)}
+            title={activeRow?.title}
+            tab={route.tab}
+            connection={state}
+            onDeleted={() => {
+              refresh().catch(() => undefined)
+              navigate({ view: 'home' })
+            }}
+            onBranched={(id) => {
+              opened()
+              navigate({ view: 'session', id, tab: 'chat' })
+            }}
             refs={refs}
             onRefsChange={setRefs}
           />
         ) : (
-          <p className="empty">从左边选一个会话，或者新建一个。</p>
-        )}
-      </main>
-    </div>
-  )
-}
-
-export function SessionView({
-  client,
-  sessionId,
-  store,
-  onDeleted,
-  onBranched,
-  refs = [],
-  onRefsChange,
-}: {
-  client: DomiClient
-  sessionId: string
-  store: SessionStore
-  onDeleted?: () => void
-  /** 分支建好了，交给上层去刷新列表并打开它 */
-  onBranched?: (sessionId: string) => void
-  /** 待发送的引用；发出去之后清空 */
-  refs?: readonly PendingRef[]
-  onRefsChange?: (refs: PendingRef[]) => void
-}) {
-  const items = useStore(store.$items)
-  const status = useStore(store.$status)
-  const ask = useStore(store.$ask)
-  const [text, setText] = useState('')
-  const [notice, setNotice] = useState<string | null>(null)
-
-  const submit = (e: FormEvent): void => {
-    e.preventDefault()
-    const t = text.trim()
-    if (t === '') return
-    client.submit(sessionId, t, refs).then(
-      () => {
-        setText('')
-        setNotice(null)
-        if (refs.length > 0) onRefsChange?.([])
-      },
-      // SESSION_BUSY 之类的结构化错误原样给人看（PRD-M3-004 AC-3）
-      (err: Error) => setNotice(err.message),
-    )
-  }
-
-  const answer = (allowed: boolean, content?: Record<string, unknown>): void => {
-    if (!ask?.askId) return
-    client.answer(ask.askId, allowed, content).then(
-      (applied) => {
-        // 没生效 = 别的客户端已经答过了；确认框会随 askDone 关掉，这里只说明一下
-        if (!applied) setNotice('这个询问已经在别处回答过了')
-      },
-      (err: Error) => setNotice(err.message),
-    )
-  }
-
-  const branch = (seq: number): void => {
-    client.branchSession(sessionId, seq).then(
-      (id) => onBranched?.(id),
-      (err: Error) => setNotice(err.message),
-    )
-  }
-
-  return (
-    <section className="session">
-      <SessionTools
-        client={client}
-        sessionId={sessionId}
-        busy={status.busy}
-        onNotice={setNotice}
-        {...(onDeleted === undefined ? {} : { onDeleted })}
-      />
-      <ModeToggle
-        client={client}
-        sessionId={sessionId}
-        busy={status.busy}
-        mode={status.metrics?.mode ?? 'act'}
-        onNotice={setNotice}
-      />
-      <StatusBar status={status} />
-      {status.worktree !== undefined && (
-        <ChangesPanel client={client} sessionId={sessionId} busy={status.busy} items={items} />
-      )}
-      <Transcript
-        items={items}
-        {...(onBranched === undefined ? {} : { onBranch: branch })}
-        {...(onRefsChange === undefined
-          ? {}
-          : {
-              onQuote: (q) =>
-                onRefsChange([...refs, { sessionId, fromSeq: q.fromSeq, toSeq: q.toSeq, label: q.label }]),
-            })}
-      />
-      {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
-      <form className="composer" onSubmit={submit}>
-        {notice !== null && <p className="error">{notice}</p>}
-        <PendingRefs refs={refs} onRemove={(i) => onRefsChange?.(refs.filter((_, j) => j !== i))} />
-        <textarea
-          value={text}
-          placeholder={status.busy ? '正在处理上一条…' : '说点什么'}
-          onChange={(e) => setText(e.target.value)}
-          rows={3}
+          <p className="m-auto text-[13px] text-mut">{online ? '正在打开会话…' : '连上 daemon 后打开会话。'}</p>
+        )
+      break
+    case 'project':
+      main = <ProjectView project={projects.find((p) => p.id === route.id)} available={projectsAvailable} />
+      break
+    case 'projects':
+      main = <ProjectsView projects={projects} available={projectsAvailable} />
+      break
+    case 'sessions':
+      main = (
+        <SessionsView
+          sessions={sessions}
+          projects={projects}
+          showDeleted={showDeleted}
+          onShowDeleted={setShowDeleted}
+          onRestore={(id) => {
+            client
+              .restoreSession(id)
+              .then(refresh)
+              .catch(() => undefined)
+          }}
+          {...(active === null ? {} : { active: { id: active.id, busy: activeStatus.busy } })}
         />
-        <button type="submit" disabled={status.busy}>
-          发送
-        </button>
-      </form>
-    </section>
-  )
-}
-
-/** 计划模式开关（PRD-M7-005）：计划模式下 domi 只读代码，想好方案提交审批，批准后才动手 */
-export function ModeToggle({
-  client,
-  sessionId,
-  busy,
-  mode,
-  onNotice,
-}: {
-  client: DomiClient
-  sessionId: string
-  busy: boolean
-  mode: 'plan' | 'act'
-  onNotice: (msg: string | null) => void
-}) {
-  const toggle = (): void => {
-    client.setMode(sessionId, mode === 'plan' ? 'act' : 'plan').then(
-      () => onNotice(null),
-      (err: Error) => onNotice(err.message),
-    )
-  }
-  return (
-    <div className="tools">
-      <button
-        type="button"
-        className={mode === 'plan' ? 'mode-toggle on' : 'mode-toggle'}
-        disabled={busy}
-        onClick={toggle}
-        title="计划模式下 domi 只读代码，想好方案后提交给你审批，批准后才动手"
-      >
-        {mode === 'plan' ? '计划模式：开（点击回到执行模式）' : '进入计划模式'}
-      </button>
-    </div>
-  )
-}
-
-/**
- * 会话级操作：切换模型、删除。都是「发一个请求，结果看事件流或列表」——
- * 切换成功后 model.switch 事件自己会出现在对话里，这里只显示会失去的能力。
- * 删除要点两下：第一下变成「确认删除」，防手滑（软删除，可以在回收站恢复）。
- */
-export function SessionTools({
-  client,
-  sessionId,
-  busy,
-  onNotice,
-  onDeleted,
-}: {
-  client: DomiClient
-  sessionId: string
-  busy: boolean
-  onNotice: (msg: string | null) => void
-  onDeleted?: () => void
-}) {
-  const [model, setModel] = useState('')
-  const [armed, setArmed] = useState(false)
-
-  const switchModel = (e: FormEvent): void => {
-    e.preventDefault()
-    const [name, provider] = model.trim().split(/\s+/)
-    if (!name) return
-    client.switchModel(sessionId, name, provider).then(
-      (lost) => {
-        setModel('')
-        onNotice(lost.length > 0 ? `已切换。新模型不支持：${lost.join('、')}` : null)
-      },
-      (err: Error) => onNotice(err.message),
-    )
-  }
-
-  const remove = (): void => {
-    if (!armed) {
-      setArmed(true)
-      return
-    }
-    client.deleteSession(sessionId).then(
-      () => onDeleted?.(),
-      (err: Error) => {
-        setArmed(false)
-        onNotice(err.message)
-      },
-    )
-  }
-
-  return (
-    <div className="tools">
-      <form onSubmit={switchModel}>
-        <input
-          value={model}
-          placeholder="切换模型：名字 [provider]"
-          onChange={(e) => setModel(e.target.value)}
-          disabled={busy}
+      )
+      break
+    case 'tasks':
+      main = (
+        <TasksView
+          client={client}
+          online={online}
+          create={route.create === true}
+          schedule={route.schedule === true}
+          onCreated={opened}
         />
-        <button type="submit" disabled={busy || model.trim() === ''}>
-          切换
-        </button>
-      </form>
-      <button type="button" className={armed ? 'danger armed' : 'danger'} disabled={busy} onClick={remove}>
-        {armed ? '确认删除' : '删除会话'}
-      </button>
+      )
+      break
+    case 'settings':
+      main = <SettingsView client={client} tab={route.tab} online={online} />
+      break
+    default:
+      main = <HomeView client={client} online={online} recent={chats} onCreated={opened} />
+  }
+
+  return (
+    <div className="grid h-screen grid-cols-[var(--sidebar-w)_1fr] overflow-hidden">
+      <Sidebar
+        state={state}
+        lastError={lastError}
+        daemonUrl={daemonUrl}
+        route={route}
+        projects={projects}
+        projectsAvailable={projectsAvailable}
+        chats={chats}
+        active={
+          active === null || sessionId === null
+            ? undefined
+            : { id: active.id, busy: activeStatus.busy, projectId: activeRow?.projectId }
+        }
+        onNewChat={() => navigate({ view: 'home' })}
+      />
+      <main className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-bg">{main}</main>
     </div>
   )
 }
+
+const EMPTY = createSessionStore()
