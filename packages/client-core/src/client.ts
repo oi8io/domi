@@ -287,12 +287,20 @@ export class DomiClient {
    * 不在这里清确认框：等 daemon 推 session.askDone 再清，所有客户端走同一条路
    */
   /** channel：在哪个端上答的（M5-007）。不给就由 daemon 用握手时的客户端名 */
-  async answer(askId: string, allowed: boolean, content?: Record<string, unknown>, channel?: string): Promise<boolean> {
+  /** grant：本会话内始终允许（M8-016），只在询问 grantable 时生效 */
+  async answer(
+    askId: string,
+    allowed: boolean,
+    content?: Record<string, unknown>,
+    channel?: string,
+    grant?: boolean,
+  ): Promise<boolean> {
     const r = await this.request('session.answer', {
       askId,
       allowed,
       ...(content === undefined ? {} : { content }),
       ...(channel === undefined ? {} : { channel }),
+      ...(grant === true ? { grant: true } : {}),
     })
     return r.ok
   }
@@ -446,6 +454,7 @@ export class DomiClient {
         capabilityId: p.capabilityId,
         detail: p.detail,
         ...(p.form === undefined ? {} : { form: p.form }),
+        ...(p.grantable === true ? { grantable: true } : {}),
       })
     } else if (msg.method === 'session.askDone') {
       const p = msg.params as NotifyParamsOf<'session.askDone'>

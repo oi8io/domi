@@ -74,6 +74,8 @@ export interface AskSnapshot {
   detail: string
   /** 工具要输入时的表单（JSON Schema）。有它就画表单，回答时带内容 */
   form?: { message: string; schema: unknown }
+  /** 可以答「本会话始终允许」（M8-016） */
+  grantable?: boolean
 }
 
 /** 状态栏的「本轮」段。一分钟以内到 0.1 秒，以上到秒 */

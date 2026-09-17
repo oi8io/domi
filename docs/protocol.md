@@ -2930,6 +2930,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
     "channel": {
       "type": "string",
       "maxLength": 40
+    },
+    "grant": {
+      "type": "boolean"
     }
   },
   "required": [
@@ -3287,7 +3290,8 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                           "default",
                           "config",
                           "user",
-                          "mode"
+                          "mode",
+                          "session-grant"
                         ]
                       },
                       "matchedRule": {
@@ -3298,6 +3302,20 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                       },
                       "channel": {
                         "type": "string"
+                      },
+                      "grant": {
+                        "type": "object",
+                        "properties": {
+                          "capability": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "capability"
+                        ]
                       }
                     },
                     "required": [
@@ -4615,6 +4633,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
         "message",
         "schema"
       ]
+    },
+    "grantable": {
+      "type": "boolean"
     }
   },
   "required": [

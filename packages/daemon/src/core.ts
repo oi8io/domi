@@ -126,7 +126,9 @@ export interface HostAsk {
   detail: string
   /** 表单型询问（工具要输入） */
   form?: { message: string; schema: unknown }
-  answer(allowed: boolean, content?: Record<string, unknown>, channel?: string): void
+  /** 可以答「本会话始终允许」（PRD-M8-016） */
+  grantable?: boolean
+  answer(allowed: boolean, content?: Record<string, unknown>, channel?: string, grant?: boolean): void
 }
 
 export type HostMetrics = NotifyParamsOf<'session.metrics'>['metrics']
@@ -269,6 +271,7 @@ export class Daemon {
       capabilityId: ask.capabilityId,
       detail: ask.detail,
       ...(ask.form === undefined ? {} : { form: ask.form }),
+      ...(ask.grantable === true ? { grantable: true } : {}),
     })
   }
 
@@ -647,13 +650,24 @@ export class Daemon {
       }
 
       case 'session.answer': {
-        const p = params as { askId: string; allowed: boolean; content?: Record<string, unknown>; channel?: string }
+        const p = params as {
+          askId: string
+          allowed: boolean
+          content?: Record<string, unknown>
+          channel?: string
+          grant?: boolean
+        }
         const ask = this.asks.get(p.askId)
         // 已经被别的客户端答过（或根本不存在）：如实说没生效，不重复作答
         if (!ask) return ok(req.id, { ok: false })
         this.asks.delete(p.askId)
         // 审批从哪个端来（M5-007 AC-3）：客户端说了算，没说就用它握手时报的名字
-        ask.answer(p.allowed, p.content, p.channel ?? this.clientNames.get(conn.id)?.replace(/^domi-/, ''))
+        ask.answer(
+          p.allowed,
+          p.content,
+          p.channel ?? this.clientNames.get(conn.id)?.replace(/^domi-/, ''),
+          p.grant === true && ask.grantable === true,
+        )
         this.broadcast(
           ask.sessionId,
           notify('session.askDone', { sessionId: ask.sessionId, askId: p.askId, allowed: p.allowed }),

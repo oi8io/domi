@@ -50,7 +50,8 @@ export interface ChildSession {
 export interface PendingAskLike {
   capabilityId: string
   args: unknown
-  answer(allowed: boolean, content?: Record<string, unknown>, channel?: string): void
+  grantable?: boolean
+  answer(allowed: boolean, content?: Record<string, unknown>, channel?: string, grant?: boolean): void
 }
 
 export interface SpawnParent {

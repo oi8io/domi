@@ -103,8 +103,13 @@ export interface PendingAsk {
   capabilityId: string
   args: unknown
   form?: { message: string; schema: unknown }
-  /** channel：用户在哪个端上回答的（tui / web / telegram），进 permission 事件（M5-007） */
-  answer(allowed: boolean, content?: Record<string, unknown>, channel?: string): void
+  /** 可以答「本会话始终允许」（M8-016） */
+  grantable?: boolean
+  /**
+   * channel：用户在哪个端上回答的（tui / web / telegram），进 permission 事件（M5-007）。
+   * grant：本会话始终允许（M8-016），只在 grantable 时有意义
+   */
+  answer(allowed: boolean, content?: Record<string, unknown>, channel?: string, grant?: boolean): void
 }
 
 export interface MetricsSnapshot {
@@ -175,6 +180,7 @@ export interface SessionOptions {
 export class DomiSession {
   private readonly log: SqliteEventLog
   private readonly tools: ToolRegistry
+  private readonly permissions: PermissionEngine
   /** 类型诊断（M7-007）：每个 tsconfig 一个常驻 LanguageService */
   private readonly diagnostics = new DiagnosticsService()
   /** 后台命令（M7-001）。会话关闭时一起杀掉 */
@@ -218,9 +224,11 @@ export class DomiSession {
         ...(opts.askAlways && opts.askAlways.length > 0
           ? { askAlways: (c: string) => (opts.askAlways as readonly string[]).includes(c) }
           : {}),
+        cwd: opts.cwd,
       },
-      (capabilityId, args) => this.askUser(capabilityId, args),
+      (capabilityId, args, o) => this.askUser(capabilityId, args, o?.grantable === true),
     )
+    this.permissions = permissions
     const outputDir = join(dirname(opts.dbPath), 'outputs', opts.sessionId)
     this.hooks = new HookRunner(opts.config.hooks ?? [], { sessionId: opts.sessionId, cwd: opts.cwd })
     this.jobs = new JobTable({ outputDir })
@@ -326,14 +334,23 @@ export class DomiSession {
     return this
   }
 
-  private askUser(capabilityId: string, args: unknown): Promise<{ allowed: boolean; channel?: string }> {
+  private askUser(
+    capabilityId: string,
+    args: unknown,
+    grantable = false,
+  ): Promise<{ allowed: boolean; channel?: string; grant?: boolean }> {
     return new Promise((resolve) => {
       const ask: PendingAsk = {
         capabilityId,
         args,
-        answer: (allowed, _content, channel) => {
+        ...(grantable ? { grantable: true } : {}),
+        answer: (allowed, _content, channel, grant) => {
           this.listeners.onAsk?.(null)
-          resolve({ allowed, ...(channel === undefined ? {} : { channel }) })
+          resolve({
+            allowed,
+            ...(channel === undefined ? {} : { channel }),
+            ...(grantable && grant === true ? { grant: true } : {}),
+          })
         },
       }
       if (!this.listeners.onAsk) {
@@ -601,9 +618,9 @@ export class DomiSession {
     }
     this.listeners.onAsk({
       ...ask,
-      answer: (allowed, content, channel) => {
+      answer: (allowed, content, channel, grant) => {
         this.listeners.onAsk?.(null)
-        ask.answer(allowed, content, channel)
+        ask.answer(allowed, content, channel, grant)
       },
     })
   }
@@ -721,7 +738,15 @@ export class DomiSession {
    * 返回补了几条
    */
   async recover(): Promise<number> {
-    const fix = recoveryEvents(await this.view())
+    const events = await this.view()
+    // 本会话给过的「始终允许」（M8-016）：重开会话照样生效
+    this.permissions.restoreGrants(
+      events.flatMap((e) => {
+        const ev = e.ev as { t: string; source?: string; grant?: { capability: string; scope?: string } }
+        return ev.t === 'permission' && ev.source === 'user' && ev.grant !== undefined ? [ev.grant] : []
+      }),
+    )
+    const fix = recoveryEvents(events)
     if (fix.length === 0) return 0
     await this.log.append(this.opts.sessionId, fix)
     await this.pump()

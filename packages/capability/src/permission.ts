@@ -5,7 +5,8 @@
  * ask 看起来更友好，实际上是把"没想过的能力"变成"弹个窗让用户点同意"——
  * 用户点第三次之后就不看内容了。fail-closed 的意思是：没显式声明过的，直接拒。
  */
-import type { CapabilityId, Decision } from './types.ts'
+import { dirname, isAbsolute, relative, resolve } from 'node:path'
+import type { CapabilityId, Decision, SessionGrant } from './types.ts'
 
 export interface PermissionRule {
   /** 规则名，会原样进事件的 matchedRule，便于事后审计"是哪条放行的" */
@@ -31,6 +32,32 @@ export interface PermissionConfig {
    * 自由会话用它让 shell.exec 每次都问——命令能碰到哪些路径没法静态判断
    */
   askAlways?: (capabilityId: CapabilityId) => boolean
+  /** 会话的工作目录：路径类授权按它把相对路径解析成绝对路径（PRD-M8-016） */
+  cwd?: string
+}
+
+/** 不提供「本会话始终允许」的能力：命令、外部来的工具——参数能碰到什么没法静态限定 */
+export function grantable(capabilityId: string): boolean {
+  return !(capabilityId === 'shell.exec' || capabilityId.startsWith('mcp.') || capabilityId.startsWith('plugin.'))
+}
+
+/** 这次调用如果被授权，授权的范围是什么。null = 这个能力不能授权 */
+export function grantFor(capabilityId: string, args: unknown, cwd?: string): SessionGrant | null {
+  if (!grantable(capabilityId)) return null
+  const path = (args as { path?: unknown } | null)?.path
+  if (typeof path === 'string' && path !== '') {
+    const abs = isAbsolute(path) ? resolve(path) : resolve(cwd ?? '.', path)
+    return { capability: capabilityId, scope: dirname(abs) }
+  }
+  return { capability: capabilityId }
+}
+
+function covers(g: SessionGrant, want: SessionGrant): boolean {
+  if (g.capability !== want.capability) return false
+  if (g.scope === undefined) return true
+  if (want.scope === undefined) return false
+  const rel = relative(g.scope, want.scope)
+  return rel === '' || !(rel.startsWith('..') || isAbsolute(rel))
 }
 
 /** 计划模式下拒绝时 matchedRule 的值 */
@@ -54,11 +81,15 @@ function readonlyInPlan(capabilityId: string): boolean {
   )
 }
 
-/** 交互式回答的来源；TUI 的确认框实现它。channel 是用户在哪个端上回答的 */
+/**
+ * 交互式回答的来源；TUI 的确认框实现它。channel 是用户在哪个端上回答的。
+ * grantable = 这次可以答「本会话始终允许」；答了就在返回里带 grant: true
+ */
 export type Asker = (
   capabilityId: CapabilityId,
   args: unknown,
-) => Promise<boolean | { allowed: boolean; channel?: string }>
+  opts?: { grantable: boolean },
+) => Promise<boolean | { allowed: boolean; channel?: string; grant?: boolean }>
 
 /** 子 agent 被父范围拦下时 matchedRule 的值 */
 export const PARENT_SCOPE_RULE = 'parent-scope'
@@ -73,10 +104,18 @@ export function scopeOf(
 }
 
 export class PermissionEngine {
+  /** 本会话的授权（PRD-M8-016）。只活在内存里，重开会话时由调用方从事件恢复 */
+  private readonly grants: SessionGrant[] = []
+
   constructor(
     private readonly config: PermissionConfig = {},
     private readonly ask?: Asker,
   ) {}
+
+  /** 从事件流恢复授权（source:'user' 且带 grant 的 permission 事件） */
+  restoreGrants(grants: readonly SessionGrant[]): void {
+    for (const g of grants) this.grants.push({ ...g })
+  }
 
   async check(capabilityId: CapabilityId, args: unknown): Promise<Decision> {
     if (this.config.scope && !this.config.scope(capabilityId)) {
@@ -100,18 +139,25 @@ export class PermissionEngine {
     if (rule.decision !== 'ask' && !tightened) {
       return { decision: rule.decision, source: 'config', matchedRule: rule.name }
     }
+    // 会话授权只能把「要问」变成「允许」，越不过 deny（上面已经返回了）
+    const want = grantFor(capabilityId, args, this.config.cwd)
+    const hit = want === null ? undefined : this.grants.find((g) => covers(g, want))
+    if (hit) return { decision: 'allow', source: 'session-grant', matchedRule: rule.name, grant: { ...hit } }
     if (!this.ask) {
       // 配置说要问，但没有人可问（比如非交互环境）——同样拒绝，不是放行
       return { decision: 'deny', source: 'default', matchedRule: rule.name }
     }
-    const answer = await this.ask(capabilityId, args)
+    const answer = await this.ask(capabilityId, args, { grantable: want !== null })
     const allowed = typeof answer === 'boolean' ? answer : answer.allowed
     const channel = typeof answer === 'boolean' ? undefined : answer.channel
+    const granted = allowed && typeof answer !== 'boolean' && answer.grant === true && want !== null
+    if (granted) this.grants.push(want)
     return {
       decision: allowed ? 'allow' : 'deny',
       source: 'user',
       matchedRule: rule.name,
       ...(channel === undefined ? {} : { channel }),
+      ...(granted ? { grant: { ...want } } : {}),
     }
   }
 }

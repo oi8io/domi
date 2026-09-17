@@ -67,9 +67,9 @@ export function SessionView({
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight
   }, [items.length, ask])
 
-  const answer = (allowed: boolean, content?: Record<string, unknown>): void => {
+  const answer = (allowed: boolean, content?: Record<string, unknown>, grant?: boolean): void => {
     if (!ask?.askId) return
-    client.answer(ask.askId, allowed, content).then(
+    client.answer(ask.askId, allowed, content, undefined, grant).then(
       (applied) => {
         // 没生效 = 别的客户端已经答过了；确认卡会随 askDone 关掉，这里只说明一下
         if (!applied) setNotice('这个询问已经在别处回答过了')

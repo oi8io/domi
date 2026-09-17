@@ -165,6 +165,8 @@ const AskSchema = z.object({
   detail: z.string(),
   /** 工具要输入时带上（TASK-M3-016）：客户端按 schema 画表单，回答时把内容放进 session.answer 的 content */
   form: z.object({ message: z.string(), schema: z.unknown() }).optional(),
+  /** 可以答「本会话始终允许」（PRD-M8-016）。命令、MCP、插件工具没有这个选项 */
+  grantable: z.boolean().optional(),
 })
 
 /**
@@ -500,6 +502,8 @@ export const METHODS = {
       content: z.record(z.string(), z.unknown()).optional(),
       /** 在哪个端上答的（M5-007）。不给就用握手时的客户端名 */
       channel: z.string().max(40).optional(),
+      /** 本会话内始终允许（PRD-M8-016）。只在 allowed 且询问 grantable 时生效 */
+      grant: z.boolean().optional(),
     }),
     result: z.object({ ok: z.boolean() }),
   },

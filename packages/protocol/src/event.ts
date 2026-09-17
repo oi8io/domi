@@ -24,7 +24,8 @@ import { z } from 'zod'
  * v9 → v10：M7 会写代码——新增 `workspace.trust` `hook.run` `verify.required` `mode.switch` `plan.proposed` `plan.decided`
  *          `worktree.create` `worktree.discard` `worktree.restore` `worktree.apply` `budget.warn` `budget.decided` `review.findings`；
  *          `permission.source` 新增取值 `mode`（计划模式拒绝的）。
- * v10 → v11：M8 工作台——新增 `session.kind`（自由会话 / 任务）`project.assign`（任务归到哪个项目）`schedule.fire`（定时触发）。
+ * v10 → v11：M8 工作台——新增 `session.kind`（自由会话 / 任务）`project.assign`（任务归到哪个项目）`schedule.fire`（定时触发）；
+ *          `permission` 新增可选的 `grant`，`permission.source` 新增取值 `session-grant`（本会话内始终允许）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
 export const SCHEMA_VERSION = 11
@@ -113,10 +114,13 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     capabilityId: z.string(),
     decision: z.enum(['allow', 'deny', 'ask']),
     /** mode：计划模式下只读之外的能力一律拒绝（M7-005） */
-    source: z.enum(['default', 'config', 'user', 'mode']),
+    /** session-grant：命中了本会话里之前给过的「始终允许」（M8-016） */
+    source: z.enum(['default', 'config', 'user', 'mode', 'session-grant']),
     matchedRule: z.string().nullable(),
     /** 用户是在哪个端上回答的（tui / web / telegram）。只有 source:'user' 时才有 */
     channel: z.string().optional(),
+    /** M8-016：用户这次给的会话级授权（source:user），或这次命中的授权（source:session-grant）。scope 是目录 */
+    grant: z.object({ capability: z.string(), scope: z.string().optional() }).optional(),
   }),
   /** M1-002：切换模型。事件流一条不动，上下文按新模型窗口重拼是 buildContext 的事 */
   z.looseObject({

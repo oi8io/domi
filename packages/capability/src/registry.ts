@@ -142,6 +142,7 @@ export class ToolRegistry {
       source: decision.source,
       matchedRule: decision.matchedRule,
       ...(decision.channel === undefined ? {} : { channel: decision.channel }),
+      ...(decision.grant === undefined ? {} : { grant: decision.grant }),
     }
 
     if (decision.decision !== 'allow') {

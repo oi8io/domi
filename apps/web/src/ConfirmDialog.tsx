@@ -117,7 +117,8 @@ export function ConfirmDialog({
   onAnswer,
 }: {
   ask: AskSnapshot
-  onAnswer: (allowed: boolean, content?: Record<string, unknown>) => void
+  /** grant：本会话内始终允许（PRD-M8-016） */
+  onAnswer: (allowed: boolean, content?: Record<string, unknown>, grant?: boolean) => void
 }) {
   const form = ask.form
   if (form) {
@@ -171,6 +172,15 @@ export function ConfirmDialog({
         <Button autoFocus onClick={() => onAnswer(false)}>
           拒绝
         </Button>
+        {ask.grantable === true && (
+          <Button
+            onClick={() => onAnswer(true, undefined, true)}
+            title="这个会话里同类操作（同一目录下）不再询问"
+            data-action="grant"
+          >
+            本会话始终允许
+          </Button>
+        )}
         <Button variant="primary" onClick={() => onAnswer(true)}>
           允许
         </Button>

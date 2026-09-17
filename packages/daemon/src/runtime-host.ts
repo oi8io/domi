@@ -268,7 +268,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           // 完整内容，不截断（PRD-M0-003 AC-1）：确认框是用户做决定的地方
           detail,
           ...(ask.form === undefined ? {} : { form: ask.form }),
-          answer: (allowed, content, channel) => ask.answer(allowed, content, channel),
+          ...(ask.grantable === true ? { grantable: true } : {}),
+          answer: (allowed, content, channel, grant) => ask.answer(allowed, content, channel, grant),
         })
         // 长任务在等人（M5-004 AC-1）。通知里只说「在等什么能力」，不带参数内容
         if (sessionId.startsWith(RUN_PREFIX) && notifier.enabled) {

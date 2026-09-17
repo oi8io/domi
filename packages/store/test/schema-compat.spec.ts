@@ -50,7 +50,7 @@ const V2_V3 = load('v2-to-v3.jsonl')
 
 describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
-    expect(MIXED).toHaveLength(35)
+    expect(MIXED).toHaveLength(37)
     for (const e of MIXED) {
       expect(() => parseEvent(e.ev, e.schemaVersion)).not.toThrow()
     }

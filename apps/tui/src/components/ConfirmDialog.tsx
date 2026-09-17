@@ -42,6 +42,7 @@ export function ConfirmDialog({ ask }: { ask: AskSnapshot }): React.ReactElement
           </Text>
           <Text>{'  '}</Text>
           <Text {...t.fg('ink2')}>{approval ? ' y 批准 ' : ' y 允许 '}</Text>
+          {ask.grantable === true && <Text {...t.fg('ink2')}>{'  a 本会话始终允许 '}</Text>}
           <Text {...t.fg('mut2')}>{'   Enter = 拒绝'}</Text>
         </Box>
       )}

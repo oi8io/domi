@@ -127,6 +127,11 @@ function Root({
     // 焦点在确认框时，按键只喂给确认框——别让用户以为自己在打字
     const ask = store.$ask.get()
     if (focusIdOf(ask) === 'domi-confirm') {
+      // a = 本会话始终允许（PRD-M8-016）：只在这次询问可以授权时生效
+      if (input.toLowerCase() === 'a' && !key.ctrl && ask?.grantable === true && ask.askId) {
+        void client.answer(ask.askId, true, undefined, undefined, true).catch(() => undefined)
+        return
+      }
       const answer = answerFromKey(input, key)
       if (answer === null || !ask?.askId) return
       // 表单型询问：终端里只接得住「一个布尔字段」这种；其余的 y 不生效，得去 Web 端填（n 照样能拒绝）

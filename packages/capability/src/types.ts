@@ -13,11 +13,19 @@ export type CapabilityId = BuiltinCapabilityId | (string & {})
 export interface Decision {
   decision: 'allow' | 'deny' | 'ask'
   /** 这条决定从哪来。default 永远是 deny（fail-closed） */
-  source: 'default' | 'config' | 'user' | 'mode'
+  source: 'default' | 'config' | 'user' | 'mode' | 'session-grant'
   /** 命中的规则；默认分支为 null */
   matchedRule: string | null
   /** 用户在哪个端上回答的（M5-007） */
   channel?: string
+  /** 本会话内始终允许（PRD-M8-016）：用户这次给的授权，或这次命中的授权 */
+  grant?: SessionGrant
+}
+
+/** 会话级授权。scope 是路径类能力的目录（绝对路径），没有 scope 的管这个能力的全部调用 */
+export interface SessionGrant {
+  capability: string
+  scope?: string
 }
 
 /** 工具向用户要输入（MCP elicitation 等）。一次问答，不是权限决定 */
