@@ -25,7 +25,12 @@ export interface SessionRow {
   parentSeq: number | null
   /** 子 agent 会话：派生它的父会话（M5-001）。和分支的 parentSessionId 是两回事 */
   spawnedBy: string | null
+  /** 自由会话 / 任务（M8-004）。null = 升级前的老会话，还没回填 */
+  kind: SessionKind | null
+  projectId: string | null
 }
+
+export type SessionKind = 'chat' | 'task'
 
 export interface SessionSummary extends SessionRow {
   messageCount: number
@@ -43,6 +48,8 @@ interface RawRow {
   parent_session_id: string | null
   parent_seq: number | null
   spawned_by: string | null
+  kind?: string | null
+  project_id?: string | null
 }
 
 function toRow(r: RawRow): SessionRow {
@@ -57,6 +64,8 @@ function toRow(r: RawRow): SessionRow {
     parentSessionId: r.parent_session_id,
     parentSeq: r.parent_seq,
     spawnedBy: r.spawned_by ?? null,
+    kind: r.kind === 'chat' || r.kind === 'task' ? r.kind : null,
+    projectId: r.project_id ?? null,
   }
 }
 
@@ -69,8 +78,8 @@ export class SessionRepo {
     const now = s.updatedAt ?? s.createdAt ?? 0
     this.db
       .query(
-        `INSERT INTO sessions (id, created_at, updated_at, cwd, title, model, parent_session_id, parent_seq, spawned_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO sessions (id, created_at, updated_at, cwd, title, model, parent_session_id, parent_seq, spawned_by, kind, project_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            updated_at = excluded.updated_at,
            title = CASE WHEN excluded.title != '' THEN excluded.title ELSE sessions.title END,
@@ -86,6 +95,8 @@ export class SessionRepo {
         s.parentSessionId ?? null,
         s.parentSeq ?? null,
         s.spawnedBy ?? null,
+        s.kind ?? null,
+        s.projectId ?? null,
       )
   }
 
@@ -102,6 +113,8 @@ export class SessionRepo {
       limit?: number
       includeSpawned?: boolean
       idPrefix?: string
+      kind?: SessionKind
+      projectId?: string
     } = {},
   ): SessionSummary[] {
     const where: string[] = []
@@ -109,6 +122,8 @@ export class SessionRepo {
     // 子 agent 的会话默认不列：它们从父会话的轨迹里点进去（M5-001 AC-4）
     if (!opts.includeSpawned) where.push('s.spawned_by IS NULL')
     if (opts.idPrefix) where.push("s.id LIKE ? || '%'")
+    if (opts.kind) where.push('s.kind = ?')
+    if (opts.projectId) where.push('s.project_id = ?')
     if (opts.titleLike) where.push("s.title LIKE '%' || ? || '%'")
     const sql = `
       SELECT s.*,
@@ -120,12 +135,24 @@ export class SessionRepo {
       LIMIT ?`
     const params: (string | number)[] = []
     if (opts.idPrefix) params.push(opts.idPrefix)
+    if (opts.kind) params.push(opts.kind)
+    if (opts.projectId) params.push(opts.projectId)
     if (opts.titleLike) params.push(opts.titleLike)
     params.push(opts.limit ?? 50)
     const rows = this.db
       .query<RawRow & { event_count: number; message_count: number }, never[]>(sql)
       .all(...(params as never[]))
     return rows.map((r) => ({ ...toRow(r), eventCount: r.event_count, messageCount: r.message_count }))
+  }
+
+  /** 归类（M8-004）：新建时就定；老会话由宿主启动时回填 */
+  setKind(id: string, kind: SessionKind, projectId: string | null): void {
+    this.db.query('UPDATE sessions SET kind = ?, project_id = ? WHERE id = ?').run(kind, projectId, id)
+  }
+
+  /** 还没归类的老会话（M8-004 回填用）。只要 id 与 cwd */
+  unclassified(): Array<{ id: string; cwd: string }> {
+    return this.db.query<{ id: string; cwd: string }, []>('SELECT id, cwd FROM sessions WHERE kind IS NULL').all()
   }
 
   setTitle(id: string, title: string): void {

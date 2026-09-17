@@ -53,6 +53,16 @@
         "properties": {
           "includeDeleted": {
             "type": "boolean"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "task"
+            ]
+          },
+          "projectId": {
+            "type": "string"
           }
         }
       },
@@ -89,6 +99,22 @@
                 },
                 "parentId": {
                   "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "chat",
+                    "task"
+                  ]
+                },
+                "projectId": {
+                  "type": "string"
+                },
+                "cwd": {
+                  "type": "string"
+                },
+                "busy": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -1211,6 +1237,647 @@
         ]
       }
     },
+    "session.rename": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "sessionId",
+          "title"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
+    },
+    "session.toTask": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "sessionId",
+          "projectId",
+          "goal"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      }
+    },
+    "project.list": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "includeArchived": {
+            "type": "boolean"
+          },
+          "recent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50
+          }
+        }
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "taskCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "lastActivity": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "settings": {
+                  "type": "object",
+                  "properties": {
+                    "isolation": {
+                      "default": "auto",
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "always",
+                        "never"
+                      ]
+                    },
+                    "planReview": {
+                      "default": "auto",
+                      "type": "string",
+                      "enum": [
+                        "auto",
+                        "always",
+                        "never"
+                      ]
+                    }
+                  }
+                },
+                "recentTasks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "busy": {
+                        "type": "boolean"
+                      },
+                      "updatedAt": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "busy",
+                      "updatedAt"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "path",
+                "createdAt",
+                "archived",
+                "taskCount",
+                "lastActivity",
+                "settings",
+                "recentTasks"
+              ]
+            }
+          }
+        },
+        "required": [
+          "projects"
+        ]
+      }
+    },
+    "project.create": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "path"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "taskCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lastActivity": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "settings": {
+                "type": "object",
+                "properties": {
+                  "isolation": {
+                    "default": "auto",
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ]
+                  },
+                  "planReview": {
+                    "default": "auto",
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ]
+                  }
+                }
+              },
+              "recentTasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "busy": {
+                      "type": "boolean"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "busy",
+                    "updatedAt"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "path",
+              "createdAt",
+              "archived",
+              "taskCount",
+              "lastActivity",
+              "settings",
+              "recentTasks"
+            ]
+          }
+        },
+        "required": [
+          "project"
+        ]
+      }
+    },
+    "project.update": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "isolation": {
+                "default": "auto",
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "always",
+                  "never"
+                ]
+              },
+              "planReview": {
+                "default": "auto",
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "always",
+                  "never"
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "taskCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lastActivity": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "settings": {
+                "type": "object",
+                "properties": {
+                  "isolation": {
+                    "default": "auto",
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ]
+                  },
+                  "planReview": {
+                    "default": "auto",
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ]
+                  }
+                }
+              },
+              "recentTasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "busy": {
+                      "type": "boolean"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "busy",
+                    "updatedAt"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "path",
+              "createdAt",
+              "archived",
+              "taskCount",
+              "lastActivity",
+              "settings",
+              "recentTasks"
+            ]
+          }
+        },
+        "required": [
+          "project"
+        ]
+      }
+    },
+    "project.archive": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "archived"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
+    },
+    "project.resolve": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cwd": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cwd"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "taskCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "lastActivity": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "settings": {
+                "type": "object",
+                "properties": {
+                  "isolation": {
+                    "default": "auto",
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ]
+                  },
+                  "planReview": {
+                    "default": "auto",
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "always",
+                      "never"
+                    ]
+                  }
+                }
+              },
+              "recentTasks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "busy": {
+                      "type": "boolean"
+                    },
+                    "updatedAt": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "busy",
+                    "updatedAt"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "path",
+              "createdAt",
+              "archived",
+              "taskCount",
+              "lastActivity",
+              "settings",
+              "recentTasks"
+            ]
+          },
+          "projectLike": {
+            "type": "boolean"
+          },
+          "root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectLike",
+          "root"
+        ]
+      }
+    },
     "session.budget": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1311,6 +1978,16 @@
           },
           "isolate": {
             "type": "boolean"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "task"
+            ]
+          },
+          "projectId": {
+            "type": "string"
           }
         }
       },
@@ -3016,6 +3693,98 @@
                             "t",
                             "action",
                             "kind"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "string",
+                              "const": "session.kind"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "chat",
+                                "task"
+                              ]
+                            },
+                            "cwd": {
+                              "type": "string"
+                            },
+                            "isolation": {
+                              "type": "object",
+                              "properties": {
+                                "isolate": {
+                                  "type": "boolean"
+                                },
+                                "reason": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "isolate",
+                                "reason"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "kind",
+                            "cwd"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "string",
+                              "const": "project.assign"
+                            },
+                            "projectId": {
+                              "type": "string"
+                            },
+                            "path": {
+                              "type": "string"
+                            },
+                            "auto": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "projectId",
+                            "path",
+                            "auto"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "string",
+                              "const": "schedule.fire"
+                            },
+                            "scheduleId": {
+                              "type": "string"
+                            },
+                            "due": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "late": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "scheduleId",
+                            "due",
+                            "late"
                           ],
                           "additionalProperties": {}
                         },

@@ -21,6 +21,7 @@ import {
   type NotifyParamsOf,
   notify,
   ok,
+  type ParamsOf,
   PROTOCOL_VERSION,
   type RefLink,
   type ResultOf,
@@ -95,6 +96,26 @@ export interface SessionSummary {
   eventCount: number
   deleted: boolean
   parentId?: string
+  kind?: 'chat' | 'task'
+  projectId?: string
+  cwd?: string
+  busy?: boolean
+}
+
+export type ProjectSummary = ResultOf<'project.list'>['projects'][number]
+
+/** 项目（PRD-M8-003）。路径不存在等参数问题抛 HostRequestError */
+export interface HostProjects {
+  list(opts: { includeArchived: boolean; recent: number }): Promise<ProjectSummary[]>
+  create(path: string, name?: string): Promise<ProjectSummary>
+  update(id: string, patch: ParamsOf<'project.update'>): Promise<ProjectSummary>
+  archive(id: string, archived: boolean): Promise<void>
+  resolve(cwd: string): Promise<ResultOf<'project.resolve'>>
+}
+
+export interface CreateOptions {
+  kind?: 'chat' | 'task'
+  projectId?: string
 }
 
 /** 一次权限询问。answer 由宿主提供，core 只负责把它交到某个客户端手里 */
@@ -160,8 +181,11 @@ export class InvalidTaskError extends Error {
 /** 宿主提供的东西。测试注入假的，生产注入真的 —— core 两边都不知道 */
 export interface DaemonHost {
   open(sessionId: string): Promise<SessionHandle>
-  create(cwd?: string): Promise<string>
-  list(opts: { includeDeleted: boolean }): Promise<SessionSummary[]>
+  create(cwd?: string, opts?: CreateOptions): Promise<string>
+  list(opts: { includeDeleted: boolean; kind?: 'chat' | 'task'; projectId?: string }): Promise<SessionSummary[]>
+  /** 改标题（PRD-M8-008）。会话不存在抛 SessionNotFoundError */
+  rename?(sessionId: string, title: string): Promise<void>
+  projects?: HostProjects
   /** 软删除 / 恢复。会话不存在时抛 SessionNotFoundError */
   remove(sessionId: string): Promise<void>
   restore(sessionId: string): Promise<void>
@@ -333,8 +357,64 @@ export class Daemon {
       }
 
       case 'session.list': {
-        const p = params as { includeDeleted?: boolean }
-        return ok(req.id, { sessions: await this.host.list({ includeDeleted: p.includeDeleted ?? false }) })
+        const p = params as { includeDeleted?: boolean; kind?: 'chat' | 'task'; projectId?: string }
+        const list = await this.host.list({
+          includeDeleted: p.includeDeleted ?? false,
+          ...(p.kind === undefined ? {} : { kind: p.kind }),
+          ...(p.projectId === undefined ? {} : { projectId: p.projectId }),
+        })
+        return ok(req.id, { sessions: list.map((x) => ({ ...x, busy: this.isBusy(x.id) })) })
+      }
+
+      case 'session.rename': {
+        const p = params as { sessionId: string; title: string }
+        if (!this.host.rename) return fail(req.id, 'INTERNAL', '这个 domid 不支持改标题')
+        await this.host.rename(p.sessionId, p.title.trim())
+        return ok(req.id, { ok: true })
+      }
+
+      case 'session.toTask': {
+        const p = params as { sessionId: string; projectId: string; goal: string }
+        const from = (await this.host.list({ includeDeleted: true })).find((x) => x.id === p.sessionId)
+        if (!from) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
+        const id = await this.host.create(undefined, { kind: 'task', projectId: p.projectId })
+        // 引用原会话全文（终点给大，daemon 截到末尾）；走和普通提交同一条路
+        const submitted = await this.dispatch(conn, req, 'session.submit', {
+          sessionId: id,
+          text: p.goal,
+          refs: [{ sessionId: p.sessionId, fromSeq: 1, toSeq: Number.MAX_SAFE_INTEGER }],
+        } as never)
+        if (submitted.error) return submitted
+        return ok(req.id, { sessionId: id })
+      }
+
+      case 'project.list':
+      case 'project.create':
+      case 'project.update':
+      case 'project.archive':
+      case 'project.resolve': {
+        const h = this.host.projects
+        if (!h) return fail(req.id, 'INTERNAL', '这个 domid 不支持项目')
+        const p = params as Record<string, unknown>
+        if (method === 'project.list') {
+          return ok(req.id, {
+            projects: await h.list({
+              includeArchived: p.includeArchived === true,
+              recent: (p.recent as number | undefined) ?? 5,
+            }),
+          })
+        }
+        if (method === 'project.create') {
+          return ok(req.id, { project: await h.create(p.path as string, p.name as string | undefined) })
+        }
+        if (method === 'project.update') {
+          return ok(req.id, { project: await h.update(p.id as string, p as ParamsOf<'project.update'>) })
+        }
+        if (method === 'project.archive') {
+          await h.archive(p.id as string, p.archived === true)
+          return ok(req.id, { ok: true })
+        }
+        return ok(req.id, await h.resolve(p.cwd as string))
       }
 
       case 'session.delete': {
@@ -437,12 +517,16 @@ export class Daemon {
       }
 
       case 'session.create': {
-        const p = params as { cwd?: string; isolate?: boolean }
+        const p = params as { cwd?: string; isolate?: boolean; kind?: 'chat' | 'task'; projectId?: string }
         if (p.isolate) {
           if (!this.host.worktrees) return fail(req.id, 'INTERNAL', '这个 domid 不支持隔离工作区')
           return ok(req.id, await this.host.worktrees.create(p.cwd))
         }
-        return ok(req.id, { sessionId: await this.host.create(p.cwd) })
+        const opts: CreateOptions = {
+          ...(p.kind === undefined ? {} : { kind: p.kind }),
+          ...(p.projectId === undefined ? {} : { projectId: p.projectId }),
+        }
+        return ok(req.id, { sessionId: await this.host.create(p.cwd, opts) })
       }
 
       case 'worktree.diff':

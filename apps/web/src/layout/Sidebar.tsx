@@ -154,7 +154,7 @@ export function ProjectNode({
             <IconArrowUpRight size={12} />
           </a>
           <a
-            href={`${detail}?new=1`}
+            href={formatRoute({ view: 'project', id: project.id, create: true })}
             className="rounded-[3px] p-0.5 text-mut hover:bg-panel-h hover:text-accent"
             title="在这个项目下新建任务"
             aria-label={`在 ${project.name} 下新建任务`}

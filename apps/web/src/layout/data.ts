@@ -14,6 +14,7 @@ export interface SessionRow {
   parentId?: string | undefined
   kind?: 'chat' | 'task' | undefined
   projectId?: string | undefined
+  cwd?: string | undefined
   busy?: boolean | undefined
   unread?: boolean | undefined
 }
@@ -31,6 +32,8 @@ export interface ProjectRow {
   path: string
   taskCount: number
   archived?: boolean
+  lastActivity?: number | null
+  settings?: { isolation: 'auto' | 'always' | 'never'; planReview: 'auto' | 'always' | 'never' }
   recentTasks: ProjectTaskRow[]
 }
 

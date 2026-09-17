@@ -111,7 +111,8 @@ describe('RuntimeHost', () => {
     )
     const c = new Conn('c')
     await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
-    await call(daemon, c, 'session.create')
+    // 任务的工作目录是 defaultCwd；不给 kind 的空参数是自由会话，在沙盒里写（PRD-M8-004）
+    await call(daemon, c, 'session.create', { kind: 'task' })
     await call(daemon, c, 'session.subscribe', { sessionId: 'sess-1', fromSeq: 0 })
     await call(daemon, c, 'session.submit', { sessionId: 'sess-1', text: '写个文件' })
 
@@ -247,7 +248,8 @@ describe('RuntimeHost', () => {
       refs: [{ sessionId: 'A', fromSeq: 1, toSeq: 50 }],
     })
     expect(r.result).toEqual({ accepted: true })
-    const inB = () => c.events().filter((e) => e.sessionId === 'B')
+    // 建会话时落的 session.kind（PRD-M8-004）不算这一轮的内容
+    const inB = () => c.events().filter((e) => e.sessionId === 'B' && e.ev.t !== 'session.kind')
     for (let i = 0; i < 100 && inB().filter((e) => e.ev.t === 'model.delta').length === 0; i++) await Bun.sleep(10)
     expect(inB()[0]?.ev).toMatchObject({ t: 'ctx.ref', sessionId: 'A', fromSeq: 1 })
     expect(JSON.stringify(provider.calls.at(-1)?.messages)).toContain('A 的结论')

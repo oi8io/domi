@@ -27,6 +27,8 @@ import {
   MemoryService,
   makeReviewReportTool,
   officialSkillsPlugin,
+  ProjectError,
+  ProjectService,
   REVIEW_PREFIX,
   REVIEW_REPORT_RULE,
   REVIEW_SCOPE,
@@ -43,19 +45,21 @@ import {
   worktreeDiff,
   worktreeFromEvents,
 } from '@domi/runtime'
-import { SqliteEventLog } from '@domi/store'
+import { type ProjectRow, type ProjectSettings, SqliteEventLog } from '@domi/store'
 import { AUDIT_SESSION_ID } from './auth.ts'
 
 const RUN_PREFIX = 'run-'
 
 import {
   BranchPointError,
+  type CreateOptions,
   type DaemonHost,
   type HostAsk,
   type HostMetrics,
   HostRequestError,
   InvalidRefError,
   InvalidTaskError,
+  type ProjectSummary,
   type SessionHandle,
   SessionNotFoundError,
   type SessionSummary,
@@ -116,6 +120,56 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       })
     : undefined
 
+  /** 项目（M8-003）。升级前的老会话在这里一次性归类（M8-004） */
+  const projects = new ProjectService({ log: index, home })
+  try {
+    projects.backfill()
+  } catch (e) {
+    process.stderr.write(`[domid] 老会话归类失败（不影响使用）：${e instanceof Error ? e.message : String(e)}\n`)
+  }
+  /** ProjectError → INVALID_PARAMS */
+  function pj<T>(fn: () => T): T {
+    try {
+      return fn()
+    } catch (e) {
+      throw e instanceof ProjectError ? new HostRequestError(e.message) : e
+    }
+  }
+  function toSummary(p: ProjectRow | ProjectSummary | { id: string }): ProjectSummary {
+    const s = projects.summary(p.id)
+    return {
+      id: s.id,
+      name: s.name,
+      path: s.path,
+      createdAt: s.createdAt,
+      archived: s.archivedAt !== null,
+      taskCount: s.taskCount,
+      lastActivity: s.lastActivity,
+      settings: s.settings,
+      recentTasks: s.recentTasks.map((t) => ({ ...t, busy: false })),
+    }
+  }
+
+  /**
+   * 建一个任务会话的元数据：归到项目、记两条事件（M8-003 / 004）。cwd 不给就用项目路径
+   */
+  async function createTask(id: string, cwd: string | undefined, projectId: string | undefined, title = '') {
+    const { project, auto, dir } = pj(() => {
+      if (projectId !== undefined) {
+        const p = projects.get(projectId)
+        if (p.archivedAt !== null) throw new ProjectError(`项目「${p.name}」已归档，先取消归档`)
+        return { project: p, auto: false, dir: cwd ?? p.path }
+      }
+      const dir = cwd ?? opts.defaultCwd
+      return { ...projects.assign(dir), dir }
+    })
+    index.sessions.upsert({ id, cwd: dir, title, model: opts.config.model.name, kind: 'task', projectId: project.id })
+    await index.append(id, [
+      { t: 'session.kind', kind: 'task', cwd: dir },
+      { t: 'project.assign', projectId: project.id, path: project.path, auto },
+    ])
+  }
+
   const notifier = new Notifier(opts.config.notify, { log: (l) => process.stderr.write(`${l}\n`) })
   /** 同一个会话只有一个 DomiSession：core、编排、子 agent 共用，推送才不会重复 */
   const sessions = new Map<string, Promise<DomiSession>>()
@@ -145,16 +199,26 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     if (cached) return cached
     const made = (async () => {
       if (init && !index.sessions.get(sessionId)) {
-        index.sessions.upsert({
-          id: sessionId,
-          cwd: init.cwd,
-          title: init.title,
-          model: opts.config.model.name,
-          ...(init.spawnedBy === undefined ? {} : { spawnedBy: init.spawnedBy }),
-        })
+        if (init.spawnedBy === undefined) {
+          // 长任务的运行会话（M5）、审阅会话（M7-010）：是任务，归到 cwd 的项目
+          await createTask(sessionId, init.cwd, undefined, init.title)
+        } else {
+          const parent = init.spawnedBy === undefined ? null : index.sessions.get(init.spawnedBy)
+          index.sessions.upsert({
+            id: sessionId,
+            cwd: init.cwd,
+            title: init.title,
+            model: opts.config.model.name,
+            ...(init.spawnedBy === undefined ? {} : { spawnedBy: init.spawnedBy }),
+            ...(parent?.kind ? { kind: parent.kind, projectId: parent.projectId } : { kind: 'task' as const }),
+          })
+        }
       }
       const row = index.sessions.get(sessionId)
       if (!row) throw new SessionNotFoundError(sessionId)
+      // 自由会话（M8-004）：不带项目上下文，命令每次都问
+      const chat: Partial<SessionOptions> =
+        row.kind === 'chat' ? { projectContext: false, askAlways: ['shell.exec'] } : {}
       // 隔离会话被删过又恢复时 worktree 目录已经清掉了：按分支重新挂上（M7-006）
       const tree = await worktreeOf(sessionId)
       if (tree) await wt(() => ensureWorktree(tree))
@@ -171,6 +235,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         childEvents: pushChild,
         // 花费与预算的金额上限（M7-009）
         pricing: pricingOf(opts.config),
+        ...chat,
         ...extra,
         // 计划批准后转长任务（M7-005）：同一个 TaskService
         startTask: async (spec, cwd) => (await tasks.start(JSON.stringify(spec), cwd)).runId,
@@ -266,16 +331,34 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       }
     },
 
-    async create(cwd?: string): Promise<string> {
+    async create(cwd?: string, o: CreateOptions = {}): Promise<string> {
       const id = newId()
-      index.sessions.upsert({ id, cwd: cwd ?? opts.defaultCwd, model: opts.config.model.name })
+      const looksLikeProject = (): boolean => {
+        if (cwd === undefined) return false
+        const r = pj(() => projects.resolve(cwd))
+        return r.project !== null || r.projectLike
+      }
+      const kind = o.kind ?? (o.projectId !== undefined || looksLikeProject() ? 'task' : 'chat')
+      if (kind === 'task') {
+        await createTask(id, cwd, o.projectId)
+        return id
+      }
+      // 自由会话：工作目录是自己的沙盒，给了 cwd 也不用（M8-004 AC-2）
+      const dir = projects.scratchDir(id)
+      index.sessions.upsert({ id, cwd: dir, model: opts.config.model.name, kind: 'chat', projectId: null })
+      await index.append(id, [{ t: 'session.kind', kind: 'chat', cwd: dir }])
       return id
     },
 
-    async list({ includeDeleted }): Promise<SessionSummary[]> {
+    async list({ includeDeleted, kind, projectId }): Promise<SessionSummary[]> {
       // 下划线开头的是 daemon 自己的会话（审计），不是用户的对话
       return index.sessions
-        .list({ includeDeleted })
+        .list({
+          includeDeleted,
+          limit: 500,
+          ...(kind === undefined ? {} : { kind }),
+          ...(projectId === undefined ? {} : { projectId }),
+        })
         .filter((r) => !r.id.startsWith('_'))
         .map((r) => ({
           id: r.id,
@@ -284,8 +367,62 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           updatedAt: r.updatedAt,
           eventCount: r.eventCount,
           deleted: r.deletedAt !== null,
+          cwd: r.cwd,
           ...(r.parentSessionId === null ? {} : { parentId: r.parentSessionId }),
+          ...(r.kind === null ? {} : { kind: r.kind }),
+          ...(r.projectId === null ? {} : { projectId: r.projectId }),
         }))
+    },
+
+    async rename(sessionId, title) {
+      if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+      index.sessions.setTitle(sessionId, title)
+    },
+
+    projects: {
+      async list({ includeArchived, recent }) {
+        return projects.list({ includeArchived, recent }).map((p) => ({
+          id: p.id,
+          name: p.name,
+          path: p.path,
+          createdAt: p.createdAt,
+          archived: p.archivedAt !== null,
+          taskCount: p.taskCount,
+          lastActivity: p.lastActivity,
+          settings: p.settings,
+          recentTasks: p.recentTasks.map((t) => ({ ...t, busy: false })),
+        }))
+      },
+      async create(path, name) {
+        return toSummary(pj(() => projects.create(path, name)).project)
+      },
+      async update(id, patch) {
+        return toSummary(
+          pj(() =>
+            projects.update(id, {
+              ...(patch.name === undefined ? {} : { name: patch.name }),
+              ...(patch.settings === undefined
+                ? {}
+                : {
+                    settings: Object.fromEntries(
+                      Object.entries(patch.settings).filter(([, v]) => v !== undefined),
+                    ) as Partial<ProjectSettings>,
+                  }),
+            }),
+          ),
+        )
+      },
+      async archive(id, archived) {
+        pj(() => projects.archive(id, archived))
+      },
+      async resolve(cwd) {
+        const r = pj(() => projects.resolve(cwd))
+        return {
+          ...(r.project === null ? {} : { project: toSummary(r.project) }),
+          projectLike: r.projectLike,
+          root: r.root,
+        }
+      },
     },
 
     /**
@@ -362,8 +499,14 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       async create(cwd) {
         const id = newId()
         const { info, cwd: inTree } = await wt(() => createWorktree(cwd ?? opts.defaultCwd, id, home))
-        index.sessions.upsert({ id, cwd: inTree, model: opts.config.model.name })
-        await index.append(id, [{ t: 'worktree.create', ...info }])
+        // 隔离会话也是任务（M8-004）：项目按原仓库算，工作目录是 worktree
+        const { project, auto } = pj(() => projects.assign(cwd ?? opts.defaultCwd))
+        index.sessions.upsert({ id, cwd: inTree, model: opts.config.model.name, kind: 'task', projectId: project.id })
+        await index.append(id, [
+          { t: 'session.kind', kind: 'task', cwd: inTree, isolation: { isolate: true, reason: 'requested' } },
+          { t: 'project.assign', projectId: project.id, path: project.path, auto },
+          { t: 'worktree.create', ...info },
+        ])
         return { sessionId: id, worktree: { path: info.path, branch: info.branch } }
       },
       async diff(sessionId) {

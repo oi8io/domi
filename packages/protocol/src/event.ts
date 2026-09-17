@@ -24,9 +24,10 @@ import { z } from 'zod'
  * v9 → v10：M7 会写代码——新增 `workspace.trust` `hook.run` `verify.required` `mode.switch` `plan.proposed` `plan.decided`
  *          `worktree.create` `worktree.discard` `worktree.restore` `worktree.apply` `budget.warn` `budget.decided` `review.findings`；
  *          `permission.source` 新增取值 `mode`（计划模式拒绝的）。
+ * v10 → v11：M8 工作台——新增 `session.kind`（自由会话 / 任务）`project.assign`（任务归到哪个项目）`schedule.fire`（定时触发）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 10
+export const SCHEMA_VERSION = 11
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -328,6 +329,22 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     action: z.enum(['continue', 'stop', 'raise']),
     kind: z.enum(['tokens', 'costUsd', 'toolCalls']),
     limit: z.number().optional(),
+  }),
+  /** M8-004：会话是自由会话还是任务；任务的工作目录与隔离决定（M8-006） */
+  z.looseObject({
+    t: z.literal('session.kind'),
+    kind: z.enum(['chat', 'task']),
+    cwd: z.string(),
+    isolation: z.object({ isolate: z.boolean(), reason: z.string() }).optional(),
+  }),
+  /** M8-003：任务归到哪个项目；auto = 这次顺带自动登记的 */
+  z.looseObject({ t: z.literal('project.assign'), projectId: z.string(), path: z.string(), auto: z.boolean() }),
+  /** M8-007：定时任务触发（落在触发出来的任务会话里）；late = domid 没开、启动后补跑的 */
+  z.looseObject({
+    t: z.literal('schedule.fire'),
+    scheduleId: z.string(),
+    due: z.number().int(),
+    late: z.boolean(),
   }),
   /** M7-010：审阅子 agent 的结构化发现 */
   z.looseObject({

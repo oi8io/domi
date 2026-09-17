@@ -1,0 +1,4 @@
+{"seq": 32, "sessionId": "legacy", "parentSeq": 31, "ts": 1757100000000, "schemaVersion": 11, "ev": {"t": "session.kind", "kind": "task", "cwd": "/home/u/proj", "isolation": {"isolate": false, "reason": "clean"}}}
+{"seq": 33, "sessionId": "legacy", "parentSeq": 32, "ts": 1757100000001, "schemaVersion": 11, "ev": {"t": "project.assign", "projectId": "p-1", "path": "/home/u/proj", "auto": true}}
+{"seq": 34, "sessionId": "legacy", "parentSeq": 33, "ts": 1757100000002, "schemaVersion": 11, "ev": {"t": "schedule.fire", "scheduleId": "sch-1", "due": 1757099940000, "late": true}}
+{"seq": 35, "sessionId": "legacy", "parentSeq": 34, "ts": 1757100000003, "schemaVersion": 11, "ev": {"t": "session.kind", "kind": "chat", "cwd": "/home/u/.domi/scratch/s-2"}}

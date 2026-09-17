@@ -2,7 +2,7 @@
  * Web 端的壳 —— PRD-M8-002（原型 .shell：260px 侧栏 + 主区）。
  *
  * 视图由 hash 路由决定；会话的订阅跟着路由走。**只渲染**：
- * 状态全在 client-core 的 atom 里，这个文件里没有一行是在算「事件意味着什么」（INV-04）。
+ * 状态全在 client-core 的 atom 与 daemon 里，这个文件里没有一行是在算「事件意味着什么」（INV-04）。
  * 与 TUI 的逐项对等见 docs/parity-checklist.md。
  */
 import { createSessionStore, type DomiClient, type SessionStore } from '@domi/client-core'
@@ -15,6 +15,7 @@ import { $route, navigate, type Route } from './router.ts'
 import { SessionView } from './session/SessionView.tsx'
 import { HomeView } from './views/HomeView.tsx'
 import { ProjectsView, ProjectView } from './views/ProjectsView.tsx'
+import { AddProjectDialog, ToTaskDialog } from './views/projectDialogs.tsx'
 import { SessionsView } from './views/SessionsView.tsx'
 import { SettingsView } from './views/SettingsView.tsx'
 import { TasksView } from './views/TasksView.tsx'
@@ -38,9 +39,11 @@ export function App({
   const online = state === 'open'
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [showDeleted, setShowDeleted] = useState(false)
-  // 项目接口（TASK-M8-004）落地前一直是空的
-  const [projects] = useState<ProjectRow[]>([])
-  const projectsAvailable = false
+  const [projects, setProjects] = useState<ProjectRow[]>([])
+  const [showArchived, setShowArchived] = useState(false)
+  // 老 daemon 没有项目接口时为 false
+  const [projectsAvailable, setProjectsAvailable] = useState(true)
+  const [dialog, setDialog] = useState<null | 'add-project' | 'to-task'>(null)
   // 跨会话引用：在哪个会话里点的都攒在这里，切到别的会话发送时带上（PRD-M3-005）
   const [refs, setRefs] = useState<PendingRef[]>([])
 
@@ -50,14 +53,24 @@ export function App({
   }, [client])
 
   const refresh = useCallback(async (): Promise<void> => {
-    const r = await client.listSessions({ includeDeleted: showDeleted })
+    const [r, p] = await Promise.all([
+      client.listSessions({ includeDeleted: showDeleted }),
+      client.listProjects({ includeArchived: showArchived }).then(
+        (list) => list,
+        () => null,
+      ),
+    ])
     setSessions(r.sessions as SessionRow[])
-  }, [client, showDeleted])
+    setProjectsAvailable(p !== null)
+    setProjects((p ?? []) as ProjectRow[])
+  }, [client, showDeleted, showArchived])
+  const refreshSoon = useCallback((): void => {
+    refresh().catch(() => undefined)
+  }, [refresh])
 
   useEffect(() => {
-    if (!online) return
-    refresh().catch(() => undefined)
-  }, [online, refresh])
+    if (online) refreshSoon()
+  }, [online, refreshSoon])
 
   // 会话订阅跟着路由走
   const sessionId = route.view === 'session' ? route.id : null
@@ -70,12 +83,28 @@ export function App({
     return () => client.unwatch(sessionId)
   }, [client, sessionId, online])
   const activeStatus = useStore((active?.store ?? EMPTY).$status)
-  const activeRow = sessions.find((s) => s.id === sessionId)
+  // 正在看的会话忙闲变化时刷新列表（标题、事件数、状态点）。列表推送在 TASK-M8-010
+  // biome-ignore lint/correctness/useExhaustiveDependencies: busy 翻转是刷新的触发条件
+  useEffect(() => {
+    if (online && active !== null) refreshSoon()
+  }, [activeStatus.busy])
+  // 切视图时也刷新一次
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 路由变化是刷新的触发条件
+  useEffect(() => {
+    if (online) refreshSoon()
+  }, [route.view])
 
-  const chats = sessions.filter((s) => !s.deleted && s.kind !== 'task')
-  const opened = (): void => {
-    refresh().catch(() => undefined)
-  }
+  const activeRow = sessions.find((s) => s.id === sessionId)
+  const activeRef = active === null ? undefined : { id: active.id, busy: activeStatus.busy }
+  const live = sessions.filter((s) => !s.deleted)
+  // 老 daemon 不给 kind：全当会话显示
+  const chats = live.filter((s) => s.kind !== 'task')
+  const tasks = live.filter((s) => s.kind === 'task')
+  // 项目树里的状态点：正在看的任务以本地 store 为准，其余看列表
+  const busyOf = new Map(live.map((s) => [s.id, s.busy === true]))
+  const tree = projects
+    .filter((p) => !p.archived)
+    .map((p) => ({ ...p, recentTasks: p.recentTasks.map((t) => ({ ...t, busy: busyOf.get(t.id) ?? t.busy })) }))
 
   let main: React.ReactNode
   switch (route.view) {
@@ -88,14 +117,18 @@ export function App({
             sessionId={active.id}
             store={active.store}
             title={activeRow?.title}
+            kind={activeRow?.kind}
+            project={projects.find((p) => p.id === activeRow?.projectId)}
             tab={route.tab}
             connection={state}
+            onRenamed={refreshSoon}
+            onToTask={activeRow?.kind === 'chat' ? () => setDialog('to-task') : undefined}
             onDeleted={() => {
-              refresh().catch(() => undefined)
+              refreshSoon()
               navigate({ view: 'home' })
             }}
             onBranched={(id) => {
-              opened()
+              refreshSoon()
               navigate({ view: 'session', id, tab: 'chat' })
             }}
             refs={refs}
@@ -106,10 +139,33 @@ export function App({
         )
       break
     case 'project':
-      main = <ProjectView project={projects.find((p) => p.id === route.id)} available={projectsAvailable} />
+      main = (
+        <ProjectView
+          client={client}
+          project={projects.find((p) => p.id === route.id)}
+          tasks={tasks.filter((t) => t.projectId === route.id)}
+          online={online}
+          focusComposer={route.create === true}
+          {...(activeRef === undefined ? {} : { active: activeRef })}
+          onChanged={refreshSoon}
+        />
+      )
       break
     case 'projects':
-      main = <ProjectsView projects={projects} available={projectsAvailable} />
+      main = (
+        <ProjectsView
+          projects={projects}
+          showArchived={showArchived}
+          onShowArchived={setShowArchived}
+          onUnarchive={(id) => {
+            client
+              .archiveProject(id, false)
+              .then(refresh)
+              .catch(() => undefined)
+          }}
+          {...(projectsAvailable && online ? { onAdd: () => setDialog('add-project') } : {})}
+        />
+      )
       break
     case 'sessions':
       main = (
@@ -124,7 +180,7 @@ export function App({
               .then(refresh)
               .catch(() => undefined)
           }}
-          {...(active === null ? {} : { active: { id: active.id, busy: activeStatus.busy } })}
+          {...(activeRef === undefined ? {} : { active: activeRef })}
         />
       )
       break
@@ -135,7 +191,11 @@ export function App({
           online={online}
           create={route.create === true}
           schedule={route.schedule === true}
-          onCreated={opened}
+          projects={projects.filter((p) => !p.archived)}
+          projectId={route.projectId}
+          tasks={tasks}
+          active={activeRef}
+          onCreated={refreshSoon}
         />
       )
       break
@@ -143,7 +203,7 @@ export function App({
       main = <SettingsView client={client} tab={route.tab} online={online} />
       break
     default:
-      main = <HomeView client={client} online={online} recent={chats} onCreated={opened} />
+      main = <HomeView client={client} online={online} recent={chats} onCreated={refreshSoon} />
   }
 
   return (
@@ -153,7 +213,7 @@ export function App({
         lastError={lastError}
         daemonUrl={daemonUrl}
         route={route}
-        projects={projects}
+        projects={tree}
         projectsAvailable={projectsAvailable}
         chats={chats}
         active={
@@ -162,8 +222,33 @@ export function App({
             : { id: active.id, busy: activeStatus.busy, projectId: activeRow?.projectId }
         }
         onNewChat={() => navigate({ view: 'home' })}
+        {...(projectsAvailable && online ? { onAddProject: () => setDialog('add-project') } : {})}
       />
       <main className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-bg">{main}</main>
+      <AddProjectDialog
+        client={client}
+        open={dialog === 'add-project'}
+        onClose={() => setDialog(null)}
+        onAdded={(id) => {
+          setDialog(null)
+          refreshSoon()
+          navigate({ view: 'project', id })
+        }}
+      />
+      {sessionId !== null && (
+        <ToTaskDialog
+          client={client}
+          sessionId={sessionId}
+          projects={projects.filter((p) => !p.archived)}
+          open={dialog === 'to-task'}
+          onClose={() => setDialog(null)}
+          onCreated={(id) => {
+            setDialog(null)
+            refreshSoon()
+            navigate({ view: 'session', id, tab: 'chat' })
+          }}
+        />
+      )}
     </div>
   )
 }

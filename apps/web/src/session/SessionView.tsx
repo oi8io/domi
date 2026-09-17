@@ -22,8 +22,12 @@ export function SessionView({
   sessionId,
   store,
   title,
+  kind,
+  project,
   tab = 'chat',
   connection,
+  onRenamed,
+  onToTask,
   onDeleted,
   onBranched,
   refs = [],
@@ -33,8 +37,14 @@ export function SessionView({
   sessionId: string
   store: SessionStore
   title?: string | undefined
+  kind?: 'chat' | 'task' | undefined
+  /** 任务所属的项目（面包屑用） */
+  project?: { id: string; name: string } | undefined
   tab?: 'chat' | 'trajectory'
   connection?: ConnectionState
+  onRenamed?: () => void
+  /** 自由会话才有：打开「转为任务」 */
+  onToTask?: (() => void) | undefined
   onDeleted?: () => void
   /** 分支建好了，交给上层去刷新列表并打开它 */
   onBranched?: (sessionId: string) => void
@@ -93,9 +103,20 @@ export function SessionView({
         >
           Trajectory
         </a>
-        <span className="ml-auto min-w-0 truncate pl-4 text-[12.5px] text-mut" title={sessionId}>
-          {title}
-        </span>
+        <SessionTitle
+          client={client}
+          sessionId={sessionId}
+          title={title ?? ''}
+          kind={kind}
+          project={project}
+          onNotice={setNotice}
+          {...(onRenamed === undefined ? {} : { onRenamed })}
+        />
+        {onToTask !== undefined && (
+          <Button variant="ghost" size="xs" className="ml-1" onClick={onToTask} data-action="to-task">
+            转为任务
+          </Button>
+        )}
         <SessionTools
           client={client}
           sessionId={sessionId}
@@ -172,6 +193,79 @@ export function SessionView({
         />
       </Composer>
     </section>
+  )
+}
+
+/** 面包屑 + 可改的标题（PRD-M8-008 AC-4）：任务显示「项目 › 标题」，会话显示「会话 › 标题」 */
+function SessionTitle({
+  client,
+  sessionId,
+  title,
+  kind,
+  project,
+  onNotice,
+  onRenamed,
+}: {
+  client: DomiClient
+  sessionId: string
+  title: string
+  kind?: 'chat' | 'task' | undefined
+  project?: { id: string; name: string } | undefined
+  onNotice: (m: string | null) => void
+  onRenamed?: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState('')
+  const save = (): void => {
+    setEditing(false)
+    const t = value.trim()
+    if (t === '' || t === title) return
+    client.renameSession(sessionId, t).then(
+      () => {
+        onNotice(null)
+        onRenamed?.()
+      },
+      (e: Error) => onNotice(e.message),
+    )
+  }
+  return (
+    <span className="ml-auto flex min-w-0 items-center gap-1.5 pl-4 text-[12.5px]" data-part="session-title">
+      {project !== undefined ? (
+        <a href={formatRoute({ view: 'project', id: project.id })} className="shrink-0 text-accent hover:underline">
+          {project.name}
+        </a>
+      ) : (
+        kind === 'chat' && <span className="shrink-0 text-mut">会话</span>
+      )}
+      {(project !== undefined || kind === 'chat') && <span className="text-mut2">›</span>}
+      {editing ? (
+        <input
+          className="field-input w-56 py-0.5 text-[12.5px]"
+          value={value}
+          aria-label="会话标题"
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          // biome-ignore lint/a11y/noAutofocus: 点了改名就该直接能打字
+          autoFocus
+        />
+      ) : (
+        <button
+          type="button"
+          className="min-w-0 truncate rounded-sm px-1 text-ink2 hover:bg-panel-h"
+          title="点击改名"
+          onClick={() => {
+            setValue(title)
+            setEditing(true)
+          }}
+        >
+          {title === '' ? '未命名' : title}
+        </button>
+      )}
+    </span>
   )
 }
 

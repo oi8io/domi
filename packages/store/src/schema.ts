@@ -113,6 +113,50 @@ export const MIGRATIONS: readonly Migration[] = [
       'ALTER TABLE sessions ADD COLUMN spawned_by TEXT',
     ],
   },
+  {
+    toVersion: 11,
+    statements: [
+      // M8-004：自由会话 / 任务。NULL = 升级前的老会话，由宿主启动时按 cwd 回填（不在迁移里 UPDATE）
+      'ALTER TABLE sessions ADD COLUMN kind TEXT',
+      'ALTER TABLE sessions ADD COLUMN project_id TEXT',
+      'CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id, updated_at DESC)',
+      // M8-003：项目。归档是 archived_at，不删行
+      `CREATE TABLE IF NOT EXISTS projects (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        path        TEXT NOT NULL UNIQUE,
+        created_at  INTEGER NOT NULL,
+        archived_at INTEGER,
+        settings    TEXT NOT NULL DEFAULT '{}'
+      ) STRICT`,
+      // M8-009：每个会话读到了第几条（视图编号）
+      `CREATE TABLE IF NOT EXISTS read_marks (
+        session_id TEXT PRIMARY KEY,
+        seq        INTEGER NOT NULL
+      ) STRICT`,
+      // M8-007：定时任务与每次触发
+      `CREATE TABLE IF NOT EXISTS schedules (
+        id         TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        goal       TEXT NOT NULL,
+        cron       TEXT NOT NULL,
+        tz         TEXT NOT NULL,
+        paused     INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        last_due   INTEGER,
+        deleted_at INTEGER
+      ) STRICT`,
+      `CREATE TABLE IF NOT EXISTS schedule_runs (
+        schedule_id TEXT NOT NULL,
+        due         INTEGER NOT NULL,
+        fired_at    INTEGER NOT NULL,
+        session_id  TEXT,
+        late        INTEGER NOT NULL,
+        skipped     INTEGER NOT NULL,
+        PRIMARY KEY (schedule_id, due)
+      ) STRICT`,
+    ],
+  },
 ]
 
 export const META_SCHEMA_VERSION = 'schema_version'

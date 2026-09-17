@@ -1,5 +1,6 @@
 export * from './event-log.ts'
 export * from './migrate.ts'
+export * from './projects.ts'
 export * from './redact.ts'
 export * from './schema.ts'
 export * from './search.ts'

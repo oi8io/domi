@@ -107,8 +107,14 @@ export class DomiClient {
     return (await result) as ResultOf<M>
   }
 
-  listSessions(opts: { includeDeleted?: boolean } = {}): Promise<ResultOf<'session.list'>> {
-    return this.request('session.list', opts.includeDeleted ? { includeDeleted: true } : {})
+  listSessions(
+    opts: { includeDeleted?: boolean; kind?: 'chat' | 'task'; projectId?: string } = {},
+  ): Promise<ResultOf<'session.list'>> {
+    return this.request('session.list', {
+      ...(opts.includeDeleted ? { includeDeleted: true } : {}),
+      ...(opts.kind === undefined ? {} : { kind: opts.kind }),
+      ...(opts.projectId === undefined ? {} : { projectId: opts.projectId }),
+    })
   }
 
   async deleteSession(sessionId: string): Promise<void> {
@@ -208,9 +214,53 @@ export class DomiClient {
     return this.request('worktree.apply', message === undefined ? { sessionId, mode } : { sessionId, mode, message })
   }
 
-  async createSession(cwd?: string): Promise<string> {
-    const r = await this.request('session.create', cwd === undefined ? {} : { cwd })
+  /**
+   * 新建会话。不给参数 = 自由会话（M8-004）；给 cwd 时由 daemon 按目录判断；
+   * opts.kind / projectId 明确指定是会话还是某个项目下的任务
+   */
+  async createSession(cwd?: string, opts: { kind?: 'chat' | 'task'; projectId?: string } = {}): Promise<string> {
+    const r = await this.request('session.create', {
+      ...(cwd === undefined ? {} : { cwd }),
+      ...(opts.kind === undefined ? {} : { kind: opts.kind }),
+      ...(opts.projectId === undefined ? {} : { projectId: opts.projectId }),
+    })
     return r.sessionId
+  }
+
+  async renameSession(sessionId: string, title: string): Promise<void> {
+    await this.request('session.rename', { sessionId, title })
+  }
+
+  /** 自由会话转任务（M8-004）。返回新任务的会话 id */
+  async sessionToTask(sessionId: string, projectId: string, goal: string): Promise<string> {
+    return (await this.request('session.toTask', { sessionId, projectId, goal })).sessionId
+  }
+
+  // ── 项目（PRD-M8-003）────────────────────────────────────
+
+  async listProjects(
+    opts: { includeArchived?: boolean; recent?: number } = {},
+  ): Promise<ResultOf<'project.list'>['projects']> {
+    return (await this.request('project.list', opts)).projects
+  }
+
+  async createProject(path: string, name?: string): Promise<ResultOf<'project.create'>['project']> {
+    return (await this.request('project.create', name === undefined ? { path } : { path, name })).project
+  }
+
+  async updateProject(
+    id: string,
+    patch: Omit<ParamsOf<'project.update'>, 'id'>,
+  ): Promise<ResultOf<'project.update'>['project']> {
+    return (await this.request('project.update', { id, ...patch })).project
+  }
+
+  async archiveProject(id: string, archived = true): Promise<void> {
+    await this.request('project.archive', { id, archived })
+  }
+
+  resolveProject(cwd: string): Promise<ResultOf<'project.resolve'>> {
+    return this.request('project.resolve', { cwd })
   }
 
   /** refs：引用其他会话的片段（PRD-M3-005），终点可以给得大，daemon 会截到末尾 */

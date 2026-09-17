@@ -154,6 +154,12 @@ export interface SessionOptions {
   spawnDepth?: number
   /** 追加在配置规则前面的规则（审阅会话放行 review.report，M7-010） */
   extraRules?: ReadonlyArray<{ name: string; capability: string; decision: 'allow' | 'deny' | 'ask' }>
+  /**
+   * 带不带项目上下文（PRD-M8-004）。false = 自由会话：不问工作区信任、不加载规矩文件与项目级 Skill。默认 true
+   */
+  projectContext?: boolean
+  /** 即使规则放行也要问人的能力（PRD-M8-004：自由会话里的 shell.exec）。只收紧不放松 */
+  askAlways?: readonly string[]
   /** 这个会话自己的用量上限（M7-009，长任务节点用）。覆盖配置里的 budget */
   budget?: BudgetLimits
   /** 计划批准后转长任务（M7-005）。daemon 里接 TaskService；不给就不能转 */
@@ -205,6 +211,9 @@ export class DomiSession {
         rules: [...(opts.extraRules ?? []), ...opts.config.permissions.rules],
         ...(opts.scope ? { scope: opts.scope } : {}),
         mode: () => this.mode,
+        ...(opts.askAlways && opts.askAlways.length > 0
+          ? { askAlways: (c: string) => (opts.askAlways as readonly string[]).includes(c) }
+          : {}),
       },
       (capabilityId, args) => this.askUser(capabilityId, args),
     )
@@ -533,7 +542,15 @@ export class DomiSession {
   } {
     const o = this.opts
     const scope = c.tools === undefined ? o.scope : scopeOf(c.tools, o.scope)
-    this.log.sessions.upsert({ id: c.sessionId, cwd: o.cwd, title: c.title, spawnedBy: o.sessionId })
+    // 子 agent 跟父会话同一类、同一个项目（M8-004）
+    const parent = this.log.sessions.get(o.sessionId)
+    this.log.sessions.upsert({
+      id: c.sessionId,
+      cwd: o.cwd,
+      title: c.title,
+      spawnedBy: o.sessionId,
+      ...(parent?.kind ? { kind: parent.kind, projectId: parent.projectId } : {}),
+    })
     const child = new DomiSession({
       config: o.config,
       dbPath: o.dbPath,
@@ -546,6 +563,9 @@ export class DomiSession {
       ...(o.clock ? { clock: o.clock } : {}),
       ...(o.pricing ? { pricing: o.pricing } : {}),
       ...(scope ? { scope } : {}),
+      // 自由会话的限制子 agent 也要带着（只能更严）
+      ...(o.projectContext === false ? { projectContext: false } : {}),
+      ...(o.askAlways ? { askAlways: o.askAlways } : {}),
       ...(o.childEvents ? { childEvents: o.childEvents } : {}),
       spawnDepth: c.depth ?? (o.spawnDepth ?? 0) + 1,
     })
@@ -706,6 +726,10 @@ export class DomiSession {
    */
   private async ensureTrust(): Promise<void> {
     if (this.trusted !== null) return
+    if (this.opts.projectContext === false) {
+      this.trusted = false
+      return
+    }
     if (!hasProjectContent(this.repoRoot, this.opts.cwd, dirname(this.opts.dbPath))) {
       this.trusted = false
       return

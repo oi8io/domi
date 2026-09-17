@@ -71,7 +71,7 @@
 
 ### `session.list`
 
-列出会话。默认不含软删除的；includeDeleted 给回收站用
+列出会话。默认不含软删除的；includeDeleted 给回收站用；kind / projectId 过滤（PRD-M8-004）
 
 **params**
 
@@ -82,6 +82,16 @@
   "properties": {
     "includeDeleted": {
       "type": "boolean"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "chat",
+        "task"
+      ]
+    },
+    "projectId": {
+      "type": "string"
     }
   }
 }
@@ -123,6 +133,22 @@
           },
           "parentId": {
             "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "chat",
+              "task"
+            ]
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "busy": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1498,6 +1524,731 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `session.rename`
+
+改会话标题（PRD-M8-008 AC-4）。只改列表里的元数据，不进事件流
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    }
+  },
+  "required": [
+    "sessionId",
+    "title"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `session.toTask`
+
+自由会话转任务（PRD-M8-004 AC-4）：在项目下新建任务，首条输入是 goal 并引用原会话全文；原会话一条事件不动。返回新任务的会话 id
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "sessionId",
+    "projectId",
+    "goal"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+### `project.list`
+
+列出项目（PRD-M8-003），按最近活动排序。recent：每个项目带几个最近任务（默认 5）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "includeArchived": {
+      "type": "boolean"
+    },
+    "recent": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 50
+    }
+  }
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "taskCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "lastActivity": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "isolation": {
+                "default": "auto",
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "always",
+                  "never"
+                ]
+              },
+              "planReview": {
+                "default": "auto",
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "always",
+                  "never"
+                ]
+              }
+            }
+          },
+          "recentTasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "busy": {
+                  "type": "boolean"
+                },
+                "updatedAt": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "busy",
+                "updatedAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "path",
+          "createdAt",
+          "archived",
+          "taskCount",
+          "lastActivity",
+          "settings",
+          "recentTasks"
+        ]
+      }
+    }
+  },
+  "required": [
+    "projects"
+  ]
+}
+```
+
+### `project.create`
+
+登记项目。path 必须是已存在的目录（同一目录只登记一次，重复登记返回已有的）；name 缺省取目录名
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    }
+  },
+  "required": [
+    "path"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "taskCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lastActivity": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "isolation": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "auto",
+                "always",
+                "never"
+              ]
+            },
+            "planReview": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "auto",
+                "always",
+                "never"
+              ]
+            }
+          }
+        },
+        "recentTasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "busy": {
+                "type": "boolean"
+              },
+              "updatedAt": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "busy",
+              "updatedAt"
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "path",
+        "createdAt",
+        "archived",
+        "taskCount",
+        "lastActivity",
+        "settings",
+        "recentTasks"
+      ]
+    }
+  },
+  "required": [
+    "project"
+  ]
+}
+```
+
+### `project.update`
+
+改项目名或设置
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "isolation": {
+          "default": "auto",
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ]
+        },
+        "planReview": {
+          "default": "auto",
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "never"
+          ]
+        }
+      }
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "taskCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lastActivity": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "isolation": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "auto",
+                "always",
+                "never"
+              ]
+            },
+            "planReview": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "auto",
+                "always",
+                "never"
+              ]
+            }
+          }
+        },
+        "recentTasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "busy": {
+                "type": "boolean"
+              },
+              "updatedAt": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "busy",
+              "updatedAt"
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "path",
+        "createdAt",
+        "archived",
+        "taskCount",
+        "lastActivity",
+        "settings",
+        "recentTasks"
+      ]
+    }
+  },
+  "required": [
+    "project"
+  ]
+}
+```
+
+### `project.archive`
+
+归档 / 取消归档。归档的项目不出现在默认列表里，它的任务仍在
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "archived": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "archived"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `project.resolve`
+
+这个目录属于哪个项目（PRD-M8-017）。只判断不登记：projectLike = 是 git 仓库或有 AGENT.md，root = 按这个目录建项目时会用的路径
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "cwd": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "cwd"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "taskCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "lastActivity": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "isolation": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "auto",
+                "always",
+                "never"
+              ]
+            },
+            "planReview": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "auto",
+                "always",
+                "never"
+              ]
+            }
+          }
+        },
+        "recentTasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "busy": {
+                "type": "boolean"
+              },
+              "updatedAt": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "busy",
+              "updatedAt"
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "path",
+        "createdAt",
+        "archived",
+        "taskCount",
+        "lastActivity",
+        "settings",
+        "recentTasks"
+      ]
+    },
+    "projectLike": {
+      "type": "boolean"
+    },
+    "root": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "projectLike",
+    "root"
+  ]
+}
+```
+
 ### `session.budget`
 
 设这个会话的用量上限（PRD-M7-009）：到 80% 提醒，到顶暂停问人。落成 budget.decided，重开会话后照样生效
@@ -1614,7 +2365,7 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 
 ### `session.create`
 
-新建会话。isolate：在 cwd 所在的 git 仓库里建隔离工作区（PRD-M7-006），会话在 worktree 里干活
+新建会话。isolate：在 cwd 所在的 git 仓库里建隔离工作区（PRD-M7-006），会话在 worktree 里干活。kind（PRD-M8-004）：chat = 不属于任何项目，工作目录是 ~/.domi/scratch/<会话>；task = 属于 projectId 或 cwd 所在的项目（没登记就自动登记）。不给 kind 时：给了 projectId、或 cwd 在已登记项目里 / 是 git 仓库 / 有 AGENT.md，就是 task；否则是 chat（PRD-M8-017 AC-1）
 
 **params**
 
@@ -1628,6 +2379,16 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
     },
     "isolate": {
       "type": "boolean"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "chat",
+        "task"
+      ]
+    },
+    "projectId": {
+      "type": "string"
     }
   }
 }
@@ -3441,6 +4202,98 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                       "t",
                       "action",
                       "kind"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "session.kind"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "chat",
+                          "task"
+                        ]
+                      },
+                      "cwd": {
+                        "type": "string"
+                      },
+                      "isolation": {
+                        "type": "object",
+                        "properties": {
+                          "isolate": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "isolate",
+                          "reason"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "kind",
+                      "cwd"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "project.assign"
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "auto": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "projectId",
+                      "path",
+                      "auto"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "schedule.fire"
+                      },
+                      "scheduleId": {
+                        "type": "string"
+                      },
+                      "due": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "late": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "scheduleId",
+                      "due",
+                      "late"
                     ],
                     "additionalProperties": {}
                   },

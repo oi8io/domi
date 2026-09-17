@@ -12,10 +12,10 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number]
 export type Route =
   | { view: 'home' }
   | { view: 'session'; id: string; tab: 'chat' | 'trajectory' }
-  | { view: 'project'; id: string }
+  | { view: 'project'; id: string; create?: boolean }
   | { view: 'projects' }
   | { view: 'sessions' }
-  | { view: 'tasks'; runId?: string; create?: boolean; schedule?: boolean }
+  | { view: 'tasks'; runId?: string; create?: boolean; schedule?: boolean; projectId?: string }
   | { view: 'settings'; tab: SettingsTab }
 
 export function parseHash(hash: string): Route {
@@ -29,14 +29,22 @@ export function parseHash(hash: string): Route {
       if (a) return { view: 'session', id: a, tab: b === 'trajectory' ? 'trajectory' : 'chat' }
       break
     case 'p':
-      if (a) return { view: 'project', id: a }
+      if (a) return params.get('new') === '1' ? { view: 'project', id: a, create: true } : { view: 'project', id: a }
       break
     case 'projects':
       return { view: 'projects' }
     case 'sessions':
       return { view: 'sessions' }
     case 'tasks':
-      if (a === 'new') return { view: 'tasks', create: true, schedule: params.get('schedule') === '1' }
+      if (a === 'new') {
+        const projectId = params.get('project')
+        return {
+          view: 'tasks',
+          create: true,
+          schedule: params.get('schedule') === '1',
+          ...(projectId ? { projectId } : {}),
+        }
+      }
       return a ? { view: 'tasks', runId: a } : { view: 'tasks' }
     case 'settings': {
       const tab = SETTINGS_TABS.find((t) => t === a) ?? 'general'
@@ -54,13 +62,19 @@ export function formatRoute(r: Route): string {
     case 'session':
       return `#/s/${e(r.id)}${r.tab === 'trajectory' ? '/trajectory' : ''}`
     case 'project':
-      return `#/p/${e(r.id)}`
+      return `#/p/${e(r.id)}${r.create ? '?new=1' : ''}`
     case 'projects':
       return '#/projects'
     case 'sessions':
       return '#/sessions'
     case 'tasks':
-      if (r.create) return `#/tasks/new${r.schedule ? '?schedule=1' : ''}`
+      if (r.create) {
+        const q = new URLSearchParams()
+        if (r.schedule) q.set('schedule', '1')
+        if (r.projectId) q.set('project', r.projectId)
+        const qs = q.toString()
+        return `#/tasks/new${qs === '' ? '' : `?${qs}`}`
+      }
       return r.runId ? `#/tasks/${e(r.runId)}` : '#/tasks'
     case 'settings':
       return `#/settings/${r.tab}`

@@ -26,6 +26,11 @@ export interface PermissionConfig {
    * 每次检查现取——模式在会话中途会变
    */
   mode?: () => 'plan' | 'act'
+  /**
+   * 收紧（PRD-M8-004）：这些能力即使规则说 allow 也要问人；规则说 deny 的照样拒。只会更严，不会更松。
+   * 自由会话用它让 shell.exec 每次都问——命令能碰到哪些路径没法静态判断
+   */
+  askAlways?: (capabilityId: CapabilityId) => boolean
 }
 
 /** 计划模式下拒绝时 matchedRule 的值 */
@@ -91,7 +96,8 @@ export class PermissionEngine {
       // 没有任何规则提到它 —— fail-closed（AC-4）
       return { decision: 'deny', source: 'default', matchedRule: null }
     }
-    if (rule.decision !== 'ask') {
+    const tightened = rule.decision === 'allow' && this.config.askAlways?.(capabilityId) === true
+    if (rule.decision !== 'ask' && !tightened) {
       return { decision: rule.decision, source: 'config', matchedRule: rule.name }
     }
     if (!this.ask) {

@@ -62,6 +62,35 @@ const SessionSummarySchema = z.object({
   deleted: z.boolean(),
   /** 分支会话：从哪个会话分出来的（TASK-M3-014） */
   parentId: z.string().optional(),
+  /** 自由会话 / 任务（PRD-M8-004）。老 daemon 不给 */
+  kind: z.enum(['chat', 'task']).optional(),
+  /** 任务所属的项目（PRD-M8-003） */
+  projectId: z.string().optional(),
+  /** 工作目录 */
+  cwd: z.string().optional(),
+  /** 正在处理（PRD-M8-009） */
+  busy: z.boolean().optional(),
+})
+
+/** 项目（PRD-M8-003） */
+export const ProjectSettingsSchema = z.object({
+  /** 任务要不要在隔离工作区里做（PRD-M8-006） */
+  isolation: z.enum(['auto', 'always', 'never']).default('auto'),
+  /** 计划要不要先给人审（PRD-M8-005） */
+  planReview: z.enum(['auto', 'always', 'never']).default('auto'),
+})
+export const ProjectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** 规范化后的绝对路径 */
+  path: z.string(),
+  createdAt: z.number().int(),
+  archived: z.boolean(),
+  taskCount: z.number().int().nonnegative(),
+  lastActivity: z.number().int().nullable(),
+  settings: ProjectSettingsSchema,
+  /** 最近的几个任务（侧栏项目树用，免得逐个项目再查） */
+  recentTasks: z.array(z.object({ id: z.string(), title: z.string(), busy: z.boolean(), updatedAt: z.number().int() })),
 })
 
 /** L3 条目（带时间与删除状态） */
@@ -153,8 +182,12 @@ export const METHODS = {
     }),
   },
   'session.list': {
-    summary: '列出会话。默认不含软删除的；includeDeleted 给回收站用',
-    params: z.object({ includeDeleted: z.boolean().optional() }),
+    summary: '列出会话。默认不含软删除的；includeDeleted 给回收站用；kind / projectId 过滤（PRD-M8-004）',
+    params: z.object({
+      includeDeleted: z.boolean().optional(),
+      kind: z.enum(['chat', 'task']).optional(),
+      projectId: z.string().optional(),
+    }),
     result: z.object({ sessions: z.array(SessionSummarySchema) }),
   },
   'session.delete': {
@@ -293,6 +326,54 @@ export const METHODS = {
     }),
     result: z.object({ sessionId: z.string() }),
   },
+  'session.rename': {
+    summary: '改会话标题（PRD-M8-008 AC-4）。只改列表里的元数据，不进事件流',
+    params: z.object({ sessionId: z.string(), title: z.string().min(1).max(200) }),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  'session.toTask': {
+    summary:
+      '自由会话转任务（PRD-M8-004 AC-4）：在项目下新建任务，首条输入是 goal 并引用原会话全文；原会话一条事件不动。返回新任务的会话 id',
+    params: z.object({ sessionId: z.string(), projectId: z.string(), goal: z.string().min(1) }),
+    result: z.object({ sessionId: z.string() }),
+  },
+  'project.list': {
+    summary: '列出项目（PRD-M8-003），按最近活动排序。recent：每个项目带几个最近任务（默认 5）',
+    params: z.object({
+      includeArchived: z.boolean().optional(),
+      recent: z.number().int().min(0).max(50).optional(),
+    }),
+    result: z.object({ projects: z.array(ProjectSchema) }),
+  },
+  'project.create': {
+    summary: '登记项目。path 必须是已存在的目录（同一目录只登记一次，重复登记返回已有的）；name 缺省取目录名',
+    params: z.object({ path: z.string().min(1), name: z.string().min(1).max(100).optional() }),
+    result: z.object({ project: ProjectSchema }),
+  },
+  'project.update': {
+    summary: '改项目名或设置',
+    params: z.object({
+      id: z.string(),
+      name: z.string().min(1).max(100).optional(),
+      settings: ProjectSettingsSchema.partial().optional(),
+    }),
+    result: z.object({ project: ProjectSchema }),
+  },
+  'project.archive': {
+    summary: '归档 / 取消归档。归档的项目不出现在默认列表里，它的任务仍在',
+    params: z.object({ id: z.string(), archived: z.boolean() }),
+    result: z.object({ ok: z.literal(true) }),
+  },
+  'project.resolve': {
+    summary:
+      '这个目录属于哪个项目（PRD-M8-017）。只判断不登记：projectLike = 是 git 仓库或有 AGENT.md，root = 按这个目录建项目时会用的路径',
+    params: z.object({ cwd: z.string() }),
+    result: z.object({
+      project: ProjectSchema.optional(),
+      projectLike: z.boolean(),
+      root: z.string(),
+    }),
+  },
   'session.budget': {
     summary: '设这个会话的用量上限（PRD-M7-009）：到 80% 提醒，到顶暂停问人。落成 budget.decided，重开会话后照样生效',
     params: z.object({
@@ -313,8 +394,16 @@ export const METHODS = {
     result: z.object({ mode: z.enum(['plan', 'act']), changed: z.boolean() }),
   },
   'session.create': {
-    summary: '新建会话。isolate：在 cwd 所在的 git 仓库里建隔离工作区（PRD-M7-006），会话在 worktree 里干活',
-    params: z.object({ cwd: z.string().optional(), isolate: z.boolean().optional() }),
+    summary:
+      '新建会话。isolate：在 cwd 所在的 git 仓库里建隔离工作区（PRD-M7-006），会话在 worktree 里干活。' +
+      'kind（PRD-M8-004）：chat = 不属于任何项目，工作目录是 ~/.domi/scratch/<会话>；task = 属于 projectId 或 cwd 所在的项目（没登记就自动登记）。' +
+      '不给 kind 时：给了 projectId、或 cwd 在已登记项目里 / 是 git 仓库 / 有 AGENT.md，就是 task；否则是 chat（PRD-M8-017 AC-1）',
+    params: z.object({
+      cwd: z.string().optional(),
+      isolate: z.boolean().optional(),
+      kind: z.enum(['chat', 'task']).optional(),
+      projectId: z.string().optional(),
+    }),
     result: z.object({
       sessionId: z.string(),
       worktree: z.object({ path: z.string(), branch: z.string() }).optional(),
