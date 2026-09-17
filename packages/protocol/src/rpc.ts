@@ -70,6 +70,8 @@ const SessionSummarySchema = z.object({
   cwd: z.string().optional(),
   /** 正在处理（PRD-M8-009） */
   busy: z.boolean().optional(),
+  /** 有还没看过的回复（PRD-M8-009）。已读位置记在 daemon，任一客户端看过就算 */
+  unread: z.boolean().optional(),
 })
 
 /** 项目（PRD-M8-003） */
@@ -622,6 +624,13 @@ export const METHODS = {
     }),
     result: z.object({ ok: z.boolean(), commit: z.string().optional(), message: z.string() }),
   },
+  'session.read': {
+    summary:
+      '报告已读到哪里（PRD-M8-009 AC-2）：seq 是视图编号，只往前推。客户端在会话可见且看到底时发（节流），' +
+      '推进了会给所有连接发 sessions.changed',
+    params: z.object({ sessionId: z.string(), seq: z.number().int().nonnegative() }),
+    result: z.object({ changed: z.boolean() }),
+  },
   'session.submit': {
     summary:
       '提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃。' +
@@ -704,6 +713,12 @@ export const NOTIFICATIONS = {
   'session.busy': {
     summary: '会话忙闲变化',
     params: z.object({ sessionId: z.string(), busy: z.boolean() }),
+  },
+  'sessions.changed': {
+    summary:
+      '会话列表该刷新了（PRD-M8-009 AC-1）：有会话新建、删除、忙闲变化、来了新事件、已读推进。' +
+      '推给所有已握手的连接，500ms 内的变化合并成一条；收到后重新 session.list（不用轮询）',
+    params: z.object({ sessionIds: z.array(z.string()) }),
   },
 } as const
 

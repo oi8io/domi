@@ -149,6 +149,9 @@
           },
           "busy": {
             "type": "boolean"
+          },
+          "unread": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -3672,6 +3675,50 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `session.read`
+
+报告已读到哪里（PRD-M8-009 AC-2）：seq 是视图编号，只往前推。客户端在会话可见且看到底时发（节流），推进了会给所有连接发 sessions.changed
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "sessionId",
+    "seq"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "changed": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "changed"
+  ]
+}
+```
+
 ### `session.submit`
 
 提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃。refs 引用其他会话的片段（PRD-M3-005）：接受之前校验，会话不存在或起点越界 → INVALID_PARAMS；终点超出时截到末尾。uploads / files / skills（PRD-M8-010）同样先校验：附件不存在、文件不在工作目录里、技能不存在、当前模型不支持图片 → INVALID_PARAMS，data.reason 为 NOT_FOUND / INVALID / UNSUPPORTED_ATTACHMENT
@@ -5798,6 +5845,30 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
   "required": [
     "sessionId",
     "busy"
+  ]
+}
+```
+
+### `sessions.changed`
+
+会话列表该刷新了（PRD-M8-009 AC-1）：有会话新建、删除、忙闲变化、来了新事件、已读推进。推给所有已握手的连接，500ms 内的变化合并成一条；收到后重新 session.list（不用轮询）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "sessionIds"
   ]
 }
 ```

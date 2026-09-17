@@ -75,6 +75,12 @@ interface Watch {
 
 export class DomiClient {
   readonly $state = atom<ConnectionState>('idle')
+  /**
+   * 会话列表的版本号（PRD-M8-009）：daemon 推 sessions.changed 时加一，界面据此重新 session.list。
+   * changedIds 是最近一次变化涉及的会话
+   */
+  readonly $sessionsVersion = atom(0)
+  changedIds: readonly string[] = []
   /** 最近一次连接失败或握手被拒的原因，给 UI 直接显示 */
   readonly $lastError = atom<string | null>(null)
 
@@ -333,6 +339,21 @@ export class DomiClient {
     })
   }
 
+  /** 报告已读到视图第几条（PRD-M8-009）。老 daemon 没有这个方法时静默忽略 */
+  async markRead(sessionId: string, seq: number): Promise<boolean> {
+    try {
+      return (await this.request('session.read', { sessionId, seq })).changed
+    } catch (e) {
+      if (e instanceof DomiRpcError && e.code === 'UNKNOWN_METHOD') return false
+      throw e
+    }
+  }
+
+  /** 这个会话订阅到了第几条（已读位置用） */
+  watchedSeq(sessionId: string): number {
+    return this.watches.get(sessionId)?.lastSeq ?? 0
+  }
+
   // ── Composer（PRD-M8-010） ──
 
   async listFiles(sessionId: string, query = '', limit = 50): Promise<ResultOf<'fs.list'>> {
@@ -531,6 +552,9 @@ export class DomiClient {
       const store = this.watches.get(p.sessionId)?.store
       // 只清同一个询问：答完之后紧接着来了下一个的话，不能把新的也清掉
       if (store && store.$ask.get()?.askId === p.askId) store.setAsk(null)
+    } else if (msg.method === 'sessions.changed') {
+      this.changedIds = (msg.params as NotifyParamsOf<'sessions.changed'>).sessionIds
+      this.$sessionsVersion.set(this.$sessionsVersion.get() + 1)
     } else if (msg.method === 'session.metrics') {
       const p = msg.params as NotifyParamsOf<'session.metrics'>
       const store = this.watches.get(p.sessionId)?.store

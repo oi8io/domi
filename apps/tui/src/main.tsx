@@ -141,6 +141,17 @@ export function Root({
     contextOf(client, sessionId).then(setContext, () => undefined)
   }, [client, sessionId, status.busy])
 
+  // 已读（PRD-M8-009 AC-2）：终端里打开着的会话就是在看，新事件到了就推进；1 秒最多报一次
+  const items = useStore(store.$items)
+  const lastSeq = items.at(-1)?.seq ?? 0
+  useEffect(() => {
+    if (lastSeq === 0) return
+    const t = setTimeout(() => {
+      client.markRead(sessionId, client.watchedSeq(sessionId)).catch(() => undefined)
+    }, 1000)
+    return () => clearTimeout(t)
+  }, [client, sessionId, lastSeq])
+
   // 主题色存在 daemon（与 Web 共用，PRD-M8-001 AC-5）；连远程时以对面的为准
   useEffect(() => {
     client.getSettings().then(

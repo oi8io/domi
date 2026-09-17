@@ -174,6 +174,12 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
   } catch (e) {
     process.stderr.write(`[domid] 老会话归类失败（不影响使用）：${e instanceof Error ? e.message : String(e)}\n`)
   }
+  try {
+    // 升级后第一次启动：已有的会话都算看过（PRD-M8-009），不然满屏未读
+    index.readMarks.backfill()
+  } catch (e) {
+    process.stderr.write(`[domid] 已读位置初始化失败（不影响使用）：${e instanceof Error ? e.message : String(e)}\n`)
+  }
   /** ProjectError → INVALID_PARAMS */
   function pj<T>(fn: () => T): T {
     try {
@@ -521,7 +527,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
 
     async list({ includeDeleted, kind, projectId }): Promise<SessionSummary[]> {
       // 下划线开头的是 daemon 自己的会话（审计），不是用户的对话
-      return index.sessions
+      const rows = index.sessions
         .list({
           includeDeleted,
           limit: 500,
@@ -529,18 +535,26 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           ...(projectId === undefined ? {} : { projectId }),
         })
         .filter((r) => !r.id.startsWith('_'))
-        .map((r) => ({
-          id: r.id,
-          title: r.title,
-          model: r.model,
-          updatedAt: r.updatedAt,
-          eventCount: r.eventCount,
-          deleted: r.deletedAt !== null,
-          cwd: r.cwd,
-          ...(r.parentSessionId === null ? {} : { parentId: r.parentSessionId }),
-          ...(r.kind === null ? {} : { kind: r.kind }),
-          ...(r.projectId === null ? {} : { projectId: r.projectId }),
-        }))
+      const read = index.readMarks.states(rows.map((r) => r.id))
+      return rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        model: r.model,
+        updatedAt: r.updatedAt,
+        eventCount: r.eventCount,
+        deleted: r.deletedAt !== null,
+        cwd: r.cwd,
+        ...(r.parentSessionId === null ? {} : { parentId: r.parentSessionId }),
+        ...(r.kind === null ? {} : { kind: r.kind }),
+        ...(r.projectId === null ? {} : { projectId: r.projectId }),
+        ...(read.get(r.id)?.unread ? { unread: true } : {}),
+      }))
+    },
+
+    async markRead(sessionId, seq) {
+      if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+      const own = seq - index.viewOffset(sessionId)
+      return own > 0 && index.readMarks.mark(sessionId, own)
     },
 
     createTask: (p) => createGoalTask(p),

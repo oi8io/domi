@@ -65,7 +65,38 @@ export function SessionView({
     const el = scroller.current
     if (!el) return
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight
+    reportRead()
   }, [items.length, ask])
+
+  // 已读（PRD-M8-009 AC-2）：页面在前台、看到了底，就告诉 daemon 读到了哪；1 秒最多一次
+  const lastReport = useRef({ at: 0, seq: 0, timer: 0 as ReturnType<typeof setTimeout> | 0 })
+  const reportRead = (): void => {
+    const el = scroller.current
+    if (!el || document.visibilityState !== 'visible') return
+    if (el.scrollHeight - el.scrollTop - el.clientHeight > 80) return
+    const r = lastReport.current
+    if (r.timer !== 0) return
+    const send = (): void => {
+      r.timer = 0
+      const seq = client.watchedSeq(sessionId)
+      if (seq <= r.seq) return
+      r.seq = seq
+      r.at = Date.now()
+      client.markRead(sessionId, seq).catch(() => undefined)
+    }
+    const wait = Math.max(0, 1000 - (Date.now() - r.at))
+    if (wait === 0) send()
+    else r.timer = setTimeout(send, wait)
+  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 只在切会话时挂一次
+  useEffect(() => {
+    const onVisible = (): void => reportRead()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      if (lastReport.current.timer !== 0) clearTimeout(lastReport.current.timer)
+    }
+  }, [sessionId])
 
   const answer = (allowed: boolean, content?: Record<string, unknown>, grant?: boolean): void => {
     if (!ask?.askId) return
@@ -130,7 +161,7 @@ export function SessionView({
       {status.worktree !== undefined && (
         <ChangesBar client={client} sessionId={sessionId} busy={status.busy} items={items} />
       )}
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto" onScroll={reportRead}>
         {tab === 'trajectory' ? (
           <Trajectory items={items} />
         ) : (

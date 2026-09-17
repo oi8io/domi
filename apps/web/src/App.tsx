@@ -96,11 +96,12 @@ export function App({
     return () => client.unwatch(sessionId)
   }, [client, sessionId, online])
   const activeStatus = useStore((active?.store ?? EMPTY).$status)
-  // 正在看的会话忙闲变化时刷新列表（标题、事件数、状态点）。列表推送在 TASK-M8-010
-  // biome-ignore lint/correctness/useExhaustiveDependencies: busy 翻转是刷新的触发条件
+  // 列表由 daemon 推送变化（sessions.changed，PRD-M8-009 AC-1）；正在看的会话忙闲翻转时也刷一次（老 daemon 不推）
+  const listVersion = useStore(client.$sessionsVersion)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 版本号与 busy 翻转是刷新的触发条件
   useEffect(() => {
-    if (online && active !== null) refreshSoon()
-  }, [activeStatus.busy])
+    if (online) refreshSoon()
+  }, [listVersion, activeStatus.busy])
   // 切视图时也刷新一次
   // biome-ignore lint/correctness/useExhaustiveDependencies: 路由变化是刷新的触发条件
   useEffect(() => {
@@ -114,10 +115,17 @@ export function App({
   const chats = live.filter((s) => s.kind !== 'task')
   const tasks = live.filter((s) => s.kind === 'task')
   // 项目树里的状态点：正在看的任务以本地 store 为准，其余看列表
-  const busyOf = new Map(live.map((s) => [s.id, s.busy === true]))
+  const byId = new Map(live.map((s) => [s.id, s]))
   const tree = projects
     .filter((p) => !p.archived)
-    .map((p) => ({ ...p, recentTasks: p.recentTasks.map((t) => ({ ...t, busy: busyOf.get(t.id) ?? t.busy })) }))
+    .map((p) => ({
+      ...p,
+      recentTasks: p.recentTasks.map((t) => ({
+        ...t,
+        busy: byId.get(t.id)?.busy ?? t.busy,
+        unread: byId.get(t.id)?.unread === true,
+      })),
+    }))
 
   let main: React.ReactNode
   switch (route.view) {

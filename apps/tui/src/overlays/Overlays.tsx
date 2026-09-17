@@ -70,8 +70,8 @@ export function sessionItems(sessions: readonly Session[], projects: readonly Pr
       key: s.id,
       label: s.title.trim() === '' ? s.id : s.title,
       group: groupOf(s),
-      meta: s.busy ? '运行中' : ago(s.updatedAt, now),
-      dot: s.busy ? 'running' : 'off',
+      meta: s.busy ? '运行中' : s.unread ? `未读 · ${ago(s.updatedAt, now)}` : ago(s.updatedAt, now),
+      dot: s.busy ? 'running' : s.unread ? 'warn' : 'off',
       search: s.id,
     }))
 }

@@ -42,6 +42,19 @@ import {
 
 export const DAEMON_VERSION = '0.1.0'
 
+/** 成功之后会话列表就变了的方法（新建、删除、恢复、改名、分支、转任务） */
+const LIST_CHANGING = new Set<string>([
+  'session.create',
+  'session.delete',
+  'session.restore',
+  'session.rename',
+  'session.branch',
+  'session.toTask',
+  'task.create',
+  'review.start',
+  'schedule.runNow',
+])
+
 const hasExtras = (p: SubmitExtras): boolean =>
   (p.uploads?.length ?? 0) + (p.files?.length ?? 0) + (p.skills?.length ?? 0) > 0
 
@@ -149,6 +162,7 @@ export interface SessionSummary {
   projectId?: string
   cwd?: string
   busy?: boolean
+  unread?: boolean
 }
 
 export type ProjectSummary = ResultOf<'project.list'>['projects'][number]
@@ -268,6 +282,8 @@ export interface DaemonHost {
     get(): Promise<ResultOf<'config.get'>>
     set(patch: Record<string, unknown>): Promise<ResultOf<'config.set'>>
   }
+  /** 已读位置（PRD-M8-009）。seq 是视图编号；返回是否推进了 */
+  markRead?(sessionId: string, seq: number): Promise<boolean>
   /** 软删除 / 恢复。会话不存在时抛 SessionNotFoundError */
   remove(sessionId: string): Promise<void>
   restore(sessionId: string): Promise<void>
@@ -322,12 +338,20 @@ export class Daemon {
   private readonly asks = new Map<string, HostAsk & { sessionId: string }>()
   private readonly metrics = new Map<string, HostMetrics>()
   private scheduler: Scheduler | null = null
+  /** 已握手的连接（sessions.changed 推给所有人） */
+  private readonly conns = new Map<string, ClientConn>()
+  private changed = new Set<string>()
+  private changedTimer: ReturnType<typeof setTimeout> | null = null
 
   constructor(private readonly host: DaemonHost) {
-    host.onEvents((sessionId, events) => this.push(sessionId, events))
+    host.onEvents((sessionId, events) => {
+      this.push(sessionId, events)
+      this.touch(sessionId)
+    })
     host.onBusy?.((sessionId, b) => {
       if (b) this.hostBusy.add(sessionId)
       else this.hostBusy.delete(sessionId)
+      this.touch(sessionId)
       this.broadcast(sessionId, notify('session.busy', { sessionId, busy: b }))
     })
     host.onAsk?.((sessionId, ask) => {
@@ -356,8 +380,24 @@ export class Daemon {
     for (const s of this.subs.get(sessionId) ?? []) s.conn.send(msg)
   }
 
+  /** 会话列表有变化：攒 500ms 一起推（PRD-M8-009 AC-1） */
+  private touch(sessionId: string): void {
+    if (sessionId.startsWith('_')) return
+    this.changed.add(sessionId)
+    if (this.changedTimer !== null) return
+    this.changedTimer = setTimeout(() => {
+      this.changedTimer = null
+      const ids = [...this.changed]
+      this.changed = new Set()
+      const msg = notify('sessions.changed', { sessionIds: ids })
+      for (const c of this.conns.values()) c.send(msg)
+    }, 500)
+    ;(this.changedTimer as { unref?: () => void }).unref?.()
+  }
+
   /** 客户端断开：只清订阅，**不动会话**——任务照常跑完（M3-002 AC-2） */
   disconnect(conn: ClientConn): void {
+    this.conns.delete(conn.id)
     this.handshaked.delete(conn.id)
     this.clientNames.delete(conn.id)
     for (const sessionId of [...this.subs.keys()]) this.unsubscribe(sessionId, conn.id)
@@ -382,7 +422,13 @@ export class Daemon {
     }
 
     try {
-      return await this.dispatch(conn, req, method, parsed.data as never)
+      const res = await this.dispatch(conn, req, method, parsed.data as never)
+      if (LIST_CHANGING.has(method) && res.error === undefined) {
+        const p = parsed.data as { sessionId?: unknown }
+        const r = res.result as { sessionId?: unknown } | undefined
+        for (const id of [p.sessionId, r?.sessionId]) if (typeof id === 'string') this.touch(id)
+      }
+      return res
     } catch (e) {
       if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message)
       if (
@@ -539,6 +585,7 @@ export class Daemon {
         }
         this.handshaked.add(conn.id)
         this.clientNames.set(conn.id, p.client)
+        if (conn.id !== SYSTEM_CONN.id) this.conns.set(conn.id, conn)
         return ok(req.id, { protocolVersion: PROTOCOL_VERSION, serverVersion: DAEMON_VERSION, methods: METHOD_NAMES })
       }
 
@@ -832,6 +879,14 @@ export class Daemon {
         return ok(req.id, { head: await session.head() })
       }
 
+      case 'session.read': {
+        const p = params as { sessionId: string; seq: number }
+        if (!this.host.markRead) return ok(req.id, { changed: false })
+        const changed = await this.host.markRead(p.sessionId, p.seq)
+        if (changed) this.touch(p.sessionId)
+        return ok(req.id, { changed })
+      }
+
       case 'session.submit': {
         const p = params as { sessionId: string; text: string; refs?: RefLink[] } & SubmitExtras
         // **检查与占位之间不许有 await。**
@@ -967,6 +1022,8 @@ export class Daemon {
 
   async close(): Promise<void> {
     this.stopScheduler()
+    if (this.changedTimer !== null) clearTimeout(this.changedTimer)
+    this.conns.clear()
     for (const s of this.sessions.values()) await s.close()
     this.sessions.clear()
     this.subs.clear()

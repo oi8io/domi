@@ -14,6 +14,7 @@ import { dirname } from 'node:path'
 import { type AnyEvent, type DomiEvent, type EventEnvelope, parseEvent, SCHEMA_VERSION } from '@domi/protocol'
 import { type AppendRange, type Clock, type EventLog, type ReadOpts, systemClock } from './event-log.ts'
 import { ProjectRepo } from './projects.ts'
+import { ReadMarkRepo } from './read-marks.ts'
 import { serializeRedacted } from './redact.ts'
 import { ScheduleRepo } from './schedules.ts'
 import { DDL, META_SCHEMA_VERSION, MIGRATIONS, PRAGMAS } from './schema.ts'
@@ -174,6 +175,10 @@ export class SqliteEventLog implements EventLog {
   /** 会话元数据仓库。事件与会话是两张表，但同一个连接同一个事务边界 */
   get projects(): ProjectRepo {
     return new ProjectRepo(this.db)
+  }
+
+  get readMarks(): ReadMarkRepo {
+    return new ReadMarkRepo(this.db)
   }
 
   get schedules(): ScheduleRepo {
