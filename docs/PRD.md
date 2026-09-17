@@ -1,11 +1,13 @@
 # domi — 产品需求文档（全量）
 
-> 覆盖 M0–M7 全部 7 个里程碑（M7 为 v1.8 追加）。
+> 覆盖 M0–M8 全部 9 个里程碑（M7 为 v1.8 追加，M8 为 v1.10 追加）。
 > **v1.2** · 2026-09-14 · 作者：PM 环节
 > 上位文档：`PRD-VISION.md` v1.1（不变量，冲突时以其为准）
 > 变更：v1.0 经两轮独立门禁审计后修订，见 `docs/qa/prd-gate-audit-v1.0.md`
 > **v1.2 回写**（触发：`docs/adr/003` 方向变更）——**原 45 条编号与 AC 全部保留不动**，仅追加 5 条新需求
 > （M1-011 步级快照 · M2-008 L1 回放评估 · M2-009 内置 MCP server · M5-007 聊天端桥接 · M6-005 L2 评估集）
+> **v1.10 回写**（2026-09-17，`docs/prd/M8.md`）——触发：用户给出已确认的 Web 高保真原型（`docs/ui-redesign/`），要求按原型重构并补齐后端。
+> **仅追加** M8 一章（13 条需求，成熟度 `SKETCH`，进入前过再批准门）；M0–M7 的编号与 AC 一字未改，不变量不增不改。
 > **v1.9.1 回写**（2026-09-16，`docs/spec/M7.md` 取舍-1）——PRD-M7-001 AC-5 划掉，改为 AC-6：后台 job 的输出查询归 `fs.read`、终止仍归 `shell.exec`。
 > 理由：`shell.exec` 在默认模板里是 `ask`，原写法下每轮询一次后台输出就要确认一次；查询只读已经产生的输出，不执行任何东西。
 > **v1.9 回写**（2026-09-16，`docs/prd/M7.md` §6）——用户拍板：M7 全做（001–010），`SKETCH` → `COMMITTED`。
@@ -862,6 +864,155 @@ AC 原文不变（`docs/adr/011`）。进入 M3 的批准门上必须重新过�
 
 **M7 DoD**：在**一个非 domi 的真实仓库**与 **domi 仓库**里各完成一个真实编码任务——从一条 issue 到一个带测试的本地提交；
 全程在隔离 worktree 中进行、结束前有成功的验证记录、用户只做权限审批与最终审阅。另用 PRD-M7-008 从 domi 历史生成 ≥ 20 道题并跑完一轮。
+
+---
+
+# M8 · 工作台 `SKETCH`
+
+> **v1.10（2026-09-17）新增**。触发：用户给出已确认的高保真原型 `docs/ui-redesign/index.html`，要求 Web 端按原型重构、后端缺的补齐。
+> 再批准门材料与用户拍板见 `docs/prd/M8.md`。
+
+**要回答的问题**：Web 端能否成为 domi 的日常主界面——按项目组织任务、自由会话与任务分开、定时执行，不用回终端改配置。
+
+**不做什么**：手机端与窄屏布局 · 通讯工具真实接入（只留入口）· 界面多语言 ·
+从 Web 改权限规则 / 钩子 / MCP server / 安装插件 · 真浏览器 e2e（沿用 ADR-013）· 多用户与云同步。
+
+**预算**：28.5 天。
+
+### PRD-M8-001 · 设计 token 与主题
+- **用户价值**：界面长得和确认过的原型一样；深浅色、主题色按自己习惯选，下次打开还在。
+- **AC**
+  - AC-1：深浅两套 CSS 变量与 `docs/ui-redesign/HANDOFF.md` §1 色板逐项一致（断言解析 `globals.css` 与 HANDOFF 表格比对）
+  - AC-2：主题三选一（跟随系统 / 深色 / 浅色），写在 `<html data-theme>`；跟随系统时响应 `prefers-color-scheme` 变化；选择在本浏览器持久化
+  - AC-3：5 个 accent 色板，选中后 `--accent` 及派生色（hover、选中背景、强调边框、实心按钮底色）一起变，深浅主题各有一套取值
+  - AC-4：实心按钮文字与底色对比度 ≥ 4.5:1，覆盖 5 个色板 × 2 个主题（断言计算）
+- **验收方式**：`bun test apps/web/test/theme.spec.ts`
+- **层级**：Negotiable · **优先级**：P0
+
+### PRD-M8-002 · 布局骨架与导航
+- **用户价值**：一眼找到项目、最近的会话与任务、设置；前进后退和刷新不丢位置。
+- **AC**
+  - AC-1：260px 固定侧栏，自上而下：品牌 → 「新对话」主按钮 → 「新任务」「定时任务」次按钮 → 项目栏 → 会话栏 → 设置
+  - AC-2：视图由地址的 hash 决定（会话、项目详情、全部项目、全部会话、任务、设置及其 tab），刷新与浏览器前进后退回到同一视图
+  - AC-3：项目栏、会话栏点标题折叠，chevron 旋转，折叠状态持久化；标题 hover 出操作（项目栏：添加项目、新建任务、全部项目；会话栏：全部会话）
+  - AC-4：项目项 hover 出笔图标，点击在该项目下新建任务；点项目名进项目详情；当前项目高亮
+  - AC-5：入口映射：新对话 → 空白会话；新任务 → 新建任务（选项目）；定时任务 → 新建任务并展开计划时间
+- **验收方式**：`bun test apps/web/test/layout.spec.tsx`
+- **层级**：Negotiable · **优先级**：P0
+
+### PRD-M8-003 · 项目
+- **用户价值**：任务按仓库归好类；给项目起个自己认得的名字；不再做的项目收起来但记录还在。
+- **AC**
+  - AC-1：daemon 有项目表（id、名字、规范化后的绝对路径、创建时间、归档标记）；同一路径（解析符号链接后）只有一个项目
+  - AC-2：`project.list / create / update / archive`；创建时路径必须是已存在的目录，否则如实拒绝；名字默认取目录名
+  - AC-3：在一个没登记过的路径上建任务时自动建项目；升级时按老会话的 cwd 回填（规则见 SPEC-M8-004）
+  - AC-4：`project.list` 带每个项目的任务数与最近活动时间；归档的项目不在侧栏出现，其任务仍能在全部会话里看到，可取消归档
+  - AC-5：项目详情页：名字（可改）、路径、在该项目下开始任务的输入框、该项目的历史任务；全部项目页可按名字或路径筛选
+- **验收方式**：`bun test daemon/projects.spec.ts` + `apps/web/test/project-view.spec.tsx`
+- **层级**：Negotiable · **优先级**：P0
+
+### PRD-M8-004 · 会话与任务
+- **用户价值**：随便聊聊不会被项目规矩和仓库文件打扰；决定动手了一键变成任务。
+- **AC**
+  - AC-1：会话有 `kind`：`chat`（不属于任何项目）或 `task`（必属于一个项目）；落 `session.kind` 事件，`session.list` 带 kind、项目 id、cwd
+  - AC-2：`chat` 的工作目录是 `~/.domi/scratch/<会话>`；不加载项目规矩文件、项目 Skill、项目信任询问；沙盒外路径的读写与命令一律询问（断言：默认规则允许的 `fs.read` 在沙盒外也会询问）
+  - AC-3：`task` 的工作目录是项目路径（或自动隔离后的 worktree，PRD-M8-006），行为与 M7 一致
+  - AC-4：会话转任务：选项目、确认目标 → 新建任务，首条输入附带原会话的引用（PRD-M3-005）；原会话事件一条不变
+  - AC-5：侧栏会话栏按最近活动混排会话与任务，任务显示项目名；全部会话页按「无项目 / 各项目」分组，可筛选，含回收站与恢复
+- **验收方式**：`bun test runtime/session-kind.spec.ts` + `apps/web/test/sessions-view.spec.tsx`
+- **层级**：Negotiable（AC-2 为 Invariant：INV-03）· **优先级**：P0
+
+### PRD-M8-005 · 目标驱动的任务
+- **用户价值**：不写 YAML，说清楚要什么就行；是一口气做完还是拆成多步，系统自己判断。
+- **AC**
+  - AC-1：`task.create {projectId, goal, attachments?, schedule?}` 建一个 `task` 会话并开始；YAML 入口保留为高级选项
+  - AC-2：执行形态由系统决定：先规划，计划给出步骤与建议形态（单会话 / 多节点）；多节点时经 PRD-M7-005 AC-3 转成 DAG 运行；决定落 `plan.decided` 的 `shape` 字段
+  - AC-3：计划审阅策略按项目设置 `always / auto / never`（默认 auto：多节点或计划涉及写操作超过阈值时才让人审）；不审时自动批准也落 `plan.decided{source:'policy'}`
+  - AC-4：任务页列出进行中与历史任务（单会话任务与 DAG 运行统一展示），可看节点、重试失败节点、取消、打开节点会话
+- **验收方式**：`bun test runtime/task-create.spec.ts` + `apps/web/test/tasks-view.spec.tsx`
+- **层级**：Negotiable · **优先级**：P0
+
+### PRD-M8-006 · 自动隔离与改动条
+- **用户价值**：不用理解 worktree；domi 自己判断要不要避开我的工作区，改完了告诉我改了什么。
+- **AC**
+  - AC-1：任务是否隔离由策略决定：项目设置 `auto / always / never`（默认 auto）；auto 时在 git 仓库里、且（工作区有未提交改动 或 任务是多节点 或 由定时触发）才隔离；决定落 `worktree.create` 或 `session.kind` 的 `isolation` 字段并注明原因
+  - AC-2：界面上没有「隔离会话」字样；隔离的任务有待带回的改动时，顶部出现「N 个文件改动 · 查看 · 带回」条，展开即 M7-006 的逐文件审阅
+  - AC-3：带回仍是人工批准动作（M7-006 AC-3 不变）；非 git 目录退回步级快照（M7-006 AC-5 不变）
+- **验收方式**：`bun test runtime/isolation-policy.spec.ts` + `apps/web/test/changes-bar.spec.tsx`
+- **层级**：Negotiable（AC-3 为 Invariant：INV-03）· **优先级**：P1
+
+### PRD-M8-007 · 定时任务
+- **用户价值**：每天早上自动跑一遍检查、每周整理一次记忆，不用自己记得。
+- **AC**
+  - AC-1：任务可带计划：5 段 cron 表达式 + 时区；非法表达式如实拒绝并指出哪一段；界面显示下次运行时间
+  - AC-2：到点时建一个 `task` 会话执行同一个目标，落 `schedule.fire {scheduleId, due, late}`；同一个计划上一次还没结束时本次跳过并记录
+  - AC-3：domid 没开期间错过的，启动后每个计划最多补跑一次（断言：假时钟跳过 5 个周期只触发 1 次，且 `late:true`）
+  - AC-4：可暂停、恢复、立即运行、编辑、删除；可看每个计划的历史运行（打开对应任务）
+- **验收方式**：`bun test daemon/scheduler.spec.ts`（假时钟）
+- **层级**：Negotiable · **优先级**：P1
+
+### PRD-M8-008 · 会话视图
+- **用户价值**：对话、思考、工具、审批一条流看清楚；想查细节切到轨迹。
+- **AC**
+  - AC-1：Chat / Trajectory 两个 tab；Chat 流按原型样式渲染用户、思考（可折叠，带耗时）、工具调用（状态 pill、耗时、可展开参数与结果）、确认卡（内嵌，默认焦点在拒绝，含计划审批与 elicitation 表单）、assistant、错误
+  - AC-2：状态栏 pill：连接状态、turns / steps / tok/s、tokens / cache 命中率、上下文占用、花费、模式与验证状态、主题切换；这些数都由 runtime 的 metrics 推过来（`packages/kernel/src/metrics.ts` 增加字段，客户端不算）
+  - AC-3：Trajectory 按轮分组，标签分 system / context / user / assistant / tool / permission 六类；有时间线（输入、模型、工具三行）、Duration / Turns / Calls 过滤与搜索
+  - AC-4：原有操作保留：每条消息 hover 出「分支」，用户输入 hover 出「引用这一轮」；会话标题可改、可删除（两步确认）、可转任务
+- **验收方式**：`bun test apps/web/test/session-view.spec.tsx` + `bun test kernel/metrics.spec.ts`
+- **层级**：Negotiable（AC-1 的默认焦点为 Invariant：INV-03）· **优先级**：P0
+
+### PRD-M8-009 · 运行与未读状态
+- **用户价值**：一眼看出哪个还在跑、哪个跑完了我还没看。
+- **AC**
+  - AC-1：`session.list` 带 `busy` 与 `unread`；列表变化由 daemon 推送（`sessions.changed` 通知），不轮询
+  - AC-2：已读位置记在 daemon（按会话的最后已读 seq），在任一客户端看过即为已读，TUI 与 Web 一致
+  - AC-3：状态点统一在左侧：运行 = 蓝色脉冲、未读 = 黄、其他 = 灰；侧栏、项目详情、全部会话三处一致
+- **验收方式**：`bun test daemon/unread.spec.ts` + `apps/web/test/layout.spec.tsx`
+- **层级**：Negotiable · **优先级**：P1
+
+### PRD-M8-010 · Composer
+- **用户价值**：引用项目文件、贴截图、指定技能、换模型，都在输入框里完成。
+- **AC**
+  - AC-1：Enter 发送、Shift+Enter 换行；忙时发送按钮不可点（M3-004 AC-3 不变）；待发送引用以 chip 显示
+  - AC-2：「文件」与输入 `@`：从项目文件清单（`fs.list`，遵守 .gitignore，复用 M7-001 的清单）里选，作为引用带进这一轮；会话里选的是沙盒文件
+  - AC-3：上传与粘贴附件：存到 `~/.domi/attachments/<会话>/`，单个上限可配置（默认 20MB）；模型支持图片时作为图片输入，不支持时如实提示而不是静默丢弃；`user.input.uploads` 记录附件引用
+  - AC-4：「技能」与输入 `/`：列出可用 Skill（`skill.list`），可搜索；选中的 Skill 这一轮强制注入，记在 `user.input.skills`
+  - AC-5：模型下拉来自 `model.list`（已配置的供应商与模型）；切换走 `session.switchModel`；模式按钮切换执行 / 计划（M7-005）
+- **验收方式**：`bun test runtime/attachments.spec.ts` + `apps/web/test/composer.spec.tsx`
+- **层级**：Negotiable · **优先级**：P1
+
+### PRD-M8-011 · 配置读写与凭据
+- **用户价值**：在设置页改配置、填 key，不用开终端；key 不会明文出现在配置文件和界面上。
+- **AC**
+  - AC-1：`config.get` 返回当前生效配置，所有凭据字段只给掩码（前缀 + 末 4 位）与来源（env / secrets / config）
+  - AC-2：`config.set {patch}` 只接受白名单内的键；`permissions`、`hooks`、`mcp`、`plugins.install` 等不在白名单（断言：带这些键的 patch 整体被拒，文件不变）
+  - AC-3：写入经 schema 校验后回写 `~/.domi/config.yaml`，保留用户的注释与键顺序；daemon 热加载，下一轮生效
+  - AC-4：凭据写进 `~/.domi/secrets.yaml`（权限 0600），不写进 config.yaml；读取优先级：环境变量 > secrets.yaml > config.yaml（旧写法继续兼容）
+- **验收方式**：`bun test config/write.spec.ts` + `bun test daemon/config-rpc.spec.ts`
+- **层级**：Negotiable（AC-2 为 Invariant：INV-03）· **优先级**：P0
+
+### PRD-M8-012 · 设置页
+- **用户价值**：所有能在 Web 上改的设置在一个地方。
+- **AC**
+  - AC-1：7 个 tab：通用 / 模型供应商 / 通讯工具 / 记忆管理 / Soul 与人格 / 插件 / 用量统计；tab 在地址里
+  - AC-2：通用：语言（只有简体中文可选）、主题、5 个 accent 色板。模型供应商：默认模型；Anthropic、OpenAI、DeepSeek、OpenAI 兼容网关各自的 key 与 base URL
+  - AC-3：通讯工具：Telegram、微信两项显示为「即将支持」，不可操作
+  - AC-4：记忆管理：逐字保留轮数、压缩阈值、记忆抽取间隔、结构化清理开关，都经 `config.set` 保存
+  - AC-5：Soul 与人格：编辑并保存 Soul 文本、待审阅改动的接受 / 否决（M4-003）、记忆条目的保留 / 否决与检索、导出 / 导入 soul.md（M4-004）
+  - AC-6：插件：卡片列出已装插件与沙箱状态，启停开关写配置并即时生效；有 UI 面板的插件仍在无同源沙箱 iframe 里打开（ADR-022）
+- **验收方式**：`bun test apps/web/test/settings-view.spec.tsx` + `bun test daemon/plugin-toggle.spec.ts`
+- **层级**：Negotiable · **优先级**：P1
+
+### PRD-M8-013 · 用量统计
+- **用户价值**：知道这个月花了多少、花在哪个模型上。
+- **AC**
+  - AC-1：`usage.summary {from, to}` 按月、按模型聚合 tokens、花费、会话数、cache 命中率、工具调用数、权限询问数，只从事件投影（INV-13）
+  - AC-2：用量 tab 上方 6 张数字卡，下方按模型的柱状图；未定价模型的花费显示「—」而不是 $0（沿用 PRD-M1-007 AC-4）
+- **验收方式**：`bun test daemon/usage.spec.ts`
+- **层级**：Negotiable · **优先级**：P2
+
+**M8 DoD**：用户连续一周只用 Web 端做日常工作（至少两个项目的任务、一个定时任务、在设置页换过一次 key），
+期间没有因为界面缺功能而回终端；旧的七个面板组件已被替换，`docs/parity-checklist.md` 更新。
 
 ---
 

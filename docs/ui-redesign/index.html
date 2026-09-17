@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>domi — UI Redesign v2</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%2358a6ff'/><text x='16' y='22' text-anchor='middle' font-family='monospace' font-size='16' font-weight='bold' fill='%230d1117'>d</text></svg>">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style>
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 8px; --r-sm: 6px; --r-lg: 12px;
+  --sidebar-w: 260px;
+  --dur: 150ms; --ease: cubic-bezier(.4,0,.2,1);
+}
+[data-theme="dark"] {
+  --bg:#0d1117; --bg2:#161b22; --panel:#1c2128; --panel-h:#22272e;
+  --border:#30363d; --border2:#21262d;
+  --ink:#e6edf3; --ink2:#c9d1d9; --mut:#8b949e; --mut2:#6e7681;
+  --accent:#58a6ff; --accent-h:#79b8ff; --accent-d:rgba(88,166,255,.12); --accent-b:rgba(88,166,255,.35);
+  --ok:#3fb950; --ok-d:rgba(63,185,80,.12);
+  --bad:#f85149; --bad-d:rgba(248,81,73,.12);
+  --warn:#d29922; --warn-d:rgba(210,153,34,.12);
+  --info:#a371f7; --info-d:rgba(163,113,247,.12);
+  --tool:#f0883e; --tool-d:rgba(240,136,62,.12);
+  --code-bg:#0d1117;
+  --shadow:0 4px 12px rgba(0,0,0,.4);
+}
+[data-theme="light"] {
+  --bg:#fff; --bg2:#f6f8fa; --panel:#f6f8fa; --panel-h:#eaeef2;
+  --border:#d0d7de; --border2:#e5e9ee;
+  --ink:#1f2328; --ink2:#424a53; --mut:#656d76; --mut2:#8b949e;
+  --accent:#0969da; --accent-h:#0a5ed3; --accent-d:rgba(9,105,218,.08); --accent-b:rgba(9,105,218,.3);
+  --ok:#1a7f37; --ok-d:rgba(26,127,55,.08);
+  --bad:#d1242f; --bad-d:rgba(209,36,47,.08);
+  --warn:#9a6700; --warn-d:rgba(154,103,0,.08);
+  --info:#8250df; --info-d:rgba(130,80,223,.08);
+  --tool:#bc4c00; --tool-d:rgba(188,76,0,.08);
+  --code-bg:#f6f8fa;
+  --shadow:0 4px 12px rgba(0,0,0,.1);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; }
+body {
+  font-family:var(--font-sans); font-size:14px; line-height:1.6;
+  background:var(--bg); color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  transition:background var(--dur),color var(--dur);
+}
+.mono { font-family:var(--font-mono); }
+button { font:inherit; cursor:pointer; border:none; background:none; color:inherit; }
+button:disabled { cursor:not-allowed; opacity:.5; }
+input,select,textarea { font:inherit; }
+a { color:var(--accent); text-decoration:none; }
+ul { list-style:none; }
+
+/* ===== Layout ===== */
+.shell { display:grid; grid-template-columns:var(--sidebar-w) 1fr; height:100vh; overflow:hidden; }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  background:var(--bg2); border-right:1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sb-brand { padding:14px 16px 10px; display:flex; align-items:center; justify-content:space-between; }
+.brand-mark { display:flex; align-items:center; gap:8px; font-weight:700; font-size:16px; }
+.brand-logo { width:26px; height:26px; border-radius:7px; background:var(--accent); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-weight:700; font-size:14px; color:#fff; }
+.conn-dot { width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:5px; }
+.conn-open { background:var(--ok); }
+.conn-label { font-size:11.5px; color:var(--mut); display:flex; align-items:center; }
+
+/* Top actions (Doubao style) */
+.top-actions { padding:0 10px 8px; display:flex; flex-direction:column; gap:5px; }
+.ta-primary { display:flex; align-items:center; gap:8px; padding:9px 12px; background:var(--accent); color:#fff; border-radius:var(--r); font-size:13px; font-weight:50px; }
+.ta-primary:hover { opacity:.9; }
+.ta-row { display:flex; gap:5px; }
+.ta-secondary { flex:1; display:flex; align-items:center; gap:6px; padding:7px 10px; background:transparent; border:1px solid var(--border); border-radius:var(--r-sm); font-size:12.5px; color:var(--ink2); }
+.ta-secondary:hover { background:var(--panel-h); }
+
+/* Project detail view */
+.project-detail { max-width:760px; margin:0 auto; padding:32px 24px; }
+.pd-title { font-size:22px; font-weight:700; letter-spacing:-.02em; margin-bottom:4px; display:flex; align-items:center; gap:10px; }
+.pd-path { font-size:12px; color:var(--mut); font-family:var(--font-mono); margin-bottom:24px; }
+.pd-composer { margin-bottom:28px; }
+.pd-history-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--mut2); margin-bottom:8px; }
+.pd-session { display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:var(--r); cursor:pointer; transition:background var(--dur); }
+.pd-session:hover { background:var(--panel-h); }
+.pd-session-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.pd-session-info { flex:1; min-width:0; }
+.pd-session-title { font-size:13.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pd-session-meta { font-size:11.5px; color:var(--mut); }
+
+/* Projects section */
+.projects-header { display:flex; align-items:center; padding:8px 14px; cursor:pointer; position:relative; }
+.projects-header:hover { background:var(--panel-h); }
+.projects-title { font-size:13px; font-weight:600; display:flex; align-items:center; gap:4px; }
+.projects-chevron { font-size:10px; color:var(--mut2); transition:transform var(--dur); }
+.projects-header.collapsed .projects-chevron { transform:rotate(-90deg); }
+.projects-actions { margin-left:auto; display:flex; align-items:center; gap:2px; }
+.pa-btn { width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:var(--r-sm); color:var(--mut); opacity:0; transition:opacity var(--dur); font-size:14px; }
+.projects-header:hover .pa-btn { opacity:1; }
+.pa-btn:hover { background:var(--border); color:var(--ink); }
+.pa-btn.plus { font-size:16px; font-weight:400; }
+
+.project-list { padding:2px 6px; }
+.project-item { display:flex; align-items:center; gap:8px; padding:5px 10px; border-radius:var(--r-sm); cursor:pointer; font-size:13px; color:var(--ink2); }
+.project-item:hover { background:var(--panel-h); }
+.project-item.current { background:var(--accent-d); color:var(--accent); font-weight:500; }
+.project-item svg { flex-shrink:0; opacity:.6; }
+.project-item.current svg { opacity:1; }
+.project-item .pencil { margin-left:auto; opacity:0; transition:opacity var(--dur); flex-shrink:0; padding:2px; border-radius:3px; color:var(--mut); }
+.project-item:hover .pencil { opacity:1; }
+.project-item .pencil:hover { color:var(--accent); background:var(--panel-h); }
+
+/* Session list — status dot on the left */
+.session-item { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:var(--r-sm); cursor:pointer; transition:background var(--dur); }
+.session-item:hover { background:var(--panel-h); }
+.session-item.current { background:var(--accent-d); }
+.s-dot { width:7px; height:7px; border-radius:50%; background:var(--border); flex-shrink:0; }
+.s-dot.running { background:var(--accent); animation:pulse 1.5s infinite; }
+.s-dot.unread { background:var(--warn); }
+.s-content { flex:1; min-width:0; }
+.session-title { font-size:12.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.session-meta { font-size:11px; color:var(--mut); }
+.badge { display:inline-block; padding:0 5px; border-radius:4px; font-size:9.5px; font-weight:600; background:var(--warn-d); color:var(--warn); }
+
+.nav-section { padding:10px 14px 3px; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--mut2); }
+.nav-item { display:flex; align-items:center; gap:9px; width:100%; padding:6px 14px; font-size:13px; color:var(--ink2); text-align:left; border-radius:0; }
+.nav-item:hover { background:var(--panel-h); }
+.nav-item.active { color:var(--accent); font-weight:500; background:var(--accent-d); }
+.nav-item svg { flex-shrink:0; opacity:.7; }
+.nav-item.active svg { opacity:1; }
+
+.sessions-list { flex:1; overflow-y:auto; padding:4px 6px; }
+.session-item { padding:6px 10px; border-radius:var(--r-sm); cursor:pointer; position:relative; transition:background var(--dur); }
+.session-item:hover { background:var(--panel-h); }
+.session-item.current { background:var(--accent-d); }
+.session-title { font-size:12.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:5px; }
+.session-meta { font-size:11px; color:var(--mut); margin-top:1px; }
+.unread-dot { width:7px; height:7px; border-radius:50%; background:var(--warn); flex-shrink:0; }
+.running-indicator { width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 1.5s infinite; flex-shrink:0; }
+@keyframes pulse { 50% { opacity:.4; } }
+.badge { display:inline-block; padding:0 5px; border-radius:4px; font-size:9.5px; font-weight:600; background:var(--warn-d); color:var(--warn); }
+
+.sb-footer { border-top:1px solid var(--border); padding:6px 8px; }
+.sb-footer .nav-item { padding:6px 10px; border-radius:var(--r-sm); }
+
+/* ===== Main ===== */
+.main { display:flex; flex-direction:column; overflow:hidden; background:var(--bg); }
+
+/* Tab bar */
+.tabbar { display:flex; align-items:center; padding:0 20px; border-bottom:1px solid var(--border2); flex-shrink:0; }
+.tab { padding:10px 16px; font-size:13px; color:var(--mut); border-bottom:2px solid transparent; margin-bottom:-1px; }
+.tab:hover { color:var(--ink2); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:500; }
+
+/* Status bar (compact pills) */
+.statusbar { display:flex; align-items:center; gap:10px; padding:6px 20px; border-bottom:1px solid var(--border2); font-size:12px; flex-shrink:0; }
+.pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:16px; background:var(--panel); border:1px solid var(--border); color:var(--ink2); font-size:11.5px; }
+.pill svg { opacity:.6; }
+.pill .val { font-weight:600; color:var(--ink); }
+.statusbar .spacer { flex:1; }
+
+/* Content area */
+.content { flex:1; overflow-y:auto; }
+
+/* ===== Chat view ===== */
+.chat-view { max-width:860px; margin:0 auto; padding:20px 24px; }
+.msg { padding:10px 14px; border-radius:var(--r); margin-bottom:4px; }
+.msg-user { background:var(--accent-d); border:1px solid var(--accent-b); }
+.msg-user .role { color:var(--accent); }
+.msg-ai .role { color:var(--ok); }
+.role { font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; }
+.msg-text { white-space:pre-wrap; font-size:14px; line-height:1.65; }
+
+.thought { padding:6px 14px; font-size:13px; color:var(--mut); font-style:italic; border-left:2px solid var(--border); margin:2px 0 2px 8px; }
+.thought summary { cursor:pointer; font-style:normal; font-size:12px; color:var(--mut2); list-style:none; user-select:none; }
+.thought summary::before { content:"▸ "; }
+.thought[open] summary::before { content:"▾ "; }
+
+.tool-call { margin:4px 0; border:1px solid var(--border2); border-radius:var(--r); overflow:hidden; }
+.tool-header { display:flex; align-items:center; gap:8px; padding:6px 12px; cursor:pointer; background:var(--panel); font-size:13px; }
+.tool-header:hover { background:var(--panel-h); }
+.tool-name { font-family:var(--font-mono); font-weight:500; font-size:12.5px; }
+.tool-status { font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:10px; }
+.tool-status.done { background:var(--ok-d); color:var(--ok); }
+.tool-status.failed { background:var(--bad-d); color:var(--bad); }
+.tool-time { font-size:11px; color:var(--mut2); margin-left:auto; }
+.tool-body { padding:8px 12px; font-family:var(--font-mono); font-size:12px; background:var(--code-bg); border-top:1px solid var(--border2); white-space:pre-wrap; word-break:break-all; max-height:260px; overflow-y:auto; }
+
+.perm-prompt { margin:8px 0; border:1px solid var(--warn); border-radius:var(--r); background:var(--warn-d); overflow:hidden; }
+.perm-header { padding:8px 14px 4px; font-size:13px; font-weight:600; color:var(--warn); }
+.perm-detail { margin:0 14px 8px; padding:8px 10px; background:var(--code-bg); border:1px solid var(--border2); border-radius:var(--r-sm); font-family:var(--font-mono); font-size:12px; white-space:pre-wrap; word-break:break-all; }
+.perm-actions { display:flex; gap:8px; justify-content:flex-end; padding:0 14px 10px; }
+.btn-deny { padding:5px 14px; border:1px solid var(--border); border-radius:var(--r-sm); font-size:12.5px; color:var(--ink2); }
+.btn-deny:hover { background:var(--panel-h); }
+.btn-allow { padding:5px 14px; background:var(--accent); color:#fff; border-radius:var(--r-sm); font-size:12.5px; font-weight:500; }
+
+/* ===== Trajectory view ===== */
+.traj-view { max-width:960px; margin:0 auto; padding:16px 24px; }
+.traj-filters { display:flex; align-items:center; gap:4px; margin-bottom:14px; }
+.filter-chip { display:inline-flex; align-items:center; gap:5px; padding:4px 12px; border-radius:var(--r-sm); font-size:12px; color:var(--mut); cursor:pointer; }
+.filter-chip:hover { background:var(--panel-h); }
+.filter-chip.active { background:var(--accent-d); color:var(--accent); font-weight:500; }
+.traj-search { margin-left:auto; padding:5px 12px; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-sm); font-size:12.5px; color:var(--ink); width:200px; }
+
+.timeline { border:1px solid var(--border2); border-radius:var(--r); overflow:hidden; margin-bottom:16px; }
+.tl-row { display:grid; grid-template-columns:70px 1fr; align-items:center; border-bottom:1px solid var(--border2); }
+.tl-row:last-child { border-bottom:none; }
+.tl-label { padding:8px 10px; font-size:11px; color:var(--mut); font-family:var(--font-mono); }
+.tl-bars { padding:8px 0; position:relative; height:22px; }
+.tl-bar { position:absolute; height:8px; border-radius:2px; top:7px; }
+.tl-bar.input { background:var(--accent); opacity:.7; }
+.tl-bar.model { background:var(--info); opacity:.7; }
+.tl-bar.tools { background:var(--tool); opacity:.7; }
+
+.turn-group { margin-bottom:2px; }
+.turn-label { font-size:11px; color:var(--mut2); padding:8px 0 4px; font-family:var(--font-mono); }
+.traj-msg { display:flex; gap:10px; padding:5px 10px; border-radius:var(--r-sm); align-items:flex-start; }
+.traj-msg:hover { background:var(--panel-h); }
+.traj-tag { flex-shrink:0; min-width:64px; text-align:center; padding:1px 8px; border-radius:4px; font-size:10.5px; font-weight:600; height:fit-content; margin-top:2px; }
+.traj-tag.system { background:var(--border2); color:var(--mut); }
+.traj-tag.user { background:var(--accent-d); color:var(--accent); }
+.traj-tag.assistant { background:var(--info-d); color:var(--info); }
+.traj-tag.tool { background:var(--tool-d); color:var(--tool); }
+.traj-tag.context { background:var(--ok-d); color:var(--ok); }
+.traj-content { flex:1; font-size:13px; line-height:1.5; color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.traj-content .mono { font-size:12px; }
+
+/* ===== Composer ===== */
+.composer-wrap { flex-shrink:0; padding:0 20px 14px; }
+.composer { border:1px solid var(--border); border-radius:var(--r-lg); background:var(--panel); transition:border-color var(--dur),box-shadow var(--dur); }
+.composer:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-d); }
+.composer textarea { width:100%; padding:10px 14px 2px; border:none; background:transparent; color:var(--ink); font:inherit; font-size:14px; resize:none; outline:none; max-height:160px; }
+.composer textarea::placeholder { color:var(--mut2); }
+.composer-toolbar { display:flex; align-items:center; gap:6px; padding:6px 10px 8px; }
+.ctb-btn { display:inline-flex; align-items:center; gap:5px; padding:4px 9px; border-radius:var(--r-sm); font-size:12px; color:var(--mut); }
+.ctb-btn:hover { background:var(--panel-h); color:var(--ink2); }
+.ctb-spacer { flex:1; }
+.ctb-select { padding:4px 8px; background:var(--bg2); color:var(--ink); border:1px solid var(--border); border-radius:var(--r-sm); font-size:12px; font-family:var(--font-mono); }
+.ctb-mode { padding:4px 10px; border-radius:var(--r-sm); font-size:12px; font-weight:500; border:1px solid var(--border); color:var(--mut); }
+.ctb-mode.plan { background:var(--info-d); color:var(--info); border-color:var(--info); }
+.ctb-send { padding:5px 16px; background:var(--accent); color:#fff; border-radius:var(--r-sm); font-size:12.5px; font-weight:500; }
+.ctb-send:hover:not(:disabled) { opacity:.9; }
+
+/* ===== Panel views (Soul / Tasks / Plugins / Settings) ===== */
+.panel-view { flex:1; overflow-y:auto; }
+.panel-inner { max-width:860px; margin:0 auto; padding:28px 32px; }
+.panel-title { font-size:20px; font-weight:700; letter-spacing:-.02em; margin-bottom:4px; }
+.panel-sub { font-size:13px; color:var(--mut); margin-bottom:24px; }
+
+.card { background:var(--panel); border:1px solid var(--border2); border-radius:var(--r-lg); padding:18px 22px; margin-bottom:14px; }
+.card h3 { font-size:14px; font-weight:600; margin-bottom:10px; }
+.soul-label { font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--mut2); margin-bottom:5px; }
+.mem-item { display:flex; gap:10px; align-items:baseline; padding:7px 0; border-bottom:1px solid var(--border2); }
+.mem-item:last-child { border-bottom:none; }
+.mem-kind { font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:4px; background:var(--info-d); color:var(--info); flex-shrink:0; }
+.mem-text { flex:1; font-size:13px; }
+.btn-vote { padding:2px 8px; font-size:11.5px; border-radius:var(--r-sm); color:var(--mut); }
+.btn-vote:hover { background:var(--panel-h); color:var(--ink); }
+
+.task-node { display:flex; gap:12px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--border2); }
+.task-dot { width:9px; height:9px; border-radius:50%; margin-top:5px; flex-shrink:0; }
+.task-dot.done { background:var(--ok); }
+.task-dot.running { background:var(--accent); animation:pulse 1.5s infinite; }
+.task-dot.waiting { background:var(--border); }
+.task-name { font-weight:500; font-size:13.5px; }
+.task-desc { font-size:12px; color:var(--mut); margin-top:1px; }
+
+.plugin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+.plugin-card { background:var(--panel); border:1px solid var(--border2); border-radius:var(--r-lg); padding:14px 16px; }
+.plugin-card:hover { border-color:var(--border); }
+.plugin-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.plugin-name { font-weight:600; font-size:13.5px; }
+.plugin-desc { font-size:12px; color:var(--mut); margin:3px 0 8px; }
+.plugin-tag { font-size:10.5px; color:var(--mut2); font-family:var(--font-mono); }
+.p-status { font-size:10.5px; font-weight:600; padding:1px 7px; border-radius:10px; }
+.p-status.on { background:var(--ok-d); color:var(--ok); }
+.p-status.off { background:var(--border2); color:var(--mut); }
+
+/* Settings */
+.settings-layout { display:grid; grid-template-columns:160px 1fr; gap:28px; }
+.settings-nav { display:flex; flex-direction:column; gap:2px; }
+.settings-tab { text-align:left; padding:6px 10px; border-radius:var(--r-sm); font-size:13px; color:var(--ink2); }
+.settings-tab:hover { background:var(--panel-h); }
+.settings-tab.active { background:var(--accent-d); color:var(--accent); font-weight:500; }
+.fg { margin-bottom:18px; }
+.fl { display:block; font-size:13px; font-weight:500; margin-bottom:3px; }
+.fh { font-size:11.5px; color:var(--mut); margin-bottom:5px; }
+.fi, .fs, .fta { width:100%; padding:6px 10px; background:var(--panel); color:var(--ink); border:1px solid var(--border); border-radius:var(--r-sm); font-size:13px; }
+.fi:focus, .fs:focus, .fta:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-d); }
+.fta { font-family:var(--font-mono); font-size:12.5px; min-height:120px; resize:vertical; }
+.fr { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; }
+.toggle { width:36px; height:20px; border-radius:10px; background:var(--border); position:relative; cursor:pointer; transition:background var(--dur); flex-shrink:0; }
+.toggle::after { content:""; position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:#fff; transition:transform var(--dur); }
+.toggle.on { background:var(--accent); }
+.toggle.on::after { transform:translateX(16px); }
+
+.stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--panel); border:1px solid var(--border2); border-radius:var(--r); padding:12px 14px; }
+.stat-val { font-size:20px; font-weight:700; letter-spacing:-.02em; }
+.stat-lab { font-size:11px; color:var(--mut); margin-top:1px; }
+
+.theme-row { display:flex; gap:8px; flex-wrap:wrap; }
+.theme-sw { width:54px; height:36px; border-radius:var(--r-sm); border:2px solid var(--border); cursor:pointer; position:relative; overflow:hidden; }
+.theme-sw.sel { border-color:var(--accent); }
+.theme-sw .bg { position:absolute; inset:0; }
+.theme-sw .ac { position:absolute; width:10px; height:10px; border-radius:50%; bottom:5px; right:5px; }
+
+/* Show-all links */
+.show-all { display:flex; align-items:center; gap:4px; padding:5px 10px; font-size:11.5px; color:var(--mut); cursor:pointer; border-radius:var(--r-sm); }
+.show-all:hover { color:var(--accent); background:var(--panel-h); }
+.show-all .arrow { font-size:10px; transition:transform var(--dur); }
+.show-all.open .arrow { transform:rotate(90deg); }
+
+/* Session filter */
+.session-filter { margin:0 6px 4px; padding:5px 10px; background:var(--panel); border:1px solid var(--border); border-radius:var(--r-sm); font-size:12px; color:var(--ink); width:calc(100% - 12px); }
+.session-filter::placeholder { color:var(--mut2); }
+.session-filter:focus { outline:none; border-color:var(--accent); }
+.session-project { font-size:10.5px; color:var(--mut2); font-family:var(--font-mono); }
+
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- ===== Sidebar ===== -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="brand-mark"><div class="brand-logo">d</div>domi</div>
+    </div>
+
+    <!-- Top actions (Doubao style) -->
+    <div class="top-actions">
+      <button class="ta-primary" onclick="switchView('project')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        新对话
+      </button>
+      <div class="ta-row">
+        <button class="ta-secondary" onclick="switchView('tasks')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          新任务
+        </button>
+        <button class="ta-secondary" onclick="toast('定时任务')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          定时任务
+        </button>
+      </div>
+    </div>
+
+    <!-- 项目 section -->
+    <div class="projects-header" id="projectsHeader" onclick="toggleProjects()">
+      <span class="projects-title">项目 <span class="projects-chevron">▾</span></span>
+      <div class="projects-actions">
+        <button class="pa-btn" title="新建工作任务" onclick="event.stopPropagation();toast('新建工作任务')">⊕</button>
+        <button class="pa-btn plus" title="新建会话" onclick="event.stopPropagation();switchView('project')">+</button>
+      </div>
+    </div>
+    <div class="project-list" id="projectList">
+      <div class="project-item" onclick="openProject('iCleaner')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        iCleaner
+        <span class="pencil" onclick="event.stopPropagation();openProject('iCleaner');toast('在 iCleaner 下新建对话')" title="新建对话">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </span>
+      </div>
+      <div class="project-item" onclick="openProject('awesome-ai-agent-stack')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        awesome-ai-agent-stack
+        <span class="pencil" onclick="event.stopPropagation();openProject('awesome-ai-agent-stack');toast('在 awesome-ai-agent-stack 下新建对话')" title="新建对话">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </span>
+      </div>
+      <div class="project-item current" onclick="openProject('domi')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        domi
+        <span class="pencil" onclick="event.stopPropagation();openProject('domi');toast('在 domi 下新建对话')" title="新建对话">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </span>
+      </div>
+      <div class="project-item" onclick="openProject('deepseek-harness')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        deepseek-harness
+        <span class="pencil" onclick="event.stopPropagation();openProject('deepseek-harness');toast('在 deepseek-harness 下新建对话')" title="新建对话">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </span>
+      </div>
+      <div class="project-item" onclick="openProject('idea')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        idea
+        <span class="pencil" onclick="event.stopPropagation();openProject('idea');toast('在 idea 下新建对话')" title="新建对话">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </span>
+      </div>
+    </div>
+
+    <!-- 会话 section -->
+    <div class="projects-header" id="sessionsHeader" onclick="toggleSessions()">
+      <span class="projects-title">会话 <span class="projects-chevron">▾</span></span>
+      <div class="projects-actions">
+        <button class="pa-btn" title="全部会话" onclick="event.stopPropagation();switchView('all-sessions')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <ul class="sessions-list" id="sessionsList">
+      <li class="session-item current" onclick="switchView('session');toast('打开会话')">
+        <span class="s-dot running"></span>
+        <span class="s-content">
+          <span class="session-title">修复 M3 DoD 跨端同步 bug</span>
+          <span class="session-meta"><span class="session-project">domi</span> · claude-sonnet-4 · 142 事件</span>
+        </span>
+      </li>
+      <li class="session-item" onclick="switchView('session');toast('打开会话')">
+        <span class="s-dot unread"></span>
+        <span class="s-content">
+          <span class="session-title">设计 Soul 导出格式 <span class="badge">工作任务</span></span>
+          <span class="session-meta"><span class="session-project">domi</span> · gpt-4o · 89 事件</span>
+        </span>
+      </li>
+      <li class="session-item" onclick="switchView('session');toast('打开会话')">
+        <span class="s-dot"></span>
+        <span class="s-content">
+          <span class="session-title">插件沙箱逃逸测试</span>
+          <span class="session-meta"><span class="session-project">domi</span> · claude-opus-4 · 256 事件</span>
+        </span>
+      </li>
+      <li class="session-item" onclick="switchView('session');toast('打开会话')">
+        <span class="s-dot unread"></span>
+        <span class="s-content">
+          <span class="session-title">L2 评估题集整理</span>
+          <span class="session-meta"><span class="session-project">domi</span> · claude-sonnet-4 · 67 事件</span>
+        </span>
+      </li>
+      <li class="session-item extra" onclick="switchView('session');toast('打开会话')">
+        <span class="s-dot"></span>
+        <span class="s-content">
+          <span class="session-title">MCP client v2 迁移</span>
+          <span class="session-meta"><span class="session-project">domi</span> · deepseek-v3 · 312 事件 · 分支</span>
+        </span>
+      </li>
+    </ul>
+
+    <!-- Settings at bottom -->
+    <div class="sb-footer">
+      <button class="nav-item" data-view="settings" onclick="switchView('settings')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>设置
+      </button>
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <main class="main" id="main-session">
+    <!-- Tab bar -->
+    <div class="tabbar">
+      <button class="tab active" data-tab="chat" onclick="switchTab('chat')">Chat</button>
+      <button class="tab" data-tab="trajectory" onclick="switchTab('trajectory')">Trajectory</button>
+    </div>
+
+    <!-- Compact status bar -->
+    <div class="statusbar">
+      <span class="pill"><span class="conn-dot conn-open" style="width:7px;height:7px;"></span>已连接</span>
+      <span class="pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="val">6 turns</span> · 9 steps · <span class="val">161 tok/s</span>
+      </span>
+      <span class="pill">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <span class="val">68.1K tok</span> · Cache hit <span class="val">83%</span>
+      </span>
+      <div class="spacer"></div>
+      <button class="ctb-btn" onclick="toggleTheme()" title="切换主题">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+    </div>
+
+    <!-- Chat view -->
+    <div class="content" id="content-chat">
+      <div class="chat-view">
+        <div class="msg msg-user">
+          <div class="role">你</div>
+          <div class="msg-text">帮我看看为什么 TUI 发起长任务后退出，浏览器端连上来看不到任务跑完。</div>
+        </div>
+        <details class="thought" open>
+          <summary>思考 · 2.1s</summary>
+          <div class="thought-body" style="padding-top:6px;">用户报告 TUI 退出后浏览器端看不到任务完成。可能是 watcher 机制问题——TUI 退出时 unwatch 了 session，但 task 完成事件应该广播给所有 watcher。</div>
+        </details>
+        <div class="tool-call">
+          <div class="tool-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
+            <span class="tool-name">fs.read</span><span class="tool-status done">done</span><span class="tool-time">12ms</span>
+          </div>
+          <div class="tool-body">path: "apps/tui/test/dod.spec.ts" → 764 tests passed</div>
+        </div>
+        <div class="perm-prompt">
+          <div class="perm-header">权限请求：写入文件</div>
+          <div class="perm-detail">fs.write · apps/web/src/App.tsx
+修改 unwatch 逻辑，task 完成事件广播给所有 watcher</div>
+          <div class="perm-actions">
+            <button class="btn-deny" onclick="this.closest('.perm-prompt').remove()">拒绝</button>
+            <button class="btn-allow" onclick="this.closest('.perm-prompt').remove()">允许</button>
+          </div>
+        </div>
+        <div class="msg msg-ai">
+          <div class="role">domi</div>
+          <div class="msg-text">找到原因了。问题在 client.unwatch()——TUI 退出时移除了 watcher，但 task 完成事件只推给当前 active watcher。修复方案：task 完成事件应广播给所有对该 session 有 watch 记录的 client。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Trajectory view -->
+    <div class="content hidden" id="content-trajectory">
+      <div class="traj-view">
+        <div class="traj-filters">
+          <span class="filter-chip active">◷ Duration</span>
+          <span class="filter-chip">⊞ Turns</span>
+          <span class="filter-chip">⊞ Calls</span>
+          <input class="traj-search" placeholder="Search…">
+        </div>
+        <div class="timeline">
+          <div class="tl-row">
+            <div class="tl-label">Input</div>
+            <div class="tl-bars"><div class="tl-bar input" style="left:2%;width:8%"></div><div class="tl-bar input" style="left:40%;width:5%"></div><div class="tl-bar input" style="left:72%;width:6%"></div></div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-label">Model</div>
+            <div class="tl-bars"><div class="tl-bar model" style="left:10%;width:12%"></div><div class="tl-bar model" style="left:45%;width:15%"></div><div class="tl-bar model" style="left:78%;width:18%"></div></div>
+          </div>
+          <div class="tl-row">
+            <div class="tl-label">Tools</div>
+            <div class="tl-bars"><div class="tl-bar tools" style="left:22%;width:50%"></div></div>
+          </div>
+        </div>
+
+        <div class="turn-label">Turn 1</div>
+        <div class="traj-msg"><span class="traj-tag system">SYSTEM</span><span class="traj-content">Initial System Prompt…</span></div>
+        <div class="traj-msg"><span class="traj-tag context">CONTEXT</span><span class="traj-content">Current runtime context. Workspace-write policy…</span></div>
+        <div class="traj-msg"><span class="traj-tag user">USER</span><span class="traj-content">帮我看看为什么 TUI 发起长任务后退出…</span></div>
+        <div class="traj-msg"><span class="traj-tag assistant">ASSISTANT</span><span class="traj-content">I need to check the dod.spec.ts test file…</span></div>
+        <div class="traj-msg"><span class="traj-tag tool">TOOL</span><span class="traj-content mono">fs.read {"file_path": "apps/tui/test/dod.spec.ts"} → 764 tests passed</span></div>
+        <div class="traj-msg"><span class="traj-tag assistant">ASSISTANT</span><span class="traj-content">找到原因了。问题在 client.unwatch()…</span></div>
+
+        <div class="turn-label" style="margin-top:12px;">Turn 2</div>
+        <div class="traj-msg"><span class="traj-tag user">USER</span><span class="traj-content">那这个改动会影响 refs 清理吗？</span></div>
+        <div class="traj-msg"><span class="traj-tag assistant">ASSISTANT</span><span class="traj-content">不会，refs 是 session 级存储，跟 watcher 生命周期无关…</span></div>
+        <div class="traj-msg"><span class="traj-tag tool">TOOL</span><span class="traj-content mono">shell.exec {"cmd": "pnpm test"} → 764 passed in 12.3s</span></div>
+        <div class="traj-msg"><span class="traj-tag assistant">ASSISTANT</span><span class="traj-content">全部测试通过，改动可以提交。</span></div>
+      </div>
+    </div>
+
+    <!-- Composer -->
+    <div class="composer-wrap" id="composer-session">
+      <div class="composer">
+        <textarea rows="2" placeholder="说点什么…  (Enter 发送, Shift+Enter 换行)"></textarea>
+        <div class="composer-toolbar">
+          <button class="ctb-btn" onclick="toast('添加文件/目录')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            文件
+          </button>
+          <button class="ctb-btn" onclick="toast('选择技能')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            技能
+          </button>
+          <div class="ctb-spacer"></div>
+          <select class="ctb-select" onchange="toast('切换模型: '+this.value)">
+            <option>claude-sonnet-4</option>
+            <option>claude-opus-4</option>
+            <option>gpt-4o</option>
+            <option>deepseek-v3</option>
+          </select>
+          <button class="ctb-mode act" onclick="toggleMode(this)">执行模式</button>
+          <button class="ctb-send" onclick="toast('发送')">发送</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Project detail view ===== -->
+  <div class="panel-view hidden" id="main-project">
+    <div class="project-detail">
+      <div class="pd-title">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span id="pd-name">domi</span>
+      </div>
+      <div class="pd-path mono">~/Develop/learn/ai/domi</div>
+
+      <!-- New conversation composer -->
+      <div class="pd-composer">
+        <div class="composer">
+          <textarea rows="2" placeholder="在这个项目里开始新对话…"></textarea>
+          <div class="composer-toolbar">
+            <button class="ctb-btn" onclick="toast('添加文件/目录')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              文件
+            </button>
+            <button class="ctb-btn" onclick="toast('选择技能')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              技能
+            </button>
+            <div class="ctb-spacer"></div>
+            <select class="ctb-select"><option>claude-sonnet-4</option><option>gpt-4o</option></select>
+            <button class="ctb-send" onclick="toast('发送')">开始对话</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Session history -->
+      <div class="pd-history-label">历史会话</div>
+      <div class="pd-session" onclick="switchView('session')">
+        <span class="pd-session-dot" style="background:var(--accent);animation:pulse 1.5s infinite;"></span>
+        <div class="pd-session-info">
+          <div class="pd-session-title">修复 M3 DoD 跨端同步 bug</div>
+          <div class="pd-session-meta">claude-sonnet-4 · 142 事件 · 运行中</div>
+        </div>
+      </div>
+      <div class="pd-session" onclick="switchView('session')">
+        <span class="pd-session-dot" style="background:var(--warn);"></span>
+        <div class="pd-session-info">
+          <div class="pd-session-title">设计 Soul 导出格式 <span class="badge">工作任务</span></div>
+          <div class="pd-session-meta">gpt-4o · 89 事件 · 未读</div>
+        </div>
+      </div>
+      <div class="pd-session" onclick="switchView('session')">
+        <span class="pd-session-dot" style="background:var(--border);"></span>
+        <div class="pd-session-info">
+          <div class="pd-session-title">插件沙箱逃逸测试</div>
+          <div class="pd-session-meta">claude-opus-4 · 256 事件 · 昨天</div>
+        </div>
+      </div>
+      <div class="pd-session" onclick="switchView('session')">
+        <span class="pd-session-dot" style="background:var(--warn);"></span>
+        <div class="pd-session-info">
+          <div class="pd-session-title">L2 评估题集整理</div>
+          <div class="pd-session-meta">claude-sonnet-4 · 67 事件 · 未读</div>
+        </div>
+      </div>
+      <div class="pd-session" onclick="switchView('session')">
+        <span class="pd-session-dot" style="background:var(--border);"></span>
+        <div class="pd-session-info">
+          <div class="pd-session-title">MCP client v2 迁移</div>
+          <div class="pd-session-meta">deepseek-v3 · 312 事件 · 3 天前</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== All projects page ===== -->
+  <div class="panel-view hidden" id="view-all-projects">
+    <div class="panel-inner">
+      <h1 class="panel-title">全部项目</h1>
+      <p class="panel-sub">所有 workspace / 仓库。点击进入项目详情。</p>
+      <input class="fi" style="margin-bottom:16px" placeholder="筛选项目…" oninput="filterList(this.value,'ap-item')">
+      <div class="card" style="padding:8px 0;">
+        <div class="pd-session ap-item" onclick="openProject('iCleaner')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">iCleaner</div><div class="pd-session-meta mono">~/Develop/cleaner · 3 个会话</div></div>
+        </div>
+        <div class="pd-session ap-item" onclick="openProject('awesome-ai-agent-stack')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">awesome-ai-agent-stack</div><div class="pd-session-meta mono">~/Develop/research/agent-stack · 12 个会话</div></div>
+        </div>
+        <div class="pd-session ap-item" onclick="openProject('domi')">
+          <span class="pd-session-dot" style="background:var(--accent);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">domi <span class="badge">当前</span></div><div class="pd-session-meta mono">~/Develop/learn/ai/domi · 47 个会话</div></div>
+        </div>
+        <div class="pd-session ap-item" onclick="openProject('deepseek-harness')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">deepseek-harness</div><div class="pd-session-meta mono">~/Develop/harness · 8 个会话</div></div>
+        </div>
+        <div class="pd-session ap-item" onclick="openProject('idea')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">idea</div><div class="pd-session-meta mono">~/Develop/idea · 2 个会话</div></div>
+        </div>
+        <div class="pd-session ap-item" onclick="openProject('ai-agent-cookbook')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">ai-agent-cookbook</div><div class="pd-session-meta mono">~/Develop/cookbook · 5 个会话</div></div>
+        </div>
+        <div class="pd-session ap-item" onclick="openProject('pomote')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">pomote</div><div class="pd-session-meta mono">~/Develop/pomote · 1 个会话</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== All sessions page ===== -->
+  <div class="panel-view hidden" id="view-all-sessions">
+    <div class="panel-inner">
+      <h1 class="panel-title">全部会话</h1>
+      <p class="panel-sub">跨项目的所有会话和任务。按项目分组。</p>
+      <input class="fi" style="margin-bottom:16px" placeholder="筛选会话…" oninput="filterList(this.value,'as-item')">
+      <div class="card" style="padding:8px 0;">
+        <div class="as-item"><div class="nav-section" style="padding:8px 14px 4px;">domi</div></div>
+        <div class="pd-session as-item" onclick="switchView('session')">
+          <span class="pd-session-dot" style="background:var(--accent);animation:pulse 1.5s infinite;"></span>
+          <div class="pd-session-info"><div class="pd-session-title">修复 M3 DoD 跨端同步 bug</div><div class="pd-session-meta">claude-sonnet-4 · 142 事件 · 运行中</div></div>
+        </div>
+        <div class="pd-session as-item" onclick="switchView('session')">
+          <span class="pd-session-dot" style="background:var(--warn);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">设计 Soul 导出格式 <span class="badge">工作任务</span></div><div class="pd-session-meta">gpt-4o · 89 事件 · 未读</div></div>
+        </div>
+        <div class="pd-session as-item" onclick="switchView('session')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">插件沙箱逃逸测试</div><div class="pd-session-meta">claude-opus-4 · 256 事件</div></div>
+        </div>
+        <div class="pd-session as-item" onclick="switchView('session')">
+          <span class="pd-session-dot" style="background:var(--warn);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">L2 评估题集整理</div><div class="pd-session-meta">claude-sonnet-4 · 67 事件 · 未读</div></div>
+        </div>
+        <div class="pd-session as-item" onclick="switchView('session')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">MCP client v2 迁移</div><div class="pd-session-meta">deepseek-v3 · 312 事件 · 分支</div></div>
+        </div>
+        <div class="as-item"><div class="nav-section" style="padding:12px 14px 4px;">iCleaner</div></div>
+        <div class="pd-session as-item" onclick="switchView('session')">
+          <span class="pd-session-dot" style="background:var(--border);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">清理系统缓存规则</div><div class="pd-session-meta">claude-sonnet-4 · 23 事件</div></div>
+        </div>
+        <div class="as-item"><div class="nav-section" style="padding:12px 14px 4px;">awesome-ai-agent-stack</div></div>
+        <div class="pd-session as-item" onclick="switchView('session')">
+          <span class="pd-session-dot" style="background:var(--warn);"></span>
+          <div class="pd-session-info"><div class="pd-session-title">agent 架构对比调研</div><div class="pd-session-meta">gpt-4o · 156 事件 · 未读</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Panel views ===== -->
+  <div class="panel-view hidden" id="view-tasks">
+    <div class="panel-inner">
+      <h1 class="panel-title">计划任务</h1>
+      <p class="panel-sub">后台执行的工作任务。进程重启后自动恢复。</p>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="margin:0;">M3 parity e2e 验证</h3>
+          <span class="p-status on">运行中</span>
+        </div>
+        <div class="task-node"><div class="task-dot done"></div><div><div class="task-name">spawn TUI client</div><div class="task-desc">在 TUI 中发起长任务 · 2.1s</div></div></div>
+        <div class="task-node"><div class="task-dot done"></div><div><div class="task-name">执行测试套件</div><div class="task-desc">pnpm test --reporter=json · 12.4s</div></div></div>
+        <div class="task-node"><div class="task-dot running"></div><div><div class="task-name">验证 Web 端事件流</div><div class="task-desc">等待新 client watch session · 进行中</div></div></div>
+        <div class="task-node"><div class="task-dot waiting"></div><div><div class="task-name">断言 DoD 通过</div><div class="task-desc">等待上一步完成</div></div></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <h3 style="margin:0;">L2 评估 · 第 2 轮</h3>
+          <span class="p-status off">已完成</span>
+        </div>
+        <div class="task-desc">20 道题 · 平均 7.2/10 · 4m32s</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-view hidden" id="view-settings">
+    <div class="panel-inner">
+      <h1 class="panel-title">设置</h1>
+      <p class="panel-sub">配置 domi 的行为、外观和连接。</p>
+      <div class="settings-layout">
+        <div class="settings-nav">
+          <button class="settings-tab active" data-stab="general" onclick="switchStab('general')">通用</button>
+          <button class="settings-tab" data-stab="models" onclick="switchStab('models')">模型供应商</button>
+          <button class="settings-tab" data-stab="messaging" onclick="switchStab('messaging')">通讯工具</button>
+          <button class="settings-tab" data-stab="memory" onclick="switchStab('memory')">记忆管理</button>
+          <button class="settings-tab" data-stab="soul" onclick="switchStab('soul')">Soul 与人格</button>
+          <button class="settings-tab" data-stab="plugins" onclick="switchStab('plugins')">插件</button>
+          <button class="settings-tab" data-stab="usage" onclick="switchStab('usage')">用量统计</button>
+        </div>
+        <div class="settings-content">
+          <div class="stab" data-stab="general">
+            <div class="fg"><label class="fl">界面语言</label><div class="fh">选择 domi 界面显示语言</div><select class="fs"><option>简体中文</option><option>English</option><option>日本語</option></select></div>
+            <div class="fg"><label class="fl">主题</label><div class="fh">跟随系统或手动选择</div>
+              <select class="fs" style="margin-bottom:10px;"><option>跟随系统</option><option>深色</option><option>浅色</option></select>
+              <div class="theme-row">
+                <div class="theme-sw sel" onclick="pickTheme(this,'#58a6ff')"><div class="bg" style="background:#0d1117"></div><div class="ac" style="background:#58a6ff"></div></div>
+                <div class="theme-sw" onclick="pickTheme(this,'#3fb950')"><div class="bg" style="background:#0d1117"></div><div class="ac" style="background:#3fb950"></div></div>
+                <div class="theme-sw" onclick="pickTheme(this,'#f0883e')"><div class="bg" style="background:#0d1117"></div><div class="ac" style="background:#f0883e"></div></div>
+                <div class="theme-sw" onclick="pickTheme(this,'#a371f7')"><div class="bg" style="background:#0d1117"></div><div class="ac" style="background:#a371f7"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="stab hidden" data-stab="models">
+            <div class="fg"><label class="fl">默认模型</label><div class="fh">新建会话时使用</div><select class="fs"><option>claude-sonnet-4 (Anthropic)</option><option>gpt-4o (OpenAI)</option></select></div>
+            <div class="fg"><label class="fl">Anthropic API</label><div class="fh">不填则用 ANTHROPIC_API_KEY</div><input class="fi mono" type="password" placeholder="sk-ant-..."><input class="fi mono" type="text" placeholder="https://api.anthropic.com" style="margin-top:6px;"></div>
+            <div class="fg"><label class="fl">OpenAI-compatible 网关</label><div class="fr"><input class="fi mono" type="text" placeholder="Base URL"><input class="fi mono" type="password" placeholder="API Key"></div></div>
+          </div>
+          <div class="stab hidden" data-stab="messaging">
+            <div class="fg"><div class="toggle-row"><div><div class="fl" style="margin:0;">Telegram 桥接</div><div class="fh">只读轨迹 + 远程审批</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div></div>
+            <div class="fg"><label class="fl">Bot Token</label><input class="fi mono" type="password" placeholder="123456:ABC-..."></div>
+            <div class="fg"><div class="toggle-row"><div><div class="fl" style="margin:0;">微信桥接</div><div class="fh">实验性，仅只读通知</div></div><div class="toggle" onclick="this.classList.toggle('on')"></div></div></div>
+          </div>
+          <div class="stab hidden" data-stab="memory">
+            <div class="fg"><label class="fl">最近 N 轮逐字保留</label><div class="fh">压缩时最近 N 轮不摘要，建议 6-10</div><input class="fi" type="number" value="8"></div>
+            <div class="fg"><label class="fl">Context 压缩触发阈值</label><div class="fh">上下文占用超此百分比自动压缩，建议 70-75%</div><input class="fi" type="number" value="72"></div>
+            <div class="fg"><label class="fl">记忆抽取间隔</label><div class="fh">每多少轮自动抽取 L3 语义记忆</div><input class="fi" type="number" value="5"></div>
+            <div class="fg"><div class="toggle-row"><div><div class="fl" style="margin:0;">结构化清理</div><div class="fh">去重工具结果、清错误、截断堆栈</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div></div>
+          </div>
+          <div class="stab" data-stab="soul">
+            <div class="fg">
+              <label class="fl">人格描述（Soul Markdown）</label>
+              <div class="fh">人类可读、可 diff、可手改。修改后下次对话生效。</div>
+              <textarea class="fta"># 工作习惯
+- 先读 PRD 和 spec 再写代码
+- 测试先行
+- commit message 带 task id
+
+# 技术偏好
+- TypeScript strict / Bun / Biome
+- 不引重型依赖
+
+# 沟通风格
+- 直接，先结论后过程
+- 不确定就标注</textarea>
+            </div>
+            <div class="fg">
+              <label class="fl">最近学到的记忆</label>
+              <div class="card" style="margin:6px 0 0;">
+                <div class="mem-item"><span class="mem-kind">L3</span><span class="mem-text">用户不喜欢 AI 生成的渐变和毛玻璃效果</span><button class="btn-vote" onclick="toast('保留')">保留</button><button class="btn-vote" onclick="toast('否决')">否决</button></div>
+                <div class="mem-item"><span class="mem-kind">L3</span><span class="mem-text">项目走 PM→架构→工程师→QA，不能跨环节</span><button class="btn-vote" onclick="toast('保留')">保留</button><button class="btn-vote" onclick="toast('否决')">否决</button></div>
+                <div class="mem-item"><span class="mem-kind">L2</span><span class="mem-text">M3 DoD 在 apps/tui/test/dod.spec.ts</span><button class="btn-vote" onclick="toast('保留')">保留</button><button class="btn-vote" onclick="toast('否决')">否决</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="stab hidden" data-stab="plugins">
+            <div class="plugin-grid">
+              <div class="plugin-card"><div class="plugin-head"><span class="plugin-name">word-count</span><span class="p-status on">启用</span></div><p class="plugin-desc">统计文件字数行数。</p><span class="plugin-tag">v1.0.0 · fs.read</span></div>
+              <div class="plugin-card"><div class="plugin-head"><span class="plugin-name">browser</span><span class="p-status on">启用</span></div><p class="plugin-desc">Playwright 浏览器自动化。</p><span class="plugin-tag">MCP · npx</span></div>
+              <div class="plugin-card"><div class="plugin-head"><span class="plugin-name">computer</span><span class="p-status off">未启用</span></div><p class="plugin-desc">桌面端 GUI 控制。</p><span class="plugin-tag">MCP · npx</span></div>
+              <div class="plugin-card"><div class="plugin-head"><span class="plugin-name">git-tools</span><span class="p-status off">未启用</span></div><p class="plugin-desc">Git 操作：branch/commit/diff。</p><span class="plugin-tag">v0.2.1</span></div>
+            </div>
+          </div>
+          <div class="stab hidden" data-stab="usage">
+            <div class="stat-grid"><div class="stat-card"><div class="stat-val" style="color:var(--accent)">128.4k</div><div class="stat-lab">本月 Tokens</div></div><div class="stat-card"><div class="stat-val" style="color:var(--ok)">$3.42</div><div class="stat-lab">本月花费</div></div><div class="stat-card"><div class="stat-val" style="color:var(--info)">47</div><div class="stat-lab">会话数</div></div></div>
+            <div class="stat-grid"><div class="stat-card"><div class="stat-val">62%</div><div class="stat-lab">Cache 命中率</div></div><div class="stat-card"><div class="stat-val">12</div><div class="stat-lab">工具调用</div></div><div class="stat-card"><div class="stat-val">3</div><div class="stat-lab">权限请求</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--panel);border:1px solid var(--border);padding:9px 18px;border-radius:8px;font-size:12.5px;box-shadow:var(--shadow);transition:transform 250ms cubic-bezier(.4,0,.2,1);z-index:999;pointer-events:none;"></div>
+
+<script>
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(function(){t.style.transform='translateX(-50%) translateY(80px)'},1800)}
+function switchView(v){
+  document.querySelectorAll('.nav-item').forEach(function(b){b.classList.toggle('active',b.dataset.view===v)});
+  document.getElementById('main-session').classList.toggle('hidden',v!=='session');
+  document.getElementById('main-project').classList.toggle('hidden',v!=='project');
+  ['tasks','settings','all-projects','all-sessions'].forEach(function(p){document.getElementById('view-'+p).classList.toggle('hidden',v!==p)});
+}
+function openProject(name){
+  document.getElementById('pd-name').textContent=name;
+  document.querySelectorAll('.project-item').forEach(function(el){el.classList.toggle('current',el.textContent.trim()===name)});
+  switchView('project');
+}
+function filterList(q,cls){
+  q=q.toLowerCase();
+  document.querySelectorAll('.'+cls).forEach(function(el){
+    el.style.display=el.textContent.toLowerCase().indexOf(q)>=0?'':'none';
+  });
+}
+function toggleProjects(){
+  var h=document.getElementById('projectsHeader');
+  var l=document.getElementById('projectList');
+  h.classList.toggle('collapsed');
+  l.style.display=l.style.display==='none'?'':'none';
+}
+function toggleSessions(){
+  var h=document.getElementById('sessionsHeader');
+  var l=document.getElementById('sessionsList');
+  h.classList.toggle('collapsed');
+  l.style.display=l.style.display==='none'?'':'none';
+}
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===t)});
+  document.getElementById('content-chat').classList.toggle('hidden',t!=='chat');
+  document.getElementById('content-trajectory').classList.toggle('hidden',t!=='trajectory');
+}
+function toggleMode(btn){
+  if(btn.classList.contains('act')){btn.classList.remove('act');btn.classList.add('plan');btn.textContent='计划模式'}
+  else{btn.classList.remove('plan');btn.classList.add('act');btn.textContent='执行模式'}
+}
+function toggleTheme(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark')}
+function switchStab(s){document.querySelectorAll('.settings-tab').forEach(function(b){b.classList.toggle('active',b.dataset.stab===s)});document.querySelectorAll('.stab').forEach(function(x){x.classList.toggle('hidden',x.dataset.stab!==s)})}
+function pickTheme(el,c){document.querySelectorAll('.theme-sw').forEach(function(s){s.classList.remove('sel')});el.classList.add('sel');document.documentElement.style.setProperty('--accent',c)}
+</script>
+</body>
+</html>

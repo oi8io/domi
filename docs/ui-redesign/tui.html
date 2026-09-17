@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>domi TUI — 视觉原型</title>
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --border2: #21262d;
+    --ink: #e6edf3;
+    --ink2: #c9d1d9;
+    --mut: #8b949e;
+    --mut2: #6e7681;
+    --accent: #58a6ff;
+    --ok: #3fb950;
+    --bad: #f85149;
+    --warn: #d29922;
+    --info: #a371f7;
+    --tool: #f0883e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #010409;
+    font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  /* ===== Terminal window ===== */
+  .term {
+    width: 100%;
+    max-width: 1100px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    position: relative;
+  }
+  /* Title bar (macOS style) */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+    font-size: 12px;
+    color: var(--mut);
+  }
+  .traffic { display: flex; gap: 6px; }
+  .traffic span { width: 12px; height: 12px; border-radius: 50%; }
+  .traffic .r { background: #ff5f57; }
+  .traffic .y { background: #febc2e; }
+  .traffic .g { background: #28c840; }
+  .titlebar-title { margin-left: 8px; }
+  .titlebar-path { color: var(--mut2); }
+
+  /* Top context bar */
+  .ctxbar {
+    display: flex;
+    align-items: center;
+    padding: 6px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    gap: 8px;
+  }
+  .ctxbar .proj { color: var(--accent); font-weight: 500; }
+  .ctxbar .sep { color: var(--mut2); }
+  .ctxbar .sess { color: var(--ink2); }
+  .ctxbar .right { margin-left: auto; color: var(--mut2); font-size: 11px; }
+
+  /* ===== Transcript area ===== */
+  .transcript {
+    flex: 1;
+    padding: 12px 16px;
+    overflow-y: auto;
+    min-height: 400px;
+  }
+  .line { display: flex; gap: 0; white-space: pre-wrap; word-break: break-word; }
+  .prefix { flex-shrink: 0; width: 1.2em; text-align: center; margin-right: 0.4em; }
+  .l-user .prefix { color: var(--ok); }
+  .l-user .body { color: var(--ok); }
+  .l-reason .prefix { color: var(--info); }
+  .l-reason .body { color: var(--mut); }
+  .l-tool .prefix { color: var(--tool); }
+  .l-tool .body { color: var(--tool); }
+  .l-tool .summary { color: var(--mut2); }
+  .l-result .prefix { color: var(--mut); }
+  .l-result .body { color: var(--mut); }
+  .l-result .summary { color: var(--mut2); }
+  .l-result.ok .body { color: var(--ink2); }
+  .l-result.err .body { color: var(--bad); }
+  .l-assistant .prefix { color: var(--accent); }
+  .l-assistant .body { color: var(--ink); }
+  .l-task .prefix { color: var(--info); }
+  .l-task .body { color: var(--info); }
+  .l-context .prefix { color: var(--accent); }
+  .l-context .body { color: var(--accent); }
+  .line .meta { color: var(--mut2); font-size: 11px; margin-left: 0.5em; }
+
+  /* Permission inline box */
+  .perm-box {
+    border: 1px solid var(--warn);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 6px 0 6px 1.6em;
+    background: rgba(210,153,34,.06);
+  }
+  .perm-title { color: var(--warn); font-weight: 600; margin-bottom: 4px; }
+  .perm-detail { color: var(--mut); font-size: 12px; }
+  .perm-detail .path { color: var(--tool); }
+  .perm-actions { margin-top: 6px; display: flex; gap: 12px; }
+  .perm-key {
+    display: inline-block;
+    padding: 1px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 11px;
+    color: var(--ink2);
+  }
+  .perm-key.primary { background: var(--warn); color: #000; border-color: var(--warn); font-weight: 600; }
+
+  /* Input line */
+  .input-line {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    gap: 8px;
+  }
+  .input-prompt { color: var(--accent); font-weight: 600; }
+  .input-text { color: var(--mut); flex: 1; }
+  .input-hints { color: var(--mut2); font-size: 11px; }
+
+  /* Status bar */
+  .statusbar {
+    display: flex;
+    align-items: center;
+    padding: 4px 16px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    font-size: 11.5px;
+    color: var(--mut);
+    gap: 14px;
+  }
+  .sb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; margin-right: 4px; }
+  .sb-seg { display: flex; align-items: center; gap: 4px; }
+  .sb-val { color: var(--ink2); }
+  .sb-warn { color: var(--warn); }
+  .sb-mode { color: var(--info); }
+  .sb-right { margin-left: auto; display: flex; gap: 14px; }
+
+  /* Key hints line */
+  .keyhints {
+    padding: 4px 16px;
+    background: var(--bg);
+    font-size: 11px;
+    color: var(--mut2);
+    border-top: 1px solid var(--border2);
+  }
+  .keyhints kbd {
+    display: inline-block;
+    padding: 0 5px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 10px;
+    color: var(--mut);
+    margin: 0 2px;
+  }
+
+  /* ===== Modal overlay ===== */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(1,4,9,.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  .overlay.hidden { display: none; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    width: 480px;
+    max-width: 90%;
+    max-height: 80%;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 40px rgba(0,0,0,.6);
+  }
+  .modal-header {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .modal-search {
+    margin: 8px 14px;
+    padding: 4px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--ink2);
+    font-family: inherit;
+  }
+  .modal-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .modal-item {
+    padding: 5px 14px;
+    font-size: 12.5px;
+    color: var(--ink2);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .modal-item.sel { background: rgba(88,166,255,.12); color: var(--accent); }
+  .modal-item .mi-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .modal-item .mi-meta { color: var(--mut2); font-size: 11px; margin-left: auto; }
+  .modal-group {
+    padding: 8px 14px 2px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--mut2);
+  }
+  .modal-footer {
+    padding: 6px 14px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--mut2);
+    display: flex;
+    gap: 12px;
+  }
+
+  /* Demo controls */
+  .demo-controls {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 100;
+  }
+  .demo-controls button {
+    padding: 6px 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--ink2);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .demo-controls button:hover { background: rgba(88,166,255,.12); color: var(--accent); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="term">
+  <!-- Title bar -->
+  <div class="titlebar">
+    <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    <span class="titlebar-title">domi</span>
+    <span class="titlebar-path">~/Develop/learn/ai/domi</span>
+  </div>
+
+  <!-- Context bar -->
+  <div class="ctxbar">
+    <span class="proj">📁 domi</span>
+    <span class="sep">›</span>
+    <span class="sess">修复 M3 DoD 跨端同步 bug</span>
+    <span class="right">6 turns</span>
+  </div>
+
+  <!-- Transcript -->
+  <div class="transcript">
+    <div class="line l-user"><span class="prefix">›</span><span class="body">帮我看看为什么 TUI 发起长任务后退出，浏览器端连上来看不到任务跑完。</span></div>
+    <div class="line l-reason"><span class="prefix">·</span><span class="body">用户报告 TUI 退出后浏览器端看不到任务完成。可能是 watcher 机制问题——TUI 退出时 unwatch 了 session，但 task 完成事件应该广播给所有 watcher。</span></div>
+    <div class="line l-tool"><span class="prefix">⚙</span><span class="body">fs.read <span class="summary">apps/tui/test/dod.spec.ts</span></span><span class="meta">done · 12ms</span></div>
+    <div class="line l-result ok"><span class="prefix">←</span><span class="body">764 tests passed</span></div>
+
+    <!-- Permission inline -->
+    <div class="perm-box">
+      <div class="perm-title">🔑 权限请求：写入文件</div>
+      <div class="perm-detail">fs.write · <span class="path">apps/web/src/App.tsx</span></div>
+      <div class="perm-detail">修改 unwatch 逻辑。task 完成事件广播给所有 watcher。</div>
+      <div class="perm-actions">
+        <span class="perm-key primary">y 允许</span>
+        <span class="perm-key">n 拒绝</span>
+        <span class="perm-key">a 始终允许此类</span>
+      </div>
+    </div>
+
+    <div class="line l-assistant"><span class="prefix">✓</span><span class="body">domi: 找到原因了。问题在 client.unwatch()——TUI 退出时移除了 watcher，但 task 完成事件只发给当前 active watcher。修复方案：task 完成事件应广播给所有对该 session 有 watch 记录的 client。</span></div>
+    <div class="line l-context"><span class="prefix">✂</span><span class="body">上下文压缩 <span class="meta">68K / 128K tokens · 83% cache hit</span></span></div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-line">
+    <span class="input-prompt">›</span>
+    <span class="input-text">说点什么…  (Enter 发送, Shift+Enter 换行)</span>
+  </div>
+
+  <!-- Status bar -->
+  <div class="statusbar">
+    <span class="sb-seg"><span class="sb-dot"></span><span class="sb-val">已连接</span></span>
+    <span class="sb-seg">claude-sonnet-4</span>
+    <span class="sb-seg"><span class="sb-val">6 turns</span> · 9 steps · <span class="sb-val">161 tok/s</span></span>
+    <span class="sb-seg"><span class="sb-val">68.1K tok</span> · Cache <span class="sb-val">83%</span></span>
+    <span class="sb-warn">ctx 68%</span>
+    <span class="sb-mode">执行模式</span>
+    <div class="sb-right">
+      <span>⏵ 运行中</span>
+    </div>
+  </div>
+
+  <!-- Key hints -->
+  <div class="keyhints">
+    <kbd>p</kbd> 项目 <kbd>s</kbd> 会话 <kbd>t</kbd> 任务 <kbd>/</kbd> 命令 <kbd>?</kbd> 帮助 <kbd>esc</kbd> 返回
+  </div>
+
+  <!-- ===== Overlays ===== -->
+  <!-- Project picker -->
+  <div class="overlay hidden" id="ov-projects" onclick="closeOverlays(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">项目选择</div>
+      <div class="modal-search">🔍 搜索项目…</div>
+      <div class="modal-list">
+        <div class="modal-item sel"><span class="mi-dot" style="background:var(--accent)"></span>domi<span class="mi-meta">~/Develop/learn/ai/domi · 47 会话</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>iCleaner<span class="mi-meta">~/Develop/cleaner · 3 会话</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>awesome-ai-agent-stack<span class="mi-meta">12 会话</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>deepseek-harness<span class="mi-meta">8 会话</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>ai-agent-cookbook<span class="mi-meta">5 会话</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>pomote<span class="mi-meta">1 会话</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>idea<span class="mi-meta">2 会话</span></div>
+      </div>
+      <div class="modal-footer"><kbd>↑↓</kbd> 选择 <kbd>enter</kbd> 确认 <kbd>esc</kbd> 关闭</div>
+    </div>
+  </div>
+
+  <!-- Session picker -->
+  <div class="overlay hidden" id="ov-sessions" onclick="closeOverlays(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">会话历史</div>
+      <div class="modal-search">🔍 搜索会话…</div>
+      <div class="modal-list">
+        <div class="modal-group">domi</div>
+        <div class="modal-item sel"><span class="mi-dot" style="background:var(--accent);animation:pulse 1.5s infinite"></span>修复 M3 DoD 跨端同步 bug<span class="mi-meta">运行中</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--warn)"></span>设计 Soul 导出格式<span class="mi-meta">工作任务 · 未读</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>插件沙箱逃逸测试<span class="mi-meta">昨天</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--warn)"></span>L2 评估题集整理<span class="mi-meta">未读</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>MCP client v2 迁移<span class="mi-meta">3 天前</span></div>
+        <div class="modal-group">iCleaner</div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>清理系统缓存规则<span class="mi-meta">上周</span></div>
+      </div>
+      <div class="modal-footer"><kbd>↑↓</kbd> 选择 <kbd>enter</kbd> 确认 <kbd>esc</kbd> 关闭</div>
+    </div>
+  </div>
+
+  <!-- Task list -->
+  <div class="overlay hidden" id="ov-tasks" onclick="closeOverlays(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">计划任务</div>
+      <div class="modal-list">
+        <div class="modal-item sel"><span class="mi-dot" style="background:var(--accent)"></span>每日 Soul 回顾<span class="mi-meta">每天 23:00</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--ok)"></span>备份记忆到 git<span class="mi-meta">每周日 02:00</span></div>
+        <div class="modal-item"><span class="mi-dot" style="background:var(--border)"></span>L2 评估集更新<span class="mi-meta">每月 1 日</span></div>
+      </div>
+      <div class="modal-footer"><kbd>n</kbd> 新建 <kbd>enter</kbd> 运行 <kbd>esc</kbd> 关闭</div>
+    </div>
+  </div>
+</div>
+
+<!-- Demo controls -->
+<div class="demo-controls">
+  <button onclick="showOverlay('ov-projects')">p — 项目</button>
+  <button onclick="showOverlay('ov-sessions')">s — 会话</button>
+  <button onclick="showOverlay('ov-tasks')">t — 任务</button>
+</div>
+
+<script>
+function showOverlay(id){
+  closeOverlays();
+  document.getElementById(id).classList.remove('hidden');
+}
+function closeOverlays(e){
+  if(e && e.target !== e.currentTarget) return;
+  document.querySelectorAll('.overlay').forEach(function(o){o.classList.add('hidden')});
+}
+document.addEventListener('keydown', function(e){
+  if(e.key==='Escape') closeOverlays();
+});
+</script>
+</body>
+</html>
