@@ -26,6 +26,7 @@ export const COMMANDS = [
   'plugin',
   'trust',
   'hook',
+  'review',
 ] as const
 export type Command = (typeof COMMANDS)[number]
 
@@ -71,15 +72,15 @@ export class UnknownCommandError extends Error {
   }
 }
 
-/** 去掉命令与子命令这两个词之后的原始参数 */
-function rawAfter(argv: readonly string[], words: ReadonlyArray<string | undefined>): string[] {
-  const out = [...argv]
-  for (const w of words) {
-    if (w === undefined) continue
-    const i = out.indexOf(w)
-    if (i >= 0) out.splice(i, 1)
-  }
-  return out
+/**
+ * 命令（与紧跟其后的子命令）之后的原始参数。
+ * 子命令只有紧跟在命令后面才算：`domi review --spec a.md` 里 a.md 是选项的值，不是子命令
+ */
+function rawAfter(argv: readonly string[], command: string | undefined, sub: string | undefined): string[] {
+  const i = command === undefined ? -1 : argv.indexOf(command)
+  if (i < 0) return [...argv]
+  const skip = sub !== undefined && argv[i + 1] === sub ? 2 : 1
+  return [...argv.slice(0, i), ...argv.slice(i + skip)]
 }
 
 export function parseCli(argv: readonly string[]): ParsedCli {
@@ -113,7 +114,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
     command: command as Command,
     sub: positionals[1],
     args: positionals.slice(2),
-    rawArgs: rawAfter(argv, [first, positionals[1]]),
+    rawArgs: rawAfter(argv, first, positionals[1]),
     flags: {
       help: Boolean(values.help),
       version: Boolean(values.version),
@@ -162,6 +163,7 @@ export const HELP = `domi —— 本地优先的 agent 运行时
   domi task run|list|status|retry|cancel      长任务编排（DAG，跑在 domid 里）
   domi bridge pair|telegram                   Telegram 桥接：生成配对码 / 启动桥接
   domi plugin list|install|remove|scaffold    插件：安装时逐条确认权限，代码跑在沙箱里
+  domi review [--base 提交] [--spec 需求文档]...  派一个只读的审阅者对照需求审改动（看不到对话历史）
   domi hook commit-msg|secrets                示例钩子（在 config.yaml 的 hooks 里引用）
 
 对话里：

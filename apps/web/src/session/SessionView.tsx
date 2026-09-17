@@ -8,12 +8,13 @@ import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 
 import { ChangesPanel } from '../ChangesPanel.tsx'
 import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
-import { IconPaperclip, IconTrash, IconZap } from '../icons.tsx'
+import { IconEye, IconPaperclip, IconTrash, IconZap } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
 import { type PendingRef, PendingRefs } from '../PendingRefs.tsx'
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
+import { ReviewFindings } from './ReviewFindings.tsx'
 import { Trajectory } from './Trajectory.tsx'
 
 export function SessionView({
@@ -44,6 +45,7 @@ export function SessionView({
   const items = useStore(store.$items)
   const status = useStore(store.$status)
   const ask = useStore(store.$ask)
+  const review = useStore(store.$review)
   const [notice, setNotice] = useState<string | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
 
@@ -100,6 +102,7 @@ export function SessionView({
           busy={status.busy}
           onNotice={setNotice}
           {...(onDeleted === undefined ? {} : { onDeleted })}
+          {...(onBranched === undefined ? {} : { onReview: onBranched })}
         />
       </div>
       <StatusBar status={status} {...(connection === undefined ? {} : { connection })} />
@@ -123,6 +126,7 @@ export function SessionView({
                       onRefsChange([...refs, { sessionId, fromSeq: q.fromSeq, toSeq: q.toSeq, label: q.label }]),
                   })}
             />
+            {review !== null && <ReviewFindings findings={review} />}
             {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
           </div>
         )}
@@ -361,14 +365,26 @@ export function SessionTools({
   busy,
   onNotice,
   onDeleted,
+  onReview,
 }: {
   client: DomiClient
   sessionId: string
   busy: boolean
   onNotice: (msg: string | null) => void
   onDeleted?: () => void
+  /** 审阅会话建好了，交给上层打开它（PRD-M7-010） */
+  onReview?: (sessionId: string) => void
 }) {
   const [armed, setArmed] = useState(false)
+  const review = (): void => {
+    client.startReview({ fromSessionId: sessionId }).then(
+      (id) => {
+        onNotice(null)
+        onReview?.(id)
+      },
+      (err: Error) => onNotice(err.message),
+    )
+  }
   const remove = (): void => {
     if (!armed) {
       setArmed(true)
@@ -384,6 +400,19 @@ export function SessionTools({
   }
   return (
     <span className="ml-2 flex items-center gap-1">
+      {onReview !== undefined && (
+        <Button
+          variant="ghost"
+          size="xs"
+          disabled={busy}
+          onClick={review}
+          data-action="review"
+          title="派一个只读的审阅者，对照需求审这个会话目录里的未提交改动（看不到对话历史）"
+        >
+          <IconEye size={12} />
+          审阅改动
+        </Button>
+      )}
       <Button
         variant={armed ? 'armed' : 'ghost'}
         size="xs"

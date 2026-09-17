@@ -50,6 +50,15 @@ export interface StatusSnapshot {
   worktree?: { path: string; branch: string; repo: string } | undefined
 }
 
+/** 审阅发现（M7-010），按事件投影 */
+export interface ReviewFindingSnapshot {
+  file: string
+  line?: number | undefined
+  severity: 'high' | 'medium' | 'low'
+  problem: string
+  basis: string
+}
+
 export interface AskSnapshot {
   /** 经 daemon 转来的询问才有；回答时要带上它（session.answer） */
   askId?: string
@@ -102,6 +111,8 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     metrics: null,
   })
   const $ask = atom<AskSnapshot | null>(null)
+  /** 最近一次提交的审阅发现；没有审阅过是 null */
+  const $review = atom<ReviewFindingSnapshot[] | null>(null)
 
   /** 最后一条 assistant 文本，流式增量往它上面拼 */
   const $streaming = computed($items, (items) => {
@@ -267,6 +278,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         })
         break
       case 'review.findings':
+        $review.set(ev.findings)
         push({
           seq: env.seq,
           kind: 'task',
@@ -329,6 +341,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     $items,
     $status,
     $ask,
+    $review,
     $streaming,
     applyEvents(envelopes: EventEnvelope[]): void {
       for (const e of envelopes) applyEvent(e)

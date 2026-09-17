@@ -18,15 +18,24 @@ import type { PluginHost } from '@domi/plugin'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
 import {
   applyWorktree,
+  collectDiff,
   createWorktree,
   DomiSession,
   discardFile,
   ensureWorktree,
+  MAX_SPAWN_DEPTH,
   MemoryService,
+  makeReviewReportTool,
   officialSkillsPlugin,
+  REVIEW_PREFIX,
+  REVIEW_REPORT_RULE,
+  REVIEW_SCOPE,
   RefError,
+  ReviewInputError,
+  readSpecs,
   removeWorktree,
   restoreDiscard,
+  reviewPrompt,
   type SessionOptions,
   TaskService,
   WorktreeError,
@@ -127,7 +136,11 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     }
   }
 
-  function live(sessionId: string, init?: { cwd: string; title: string; spawnedBy?: string }): Promise<DomiSession> {
+  function live(
+    sessionId: string,
+    init?: { cwd: string; title: string; spawnedBy?: string },
+    extra: Partial<SessionOptions> = {},
+  ): Promise<DomiSession> {
     const cached = sessions.get(sessionId)
     if (cached) return cached
     const made = (async () => {
@@ -158,6 +171,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         childEvents: pushChild,
         // 花费与预算的金额上限（M7-009）
         pricing: pricingOf(opts.config),
+        ...extra,
         // 计划批准后转长任务（M7-005）：同一个 TaskService
         startTask: async (spec, cwd) => (await tasks.start(JSON.stringify(spec), cwd)).runId,
       })
@@ -296,6 +310,52 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       const tree = await worktreeOf(sessionId)
       if (tree) await wt(() => removeWorktree(tree))
       index.sessions.softDelete(sessionId, Date.now())
+    },
+
+    async review(p) {
+      const from = p.fromSessionId === undefined ? undefined : index.sessions.get(p.fromSessionId)
+      if (p.fromSessionId !== undefined && !from) throw new SessionNotFoundError(p.fromSessionId)
+      const cwd = p.cwd ?? from?.cwd ?? opts.defaultCwd
+      const base = p.base ?? 'HEAD'
+      let prompt: string
+      try {
+        prompt = reviewPrompt(collectDiff(cwd, base), readSpecs(cwd, p.specs ?? []), base)
+      } catch (e) {
+        throw e instanceof ReviewInputError ? new HostRequestError(e.message) : e
+      }
+      const id = `${REVIEW_PREFIX}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+      const report = makeReviewReportTool()
+      const s = await live(
+        id,
+        {
+          cwd,
+          title: `审阅：${(p.specs ?? []).join('、') || base}`,
+          ...(p.fromSessionId === undefined ? {} : { spawnedBy: p.fromSessionId }),
+        },
+        {
+          // 只读 + 提交发现；**不带**发起会话的任何事件（AC-1）
+          scope: (c: string) => REVIEW_SCOPE.some((x) => x === c || (x.endsWith('.*') && c.startsWith(x.slice(0, -1)))),
+          extraRules: [REVIEW_REPORT_RULE],
+          extraTools: () => [report],
+          spawnDepth: MAX_SPAWN_DEPTH,
+        },
+      )
+      // 挂到发起会话的轨迹下（和 task.spawn 同一个形状）
+      if (p.fromSessionId !== undefined) {
+        const parent = sessions.get(p.fromSessionId)
+        if (parent) {
+          const ps = await parent
+          await ps.appendEvents([{ t: 'task.spawn', childSessionId: id, goal: '审阅改动' }]).catch(() => undefined)
+        }
+      }
+      void s.submit(prompt).catch(async (e) => {
+        await s
+          .appendEvents([
+            { t: 'error', scope: 'review', message: e instanceof Error ? e.message : String(e), recoverable: false },
+          ])
+          .catch(() => undefined)
+      })
+      return id
     },
 
     worktrees: {

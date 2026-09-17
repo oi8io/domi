@@ -152,6 +152,8 @@ export interface SessionOptions {
   scope?: (capabilityId: string) => boolean
   /** 第几层子 agent。0 = 用户直接对话的会话；到 MAX_SPAWN_DEPTH 就不再给 task.spawn */
   spawnDepth?: number
+  /** 追加在配置规则前面的规则（审阅会话放行 review.report，M7-010） */
+  extraRules?: ReadonlyArray<{ name: string; capability: string; decision: 'allow' | 'deny' | 'ask' }>
   /** 这个会话自己的用量上限（M7-009，长任务节点用）。覆盖配置里的 budget */
   budget?: BudgetLimits
   /** 计划批准后转长任务（M7-005）。daemon 里接 TaskService；不给就不能转 */
@@ -200,7 +202,7 @@ export class DomiSession {
 
     const permissions = new PermissionEngine(
       {
-        rules: opts.config.permissions.rules,
+        rules: [...(opts.extraRules ?? []), ...opts.config.permissions.rules],
         ...(opts.scope ? { scope: opts.scope } : {}),
         mode: () => this.mode,
       },

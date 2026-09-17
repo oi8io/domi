@@ -281,6 +281,18 @@ export const METHODS = {
     params: z.object({ sessionId: z.string(), model: z.string().min(1), provider: z.string().min(1).optional() }),
     result: z.object({ lost: z.array(z.string()) }),
   },
+  'review.start': {
+    summary:
+      '派一个只读的审阅会话（PRD-M7-010）：输入是相对 base 的 diff 与需求文档，不带任何会话历史。立刻返回会话 id，发现以 review.findings 事件出现',
+    params: z.object({
+      cwd: z.string().optional(),
+      base: z.string().optional(),
+      specs: z.array(z.string()).optional(),
+      /** 从哪个会话发起：审阅会话挂在它的轨迹下；没给 cwd 时用它的目录 */
+      fromSessionId: z.string().optional(),
+    }),
+    result: z.object({ sessionId: z.string() }),
+  },
   'session.budget': {
     summary: '设这个会话的用量上限（PRD-M7-009）：到 80% 提醒，到顶暂停问人。落成 budget.decided，重开会话后照样生效',
     params: z.object({

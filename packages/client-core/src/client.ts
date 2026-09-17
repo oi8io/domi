@@ -168,6 +168,11 @@ export class DomiClient {
     return r.lost
   }
 
+  /** 派一个只读的审阅会话（M7-010）。返回审阅会话 id；发现以 review.findings 事件出现在它里面 */
+  async startReview(p: { cwd?: string; base?: string; specs?: string[]; fromSessionId?: string }): Promise<string> {
+    return (await this.request('review.start', p)).sessionId
+  }
+
   /** 会话的用量上限（M7-009） */
   async setBudget(sessionId: string, budget: { tokens?: number; costUsd?: number; toolCalls?: number }): Promise<void> {
     await this.request('session.budget', { sessionId, budget })

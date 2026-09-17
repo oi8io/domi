@@ -1451,6 +1451,53 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `review.start`
+
+派一个只读的审阅会话（PRD-M7-010）：输入是相对 base 的 diff 与需求文档，不带任何会话历史。立刻返回会话 id，发现以 review.findings 事件出现
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "cwd": {
+      "type": "string"
+    },
+    "base": {
+      "type": "string"
+    },
+    "specs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fromSessionId": {
+      "type": "string"
+    }
+  }
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
 ### `session.budget`
 
 设这个会话的用量上限（PRD-M7-009）：到 80% 提醒，到顶暂停问人。落成 budget.decided，重开会话后照样生效

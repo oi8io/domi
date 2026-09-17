@@ -317,7 +317,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
 
   // 要连 domid 的命令：接线在端上（和对话同一条路）
-  if (!cli.flags.help && (cli.command === 'task' || cli.command === 'bridge')) {
+  if (!cli.flags.help && (cli.command === 'task' || cli.command === 'bridge' || cli.command === 'review')) {
     process.exit(await runDaemonCommand(cli, io))
   }
 
@@ -350,6 +350,11 @@ async function runDaemonCommand(cli: ParsedCli, io: { out(s: string): void; err(
       ...(token === undefined ? {} : { token }),
     })
     try {
+      if (cli.command === 'review') {
+        const { runReviewCommand } = await import('./review-cli.ts')
+        // --spec / --base 要原始参数（parseArgs 会把不认识的选项吞掉）
+        return await runReviewCommand(cli.rawArgs, io, client, process.cwd())
+      }
       const { runTaskCommand } = await import('./task-cli.ts')
       return await runTaskCommand(cli.sub, cli.args, io, client, { follow: cli.flags.follow, cwd: process.cwd() })
     } finally {

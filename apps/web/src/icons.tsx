@@ -135,3 +135,9 @@ export const IconRestore = base(
     <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
   </>,
 )
+export const IconEye = base(
+  <>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </>,
+)

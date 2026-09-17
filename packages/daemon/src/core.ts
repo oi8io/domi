@@ -173,6 +173,8 @@ export interface DaemonHost {
   memory?: HostMemory
   tasks?: HostTasks
   worktrees?: HostWorktrees
+  /** 审阅子 agent（M7-010） */
+  review?(p: { cwd?: string; base?: string; specs?: string[]; fromSessionId?: string }): Promise<string>
   plugins?: {
     list(): Promise<ResultOf<'plugin.list'>>
     /** 没有这个面板时返回 null */
@@ -408,6 +410,12 @@ export class Daemon {
         const session = await this.session(p.sessionId)
         if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
         return ok(req.id, await session.switchModel(p.model, p.provider))
+      }
+
+      case 'review.start': {
+        if (!this.host.review) return fail(req.id, 'INTERNAL', '这个 domid 不支持审阅')
+        const p = params as { cwd?: string; base?: string; specs?: string[]; fromSessionId?: string }
+        return ok(req.id, { sessionId: await this.host.review(p) })
       }
 
       case 'session.budget': {
