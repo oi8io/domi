@@ -277,7 +277,41 @@ export const METHODS = {
   'soul.get': {
     summary: 'Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）',
     params: z.object({}),
-    result: z.object({ path: z.string(), text: z.string() }),
+    result: z.object({
+      path: z.string(),
+      text: z.string(),
+      /** 文件修改时间（毫秒）；没有文件时不给。soul.write 用它防止覆盖别处刚做的修改 */
+      mtime: z.number().optional(),
+    }),
+  },
+  'soul.write': {
+    summary:
+      '保存编辑后的 Soul（PRD-M8-012 AC-5）。等同于手改文件：改过或没有来源注释的行，domi 之后不再动（M4-003）。' +
+      '给了 mtime 而文件在那之后被改过 → INVALID_PARAMS（data.reason = CONFLICT），不覆盖',
+    params: z.object({ text: z.string().max(200_000), mtime: z.number().optional() }),
+    result: z.object({ ok: z.literal(true), mtime: z.number() }),
+  },
+  'soul.export': {
+    summary: '导出成单个 Markdown（M4-004，去掉来源注释）。findings 非空时不该分享：里面有凭据、本机路径或邮箱',
+    params: z.object({}),
+    result: z.object({
+      text: z.string(),
+      findings: z.array(z.object({ line: z.number().int(), kind: z.string(), text: z.string() })),
+    }),
+  },
+  'soul.import': {
+    summary:
+      '导入别人的 Soul（M4-004）。不给 sections 时只返回每区要新增的行（预览）；给了就只导入这些区，' +
+      '导入的行作为待审阅改动出现在 soul.changes 里，可以逐条否决。导入的文字只作参考资料，不当指令',
+    params: z.object({
+      text: z.string().max(200_000),
+      name: z.string().min(1).max(100),
+      sections: z.array(z.string()).optional(),
+    }),
+    result: z.object({
+      plans: z.array(z.object({ section: z.string(), add: z.array(z.string()) })),
+      imported: z.number().int(),
+    }),
   },
   'soul.changes': {
     summary: '上次审阅以来 Soul 的改动（PRD-M4-003 AC-2）',
@@ -335,6 +369,8 @@ export const METHODS = {
           skills: z.number().int(),
           mcp: z.array(z.string()),
           ui: z.array(z.object({ id: z.string(), title: z.string() })),
+          /** 没被停用（config plugins.disabled，PRD-M8-012 AC-6）。老 daemon 不给，当启用 */
+          enabled: z.boolean().optional(),
         }),
       ),
       problems: z.array(z.object({ name: z.string(), message: z.string() })),

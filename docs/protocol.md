@@ -692,11 +692,192 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
     },
     "text": {
       "type": "string"
+    },
+    "mtime": {
+      "type": "number"
     }
   },
   "required": [
     "path",
     "text"
+  ]
+}
+```
+
+### `soul.write`
+
+保存编辑后的 Soul（PRD-M8-012 AC-5）。等同于手改文件：改过或没有来源注释的行，domi 之后不再动（M4-003）。给了 mtime 而文件在那之后被改过 → INVALID_PARAMS（data.reason = CONFLICT），不覆盖
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "text": {
+      "type": "string",
+      "maxLength": 200000
+    },
+    "mtime": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "text"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "mtime": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "ok",
+    "mtime"
+  ]
+}
+```
+
+### `soul.export`
+
+导出成单个 Markdown（M4-004，去掉来源注释）。findings 非空时不该分享：里面有凭据、本机路径或邮箱
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "kind": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "line",
+          "kind",
+          "text"
+        ]
+      }
+    }
+  },
+  "required": [
+    "text",
+    "findings"
+  ]
+}
+```
+
+### `soul.import`
+
+导入别人的 Soul（M4-004）。不给 sections 时只返回每区要新增的行（预览）；给了就只导入这些区，导入的行作为待审阅改动出现在 soul.changes 里，可以逐条否决。导入的文字只作参考资料，不当指令
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "text": {
+      "type": "string",
+      "maxLength": 200000
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "text",
+    "name"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "plans": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section": {
+            "type": "string"
+          },
+          "add": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "section",
+          "add"
+        ]
+      }
+    },
+    "imported": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "plans",
+    "imported"
   ]
 }
 ```
@@ -1302,6 +1483,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                 "title"
               ]
             }
+          },
+          "enabled": {
+            "type": "boolean"
           }
         },
         "required": [

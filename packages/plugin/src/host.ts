@@ -31,6 +31,8 @@ export interface PluginHostOptions {
   backend?: SandboxBackend
   fetch?: typeof globalThis.fetch
   log?: (line: string) => void
+  /** 停用的插件名（config plugins.disabled，PRD-M8-012 AC-6）。之后可以用 setDisabled 改 */
+  disabled?: readonly string[]
 }
 
 export interface PluginUiPanel {
@@ -61,10 +63,31 @@ export class PluginHost {
   private problemList: LoadProblem[] = []
   readonly backend: SandboxBackend
   private runnerPath = ''
+  private disabled: Set<string>
 
   constructor(private readonly opts: PluginHostOptions) {
     this.backend = opts.backend ?? detectSandbox()
+    this.disabled = new Set(opts.disabled ?? [])
     this.reload()
+  }
+
+  /** 启停即时生效（PRD-M8-012 AC-6）：工具、skill、UI 面板下一次取就按新名单；MCP server 见 disabledServers */
+  setDisabled(names: readonly string[]): void {
+    this.disabled = new Set(names)
+  }
+
+  isEnabled(name: string): boolean {
+    return !this.disabled.has(name)
+  }
+
+  /** 没停用的插件 */
+  private get active(): LoadedPlugin[] {
+    return this.loaded.filter((p) => !this.disabled.has(p.manifest.name))
+  }
+
+  /** 停用插件带的 MCP server 名（hub 已经连上的，由调用方把它们的工具滤掉） */
+  disabledServers(): string[] {
+    return this.serversOf(this.loaded.filter((p) => this.disabled.has(p.manifest.name))).map((s) => s.name)
   }
 
   reload(): void {
@@ -84,6 +107,7 @@ export class PluginHost {
     this.runnerPath = ensureRunner(join(this.opts.pluginsDir, '.runtime'))
   }
 
+  /** 全部已装的（含停用的，列表用） */
   get plugins(): readonly LoadedPlugin[] {
     return this.loaded
   }
@@ -97,17 +121,21 @@ export class PluginHost {
   }
 
   skillDirs(): string[] {
-    return this.loaded.flatMap((p) => p.manifest.contributes.skills.map((s) => dirname(join(p.dir, s))))
+    return this.active.flatMap((p) => p.manifest.contributes.skills.map((s) => dirname(join(p.dir, s))))
   }
 
   /** 插件带的 skill：每个是一个 SKILL.md 文件路径 */
   skillFiles(): string[] {
-    return this.loaded.flatMap((p) => p.manifest.contributes.skills.map((s) => join(p.dir, s, 'SKILL.md')))
+    return this.active.flatMap((p) => p.manifest.contributes.skills.map((s) => join(p.dir, s, 'SKILL.md')))
   }
 
   /** MCP server 配置，名字加上插件前缀，避免和用户自己配的撞名 */
   mcpServers(): McpServerConfig[] {
-    return this.loaded.flatMap((p) =>
+    return this.serversOf(this.active)
+  }
+
+  private serversOf(list: readonly LoadedPlugin[]): McpServerConfig[] {
+    return list.flatMap((p) =>
       p.manifest.contributes.mcp.map((s) => ({
         ...s,
         name: `${p.manifest.name}-${s.name}`.slice(0, 32),
@@ -117,7 +145,7 @@ export class PluginHost {
   }
 
   uiPanels(): PluginUiPanel[] {
-    return this.loaded.flatMap((p) =>
+    return this.active.flatMap((p) =>
       p.manifest.contributes.ui.map((u) => ({
         plugin: p.manifest.name,
         id: u.id,
@@ -136,7 +164,7 @@ export class PluginHost {
 
   tools(cwd: string): Tool[] {
     if (!this.codeAllowed()) return []
-    return this.loaded.flatMap((p) => p.manifest.contributes.tools.map((t) => this.makeTool(p, t, cwd)))
+    return this.active.flatMap((p) => p.manifest.contributes.tools.map((t) => this.makeTool(p, t, cwd)))
   }
 
   private makeTool(p: LoadedPlugin, t: LoadedPlugin['manifest']['contributes']['tools'][number], cwd: string): Tool {

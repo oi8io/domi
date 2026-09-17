@@ -220,6 +220,10 @@ export interface HostMemory {
   changes(): Promise<ResultOf<'soul.changes'>['changes']>
   review(changeId: string, decision: 'accept' | 'reject'): Promise<ResultOf<'soul.review'>>
   update(): Promise<ResultOf<'soul.update'>['changes']>
+  /** M8-012：编辑、导出、导入。老宿主没有 */
+  writeSoul?(text: string, mtime: number | undefined): Promise<ResultOf<'soul.write'>>
+  exportSoul?(): Promise<ResultOf<'soul.export'>>
+  importSoul?(p: ParamsOf<'soul.import'>): Promise<ResultOf<'soul.import'>>
 }
 
 /** DAG 编排（PRD-M5-002）。不合法的定义 / 不能重试的状态抛 InvalidTaskError */
@@ -568,6 +572,15 @@ export class Daemon {
         return { changes: await m.changes() }
       case 'soul.review':
         return m.review(p.changeId as string, p.decision as 'accept' | 'reject')
+      case 'soul.write':
+        if (!m.writeSoul) throw new Error('这个 domid 不支持在界面里编辑 Soul')
+        return m.writeSoul(p.text as string, p.mtime as number | undefined)
+      case 'soul.export':
+        if (!m.exportSoul) throw new Error('这个 domid 不支持导出 Soul')
+        return m.exportSoul()
+      case 'soul.import':
+        if (!m.importSoul) throw new Error('这个 domid 不支持导入 Soul')
+        return m.importSoul(p as ParamsOf<'soul.import'>)
       default:
         return { changes: await m.update() }
     }
@@ -773,6 +786,9 @@ export class Daemon {
       case 'soul.get':
       case 'soul.changes':
       case 'soul.review':
+      case 'soul.write':
+      case 'soul.export':
+      case 'soul.import':
       case 'soul.update':
         return ok(req.id, await this.memoryCall(method, params))
 

@@ -1,16 +1,14 @@
 /**
  * 设置（`#/settings/<tab>`）—— PRD-M8-012（原型 #view-settings，7 个 tab）。
  * 通用 / 模型供应商 / 记忆管理经 config.get / config.set 读写（PRD-M8-011）；通讯工具只留入口。
- * Soul 与插件暂时装着原来的面板，在 TASK-M8-008 里按原型重写。
+ * Soul 与人格、插件两个 tab 吸收了原来的 SoulPanel / PluginPanel（PRD-M8-012 AC-5 / AC-6）。
  */
 import { type DomiClient, PALETTES, TOKENS } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '../components/ui/button.tsx'
 import { cn } from '../lib/cn.ts'
-import { PluginPanel } from '../PluginPanel.tsx'
 import { formatRoute, type SettingsTab } from '../router.ts'
-import { SoulPanel } from '../SoulPanel.tsx'
 import {
   $accent,
   $systemDark,
@@ -21,6 +19,9 @@ import {
   type ThemeChoice,
 } from '../theme/store.ts'
 import { Notice, Page } from './Page.tsx'
+import { Field, Saved, ToggleRow } from './settings/fields.tsx'
+import { PluginsTab } from './settings/PluginsTab.tsx'
+import { SoulTab } from './settings/SoulTab.tsx'
 import { str, useSettings } from './settings/useSettings.ts'
 
 const TABS: Array<[SettingsTab, string]> = [
@@ -32,53 +33,6 @@ const TABS: Array<[SettingsTab, string]> = [
   ['plugins', '插件'],
   ['usage', '用量统计'],
 ]
-
-function Field({ label, hint, children, id }: { label: string; hint?: string; children: ReactNode; id?: string }) {
-  return (
-    <div className="mb-[18px]">
-      <label className="mb-[3px] block text-[13px] font-medium" htmlFor={id}>
-        {label}
-      </label>
-      {hint !== undefined && <div className="mb-[5px] text-[11.5px] text-mut">{hint}</div>}
-      {children}
-    </div>
-  )
-}
-
-function ToggleRow({ label, hint, on, disabled }: { label: string; hint: string; on: boolean; disabled?: boolean }) {
-  return (
-    <div className="mb-[18px] flex items-center justify-between py-1.5">
-      <div>
-        <div className="text-[13px] font-medium">{label}</div>
-        <div className="text-[11.5px] text-mut">{hint}</div>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={label}
-        disabled={disabled}
-        className={cn(
-          'relative h-5 w-9 shrink-0 rounded-[10px] transition-colors duration-150',
-          on ? 'bg-accent-e' : 'bg-border',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-[3px] left-[3px] size-3.5 rounded-full bg-white transition-transform duration-150',
-            on && 'translate-x-4',
-          )}
-        />
-      </button>
-    </div>
-  )
-}
-
-function Saved({ error, saved }: { error: string | null; saved: string | null }) {
-  if (error !== null) return <p className="mb-3 text-[13px] text-bad">{error}</p>
-  if (saved !== null) return <p className="mb-3 text-[13px] text-ok">{saved}</p>
-  return null
-}
 
 type TabProps = { s: ReturnType<typeof useSettings> }
 
@@ -380,9 +334,11 @@ export function SettingsView({ client, tab, online }: { client: DomiClient; tab:
           {tab === 'usage' && <UsageTab />}
           {(tab === 'soul' || tab === 'plugins') &&
             (online ? (
-              <div className="legacy">
-                {tab === 'soul' ? <SoulPanel client={client} /> : <PluginPanel client={client} />}
-              </div>
+              tab === 'soul' ? (
+                <SoulTab client={client} />
+              ) : (
+                <PluginsTab client={client} />
+              )
             ) : (
               <Notice>连上 daemon 后显示。</Notice>
             ))}

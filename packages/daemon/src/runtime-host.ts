@@ -53,6 +53,7 @@ import {
   restoreDiscard,
   reviewPrompt,
   type SessionOptions,
+  SoulConflictError,
   TaskService,
   WorktreeError,
   type WorktreeInfo,
@@ -166,6 +167,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...(opts.plugins ? { extraFiles: () => opts.plugins?.skillFiles() ?? [] } : {}),
       })
     : undefined
+
+  /** 启动时就连上的插件 MCP server（启用启动时停着的插件，要重启才连） */
+  const startedServers = new Set(opts.plugins?.mcpServers().map((s) => s.name) ?? [])
 
   /** 项目（M8-003）。升级前的老会话在这里一次性归类（M8-004） */
   const projects = new ProjectService({ log: index, home })
@@ -666,8 +670,19 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
               const next = loadConfig(src)
               ;(opts as { config: DomiConfig }).config = next
               for (const s of sessions.values()) void s.then((x) => x.reconfigure(next)).catch(() => undefined)
+              // 插件启停即时生效；只有「启用一个启动时停着、带 MCP server 的插件」要重启才连得上
+              let pluginRestart = false
+              if ('plugins.disabled' in patch && opts.plugins) {
+                const before = new Set(opts.plugins.disabledServers())
+                opts.plugins.setDisabled(next.plugins.disabled)
+                skills?.reload()
+                pluginRestart = [...before].some(
+                  (s) => !opts.plugins?.disabledServers().includes(s) && !startedServers.has(s),
+                )
+              }
               const restartRequired = Object.keys(patch).filter(
-                (k) => k.startsWith('memory.') || k.startsWith('plugins.'),
+                (k) =>
+                  k.startsWith('memory.') || (k.startsWith('plugins.') && (k !== 'plugins.disabled' || pluginRestart)),
               )
               return { ok: true as const, restartRequired }
             },
@@ -925,6 +940,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
                   skills: p.manifest.contributes.skills.length,
                   mcp: p.manifest.contributes.mcp.map((s) => s.name),
                   ui: p.manifest.contributes.ui.map((u) => ({ id: u.id, title: u.title })),
+                  enabled: ph.isEnabled(p.manifest.name),
                 })),
                 problems: [...ph.problems()],
               }
@@ -968,8 +984,40 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         return { added: r.added, soulChanges: r.soul }
       },
       async soul() {
-        const { readFileSync, existsSync } = await import('node:fs')
-        return { path: memory.soulPath, text: existsSync(memory.soulPath) ? readFileSync(memory.soulPath, 'utf8') : '' }
+        const { readFileSync, existsSync, statSync } = await import('node:fs')
+        if (!existsSync(memory.soulPath)) return { path: memory.soulPath, text: '' }
+        return {
+          path: memory.soulPath,
+          text: readFileSync(memory.soulPath, 'utf8'),
+          mtime: statSync(memory.soulPath).mtimeMs,
+        }
+      },
+      async writeSoul(text, mtime) {
+        try {
+          return { ok: true as const, mtime: await memory.writeText(text, mtime) }
+        } catch (e) {
+          throw e instanceof SoulConflictError ? new HostRequestError(e.message, { reason: 'CONFLICT' }) : e
+        }
+      },
+      async exportSoul() {
+        const r = memory.exportText()
+        // 同一行被几条规则同时命中时只报一次
+        const seen = new Set<string>()
+        const findings = r.findings.filter((f) => {
+          const k = `${f.line}:${f.kind}`
+          if (seen.has(k)) return false
+          seen.add(k)
+          return true
+        })
+        return { text: r.text, findings: findings.map((f) => ({ line: f.line, kind: f.kind, text: f.text })) }
+      },
+      async importSoul(p) {
+        const plans = memory.planImport(p.text, p.name)
+        const view = plans.map((x) => ({ section: x.section as string, add: x.add }))
+        if (p.sections === undefined) return { plans: view, imported: 0 }
+        const wanted = new Set(p.sections)
+        const changes = await memory.applyImport(plans.filter((x) => wanted.has(x.section)))
+        return { plans: view, imported: changes.length }
       },
       changes: () => memory.pendingChanges(),
       review: (id, decision) => memory.review(id, decision),

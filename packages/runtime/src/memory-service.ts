@@ -7,7 +7,7 @@
  * 所有写入先落事件（_memory 会话），L3 表是事件的投影（store 在同一个事务里投影）；
  * soul.md 是人也会改的文件，所以每次都现读现写，domi 写过什么由 L4 事件记着（INV-09）。
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Tool } from '@domi/capability'
 import type { DomiConfig } from '@domi/config'
@@ -54,6 +54,13 @@ export interface MemoryServiceOptions {
 }
 
 /** 审阅列表里的一项 */
+export class SoulConflictError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SoulConflictError'
+  }
+}
+
 export interface PendingChange extends SoulChange {
   at: number
   diff: string
@@ -259,6 +266,27 @@ export class MemoryService {
     const tmp = `${this.soulPath}.tmp`
     writeFileSync(tmp, renderSoul(doc), 'utf8')
     renameSync(tmp, this.soulPath)
+  }
+
+  /**
+   * 界面里保存的 Soul 全文（PRD-M8-012 AC-5）：和手改文件一样，不落事件——
+   * 「人改过的行 domi 不再动」由 ownedLines 按文件内容判断。mtime 不对 → SoulConflictError
+   */
+  writeText(text: string, mtime?: number): Promise<number> {
+    return this.serial(async () => {
+      if (mtime !== undefined && existsSync(this.soulPath)) {
+        const now = statSync(this.soulPath).mtimeMs
+        if (Math.abs(now - mtime) > 1) {
+          throw new SoulConflictError('Soul 在你打开之后被改过（可能是 domi 刚更新，或者你在别处改了）。刷新看看再保存')
+        }
+      }
+      mkdirSync(this.opts.soulDir, { recursive: true })
+      const tmp = `${this.soulPath}.tmp`
+      // 过一遍解析再渲染：人写的内容原样留着，六个固定区补齐（M4-002 AC-1）
+      writeFileSync(tmp, renderSoul(parseSoul(text)), 'utf8')
+      renameSync(tmp, this.soulPath)
+      return statSync(this.soulPath).mtimeMs
+    })
   }
 
   rejected(): string[] {

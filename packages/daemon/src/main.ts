@@ -55,6 +55,7 @@ export async function main(env: Record<string, string | undefined> = process.env
     ? new PluginHost({
         pluginsDir: join(home, 'plugins'),
         allowUnsandboxed: config.plugins.allowUnsandboxed,
+        disabled: config.plugins.disabled,
         log: (l) => process.stderr.write(`${l}\n`),
       })
     : undefined
@@ -71,7 +72,13 @@ export async function main(env: Record<string, string | undefined> = process.env
     defaultCwd: process.cwd(),
     // 设置页读写的就是启动时读的那一份（PRD-M8-011）
     configSource: { env, home: env.HOME ?? homedir() },
-    extraTools: (cwd) => [...hub.tools(), ...(plugins?.tools(cwd) ?? [])],
+    // 停用插件带的 MCP server 已经连上了的话，它的工具这里滤掉（启停即时生效，PRD-M8-012 AC-6）
+    extraTools: (cwd) => {
+      const off = plugins?.disabledServers() ?? []
+      const mcp =
+        off.length === 0 ? hub.tools() : hub.tools().filter((t) => !off.some((s) => t.name.startsWith(`mcp.${s}.`)))
+      return [...mcp, ...(plugins?.tools(cwd) ?? [])]
+    },
     ...(plugins === undefined ? {} : { plugins }),
     notices: () => hub.notices().map((n) => n.message),
   })

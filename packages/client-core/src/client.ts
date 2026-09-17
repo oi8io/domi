@@ -154,6 +154,23 @@ export class DomiClient {
     return this.request('soul.get', {})
   }
 
+  /** 保存 Soul 全文（M8-012）。mtime 是 getSoul 时拿到的；中间被改过会被拒（data.reason = CONFLICT） */
+  writeSoul(text: string, mtime?: number): Promise<ResultOf<'soul.write'>> {
+    return this.request('soul.write', mtime === undefined ? { text } : { text, mtime })
+  }
+
+  exportSoul(): Promise<ResultOf<'soul.export'>> {
+    return this.request('soul.export', {})
+  }
+
+  /** 不给 sections = 只预览每区要加的行 */
+  importSoul(text: string, name: string, sections?: readonly string[]): Promise<ResultOf<'soul.import'>> {
+    return this.request(
+      'soul.import',
+      sections === undefined ? { text, name } : { text, name, sections: [...sections] },
+    )
+  }
+
   async soulChanges(): Promise<ResultOf<'soul.changes'>['changes']> {
     return (await this.request('soul.changes', {})).changes
   }
