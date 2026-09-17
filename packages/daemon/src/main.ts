@@ -127,6 +127,12 @@ export async function main(env: Record<string, string | undefined> = process.env
     },
     (e: unknown) => process.stderr.write(`domid 恢复任务失败：${e instanceof Error ? e.message : String(e)}\n`),
   )
+  // 定时任务（M8-007）：先补跑 domid 没开期间错过的（每个计划最多一次），再按时间表排
+  void daemon
+    .startScheduler({ log: (l) => process.stderr.write(`${l}\n`) })
+    .catch((e: unknown) =>
+      process.stderr.write(`domid 调度器启动失败：${e instanceof Error ? e.message : String(e)}\n`),
+    )
   if (config.mcp.servers.length > 0 || (plugins?.mcpServers().length ?? 0) > 0) {
     void hub.start().then((statuses) => {
       for (const s of statuses) {

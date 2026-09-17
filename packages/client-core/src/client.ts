@@ -22,6 +22,7 @@ import {
   type RefLink,
   type ResultOf,
   type RpcError,
+  type Schedule,
 } from '@domi/protocol'
 import { atom } from 'nanostores'
 import type { SessionStore } from './store.ts'
@@ -253,6 +254,37 @@ export class DomiClient {
   }
 
   // ── 项目（PRD-M8-003）────────────────────────────────────
+
+  // ── 定时任务（PRD-M8-007） ──
+
+  async listSchedules(): Promise<Schedule[]> {
+    return (await this.request('schedule.list', {})).schedules
+  }
+
+  async createSchedule(p: ParamsOf<'schedule.create'>): Promise<Schedule> {
+    return (await this.request('schedule.create', p)).schedule
+  }
+
+  async updateSchedule(p: ParamsOf<'schedule.update'>): Promise<Schedule> {
+    return (await this.request('schedule.update', p)).schedule
+  }
+
+  async deleteSchedule(id: string): Promise<void> {
+    await this.request('schedule.delete', { id })
+  }
+
+  async runScheduleNow(id: string): Promise<string> {
+    return (await this.request('schedule.runNow', { id })).sessionId
+  }
+
+  async scheduleRuns(id: string, limit?: number): Promise<ResultOf<'schedule.runs'>['runs']> {
+    return (await this.request('schedule.runs', limit === undefined ? { id } : { id, limit })).runs
+  }
+
+  /** 校验 cron 并给出接下来几次运行；不合法抛 DomiRpcError（data.field 指出哪一段） */
+  previewSchedule(cron: string, tz?: string): Promise<ResultOf<'schedule.preview'>> {
+    return this.request('schedule.preview', tz === undefined ? { cron } : { cron, tz })
+  }
 
   async listProjects(
     opts: { includeArchived?: boolean; recent?: number } = {},

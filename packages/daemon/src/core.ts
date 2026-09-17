@@ -28,10 +28,22 @@ import {
   type RpcNotification,
   type RpcRequest,
   type RpcResponse,
+  type Schedule,
   versionMismatch,
 } from '@domi/protocol'
+import type { ScheduleRunRow } from '@domi/store'
+import {
+  ScheduleBusyError,
+  ScheduleNotFoundError,
+  Scheduler,
+  type SchedulerDeps,
+  type ScheduleStore,
+} from './scheduler.ts'
 
 export const DAEMON_VERSION = '0.1.0'
+
+/** 调度器触发任务时用的内部连接：不订阅、不收推送 */
+const SYSTEM_CONN: ClientConn = { id: '_scheduler', send() {} }
 
 /**
  * 宿主用它表达「没有这个会话」。**只有它**会被翻译成 SESSION_NOT_FOUND；
@@ -113,6 +125,18 @@ export interface HostProjects {
   resolve(cwd: string): Promise<ResultOf<'project.resolve'>>
 }
 
+/** 定时任务（PRD-M8-007）。cron / 时区不合法抛 HostRequestError（data.reason = INVALID_CRON） */
+export interface HostSchedules {
+  /** 调度器读写的那几张表 */
+  store: ScheduleStore
+  list(): Promise<Schedule[]>
+  create(p: ParamsOf<'schedule.create'>): Promise<Schedule>
+  update(p: ParamsOf<'schedule.update'>): Promise<Schedule>
+  remove(id: string): Promise<void>
+  runs(id: string, limit: number): Promise<ScheduleRunRow[]>
+  preview(cron: string, tz: string | undefined, count: number): Promise<ResultOf<'schedule.preview'>>
+}
+
 export interface CreateOptions {
   kind?: 'chat' | 'task'
   projectId?: string
@@ -158,7 +182,11 @@ export interface HostTasks {
 
 /** 宿主拒绝了一个请求（参数本身合法，但当前状态不允许，比如不是隔离会话）。→ INVALID_PARAMS */
 export class HostRequestError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** 结构化细节，原样放进错误响应的 data */
+    readonly data?: Record<string, unknown>,
+  ) {
     super(message)
     this.name = 'HostRequestError'
   }
@@ -190,10 +218,13 @@ export interface DaemonHost {
     projectId: string
     goal: string
     trigger?: 'user' | 'schedule'
+    /** 定时触发时：落在新任务里的 schedule.fire */
+    schedule?: { scheduleId: string; due: number; late: boolean }
   }): Promise<Omit<ResultOf<'task.create'>, 'sessionId'> & { sessionId: string }>
   /** 改标题（PRD-M8-008）。会话不存在抛 SessionNotFoundError */
   rename?(sessionId: string, title: string): Promise<void>
   projects?: HostProjects
+  schedules?: HostSchedules
   /** 设置页（PRD-M8-011）。补丁不合法抛 HostRequestError */
   config?: {
     get(): Promise<ResultOf<'config.get'>>
@@ -252,6 +283,7 @@ export class Daemon {
   /** 等人回答的询问。任务停在那里等，所以订阅时必须补发——否则后连上来的客户端永远看不见它 */
   private readonly asks = new Map<string, HostAsk & { sessionId: string }>()
   private readonly metrics = new Map<string, HostMetrics>()
+  private scheduler: Scheduler | null = null
 
   constructor(private readonly host: DaemonHost) {
     host.onEvents((sessionId, events) => this.push(sessionId, events))
@@ -319,11 +351,112 @@ export class Daemon {
         e instanceof BranchPointError ||
         e instanceof InvalidRefError ||
         e instanceof InvalidTaskError ||
-        e instanceof HostRequestError
+        e instanceof HostRequestError ||
+        e instanceof ScheduleNotFoundError
       ) {
-        return fail(req.id, 'INVALID_PARAMS', e.message)
+        return fail(req.id, 'INVALID_PARAMS', e.message, e instanceof HostRequestError ? e.data : undefined)
       }
+      if (e instanceof ScheduleBusyError) return fail(req.id, 'SESSION_BUSY', e.message)
       return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  /**
+   * 启动调度器（PRD-M8-007）。domid 开门之后调；测试注入时钟与定时器。
+   * 触发 = 按目标建任务（trigger: schedule）+ 走普通的提交路径，所以忙闲、推送与手动建的任务完全一样
+   */
+  startScheduler(
+    o: { now?: () => number; setTimer?: SchedulerDeps['setTimer']; log?: (l: string) => void } = {},
+  ): Promise<void> {
+    const h = this.host.schedules
+    const create = this.host.createTask?.bind(this.host)
+    if (!h || !create) return Promise.resolve()
+    this.scheduler?.stop()
+    this.scheduler = new Scheduler({
+      store: h.store,
+      now: o.now ?? Date.now,
+      setTimer:
+        o.setTimer ??
+        ((fn, ms) => {
+          const t = setTimeout(fn, ms)
+          t.unref?.()
+          return () => clearTimeout(t)
+        }),
+      isBusy: (id) => this.isBusy(id),
+      ...(o.log === undefined ? {} : { log: o.log }),
+      fire: async (s, due, late) => {
+        const r = await create({
+          projectId: s.projectId,
+          goal: s.goal,
+          trigger: 'schedule',
+          schedule: { scheduleId: s.id, due, late },
+        })
+        const sub = await this.dispatch(
+          SYSTEM_CONN,
+          { jsonrpc: '2.0', id: 0, method: 'session.submit' },
+          'session.submit',
+          {
+            sessionId: r.sessionId,
+            text: s.goal,
+          } as never,
+        )
+        if (sub.error) throw new Error(sub.error.message)
+        return r.sessionId
+      },
+    })
+    return this.scheduler.start()
+  }
+
+  stopScheduler(): void {
+    this.scheduler?.stop()
+    this.scheduler = null
+  }
+
+  private async scheduleCall(method: MethodName, params: unknown): Promise<unknown> {
+    const h = this.host.schedules
+    if (!h) throw new HostRequestError('这个 domid 不支持定时任务')
+    const p = params as Record<string, unknown>
+    const changed = <T>(v: T): T => {
+      this.scheduler?.reschedule()
+      return v
+    }
+    switch (method) {
+      case 'schedule.list':
+        return { schedules: await h.list() }
+      case 'schedule.create':
+        return changed({ schedule: await h.create(p as ParamsOf<'schedule.create'>) })
+      case 'schedule.update':
+        return changed({ schedule: await h.update(p as ParamsOf<'schedule.update'>) })
+      case 'schedule.delete':
+        await h.remove(p.id as string)
+        return changed({ ok: true })
+      case 'schedule.runNow': {
+        if (!this.scheduler) throw new HostRequestError('调度器没有启动')
+        return { sessionId: await this.scheduler.runNow(p.id as string) }
+      }
+      case 'schedule.runs': {
+        const runs = await h.runs(p.id as string, (p.limit as number | undefined) ?? 20)
+        return {
+          runs: runs.map((r) => ({
+            ...(r.sessionId === null ? {} : { sessionId: r.sessionId }),
+            due: r.due,
+            firedAt: r.firedAt,
+            late: r.late,
+            skipped: r.skipped,
+            status: r.skipped
+              ? 'skipped'
+              : r.sessionId === null
+                ? 'failed'
+                : this.isBusy(r.sessionId)
+                  ? 'running'
+                  : 'done',
+          })),
+        }
+      }
+      case 'schedule.preview':
+        return h.preview(p.cron as string, p.tz as string | undefined, (p.count as number | undefined) ?? 3)
+      default:
+        throw new Error(`不是定时任务方法：${method}`)
     }
   }
 
@@ -421,6 +554,15 @@ export class Daemon {
         if (method === 'config.get') return ok(req.id, await h.get())
         return ok(req.id, await h.set((params as { patch: Record<string, unknown> }).patch))
       }
+
+      case 'schedule.list':
+      case 'schedule.create':
+      case 'schedule.update':
+      case 'schedule.delete':
+      case 'schedule.runNow':
+      case 'schedule.runs':
+      case 'schedule.preview':
+        return ok(req.id, await this.scheduleCall(method, params))
 
       case 'project.list':
       case 'project.create':
@@ -750,6 +892,7 @@ export class Daemon {
   }
 
   async close(): Promise<void> {
+    this.stopScheduler()
     for (const s of this.sessions.values()) await s.close()
     this.sessions.clear()
     this.subs.clear()

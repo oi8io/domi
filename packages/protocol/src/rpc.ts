@@ -100,6 +100,44 @@ const MemoryItemSchema = SemanticItemSchema.extend({
   score: z.number().optional(),
 })
 
+/** 定时任务（PRD-M8-007） */
+export const ScheduleSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  goal: z.string(),
+  /** 5 段 cron */
+  cron: z.string(),
+  /** IANA 时区 */
+  tz: z.string(),
+  paused: z.boolean(),
+  createdAt: z.number().int(),
+  /** 下一次运行（毫秒）；暂停或永远不触发 → null */
+  nextRun: z.number().int().nullable(),
+  lastRun: z
+    .object({
+      due: z.number().int(),
+      firedAt: z.number().int(),
+      sessionId: z.string().optional(),
+      skipped: z.boolean(),
+    })
+    .optional(),
+})
+export type Schedule = z.infer<typeof ScheduleSchema>
+
+const ScheduleRunSchema = z.object({
+  sessionId: z.string().optional(),
+  due: z.number().int(),
+  firedAt: z.number().int(),
+  /** domid 没开、启动后补跑的 */
+  late: z.boolean(),
+  /** 上一次还没结束，这次跳过了 */
+  skipped: z.boolean(),
+  status: z.enum(['running', 'done', 'skipped', 'failed']),
+})
+
+/** cron 或时区不合法时，INVALID_PARAMS 的 data：{ reason: 'INVALID_CRON', field } */
+const CronParams = { cron: z.string().min(1), tz: z.string().min(1).optional() }
+
 const PendingChangeSchema = SoulChangeSchema.extend({ at: z.number().int(), diff: z.string() })
 
 const RunStatusSchema = z.enum(['running', 'done', 'failed', 'cancelled'])
@@ -354,6 +392,49 @@ export const METHODS = {
       isolation: z.object({ isolate: z.boolean(), reason: z.string() }),
       planned: z.boolean(),
     }),
+  },
+  'schedule.list': {
+    summary: '定时任务列表（PRD-M8-007），带下一次运行时间与最近一次触发',
+    params: z.object({}),
+    result: z.object({ schedules: z.array(ScheduleSchema) }),
+  },
+  'schedule.create': {
+    summary:
+      '新建定时任务：项目 + 目标 + 5 段 cron + 时区（缺省 domid 所在时区）。' +
+      'cron / 时区不合法 → INVALID_PARAMS，data = { reason: "INVALID_CRON", field }，message 指出哪一段',
+    params: z.object({ projectId: z.string(), goal: z.string().min(1), ...CronParams }),
+    result: z.object({ schedule: ScheduleSchema }),
+  },
+  'schedule.update': {
+    summary: '改目标 / 时间表 / 暂停与恢复。改了时间表或恢复时从此刻重新算，不补之前错过的',
+    params: z.object({
+      id: z.string(),
+      goal: z.string().min(1).optional(),
+      cron: z.string().min(1).optional(),
+      tz: z.string().min(1).optional(),
+      paused: z.boolean().optional(),
+    }),
+    result: z.object({ schedule: ScheduleSchema }),
+  },
+  'schedule.delete': {
+    summary: '删除定时任务（历史运行建出的任务不动）',
+    params: z.object({ id: z.string() }),
+    result: z.object({ ok: z.boolean() }),
+  },
+  'schedule.runNow': {
+    summary: '立即运行一次（不影响之后的时间表）。上一次还没结束 → SESSION_BUSY',
+    params: z.object({ id: z.string() }),
+    result: z.object({ sessionId: z.string() }),
+  },
+  'schedule.runs': {
+    summary: '某个定时任务的历史触发，新的在前',
+    params: z.object({ id: z.string(), limit: z.number().int().min(1).max(200).optional() }),
+    result: z.object({ runs: z.array(ScheduleRunSchema) }),
+  },
+  'schedule.preview': {
+    summary: '校验 cron 与时区并给出接下来几次运行时间（表单预览用）。不合法同 schedule.create',
+    params: z.object({ ...CronParams, count: z.number().int().min(1).max(10).optional() }),
+    result: z.object({ nextRuns: z.array(z.number().int()), tz: z.string() }),
   },
   'project.list': {
     summary: '列出项目（PRD-M8-003），按最近活动排序。recent：每个项目带几个最近任务（默认 5）',

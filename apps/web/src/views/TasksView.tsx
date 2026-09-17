@@ -1,17 +1,18 @@
 /**
- * 任务页（`#/tasks`）—— PRD-M8-005 AC-4；新建（`#/tasks/new`，`?schedule=1` 展开计划时间）。
- * 新建 = task.create：系统按项目设置决定隔离与规划，目标作为第一句话发出去（PRD-M8-005）。定时在 TASK-M8-012。
- * 编排运行（DAG）仍用原来的长任务面板。
+ * 任务页（`#/tasks`）—— PRD-M8-005 AC-4 · PRD-M8-007；新建（`#/tasks/new`，`?schedule=1` 是定时任务）。
+ * 新建 = task.create：系统按项目设置决定隔离与规划，目标作为第一句话发出去（PRD-M8-005）。
+ * 定时 = schedule.create：到点由 daemon 按同一个目标建任务。多节点运行在「编排运行」里。
  */
 import type { DomiClient } from '@domi/client-core'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { IconClock } from '../icons.tsx'
 import { dotOf, type ProjectRow, type SessionRow, titleOf } from '../layout/data.ts'
 import { formatRoute, navigate } from '../router.ts'
 import { Composer } from '../session/SessionView.tsx'
-import { TaskPanel } from '../TaskPanel.tsx'
 import { Card, ListRow, Page } from './Page.tsx'
 import { ProjectSelect } from './projectDialogs.tsx'
+import { RunsPanel } from './RunsPanel.tsx'
+import { browserTimeZone, CronFields, ScheduleSection, useSchedules } from './Schedules.tsx'
 
 export function NewTask({
   client,
@@ -20,6 +21,7 @@ export function NewTask({
   projects,
   projectId: initialProject,
   onCreated,
+  onScheduled,
 }: {
   client: DomiClient
   online: boolean
@@ -27,9 +29,13 @@ export function NewTask({
   projects: readonly ProjectRow[]
   projectId?: string | undefined
   onCreated: (id: string) => void
+  onScheduled?: () => void
 }) {
   const [projectId, setProjectId] = useState(initialProject ?? projects[0]?.id ?? '')
   const [notice, setNotice] = useState<string | null>(null)
+  const [when, setWhen] = useState({ cron: '', tz: browserTimeZone() })
+  const [cronOk, setCronOk] = useState(false)
+  const onValid = useCallback((ok: boolean) => setCronOk(ok), [])
   const project = projects.find((p) => p.id === projectId)
   return (
     <Card>
@@ -47,18 +53,38 @@ export function NewTask({
             <IconClock size={13} />
             计划时间
           </label>
-          <p className="mb-1.5 text-[11.5px] text-mut">cron 表达式，例如 0 9 * * 1-5（定时调度即将可用）</p>
-          <input id="task-cron" className="field-input font-mono" placeholder="0 9 * * 1-5" disabled />
+          <p className="mb-1.5 text-[11.5px] text-mut">cron 表达式与时区；到点时按下面的目标新建一个任务</p>
+          <CronFields
+            client={client}
+            cron={when.cron}
+            tz={when.tz}
+            onChange={setWhen}
+            onValid={onValid}
+            idPrefix="task"
+          />
         </div>
       )}
       <Composer
         className="px-0 pb-0"
-        busy={!online || schedule || project === undefined}
+        busy={!online || project === undefined || (schedule && !cronOk)}
         notice={notice}
-        placeholder="这个任务要达成什么？  (Enter 开始)"
-        submitLabel="开始任务"
+        placeholder={schedule ? '每次运行要达成什么？  (Enter 创建)' : '这个任务要达成什么？  (Enter 开始)'}
+        submitLabel={schedule ? '创建定时任务' : '开始任务'}
         onSubmit={async (goal) => {
           if (!project) return
+          if (schedule) {
+            try {
+              await client.createSchedule({ projectId: project.id, goal, cron: when.cron, tz: when.tz })
+              setNotice(null)
+              setWhen({ cron: '', tz: when.tz })
+              onScheduled?.()
+              navigate({ view: 'tasks' })
+            } catch (e) {
+              setNotice(e instanceof Error ? e.message : String(e))
+              throw e
+            }
+            return
+          }
           try {
             // 隔离与否、先不先规划，由系统按项目设置决定（PRD-M8-005 / 006）
             const { sessionId: id } = await client.createTask(project.id, goal)
@@ -98,6 +124,7 @@ export function TasksView({
   onCreated: (id: string) => void
 }) {
   const names = new Map(projects.map((p) => [p.id, p.name]))
+  const sched = useSchedules(client, online)
   const running = tasks.filter((t) => dotOf(t, active) === 'running')
   const recent = tasks.filter((t) => dotOf(t, active) !== 'running').slice(0, 20)
   const row = (t: SessionRow) => (
@@ -120,6 +147,7 @@ export function TasksView({
           projects={projects}
           projectId={projectId}
           onCreated={onCreated}
+          onScheduled={sched.reload}
         />
       )}
       {running.length > 0 && (
@@ -132,13 +160,22 @@ export function TasksView({
       <Card className="px-0 py-2">
         {recent.length === 0 ? <p className="px-3.5 py-2 text-[13px] text-mut">还没有任务。</p> : recent.map(row)}
       </Card>
-      <div className="caps mb-2">编排运行</div>
       {online ? (
-        <Card className="legacy">
-          <TaskPanel client={client} onOpen={(id) => navigate({ view: 'session', id, tab: 'chat' })} />
-        </Card>
+        <>
+          <ScheduleSection
+            client={client}
+            schedules={sched.schedules}
+            error={sched.error}
+            projects={projects}
+            onChanged={sched.reload}
+          />
+          <div className="caps mb-2">编排运行</div>
+          <Card className="px-0 py-2">
+            <RunsPanel client={client} onOpen={(id) => navigate({ view: 'session', id, tab: 'chat' })} />
+          </Card>
+        </>
       ) : (
-        <p className="text-[13px] text-mut">连上 daemon 后显示任务。</p>
+        <p className="text-[13px] text-mut">连上 daemon 后显示定时任务与编排运行。</p>
       )}
     </Page>
   )

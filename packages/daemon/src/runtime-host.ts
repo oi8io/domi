@@ -24,7 +24,7 @@ import {
 import { Notifier } from '@domi/notify'
 import { DagSpecError } from '@domi/orchestrator'
 import type { PluginHost } from '@domi/plugin'
-import type { DomiEvent, EventEnvelope } from '@domi/protocol'
+import type { DomiEvent, EventEnvelope, Schedule } from '@domi/protocol'
 import {
   AUTO_PLAN_REASON,
   applyWorktree,
@@ -57,7 +57,7 @@ import {
   worktreeDiff,
   worktreeFromEvents,
 } from '@domi/runtime'
-import { type ProjectRow, type ProjectSettings, SqliteEventLog } from '@domi/store'
+import { type ProjectRow, type ProjectSettings, type ScheduleRow, SqliteEventLog } from '@domi/store'
 import { AUDIT_SESSION_ID } from './auth.ts'
 
 const RUN_PREFIX = 'run-'
@@ -76,9 +76,13 @@ import {
   SessionNotFoundError,
   type SessionSummary,
 } from './core.ts'
+import { CronError, previewCron } from './cron.ts'
+import { scheduleNextRun } from './scheduler.ts'
 
 export interface RuntimeHostOptions {
   config: DomiConfig
+  /** 时钟（定时任务的测试注入） */
+  now?: () => number
   dbPath: string
   /** 新建会话没给 cwd 时用这个 */
   defaultCwd: string
@@ -106,6 +110,25 @@ export interface RuntimeHost extends DaemonHost {
   /** daemon 自己的审计事件（被拒的连接等）。写进 AUDIT_SESSION_ID，不出现在会话列表里 */
   audit(ev: DomiEvent): Promise<void>
   close(): void
+}
+
+function localTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
+const normalizeCron = (cron: string): string => cron.trim().split(/\s+/).join(' ')
+
+function cronError(e: unknown): unknown {
+  return e instanceof CronError ? new HostRequestError(e.message, { reason: 'INVALID_CRON', field: e.field }) : e
+}
+
+/** 校验 cron 与时区（还要确实会触发） */
+function checkCron(cron: string, tz: string): void {
+  try {
+    previewCron(cron, tz, Date.now(), 1)
+  } catch (e) {
+    throw cronError(e)
+  }
 }
 
 /** 计划转出来的运行带给宿主的信息（经 TaskService.start 的 meta 透传） */
@@ -198,7 +221,12 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
   }
 
   /** 按目标建任务（PRD-M8-005 / 006）：隔离决定 → 建会话 → 需要时先进计划模式 */
-  async function createGoalTask(p: { projectId: string; goal: string; trigger?: 'user' | 'schedule' }) {
+  async function createGoalTask(p: {
+    projectId: string
+    goal: string
+    trigger?: 'user' | 'schedule'
+    schedule?: { scheduleId: string; due: number; late: boolean }
+  }) {
     const project = pj(() => projects.get(p.projectId))
     if (project.archivedAt !== null) throw new HostRequestError(`项目「${project.name}」已归档，先取消归档`)
     const isolation = decideIsolation({
@@ -218,10 +246,43 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     } else {
       await createTask(id, project.path, project.id, '', isolation)
     }
+    if (p.schedule) await index.append(id, [{ t: 'schedule.fire', ...p.schedule }])
     // 小任务不强制先规划（SPEC-M8-005）：目标很短、项目也没要求每次都审
     const planned = !(p.goal.trim().length < 40 && project.settings.planReview !== 'always')
     if (planned) await (await live(id)).setMode('plan', AUTO_PLAN_REASON)
     return { sessionId: id, isolation, planned }
+  }
+
+  const now = opts.now ?? Date.now
+
+  function schedule(id: string): ScheduleRow {
+    const row = index.schedules.get(id)
+    if (!row) throw new HostRequestError(`没有这个定时任务：${id}`)
+    return row
+  }
+
+  function toSchedule(row: ScheduleRow): Schedule {
+    const last = index.schedules.runs(row.id, 1)[0]
+    return {
+      id: row.id,
+      projectId: row.projectId,
+      goal: row.goal,
+      cron: row.cron,
+      tz: row.tz,
+      paused: row.paused,
+      createdAt: row.createdAt,
+      nextRun: scheduleNextRun(row, now()),
+      ...(last === undefined
+        ? {}
+        : {
+            lastRun: {
+              due: last.due,
+              firedAt: last.firedAt,
+              skipped: last.skipped,
+              ...(last.sessionId === null ? {} : { sessionId: last.sessionId }),
+            },
+          }),
+    }
   }
 
   /**
@@ -473,6 +534,62 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     },
 
     createTask: (p) => createGoalTask(p),
+
+    schedules: {
+      store: index.schedules,
+      async list() {
+        return index.schedules.list().map(toSchedule)
+      },
+      async create(p) {
+        const project = pj(() => projects.get(p.projectId))
+        if (project.archivedAt !== null) throw new HostRequestError(`项目「${project.name}」已归档，先取消归档`)
+        const tz = p.tz ?? localTimeZone()
+        checkCron(p.cron, tz)
+        const at = now()
+        const row = index.schedules.insert({
+          id: `sch-${at.toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+          projectId: project.id,
+          goal: p.goal.trim(),
+          cron: normalizeCron(p.cron),
+          tz,
+          createdAt: at,
+        })
+        index.schedules.setLastDue(row.id, at)
+        return toSchedule(schedule(row.id))
+      },
+      async update(p) {
+        const cur = schedule(p.id)
+        const cron = p.cron === undefined ? cur.cron : normalizeCron(p.cron)
+        const tz = p.tz ?? cur.tz
+        if (p.cron !== undefined || p.tz !== undefined) checkCron(cron, tz)
+        index.schedules.update(p.id, {
+          ...(p.goal === undefined ? {} : { goal: p.goal.trim() }),
+          cron,
+          tz,
+          ...(p.paused === undefined ? {} : { paused: p.paused }),
+        })
+        // 改了时间表、或者从暂停恢复：从此刻重新算，不补之前错过的
+        const resumed = cur.paused && p.paused === false
+        if (resumed || cron !== cur.cron || tz !== cur.tz) index.schedules.setLastDue(p.id, now())
+        return toSchedule(schedule(p.id))
+      },
+      async remove(id) {
+        schedule(id)
+        index.schedules.delete(id, now())
+      },
+      async runs(id, limit) {
+        schedule(id)
+        return index.schedules.runs(id, limit)
+      },
+      async preview(cron, tz, count) {
+        const zone = tz ?? localTimeZone()
+        try {
+          return { nextRuns: previewCron(cron, zone, now(), count), tz: zone }
+        } catch (e) {
+          throw cronError(e)
+        }
+      },
+    },
 
     async rename(sessionId, title) {
       if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)

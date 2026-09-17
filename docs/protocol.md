@@ -1679,6 +1679,580 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `schedule.list`
+
+定时任务列表（PRD-M8-007），带下一次运行时间与最近一次触发
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schedules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "cron": {
+            "type": "string"
+          },
+          "tz": {
+            "type": "string"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "nextRun": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastRun": {
+            "type": "object",
+            "properties": {
+              "due": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "firedAt": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "skipped": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "due",
+              "firedAt",
+              "skipped"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "goal",
+          "cron",
+          "tz",
+          "paused",
+          "createdAt",
+          "nextRun"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schedules"
+  ]
+}
+```
+
+### `schedule.create`
+
+新建定时任务：项目 + 目标 + 5 段 cron + 时区（缺省 domid 所在时区）。cron / 时区不合法 → INVALID_PARAMS，data = { reason: "INVALID_CRON", field }，message 指出哪一段
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "projectId": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cron": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tz": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "projectId",
+    "goal",
+    "cron"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        },
+        "cron": {
+          "type": "string"
+        },
+        "tz": {
+          "type": "string"
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "nextRun": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastRun": {
+          "type": "object",
+          "properties": {
+            "due": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "firedAt": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "skipped": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "due",
+            "firedAt",
+            "skipped"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "goal",
+        "cron",
+        "tz",
+        "paused",
+        "createdAt",
+        "nextRun"
+      ]
+    }
+  },
+  "required": [
+    "schedule"
+  ]
+}
+```
+
+### `schedule.update`
+
+改目标 / 时间表 / 暂停与恢复。改了时间表或恢复时从此刻重新算，不补之前错过的
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cron": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tz": {
+      "type": "string",
+      "minLength": 1
+    },
+    "paused": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "goal": {
+          "type": "string"
+        },
+        "cron": {
+          "type": "string"
+        },
+        "tz": {
+          "type": "string"
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "nextRun": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastRun": {
+          "type": "object",
+          "properties": {
+            "due": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "firedAt": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "skipped": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "due",
+            "firedAt",
+            "skipped"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "goal",
+        "cron",
+        "tz",
+        "paused",
+        "createdAt",
+        "nextRun"
+      ]
+    }
+  },
+  "required": [
+    "schedule"
+  ]
+}
+```
+
+### `schedule.delete`
+
+删除定时任务（历史运行建出的任务不动）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
+### `schedule.runNow`
+
+立即运行一次（不影响之后的时间表）。上一次还没结束 → SESSION_BUSY
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+### `schedule.runs`
+
+某个定时任务的历史触发，新的在前
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    }
+  },
+  "required": [
+    "id"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "due": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "firedAt": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "late": {
+            "type": "boolean"
+          },
+          "skipped": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "done",
+              "skipped",
+              "failed"
+            ]
+          }
+        },
+        "required": [
+          "due",
+          "firedAt",
+          "late",
+          "skipped",
+          "status"
+        ]
+      }
+    }
+  },
+  "required": [
+    "runs"
+  ]
+}
+```
+
+### `schedule.preview`
+
+校验 cron 与时区并给出接下来几次运行时间（表单预览用）。不合法同 schedule.create
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "cron": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tz": {
+      "type": "string",
+      "minLength": 1
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    }
+  },
+  "required": [
+    "cron"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "nextRuns": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": -9007199254740991,
+        "maximum": 9007199254740991
+      }
+    },
+    "tz": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nextRuns",
+    "tz"
+  ]
+}
+```
+
 ### `project.list`
 
 列出项目（PRD-M8-003），按最近活动排序。recent：每个项目带几个最近任务（默认 5）
