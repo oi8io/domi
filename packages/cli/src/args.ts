@@ -55,6 +55,10 @@ export interface ParsedCli {
     fromToml: boolean
     /** `domi --isolate`：在隔离工作区（git worktree）里开会话（PRD-M7-006） */
     isolate: boolean
+    /** `domi --chat`：不管在哪个目录，都开自由会话（PRD-M8-017 AC-2） */
+    chat: boolean
+    /** `domi -p <项目名或路径>`（长写法 `--in`）：在这个项目下开任务。`--project` 已被 `domi init --project` 占用 */
+    inProject: string | undefined
     /** `domi init --project`：在仓库里建 .domi/ 与 AGENT.md 模板（PRD-M7-002 AC-5） */
     project: boolean
     /** `domi trust <路径> --revoke` */
@@ -102,6 +106,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       project: { type: 'boolean' },
       revoke: { type: 'boolean' },
       isolate: { type: 'boolean' },
+      chat: { type: 'boolean' },
+      in: { type: 'string', short: 'p' },
     },
   })
 
@@ -124,6 +130,8 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       fromToml: Boolean(values['from-toml']),
       project: Boolean(values.project),
       isolate: Boolean(values.isolate),
+      chat: Boolean(values.chat),
+      inProject: typeof values.in === 'string' ? values.in : undefined,
       revoke: Boolean(values.revoke),
       html: typeof values.html === 'string' ? values.html : undefined,
       connect: typeof values.connect === 'string' ? values.connect : undefined,
@@ -137,6 +145,8 @@ export const HELP = `domi —— 本地优先的 agent 运行时
 
 用法：
   domi                      进入对话（最常用，不需要子命令）
+  domi --chat               开自由会话（不带项目上下文，在 ~/.domi/scratch 里）；不加时在仓库里是任务、在别处是会话
+  domi -p <项目名或路径>    在这个项目下开任务
   domi --isolate            在隔离工作区里开会话（git worktree，不碰你的工作区；改完审阅后再带回）
   domi --connect ws://主机:端口
                             连另一台机器上的 domid（token 放在环境变量 DOMI_TOKEN）

@@ -40,6 +40,10 @@ export interface ConnectOptions {
   token?: string
   /** `domi --isolate`：在隔离工作区（git worktree）里开会话（PRD-M7-006） */
   isolate?: boolean
+  /** `domi --chat`（PRD-M8-017） */
+  chat?: boolean
+  /** `domi -p <项目名或路径>`（PRD-M8-017） */
+  inProject?: string
 }
 
 /** 远程连不上。说清楚是哪一步，别让人对着「一直在重连」猜 */
@@ -96,6 +100,67 @@ export async function connectDaemon(
   return { client, daemon }
 }
 
+/** 编辑距离（相近项目名提示用） */
+export function editDistance(a: string, b: string): number {
+  const dp = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0] as number
+    dp[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const cur = dp[j] as number
+      dp[j] = Math.min((dp[j] as number) + 1, (dp[j - 1] as number) + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1))
+      prev = cur
+    }
+  }
+  return dp[b.length] as number
+}
+
+export class ProjectArgError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ProjectArgError'
+  }
+}
+
+/**
+ * `-p` 的值 → 项目 id：先按名字精确匹配，再当路径（已登记就用，没登记但像项目就登记），
+ * 都不行就报错并列出名字相近的（编辑距离 ≤ 3，最多 5 个）
+ */
+export async function findProject(
+  client: Pick<DomiClient, 'listProjects' | 'createProject' | 'resolveProject'>,
+  arg: string,
+  cwd: string,
+): Promise<string> {
+  const projects = await client.listProjects({ includeArchived: false, recent: 0 })
+  const byName = projects.filter((p) => p.name === arg)
+  if (byName.length === 1) return (byName[0] as (typeof projects)[number]).id
+  if (byName.length > 1) {
+    throw new ProjectArgError(
+      `有 ${byName.length} 个项目都叫「${arg}」，请改用路径：${byName.map((p) => p.path).join('、')}`,
+    )
+  }
+  const looksLikePath = arg.includes('/') || arg.startsWith('.') || arg.startsWith('~')
+  if (looksLikePath) {
+    const abs = arg.startsWith('~') || arg.startsWith('/') ? arg : `${cwd}/${arg}`
+    try {
+      const r = await client.resolveProject(abs)
+      if (r.project) return r.project.id
+      return (await client.createProject(r.root)).id
+    } catch (e) {
+      throw new ProjectArgError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  const near = projects
+    .map((p) => ({ p, d: editDistance(p.name.toLowerCase(), arg.toLowerCase()) }))
+    .filter((x) => x.d <= 3)
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 5)
+    .map((x) => x.p.name)
+  throw new ProjectArgError(
+    `没有叫「${arg}」的项目。${near.length > 0 ? `是不是：${near.join('、')}？` : ''}也可以直接给路径：domi -p ./路径`,
+  )
+}
+
 export async function connectChat(opts: ConnectOptions): Promise<ChatConnection> {
   let daemon: DaemonEndpoint
   if (opts.connect !== undefined) {
@@ -116,9 +181,15 @@ export async function connectChat(opts: ConnectOptions): Promise<ChatConnection>
     connect: () => new WebSocket(daemon.url, protocols) as unknown as WireSocket,
   })
   await client.start()
-  const sessionId = opts.isolate
-    ? (await client.createIsolatedSession(opts.cwd)).sessionId
-    : await client.createSession(opts.cwd)
+  let sessionId: string
+  if (opts.isolate) sessionId = (await client.createIsolatedSession(opts.cwd)).sessionId
+  else if (opts.chat) sessionId = await client.createSession(undefined, { kind: 'chat' })
+  else if (opts.inProject !== undefined) {
+    const projectId = await findProject(client, opts.inProject, opts.cwd)
+    sessionId = await client.createSession(undefined, { kind: 'task', projectId })
+  }
+  // 不指定时由 daemon 按目录判断：项目 / git 仓库 / 有 AGENT.md → 任务，否则 → 会话（PRD-M8-017 AC-1）
+  else sessionId = await client.createSession(opts.cwd)
   // 模型名先按本地配置显示；daemon 推来第一份 metrics 后以它为准
   const store = createSessionStore({ model: opts.model.name, provider: opts.model.provider })
   await client.watch(sessionId, store)

@@ -375,7 +375,11 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     process.exit(await runCommand(cli, io))
   }
 
-  return startChat(cli.flags.connect, cli.flags.isolate)
+  return startChat(cli.flags.connect, {
+    isolate: cli.flags.isolate,
+    chat: cli.flags.chat,
+    ...(cli.flags.inProject === undefined ? {} : { inProject: cli.flags.inProject }),
+  })
 }
 
 async function runDaemonCommand(cli: ParsedCli, io: { out(s: string): void; err(s: string): void }): Promise<number> {
@@ -415,7 +419,10 @@ async function runDaemonCommand(cli: ParsedCli, io: { out(s: string): void; err(
   }
 }
 
-async function startChat(remote: string | undefined, isolate = false): Promise<void> {
+async function startChat(
+  remote: string | undefined,
+  where: { isolate: boolean; chat: boolean; inProject?: string } = { isolate: false, chat: false },
+): Promise<void> {
   let config: ReturnType<typeof loadConfigOrThrow>
   try {
     // 连远程时模型在对面跑，本机不需要模型凭据
@@ -441,7 +448,9 @@ async function startChat(remote: string | undefined, isolate = false): Promise<v
       model: config.model,
       ...(remote === undefined ? {} : { connect: remote }),
       ...(token === undefined ? {} : { token }),
-      ...(isolate ? { isolate: true } : {}),
+      ...(where.isolate ? { isolate: true } : {}),
+      ...(where.chat ? { chat: true } : {}),
+      ...(where.inProject === undefined ? {} : { inProject: where.inProject }),
     })
     const theme = makeTheme({
       mode: detectMode(config.tui.theme, process.env),
