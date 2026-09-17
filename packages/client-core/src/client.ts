@@ -236,6 +236,17 @@ export class DomiClient {
     return (await this.request('session.toTask', { sessionId, projectId, goal })).sessionId
   }
 
+  // ── 设置（PRD-M8-011）────────────────────────────────────
+
+  getSettings(): Promise<ResultOf<'config.get'>> {
+    return this.request('config.get', {})
+  }
+
+  /** 键是 config.get 的 writable 里的点分路径；null = 删掉 */
+  setSettings(patch: Record<string, unknown>): Promise<ResultOf<'config.set'>> {
+    return this.request('config.set', { patch })
+  }
+
   // ── 项目（PRD-M8-003）────────────────────────────────────
 
   async listProjects(

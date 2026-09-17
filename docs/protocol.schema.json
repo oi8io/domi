@@ -1878,6 +1878,123 @@
         ]
       }
     },
+    "config.get": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "secrets": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "set": {
+                  "type": "boolean"
+                },
+                "masked": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "env",
+                    "secrets",
+                    "config"
+                  ]
+                }
+              },
+              "required": [
+                "set"
+              ]
+            }
+          },
+          "paths": {
+            "type": "object",
+            "properties": {
+              "config": {
+                "type": "string"
+              },
+              "secrets": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "config",
+              "secrets"
+            ]
+          },
+          "secretsTooOpen": {
+            "type": "boolean"
+          },
+          "writable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "values",
+          "secrets",
+          "paths",
+          "secretsTooOpen",
+          "writable"
+        ]
+      }
+    },
+    "config.set": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "patch": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "patch"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "restartRequired": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ok",
+          "restartRequired"
+        ]
+      }
+    },
     "session.budget": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

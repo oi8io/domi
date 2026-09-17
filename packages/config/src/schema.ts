@@ -109,8 +109,34 @@ export const ConfigSchema = z.object({
   bridge: z.object({ telegram: z.object({ token: z.string().optional() }).optional() }).default({}),
   /** 插件（PRD-M6）。allowUnsandboxed：没有系统级沙箱时也运行插件代码——不推荐，doctor 会标红 */
   plugins: z
-    .object({ enabled: z.boolean().default(true), allowUnsandboxed: z.boolean().default(false) })
-    .default({ enabled: true, allowUnsandboxed: false }),
+    .object({
+      enabled: z.boolean().default(true),
+      allowUnsandboxed: z.boolean().default(false),
+      /** 停用的插件名（PRD-M8-012 AC-6）。设置页的开关写这里 */
+      disabled: z.array(z.string()).default([]),
+    })
+    .default({ enabled: true, allowUnsandboxed: false, disabled: [] }),
+  /**
+   * 各家模型的凭据与地址（PRD-M8-011）。文件里写 base_url；api_key 推荐放 ~/.domi/secrets.yaml（设置页就写那里）。
+   * model.provider 那一家的 key / base_url 也可以写在 model 下（旧写法，继续认）
+   */
+  providers: z
+    .record(
+      z.string(),
+      z.object({
+        apiKey: z.string().optional(),
+        baseUrl: z.string().optional(),
+        /** OpenAI 兼容网关后面挂了哪些模型（模型下拉用） */
+        models: z.array(z.string()).default([]),
+      }),
+    )
+    .default({}),
+  /** 界面（PRD-M8-001 AC-5）：主题色在 Web 与 TUI 之间共用 */
+  ui: z
+    .object({ accent: z.enum(['blue', 'green', 'orange', 'purple', 'pink']).default('blue') })
+    .default({ accent: 'blue' }),
+  /** TUI 深浅（PRD-M8-014 AC-6）。auto 读 COLORFGBG */
+  tui: z.object({ theme: z.enum(['auto', 'dark', 'light']).default('auto') }).default({ theme: 'auto' }),
   /**
    * 钩子（PRD-M7-003 · ADR-025）。**只从这个文件读**，仓库里的任何文件都注册不了钩子。
    * pre：权限允许之后、执行之前，非 0 退出 = 拦下；post：执行之后，输出附在结果上；stop：一轮结束后
@@ -202,8 +228,12 @@ export const ConfigSchema = z.object({
       maxTokens: z.number().int().positive().default(150_000),
       includeReasoning: z.boolean().default(false),
       strategy: z.string().default('full'),
+      /** 压缩时逐字保留的最近轮数（PRD-M8-012 AC-4）。只在 strategy = compact 时用 */
+      keepTurns: z.number().int().min(0).max(50).default(2),
+      /** 上下文占用到这个百分比就压缩。只在 strategy = compact 时用 */
+      compactAt: z.number().int().min(30).max(95).default(70),
     })
-    .default({ maxTokens: 150_000, includeReasoning: false, strategy: 'full' }),
+    .default({ maxTokens: 150_000, includeReasoning: false, strategy: 'full', keepTurns: 2, compactAt: 70 }),
 })
 
 export type DomiConfig = z.infer<typeof ConfigSchema>

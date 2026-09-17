@@ -69,6 +69,8 @@ export async function main(env: Record<string, string | undefined> = process.env
     config,
     dbPath: join(home, 'events.db'),
     defaultCwd: process.cwd(),
+    // 设置页读写的就是启动时读的那一份（PRD-M8-011）
+    configSource: { env, home: env.HOME ?? homedir() },
     extraTools: (cwd) => [...hub.tools(), ...(plugins?.tools(cwd) ?? [])],
     ...(plugins === undefined ? {} : { plugins }),
     notices: () => hub.notices().map((n) => n.message),

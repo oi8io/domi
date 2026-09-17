@@ -41,9 +41,9 @@ export const TRIGGER_HIGH = 0.75
  * 而每次压缩都是一次真实模型调用。所以到 70% 就压，别等 75%——
  * 75% 是"最晚也该压了"的上限，不是触发点。
  */
-export function shouldCompact(usedTokens: number, maxTokens: number): boolean {
+export function shouldCompact(usedTokens: number, maxTokens: number, trigger = TRIGGER_LOW): boolean {
   if (maxTokens <= 0) return false
-  return usedTokens / maxTokens >= TRIGGER_LOW
+  return usedTokens / maxTokens >= trigger
 }
 
 /** 摘要生成器由外面注入 —— packages/memory 不依赖 @domi/model（INV-02） */

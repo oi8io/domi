@@ -374,6 +374,32 @@ export const METHODS = {
       root: z.string(),
     }),
   },
+  'config.get': {
+    summary:
+      '设置页要显示的配置（PRD-M8-011 AC-1）：白名单里各键的当前值，各家 key 只给掩码与来源（env / secrets / config），绝不回原文',
+    params: z.object({}),
+    result: z.object({
+      values: z.record(z.string(), z.unknown()),
+      secrets: z.record(
+        z.string(),
+        z.object({
+          set: z.boolean(),
+          masked: z.string().optional(),
+          source: z.enum(['env', 'secrets', 'config']).optional(),
+        }),
+      ),
+      paths: z.object({ config: z.string(), secrets: z.string() }),
+      secretsTooOpen: z.boolean(),
+      writable: z.array(z.string()),
+    }),
+  },
+  'config.set': {
+    summary:
+      '改配置（PRD-M8-011 AC-2 / AC-3）。patch 的键是 config.get 的 writable 里的点分路径，值为 null 表示删掉；' +
+      '有一个键不在白名单就整体拒绝（INVALID_PARAMS），文件不动。key 写进 secrets.yaml。改完下一轮生效；restartRequired 列出要重启 domid 才生效的键',
+    params: z.object({ patch: z.record(z.string(), z.unknown()) }),
+    result: z.object({ ok: z.literal(true), restartRequired: z.array(z.string()) }),
+  },
   'session.budget': {
     summary: '设这个会话的用量上限（PRD-M7-009）：到 80% 提醒，到顶暂停问人。落成 budget.decided，重开会话后照样生效',
     params: z.object({

@@ -11,7 +11,16 @@
 
 import { dirname, join } from 'node:path'
 import { SkillRegistry } from '@domi/capability'
-import { type DomiConfig, pricingOf } from '@domi/config'
+import {
+  ConfigParseError,
+  ConfigWriteError,
+  type DomiConfig,
+  type LoadOptions,
+  loadConfig,
+  pricingOf,
+  readSettings,
+  writeConfigPatch,
+} from '@domi/config'
 import { Notifier } from '@domi/notify'
 import { DagSpecError } from '@domi/orchestrator'
 import type { PluginHost } from '@domi/plugin'
@@ -82,6 +91,8 @@ export interface RuntimeHostOptions {
   skillsDir?: string
   /** 已加载的插件（PRD-M6）：skill 进 Skill 清单，UI 面板经协议给客户端 */
   plugins?: PluginHost
+  /** 配置从哪读（PRD-M8-011）。给了才开放 config.get / config.set */
+  configSource?: LoadOptions
   /** 测试注入：记忆抽取用的模型。不给就用 provider（再不给就按配置建） */
   memoryProvider?: SessionOptions['provider']
 }
@@ -378,6 +389,39 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
       index.sessions.setTitle(sessionId, title)
     },
+
+    ...(opts.configSource === undefined
+      ? {}
+      : {
+          config: {
+            async get() {
+              try {
+                const v = readSettings(opts.configSource)
+                return { ...v, writable: [...v.writable] }
+              } catch (e) {
+                throw e instanceof ConfigParseError ? new HostRequestError(e.message) : e
+              }
+            },
+            async set(patch) {
+              const src = opts.configSource as LoadOptions
+              try {
+                writeConfigPatch(patch, src)
+              } catch (e) {
+                throw e instanceof ConfigWriteError || e instanceof ConfigParseError
+                  ? new HostRequestError(e.message)
+                  : e
+              }
+              // 热加载（AC-3）：之后新建的会话用新配置；已经开着的会话下一轮用新配置
+              const next = loadConfig(src)
+              ;(opts as { config: DomiConfig }).config = next
+              for (const s of sessions.values()) void s.then((x) => x.reconfigure(next)).catch(() => undefined)
+              const restartRequired = Object.keys(patch).filter(
+                (k) => k.startsWith('memory.') || k.startsWith('plugins.'),
+              )
+              return { ok: true as const, restartRequired }
+            },
+          },
+        }),
 
     projects: {
       async list({ includeArchived, recent }) {

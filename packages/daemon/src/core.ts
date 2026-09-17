@@ -186,6 +186,11 @@ export interface DaemonHost {
   /** 改标题（PRD-M8-008）。会话不存在抛 SessionNotFoundError */
   rename?(sessionId: string, title: string): Promise<void>
   projects?: HostProjects
+  /** 设置页（PRD-M8-011）。补丁不合法抛 HostRequestError */
+  config?: {
+    get(): Promise<ResultOf<'config.get'>>
+    set(patch: Record<string, unknown>): Promise<ResultOf<'config.set'>>
+  }
   /** 软删除 / 恢复。会话不存在时抛 SessionNotFoundError */
   remove(sessionId: string): Promise<void>
   restore(sessionId: string): Promise<void>
@@ -386,6 +391,14 @@ export class Daemon {
         } as never)
         if (submitted.error) return submitted
         return ok(req.id, { sessionId: id })
+      }
+
+      case 'config.get':
+      case 'config.set': {
+        const h = this.host.config
+        if (!h) return fail(req.id, 'INTERNAL', '这个 domid 不支持从这里改配置')
+        if (method === 'config.get') return ok(req.id, await h.get())
+        return ok(req.id, await h.set((params as { patch: Record<string, unknown> }).patch))
       }
 
       case 'project.list':

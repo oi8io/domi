@@ -129,6 +129,11 @@ export function diagnosticFetch(base: FetchLike, trace: RequestTrace): typeof gl
   return wrapped as unknown as typeof globalThis.fetch
 }
 
+/** 走 OpenAI 兼容协议、但有固定官方地址的几家（PRD-M8-012 AC-2）。没配 base_url 时用这里的 */
+const COMPATIBLE_DEFAULT_BASE: Record<string, string> = {
+  deepseek: 'https://api.deepseek.com/v1',
+}
+
 export function createProvider(cfg: ProviderConfig): ModelProvider {
   const capabilities = capabilitiesFor(cfg)
   const apiKey = cfg.apiKey ?? ''
@@ -156,7 +161,7 @@ export function createProvider(cfg: ProviderConfig): ModelProvider {
         return createOpenAICompatible({
           ...common,
           name: cfg.provider,
-          baseURL: cfg.baseUrl ?? 'http://localhost:11434/v1',
+          baseURL: cfg.baseUrl ?? COMPATIBLE_DEFAULT_BASE[cfg.provider] ?? 'http://localhost:11434/v1',
         })(cfg.name)
     }
   })()

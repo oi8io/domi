@@ -291,14 +291,25 @@ export class DomiSession {
 
   private buildProvider(provider: string, name: string): ModelProvider {
     const m = this.opts.config.model
+    // 默认那一家用 model 下的凭据；换到别家时用 providers 里那一家的（PRD-M8-011），没配就沿用默认的
+    const other = provider === m.provider ? undefined : this.opts.config.providers?.[provider]
     return createProvider({
       provider,
       name,
-      apiKey: m.apiKey,
-      baseUrl: m.baseUrl,
+      apiKey: other?.apiKey ?? m.apiKey,
+      baseUrl: other === undefined ? m.baseUrl : other.baseUrl,
       // 能力覆盖是为配置里那个 provider 写的，换了 provider 就不再适用
       capabilities: provider === m.provider ? m.capabilities : undefined,
     })
+  }
+
+  /**
+   * 换一份配置（PRD-M8-011 AC-3：设置页改完，下一轮生效）。已经在跑的这一轮不受影响；
+   * 权限规则与钩子不从设置页改，这里不重建它们。模型实例按新凭据重建（测试注入的替身不动）
+   */
+  reconfigure(config: DomiConfig): void {
+    ;(this.opts as { config: DomiConfig }).config = config
+    if (!this.injectedProvider) this.provider = this.buildProvider(this.currentProvider, this.currentModel)
   }
 
   /** 当前在用的 provider 与模型（会话中途可能被 switchModel 换掉） */
@@ -501,6 +512,7 @@ export class DomiSession {
     try {
       const r = await compact(events, {
         trigger,
+        keepTurns: this.opts.config.context.keepTurns ?? 2,
         summarize: async ({ text }) =>
           generateStructured({ provider: this.provider, capabilities: this.provider.capabilities }, SummarySchema, {
             model: this.currentModel,
@@ -765,7 +777,8 @@ export class DomiSession {
     const events = await this.view()
     const used = aggregate(events, { maxContextTokens: this.opts.config.context.maxTokens }).tokens
     const total = used.input + used.output
-    if (!shouldCompact(total, this.opts.config.context.maxTokens)) return
+    if (!shouldCompact(total, this.opts.config.context.maxTokens, (this.opts.config.context.compactAt ?? 70) / 100))
+      return
     await this.compactNow('threshold')
   }
 

@@ -1,3 +1,5 @@
 export * from './load.ts'
 export * from './preflight.ts'
 export * from './schema.ts'
+export * from './secrets.ts'
+export * from './write.ts'

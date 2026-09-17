@@ -5,7 +5,7 @@
  * 状态全在 client-core 的 atom 与 daemon 里，这个文件里没有一行是在算「事件意味着什么」（INV-04）。
  * 与 TUI 的逐项对等见 docs/parity-checklist.md。
  */
-import { createSessionStore, type DomiClient, type SessionStore } from '@domi/client-core'
+import { createSessionStore, type DomiClient, PALETTES, type PaletteId, type SessionStore } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 import type { ProjectRow, SessionRow } from './layout/data.ts'
@@ -13,6 +13,7 @@ import { Sidebar } from './layout/Sidebar.tsx'
 import type { PendingRef } from './PendingRefs.tsx'
 import { $route, navigate, type Route } from './router.ts'
 import { SessionView } from './session/SessionView.tsx'
+import { setAccent } from './theme/store.ts'
 import { HomeView } from './views/HomeView.tsx'
 import { ProjectsView, ProjectView } from './views/ProjectsView.tsx'
 import { AddProjectDialog, ToTaskDialog } from './views/projectDialogs.tsx'
@@ -71,6 +72,18 @@ export function App({
   useEffect(() => {
     if (online) refreshSoon()
   }, [online, refreshSoon])
+
+  // 主题色存在 daemon（与 TUI 共用，PRD-M8-001 AC-5）；连上时以它为准。老 daemon 没有这个接口就用本地的
+  useEffect(() => {
+    if (!online) return
+    client.getSettings().then(
+      (d) => {
+        const a = d.values['ui.accent']
+        if (typeof a === 'string' && PALETTES.some((p) => p.id === a)) setAccent(a as PaletteId)
+      },
+      () => undefined,
+    )
+  }, [client, online])
 
   // 会话订阅跟着路由走
   const sessionId = route.view === 'session' ? route.id : null
