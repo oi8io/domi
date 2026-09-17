@@ -117,6 +117,10 @@ export interface MetricsSnapshot {
   /** 本轮验证状态（M7-004） */
   verify: VerifyState
   mode: 'plan' | 'act'
+  turns?: number
+  steps?: number
+  tokPerSec?: number | null
+  cacheHitPercent?: number | null
 }
 
 export interface SessionEvents {
@@ -404,6 +408,10 @@ export class DomiSession {
         unpricedModels: m.unpricedModels,
         verify: verifyState(all, { command: this.opts.config.verify?.command }),
         mode: this.mode,
+        turns: m.turns,
+        steps: m.steps,
+        tokPerSec: m.tokPerSec,
+        cacheHitPercent: m.cacheHitPercent,
       })
     }
   }

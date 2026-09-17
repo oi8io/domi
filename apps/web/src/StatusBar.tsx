@@ -46,18 +46,31 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
           </span>
         )}
         <span className="pill font-mono">{status.model === '' ? '—' : `${status.provider}/${status.model}`}</span>
-        <span className="pill">
+        <span className="pill" data-pill="pace">
           <IconClock size={12} className="opacity-60" />
-          {m?.turnMs !== undefined && (
+          {m?.turns !== undefined && (
             <>
-              本轮 <b>{formatElapsed(m.turnMs)}</b> ·{' '}
+              <b>{m.turns} turns</b> · {m.steps ?? 0} steps ·{' '}
             </>
           )}
-          <b>{status.toolCalls}</b> 次工具
+          {m?.tokPerSec !== undefined && m.tokPerSec !== null && (
+            <>
+              <b>{m.tokPerSec} tok/s</b> ·{' '}
+            </>
+          )}
+          {m?.turnMs !== undefined && <>本轮 {formatElapsed(m.turnMs)} · </>}
+          {status.toolCalls} 次工具
         </span>
-        <span className="pill">
+        <span className="pill" data-pill="tokens">
           <IconDatabase size={12} className="opacity-60" />
-          <b>{m === null ? '— tok' : formatTokens(m.tokens)}</b> · {m === null ? '—' : m.cost}
+          <b>{m === null ? '— tok' : formatTokens(m.tokens)}</b>
+          {m?.cacheHitPercent !== undefined && m.cacheHitPercent !== null && (
+            <>
+              {' '}
+              · Cache hit <b>{m.cacheHitPercent}%</b>
+            </>
+          )}{' '}
+          · {m === null ? '—' : m.cost}
         </span>
         <span className={cn('pill', CTX_CLASS[level])} data-ctx={level}>
           ctx {m?.contextPercent ?? 0}%

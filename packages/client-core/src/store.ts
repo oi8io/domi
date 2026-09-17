@@ -17,6 +17,8 @@ export interface TranscriptItem {
   ok?: boolean
   /** 工具调用的参数摘要：JSON 序列化后前 80 字符 + …（PRD-M0-005 AC-1 写死的规则） */
   summary?: string
+  /** 工具结果：执行耗时（毫秒，来自 tool.result 事件，M8-008） */
+  ms?: number
 }
 
 export interface MetricsSnapshot {
@@ -32,6 +34,11 @@ export interface MetricsSnapshot {
   verify?: 'clean' | 'unverified' | 'verified' | 'failed' | undefined
   /** 计划模式（M7-005） */
   mode?: 'plan' | 'act' | undefined
+  /** M8-008：轮数、模型请求次数、最近一轮输出速度、缓存命中率。老 daemon 不推 */
+  turns?: number | undefined
+  steps?: number | undefined
+  tokPerSec?: number | null | undefined
+  cacheHitPercent?: number | null | undefined
 }
 
 export interface StatusSnapshot {
@@ -159,6 +166,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           text: ev.reason ?? (ev.ok ? 'ok' : 'failed'),
           ok: ev.ok,
           summary: summarizeArgs(ev.payload),
+          ms: ev.ms,
         })
         break
       case 'permission':

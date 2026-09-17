@@ -26,11 +26,12 @@ import { ConfigParseError, loadConfig, loadConfigOrThrow, MissingCredentialError
 import { resolveClientToken } from '@domi/daemon'
 import { useStore } from '@nanostores/react'
 import { Box, render, Text, useApp, useInput } from 'ink'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { App } from './App.tsx'
 import { parseSlash } from './commands.ts'
-import { Prompt } from './components/Prompt.tsx'
+import { editAction, Prompt } from './components/Prompt.tsx'
 import { connectChat, connectDaemon } from './connect.ts'
+import { detectMode, makeTheme, ThemeContext, type TuiTheme } from './theme.ts'
 
 const EXIT_CONFIG_ERROR = 2
 
@@ -56,14 +57,28 @@ export function formatSessionLine(
 }
 const DAEMON_ROLE_ENV = 'DOMI_INTERNAL_ROLE'
 
+/** 顶栏要的：会话标题与所属项目名（从列表里查；老 daemon 没有项目接口就只显示标题） */
+async function contextOf(client: DomiClient, sessionId: string): Promise<{ project: string | null; title: string }> {
+  const { sessions } = await client.listSessions()
+  const row = sessions.find((s) => s.id === sessionId)
+  let project: string | null = null
+  if (row?.projectId !== undefined) {
+    const projects = await client.listProjects({ includeArchived: true, recent: 0 }).catch(() => [])
+    project = projects.find((p) => p.id === row.projectId)?.name ?? null
+  }
+  return { project, title: row?.title ?? '' }
+}
+
 function Root({
   store: initialStore,
   client,
   sessionId: initialSessionId,
+  theme: initialTheme,
 }: {
   store: SessionStore
   client: DomiClient
   sessionId: string
+  theme: TuiTheme
 }): React.ReactElement {
   const { exit } = useApp()
   // 分支后切到新会话：换一个 store 重新订阅，旧会话在 daemon 里不受影响
@@ -75,7 +90,27 @@ function Root({
   // 提交到 daemon 回 accepted、再到第一条 busy 通知之间有个空档，这段时间也不许再提交
   const [sending, setSending] = useState(false)
   const status = useStore(store.$status)
+  const connection = useStore(client.$state)
   const busy = sending || status.busy
+  const [theme, setTheme] = useState(initialTheme)
+  const [context, setContext] = useState<{ project: string | null; title: string }>({ project: null, title: '' })
+
+  // 顶栏：切会话时、每一轮结束时（标题可能刚生成）刷新
+  // biome-ignore lint/correctness/useExhaustiveDependencies: busy 翻转是刷新的触发条件
+  useEffect(() => {
+    contextOf(client, sessionId).then(setContext, () => undefined)
+  }, [client, sessionId, status.busy])
+
+  // 主题色存在 daemon（与 Web 共用，PRD-M8-001 AC-5）；连远程时以对面的为准
+  useEffect(() => {
+    client.getSettings().then(
+      (d) => {
+        const a = d.values['ui.accent']
+        if (typeof a === 'string') setTheme(makeTheme({ mode: initialTheme.mode, accent: a, env: process.env }))
+      },
+      () => undefined,
+    )
+  }, [client, initialTheme])
 
   const quit = useCallback(() => {
     // 只断开这个客户端。任务在 domid 里照常跑完——M3 DoD 要的就是这个
@@ -103,7 +138,13 @@ function Root({
     }
 
     if (busy) return
-    if (key.return) {
+    const edit = editAction(input, key)
+    if (edit === null) return
+    if (edit.kind === 'newline') {
+      setDraft((d) => `${d}\n`)
+      return
+    }
+    if (edit.kind === 'submit') {
       const text = draft.trim()
       if (text === '') return
       setDraft('')
@@ -260,19 +301,22 @@ function Root({
         .finally(() => setSending(false))
       return
     }
-    if (key.backspace || key.delete) {
+    if (edit.kind === 'backspace') {
       setDraft((d) => d.slice(0, -1))
       return
     }
-    if (input && !key.ctrl && !key.meta) setDraft((d) => d + input)
+    setDraft((d) => d + edit.text)
   })
 
   return (
-    <Box flexDirection="column">
-      <App store={store} />
-      {notice !== null && <Text dimColor>{notice}</Text>}
-      <Prompt value={draft} disabled={busy} />
-    </Box>
+    <ThemeContext.Provider value={theme}>
+      <App store={store} context={context} connection={connection}>
+        {notice !== null && <Text dimColor>{notice}</Text>}
+        <Box borderStyle="single" borderLeft={false} borderRight={false} borderBottom={false} borderDimColor>
+          <Prompt value={draft} disabled={busy} />
+        </Box>
+      </App>
+    </ThemeContext.Provider>
   )
 }
 
@@ -394,7 +438,15 @@ async function startChat(remote: string | undefined, isolate = false): Promise<v
       ...(token === undefined ? {} : { token }),
       ...(isolate ? { isolate: true } : {}),
     })
-    render(<Root store={conn.store} client={conn.client} sessionId={conn.sessionId} />)
+    const theme = makeTheme({
+      mode: detectMode(config.tui.theme, process.env),
+      accent: config.ui.accent,
+      env: process.env,
+    })
+    // kitty 键盘协议：终端支持时 Shift+Enter 能和 Enter 区分开（PRD-M8-014 AC-5）；不支持的终端上什么都不做
+    render(<Root store={conn.store} client={conn.client} sessionId={conn.sessionId} theme={theme} />, {
+      kittyKeyboard: { mode: 'auto' },
+    })
   } catch (e) {
     process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`)
     process.exit(EXIT_DAEMON_ERROR)

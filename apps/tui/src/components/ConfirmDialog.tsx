@@ -1,5 +1,6 @@
 import type { AskSnapshot } from '@domi/client-core'
 import { Box, Text } from 'ink'
+import { useTheme } from '../theme.ts'
 
 /**
  * 回滚确认框的副作用提示 —— PRD-M1-011 AC-6。
@@ -23,15 +24,27 @@ export const CONFIRM_FOCUS_ID = 'domi-confirm'
  * 那样这道权限就成了摆设。
  */
 export function ConfirmDialog({ ask }: { ask: AskSnapshot }): React.ReactElement {
+  const t = useTheme()
+  const needsWeb = ask.form !== undefined && formNeedsWeb(ask.form.schema)
+  const approval = (ask.form?.schema as Record<string, unknown> | undefined)?.[TUI_ACCEPT_EMPTY] === true
+  const title = ask.form ? (approval ? '等你审批' : '需要你提供信息') : '权限请求'
+  // 内嵌在对话流里的框（PRD-M8-014 AC-3）。回车 = 拒绝，所以高亮的是「拒绝」（INV-03）
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1}>
-      <Text color="yellow">{`需要授权：${ask.capabilityId}`}</Text>
-      <Text>{ask.detail}</Text>
-      <Text dimColor>
-        {ask.form && formNeedsWeb(ask.form.schema)
-          ? '这个请求要填表：请在 Web 端（pnpm web）回答；n 拒绝'
-          : 'y 允许 / n 拒绝（默认拒绝）'}
-      </Text>
+    <Box flexDirection="column" borderStyle="round" borderColor={t.border('warn')} paddingX={1} marginLeft={2}>
+      <Text {...t.fg('warn')} bold>{`🔑 ${title}：${ask.capabilityId}`}</Text>
+      <Text {...t.fg('ink2')}>{ask.detail}</Text>
+      {needsWeb ? (
+        <Text {...t.fg('mut')}>这个请求要填表：请在 Web 端（pnpm web）回答；n 拒绝</Text>
+      ) : (
+        <Box marginTop={1}>
+          <Text {...t.fg('warn')} inverse bold>
+            {' n 拒绝 '}
+          </Text>
+          <Text>{'  '}</Text>
+          <Text {...t.fg('ink2')}>{approval ? ' y 批准 ' : ' y 允许 '}</Text>
+          <Text {...t.fg('mut2')}>{'   Enter = 拒绝'}</Text>
+        </Box>
+      )}
     </Box>
   )
 }

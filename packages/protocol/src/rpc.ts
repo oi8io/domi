@@ -151,6 +151,11 @@ const MetricsSchema = z.object({
   verify: z.enum(['clean', 'unverified', 'verified', 'failed']).optional(),
   /** 计划模式 / 执行模式（PRD-M7-005） */
   mode: z.enum(['plan', 'act']).optional(),
+  /** PRD-M8-008 AC-2：轮数、模型请求次数、最近一轮输出速度、缓存命中率（老 daemon 不推） */
+  turns: z.number().int().nonnegative().optional(),
+  steps: z.number().int().nonnegative().optional(),
+  tokPerSec: z.number().nonnegative().nullable().optional(),
+  cacheHitPercent: z.number().min(0).max(100).nullable().optional(),
 })
 
 const AskSchema = z.object({

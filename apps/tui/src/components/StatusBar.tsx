@@ -1,8 +1,9 @@
-import { formatElapsed, formatTokens, type StatusSnapshot, VERIFY_LABEL } from '@domi/client-core'
+import { type ConnectionState, formatElapsed, formatTokens, type StatusSnapshot, VERIFY_LABEL } from '@domi/client-core'
 import { Box, Text } from 'ink'
+import { type Tone, useTheme } from '../theme.ts'
 
 /**
- * 状态栏 —— PRD-M1-007。
+ * 状态栏 —— PRD-M1-007 · PRD-M8-014 AC-4。
  *
  * 它只**显示**指标，一个都不自己算：数字全部来自 client-core 的投影，
  * 而投影又全部来自事件流。AC-3 的判据（删掉本文件 kernel 测试仍绿）
@@ -14,30 +15,84 @@ export const CONTEXT_COLOR = {
   danger: 'red',
 } as const
 
-export const VERIFY_COLOR = { unverified: 'yellow', verified: 'green', failed: 'red' } as const
+const CONTEXT_TONE: Record<keyof typeof CONTEXT_COLOR, Tone> = { ok: 'mut', warn: 'warn', danger: 'bad' }
 
-export function StatusBar({ status }: { status: StatusSnapshot }): React.ReactElement {
+export const VERIFY_COLOR = { unverified: 'yellow', verified: 'green', failed: 'red' } as const
+const VERIFY_TONE: Record<keyof typeof VERIFY_COLOR, Tone> = { unverified: 'warn', verified: 'ok', failed: 'bad' }
+
+const CONN_LABEL: Record<ConnectionState, string> = {
+  idle: '未连接',
+  connecting: '连接中',
+  open: '已连接',
+  reconnecting: '重连中',
+  incompatible: '版本不兼容',
+  closed: '已断开',
+}
+
+export function StatusBar({
+  status,
+  connection,
+}: {
+  status: StatusSnapshot
+  connection?: ConnectionState
+}): React.ReactElement {
+  const t = useTheme()
   const m = status.metrics
   const tokens = m === null ? '— tok' : formatTokens(m.tokens)
   const cost = m === null ? '—' : m.cost
   const pct = m?.contextPercent ?? 0
   const level = m?.contextLevel ?? 'ok'
-  const turn = m?.turnMs === undefined ? '' : `本轮 ${formatElapsed(m.turnMs)} · `
+  const val = t.fg('ink2')
+  const sep = <Text {...t.fg('mut2')}>{'  '}</Text>
+  const pace = [
+    m?.turns === undefined ? null : `${m.turns} turns`,
+    m?.steps === undefined ? null : `${m.steps} steps`,
+    m?.tokPerSec === undefined || m.tokPerSec === null ? null : `${m.tokPerSec} tok/s`,
+  ].filter((x) => x !== null)
 
   // 用一个 Text 包起来而不是并排的 Box：40 列下 Box 的 flex 会把
   // 「ctx N%」甩到另一段去，读起来像两条信息。整体折行才是对的
   return (
     <Box>
-      <Text dimColor>
-        {`${status.provider}/${status.model} · ${tokens} · ${cost} · ${turn}${status.toolCalls} 次工具 · `}
-        <Text color={CONTEXT_COLOR[level]}>{`ctx ${pct}%`}</Text>
-        {m?.mode === 'plan' ? <Text color="cyan">{' · 计划模式'}</Text> : ''}
+      <Text {...t.fg('mut')}>
+        {connection !== undefined && (
+          <>
+            <Text {...t.fg(connection === 'open' ? 'ok' : 'warn')}>●</Text>
+            <Text {...val}>{` ${CONN_LABEL[connection]}`}</Text>
+            {sep}
+          </>
+        )}
+        {`${status.provider}/${status.model}`}
+        {sep}
+        {pace.length > 0 && (
+          <>
+            <Text {...val}>{pace.join(' · ')}</Text>
+            {sep}
+          </>
+        )}
+        <Text {...val}>{tokens}</Text>
+        {m?.cacheHitPercent !== undefined && m.cacheHitPercent !== null ? ` · Cache ${m.cacheHitPercent}%` : ''}
+        {` · ${cost}`}
+        {sep}
+        {m?.turnMs === undefined ? '' : `本轮 ${formatElapsed(m.turnMs)} · `}
+        {`${status.toolCalls} 次工具`}
+        {sep}
+        <Text {...t.fg(CONTEXT_TONE[level])}>{`ctx ${pct}%`}</Text>
+        {sep}
+        <Text {...t.fg('info')}>{m?.mode === 'plan' ? '计划模式' : '执行模式'}</Text>
         {m?.verify !== undefined && m.verify !== 'clean' ? (
-          <Text color={VERIFY_COLOR[m.verify]}>{` · ${VERIFY_LABEL[m.verify]}`}</Text>
+          <Text {...t.fg(VERIFY_TONE[m.verify])}>{` · ${VERIFY_LABEL[m.verify]}`}</Text>
         ) : (
           ''
         )}
-        {status.busy ? ' · 运行中' : ''}
+        {status.busy ? (
+          <>
+            {sep}
+            <Text {...t.fg('accent')}>⏵ 运行中</Text>
+          </>
+        ) : (
+          ''
+        )}
       </Text>
     </Box>
   )

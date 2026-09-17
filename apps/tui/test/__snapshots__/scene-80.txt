@@ -1,11 +1,13 @@
 › 把 sum.js 的减号改成加号，然后跑测试
 · 先看看文件内容
-我先读一下 sum.js。
-⚙ fs.read {"path":"sum.js"}
+✓ domi: 我先读一下 sum.js。
+⚙ fs.read {"path":"sum.js"}  done · 4ms
 🔑 fs.read → allow
 ← ok {"lines":1}
-减号写错了，改成加号。
+✓ domi: 减号写错了，改成加号。
 ⚙ fs.write {"path":"sum.js","content":"export const sum = (a, b) => a + b"}
+done · 2ms
 🔑 fs.write → allow
 ← ok {"bytes":34,"created":false}
-stub/stub-1 · 421/88 tok (cache 256) · $0.0021 · 2 次工具 · ctx 42%
+stub/stub-1  421/88 tok (cache 256) · $0.0021  2 次工具  ctx 42%  执行模式
+ Enter  发送   Ctrl+J  换行   /  命令   Ctrl+C  退出

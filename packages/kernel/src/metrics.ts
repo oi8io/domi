@@ -39,6 +39,14 @@ export interface Metrics {
   /** 最近一轮用了多久。传了 now（这一轮还在跑）就算到 now */
   turnMs: number
   contextPercent: number
+  /** 用户输入了几次（PRD-M8-008 AC-2） */
+  turns: number
+  /** 发了几次模型请求 */
+  steps: number
+  /** 最近一轮的输出速度：这一轮的输出 token ÷ 从这一轮第一次模型请求到最后一条事件的秒数。算不出来是 null */
+  tokPerSec: number | null
+  /** 缓存命中：cacheRead ÷（input + cacheRead），0–100 取整；没有输入是 null */
+  cacheHitPercent: number | null
 }
 
 export interface AggregateOptions {
@@ -82,6 +90,11 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
   /** 本轮 = 最后一条用户输入开始（BUG-M3-003：以前算的是整个会话的跨度） */
   let turnStart: number | null = null
   let lastTs = 0
+  let turns = 0
+  let steps = 0
+  /** 本轮第一次模型请求的时间、本轮输出 token */
+  let turnModelStart: number | null = null
+  let turnOutput = 0
 
   for (const env of events) {
     const ev: AnyEvent = env.ev
@@ -91,10 +104,15 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
     switch (ev.t) {
       case 'user.input':
         turnStart = env.ts
+        turns += 1
+        turnModelStart = null
+        turnOutput = 0
         break
       case 'model.request':
         model = ev.model
         provider = ev.provider
+        steps += 1
+        if (turnModelStart === null) turnModelStart = env.ts
         break
       case 'model.switch':
         model = ev.to
@@ -107,6 +125,7 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
         totals.input += t.input
         totals.output += t.output
         totals.cacheRead += t.cacheRead
+        turnOutput += t.output
         const price = pricing[model]
         if (price) {
           cost += costOf(t, price)
@@ -123,6 +142,8 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
 
   const used = totals.input + totals.cacheRead
   const max = opts.maxContextTokens ?? 0
+  const end = opts.now ?? lastTs
+  const genMs = turnModelStart === null ? 0 : end - turnModelStart
   return {
     model,
     provider,
@@ -132,6 +153,10 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
     toolCalls,
     turnMs: turnStart === null ? 0 : Math.max(0, (opts.now ?? lastTs) - turnStart),
     contextPercent: max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0,
+    turns,
+    steps,
+    tokPerSec: genMs > 0 && turnOutput > 0 ? Math.round((turnOutput / genMs) * 1000) : null,
+    cacheHitPercent: used > 0 ? Math.round((totals.cacheRead / used) * 100) : null,
   }
 }
 

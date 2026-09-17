@@ -1,5 +1,6 @@
 import { Text } from 'ink'
 import { useEffect, useState } from 'react'
+import { useTheme } from '../theme.ts'
 
 const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
@@ -13,5 +14,6 @@ export function Spinner({ label = '思考中' }: { label?: string }): React.Reac
     const t = setInterval(() => setI((n) => (n + 1) % FRAMES.length), 80)
     return () => clearInterval(t)
   }, [])
-  return <Text color="cyan">{`${FRAMES[i]} ${label}`}</Text>
+  const t = useTheme()
+  return <Text {...t.fg('accent')}>{`${FRAMES[i]} ${label}`}</Text>
 }
