@@ -34,6 +34,7 @@ import {
   decideIsolation,
   discardFile,
   ensureWorktree,
+  type IsolationDecision,
   MAX_SPAWN_DEPTH,
   MemoryService,
   makeReviewReportTool,
@@ -105,6 +106,13 @@ export interface RuntimeHost extends DaemonHost {
   /** daemon 自己的审计事件（被拒的连接等）。写进 AUDIT_SESSION_ID，不出现在会话列表里 */
   audit(ev: DomiEvent): Promise<void>
   close(): void
+}
+
+/** 计划转出来的运行带给宿主的信息（经 TaskService.start 的 meta 透传） */
+interface RunMeta {
+  projectId?: string
+  isolation?: IsolationDecision
+  worktree?: WorktreeInfo
 }
 
 export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
@@ -216,6 +224,23 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     return { sessionId: id, isolation, planned }
   }
 
+  /**
+   * 计划转成的 DAG 运行（PRD-M8-006 AC-1）：跟着来源任务的项目走；来源任务没在单独的工作区里、
+   * 项目策略允许时，给运行建一个（多节点并行改，不直接动用户的工作区）
+   */
+  async function runMeta(fromSession: string, cwd: string): Promise<RunMeta & { cwd: string }> {
+    const row = index.sessions.get(fromSession)
+    if (!row?.projectId) return { cwd }
+    const projectId = row.projectId
+    const project = pj(() => projects.get(projectId))
+    if (await worktreeOf(fromSession)) return { cwd, projectId }
+    const isolation = decideIsolation({ policy: project.settings.isolation, cwd, shape: 'dag' })
+    if (!isolation.isolate) return { cwd, projectId, isolation }
+    const key = `dag-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+    const { info, cwd: inTree } = await wt(() => createWorktree(cwd, key, home))
+    return { cwd: inTree, projectId, isolation, worktree: info }
+  }
+
   const notifier = new Notifier(opts.config.notify, { log: (l) => process.stderr.write(`${l}\n`) })
   /** 同一个会话只有一个 DomiSession：core、编排、子 agent 共用，推送才不会重复 */
   const sessions = new Map<string, Promise<DomiSession>>()
@@ -238,7 +263,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
 
   function live(
     sessionId: string,
-    init?: { cwd: string; title: string; spawnedBy?: string },
+    init?: { cwd: string; title: string; spawnedBy?: string; meta?: unknown },
     extra: Partial<SessionOptions> = {},
   ): Promise<DomiSession> {
     const cached = sessions.get(sessionId)
@@ -246,8 +271,11 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     const made = (async () => {
       if (init && !index.sessions.get(sessionId)) {
         if (init.spawnedBy === undefined) {
-          // 长任务的运行会话（M5）、审阅会话（M7-010）：是任务，归到 cwd 的项目
-          await createTask(sessionId, init.cwd, undefined, init.title)
+          // 长任务的运行会话（M5）、审阅会话（M7-010）：是任务。计划转出来的运行带着来源任务的项目与隔离决定，
+          // 其余的归到 cwd 的项目
+          const m = init.meta as RunMeta | undefined
+          await createTask(sessionId, init.cwd, m?.projectId, init.title, m?.isolation)
+          if (m?.worktree) await index.append(sessionId, [{ t: 'worktree.create', ...m.worktree }])
         } else {
           const parent = init.spawnedBy === undefined ? null : index.sessions.get(init.spawnedBy)
           index.sessions.upsert({
@@ -299,7 +327,15 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...planReview,
         ...extra,
         // 计划批准后转长任务（M7-005）：同一个 TaskService
-        startTask: async (spec, cwd) => (await tasks.start(JSON.stringify(spec), cwd)).runId,
+        startTask: async (spec, cwd) => {
+          const meta = await runMeta(sessionId, cwd)
+          try {
+            return (await tasks.start(JSON.stringify(spec), meta.cwd, meta)).runId
+          } catch (e) {
+            if (meta.worktree) removeWorktree(meta.worktree)
+            throw e
+          }
+        },
       })
       // 上一个 domid 可能是被 kill -9 的：先把这个会话补到一致点，再交出去（TASK-M3-010）。
       // 这时还没有订阅者，补的事件由之后的订阅补发带过去

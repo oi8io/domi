@@ -30,7 +30,10 @@ export interface TaskServiceOptions {
   dbPath: string
   defaultCwd: string
   /** 拿到（或建出）一个会话对象。运行会话与节点会话都从这里来 */
-  openSession(sessionId: string, init?: { cwd: string; title: string; spawnedBy?: string }): Promise<DomiSession>
+  openSession(
+    sessionId: string,
+    init?: { cwd: string; title: string; spawnedBy?: string; meta?: unknown },
+  ): Promise<DomiSession>
   /** 运行有新事件时（通知、桥接推送） */
   onEvent?(runId: string, evs: readonly DomiEvent[], state: RunState): void
   now?: () => number
@@ -73,13 +76,20 @@ export class TaskService {
     }
   }
 
-  /** 解析、落 task.run、在后台开跑。YAML 不合法时在这里就抛（AC-2），什么都不落 */
-  async start(yaml: string, cwd?: string): Promise<{ runId: string; spec: DagSpec }> {
+  /**
+   * 解析、落 task.run、在后台开跑。YAML 不合法时在这里就抛（AC-2），什么都不落。
+   * meta：原样交给 openSession（宿主用它记运行归哪个项目、在不在单独的工作区里）
+   */
+  async start(yaml: string, cwd?: string, meta?: unknown): Promise<{ runId: string; spec: DagSpec }> {
     const spec = parseDagYaml(yaml)
     const runId =
       this.opts.newRunId?.() ?? `${RUN_PREFIX}${this.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
     const dir = cwd ?? this.opts.defaultCwd
-    const run = await this.opts.openSession(runId, { cwd: dir, title: `任务：${spec.name}` })
+    const run = await this.opts.openSession(runId, {
+      cwd: dir,
+      title: `任务：${spec.name}`,
+      ...(meta === undefined ? {} : { meta }),
+    })
     await run.appendEvents([{ t: 'task.run', name: spec.name, spec, cwd: dir }])
     this.launch(runId, run, (deps, signal) => drive(deps, runId, signal))
     return { runId, spec }

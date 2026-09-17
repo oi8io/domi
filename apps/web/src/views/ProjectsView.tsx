@@ -205,10 +205,9 @@ export function ProjectView({
         <summary className="cursor-pointer text-mut select-none">项目设置</summary>
         <div className="mt-3 grid gap-3">
           <label className="grid gap-1">
-            <span className="font-medium">改动前先隔离</span>
+            <span className="font-medium">在单独的工作区里改</span>
             <span className="text-[11.5px] text-mut">
-              自动 =
-              工作区有未提交改动、多步任务或定时触发时，在单独的工作区里改，改完再审阅带回（任务执行策略接入后生效）
+              自动 = 你的工作区有未提交改动、或由定时触发时，任务在单独的工作区里改，改完在任务顶部审阅、带回
             </span>
             <select
               className="field-input"
@@ -226,7 +225,9 @@ export function ProjectView({
           </label>
           <label className="grid gap-1">
             <span className="font-medium">计划先给我审</span>
-            <span className="text-[11.5px] text-mut">自动 = 多步任务或改动较多时才先审（任务执行策略接入后生效）</span>
+            <span className="text-[11.5px] text-mut">
+              自动 = 多步任务或要改的文件较多时才先审；只作用于新建任务时系统开的规划
+            </span>
             <select
               className="field-input"
               value={settings.planReview}

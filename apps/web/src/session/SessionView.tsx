@@ -5,7 +5,6 @@
 import type { ConnectionState, DomiClient, SessionStore } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
-import { ChangesPanel } from '../ChangesPanel.tsx'
 import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconPaperclip, IconTrash, IconZap } from '../icons.tsx'
@@ -14,6 +13,7 @@ import { type PendingRef, PendingRefs } from '../PendingRefs.tsx'
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
+import { ChangesBar } from './ChangesBar.tsx'
 import { ReviewFindings } from './ReviewFindings.tsx'
 import { Trajectory } from './Trajectory.tsx'
 
@@ -128,9 +128,7 @@ export function SessionView({
       </div>
       <StatusBar status={status} {...(connection === undefined ? {} : { connection })} />
       {status.worktree !== undefined && (
-        <div className="legacy shrink-0 border-b border-border2 px-5 py-1.5">
-          <ChangesPanel client={client} sessionId={sessionId} busy={status.busy} items={items} />
-        </div>
+        <ChangesBar client={client} sessionId={sessionId} busy={status.busy} items={items} />
       )}
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         {tab === 'trajectory' ? (
