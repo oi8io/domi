@@ -28,6 +28,35 @@ export type SlashCommand =
   | { kind: 'apply'; mode: 'squash' | 'merge' | 'branch' }
   | { kind: 'invalid'; message: string }
 
+/** 命令表：`/` 补全与帮助弹层用（PRD-M8-015 AC-5）。和 parseSlash 的分支一一对应 */
+export const COMMANDS: ReadonlyArray<{ name: string; args?: string; desc: string }> = [
+  { name: '/new', desc: '新会话' },
+  { name: '/sessions', args: '[--all]', desc: '列出会话' },
+  { name: '/open', args: '<会话 id>', desc: '打开会话' },
+  { name: '/delete', args: '<会话 id>', desc: '删除会话（可恢复）' },
+  { name: '/restore', args: '<会话 id>', desc: '恢复删除的会话' },
+  { name: '/branch', args: '[seq]', desc: '从这里分支' },
+  { name: '/ref', args: '<会话 id> [起-止]', desc: '下一句话引用另一个会话' },
+  { name: '/plan', desc: '切到计划模式' },
+  { name: '/act', desc: '切回执行模式' },
+  { name: '/model', args: '<模型> [provider]', desc: '换模型' },
+  { name: '/compact', desc: '压缩上下文' },
+  { name: '/budget', args: 'tokens|cost|calls <数>', desc: '设用量上限' },
+  { name: '/changes', args: '[文件]', desc: '看单独工作区里的改动' },
+  { name: '/discard', args: '<文件>', desc: '丢弃一个文件的改动' },
+  { name: '/undo', args: '<编号>', desc: '撤销丢弃' },
+  { name: '/apply', args: '[squash|merge|branch]', desc: '把改动带回原仓库' },
+  { name: '/soul', args: '[accept|reject <id>]', desc: 'Soul 待审阅的改动' },
+  { name: '/memory', args: '[关键词]', desc: '查记忆' },
+  { name: '/extract', desc: '从这个会话提取记忆' },
+]
+
+/** 输入框里还在打命令名（`/` 开头、没有空格）时，给出候选 */
+export function completeSlash(draft: string): Array<(typeof COMMANDS)[number]> {
+  if (!draft.startsWith('/') || /\s/.test(draft)) return []
+  return COMMANDS.filter((c) => c.name.startsWith(draft))
+}
+
 /** lastSeq = 当前对话里最后一条的 seq；`/branch` 不带数字时从这里分 */
 export function parseSlash(text: string, lastSeq: number): SlashCommand {
   const [cmd, ...rest] = text.split(/\s+/)

@@ -38,25 +38,29 @@ export function ContextBar({
   )
 }
 
-/** 底部的按键提示。只列真的能用的键 */
+/** 底部的按键提示。只列真的能用的键；窄终端里按整条换行，不把「退出」拆到下一行 */
 export function KeyHints({ hints }: { hints: ReadonlyArray<readonly [string, string]> }): React.ReactElement {
   const t = useTheme()
   return (
-    <Text {...t.fg('mut2')} dimColor={!t.truecolor}>
-      {hints.map(([k, label], i) => (
-        <Text key={k}>
-          {i > 0 ? '  ' : ''}
-          <Text {...t.fg('mut')} inverse>{` ${k} `}</Text>
-          {` ${label}`}
-        </Text>
+    <Box flexWrap="wrap" columnGap={2}>
+      {hints.map(([k, label]) => (
+        <Box key={k} flexShrink={0}>
+          <Text {...t.fg('mut2')} dimColor={!t.truecolor}>
+            <Text {...t.fg('mut')} inverse>{` ${k} `}</Text>
+            {` ${label}`}
+          </Text>
+        </Box>
       ))}
-    </Text>
+    </Box>
   )
 }
 
+/** 原型 tui.html 的按键提示（单键在输入框为空时生效；Enter / Ctrl+J 写在输入框的占位里） */
 export const DEFAULT_HINTS = [
-  ['Enter', '发送'],
-  ['Ctrl+J', '换行'],
+  ['p', '项目'],
+  ['s', '会话'],
+  ['t', '任务'],
   ['/', '命令'],
+  ['?', '帮助'],
   ['Ctrl+C', '退出'],
 ] as const

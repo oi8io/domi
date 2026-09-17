@@ -28,9 +28,12 @@ import { useStore } from '@nanostores/react'
 import { Box, render, Text, useApp, useInput } from 'ink'
 import { useCallback, useEffect, useState } from 'react'
 import { App } from './App.tsx'
-import { parseSlash } from './commands.ts'
+import { completeSlash, parseSlash } from './commands.ts'
 import { editAction, Prompt } from './components/Prompt.tsx'
+import { SlashHints } from './components/SlashHints.tsx'
 import { connectChat, connectDaemon } from './connect.ts'
+import { moveOf, routeKey } from './keys.ts'
+import { type OverlayState, Overlays } from './overlays/Overlays.tsx'
 import { detectMode, makeTheme, ThemeContext, type TuiTheme } from './theme.ts'
 
 const EXIT_CONFIG_ERROR = 2
@@ -69,7 +72,7 @@ async function contextOf(client: DomiClient, sessionId: string): Promise<{ proje
   return { project, title: row?.title ?? '' }
 }
 
-function Root({
+export function Root({
   store: initialStore,
   client,
   sessionId: initialSessionId,
@@ -94,6 +97,23 @@ function Root({
   const busy = sending || status.busy
   const [theme, setTheme] = useState(initialTheme)
   const [context, setContext] = useState<{ project: string | null; title: string }>({ project: null, title: '' })
+  // 弹层（PRD-M8-015）与 `/` 补全的选中项
+  const [overlay, setOverlay] = useState<OverlayState | null>(null)
+  const [slashSel, setSlashSel] = useState(0)
+  const slash = completeSlash(draft)
+
+  /** 切到另一个会话：先订阅新的再放掉旧的（id 不存在时 watch 抛错，留在原会话里） */
+  const switchTo = useCallback(
+    async (id: string): Promise<void> => {
+      const { model, provider } = store.$status.get()
+      const next = createSessionStore({ model, provider })
+      await client.watch(id, next)
+      client.unwatch(sessionId)
+      setActive({ sessionId: id, store: next })
+      setPendingRefs([])
+    },
+    [client, sessionId, store],
+  )
 
   // 顶栏：切会话时、每一轮结束时（标题可能刚生成）刷新
   // biome-ignore lint/correctness/useExhaustiveDependencies: busy 翻转是刷新的触发条件
@@ -140,6 +160,30 @@ function Root({
       // 不在这里关框：等 daemon 的 askDone，和别的客户端走同一条路
       void client.answer(ask.askId, answer, content ?? undefined).catch(() => undefined)
       return
+    }
+
+    // 弹层：单键 / Ctrl 键开关；打开时按键归弹层自己
+    const route = routeKey(input, key, { inputEmpty: draft === '', overlay: overlay?.id ?? null })
+    if (route !== null) {
+      setOverlay(route.kind === 'open' ? { id: route.overlay } : null)
+      return
+    }
+    if (overlay !== null) return
+
+    // `/` 补全：Tab 补上选中的命令，↑↓ 换候选
+    if (slash.length > 0) {
+      const cur = Math.min(slashSel, slash.length - 1)
+      if (key.tab) {
+        const c = slash[cur]
+        if (c) setDraft(c.args === undefined ? c.name : `${c.name} `)
+        setSlashSel(0)
+        return
+      }
+      const d = moveOf(input, key)
+      if (d !== 0 && !key.ctrl) {
+        setSlashSel((cur + d + slash.length) % slash.length)
+        return
+      }
     }
 
     if (busy) return
@@ -233,13 +277,7 @@ function Root({
           case 'new': {
             const id = cmd.kind === 'new' ? await client.createSession(process.cwd()) : cmd.sessionId
             if (id === sessionId) return
-            const { model, provider } = store.$status.get()
-            const next = createSessionStore({ model, provider })
-            // 先订阅新的再放掉旧的：id 不存在时 watch 抛错，留在原会话里
-            await client.watch(id, next)
-            client.unwatch(sessionId)
-            setActive({ sessionId: id, store: next })
-            setPendingRefs([])
+            await switchTo(id)
             setNotice(`已切到会话 ${id}`)
             return
           }
@@ -306,6 +344,7 @@ function Root({
         .finally(() => setSending(false))
       return
     }
+    setSlashSel(0)
     if (edit.kind === 'backspace') {
       setDraft((d) => d.slice(0, -1))
       return
@@ -313,13 +352,30 @@ function Root({
     setDraft((d) => d + edit.text)
   })
 
+  const overlayView =
+    overlay === null ? null : (
+      <Overlays
+        client={client}
+        state={overlay}
+        sessionId={sessionId}
+        onChange={setOverlay}
+        onOpenSession={(id) => {
+          switchTo(id).then(
+            () => setNotice(null),
+            (e: unknown) => setNotice(e instanceof Error ? e.message : String(e)),
+          )
+        }}
+      />
+    )
+
   return (
     <ThemeContext.Provider value={theme}>
-      <App store={store} context={context} connection={connection}>
+      <App store={store} context={context} connection={connection} overlay={overlayView}>
         {notice !== null && <Text dimColor>{notice}</Text>}
         <Box borderStyle="single" borderLeft={false} borderRight={false} borderBottom={false} borderDimColor>
           <Prompt value={draft} disabled={busy} />
         </Box>
+        <SlashHints items={slash} selected={Math.min(slashSel, Math.max(slash.length - 1, 0))} />
       </App>
     </ThemeContext.Provider>
   )

@@ -5,7 +5,7 @@
  * 取最后一帧的做法：ink 每次都写整帧。去掉 ANSI 之后，**最后一个有可见内容的 chunk**
  * 就是当前画面——不能直接取最后一个 chunk，收尾时 ink 会单独写一条「显示光标」的转义。
  */
-import { Writable } from 'node:stream'
+import { Readable, Writable } from 'node:stream'
 import { render } from 'ink'
 import type { ReactElement } from 'react'
 
@@ -44,6 +44,34 @@ class FrameSink extends Writable {
   }
 }
 
+/** 假 stdin：Ink 要 isTTY / setRawMode / ref / unref；按键经 push 进去，走 'readable' 事件 */
+class KeySource extends Readable {
+  readonly isTTY = true
+  override _read(): void {}
+  setRawMode(): this {
+    return this
+  }
+  ref(): this {
+    return this
+  }
+  unref(): this {
+    return this
+  }
+}
+
+/** 常用按键的原始序列（raw mode 下终端发的字节） */
+export const KEYS = {
+  enter: '\r',
+  escape: '\u001B',
+  tab: '\t',
+  backspace: '\u007F',
+  up: '\u001B[A',
+  down: '\u001B[B',
+  left: '\u001B[D',
+  right: '\u001B[C',
+  ctrl: (c: string) => String.fromCharCode(c.toLowerCase().charCodeAt(0) - 96),
+} as const
+
 export interface Harness {
   lastFrame(): string
   frames(): string[]
@@ -56,11 +84,17 @@ export interface Harness {
    * sleep 短了会假红，sleep 长了就测不出 PRD-M0-002 AC-1 的 100ms 上限。
    */
   waitFor(pred: (frame: string) => boolean, timeoutMs?: number): Promise<number>
+  /**
+   * 按键（PRD-M8-015 验收）：依次写进假 stdin，每个之间等一帧。
+   * 单独的 Esc 要等 Ink 的转义超时才会生效，所以之后多等一会儿
+   */
+  press(...keys: string[]): Promise<void>
 }
 
 export function renderAt(columns: number, tree: ReactElement): Harness {
   const sink = new FrameSink(columns)
-  const app = render(tree, { stdout: sink as never, patchConsole: false, exitOnCtrlC: false })
+  const keys = new KeySource()
+  const app = render(tree, { stdout: sink as never, stdin: keys as never, patchConsole: false, exitOnCtrlC: false })
   return {
     lastFrame: () => sink.lastFrame(),
     frames: () => sink.frames,
@@ -68,6 +102,12 @@ export function renderAt(columns: number, tree: ReactElement): Harness {
     unmount: () => app.unmount(),
     flush: async () => {
       await new Promise((r) => setTimeout(r, 50))
+    },
+    press: async (...seq) => {
+      for (const k of seq) {
+        keys.push(k)
+        await new Promise((r) => setTimeout(r, k === KEYS.escape ? 120 : 20))
+      }
     },
     waitFor: async (pred, timeoutMs = 1000) => {
       const t0 = performance.now()
