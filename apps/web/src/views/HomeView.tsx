@@ -30,10 +30,11 @@ export function HomeView({
         notice={notice}
         placeholder="有什么想聊的？  (Enter 发送，Shift+Enter 换行)"
         submitLabel="开始对话"
-        onSubmit={async (text) => {
+        tools={{ client, hint: '附件与文件引用在对话开始之后可用' }}
+        onSubmit={async (text, extras) => {
           try {
             const id = await client.createSession()
-            await client.submit(id, text)
+            await client.submit(id, text, undefined, { skills: extras.skills })
             onCreated(id)
             navigate({ view: 'session', id, tab: 'chat' })
           } catch (e) {

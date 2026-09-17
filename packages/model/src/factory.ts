@@ -35,6 +35,27 @@ export function isKnownProvider(p: string): p is ProviderKind {
   return p in CAPABILITIES
 }
 
+/** 价目表里的模型名归哪一家（按前缀认，模型下拉用，PRD-M8-010 AC-5）。认不出 → undefined */
+const MODEL_FAMILY: Array<[RegExp, string]> = [
+  [/^claude-/, 'anthropic'],
+  [/^(gpt-|o\d|chatgpt-)/, 'openai'],
+  [/^deepseek-/, 'deepseek'],
+  [/^gemini-/, 'google'],
+]
+
+/** 价目表里没有、但这家的 API 名字长期稳定的（模型下拉兜底；更多的在 providers.<p>.models 里配） */
+const KNOWN_MODELS: Record<string, readonly string[]> = {
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+}
+
+export function knownModels(provider: string): readonly string[] {
+  return KNOWN_MODELS[provider] ?? []
+}
+
+export function providerOfModelName(name: string): string | undefined {
+  return MODEL_FAMILY.find(([re]) => re.test(name))?.[1]
+}
+
 export function capabilitiesFor(cfg: ProviderConfig): ModelCapabilities {
   const base = isKnownProvider(cfg.provider) ? CAPABILITIES[cfg.provider] : CAPABILITIES['openai-compatible']
   // 只覆盖显式给了值的项：undefined 不是 false，不能把默认值冲掉

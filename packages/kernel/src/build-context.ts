@@ -8,7 +8,14 @@
  * 策略是 ContextPolicy 上的**可选项**，不是两套实现（ADR-005 的限定）：
  * M0 只实现 'full'，'incremental' 占位且调用即报错，**不静默降级**。
  */
-import { type EventEnvelope, isKnownEvent, type ModelMessage, type ModelMessages, type ToolCall } from '@domi/protocol'
+import {
+  type EventEnvelope,
+  isKnownEvent,
+  type ModelMessage,
+  type ModelMessages,
+  type ToolCall,
+  type UploadRef,
+} from '@domi/protocol'
 import { refKey, renderRef } from './refs.ts'
 
 export type ContextStrategyName = 'full' | 'incremental' | (string & {})
@@ -23,6 +30,50 @@ export interface ContextPolicy {
    * 缺了的引用照样拼，内容换成一句「读不到」
    */
   refs?: ReadonlyMap<string, readonly EventEnvelope[]>
+  /** 附件内容，按附件 id 索引（PRD-M8-010）。同样由调用方读好放进来；缺了的照实说读不到 */
+  uploads?: ReadonlyMap<string, LoadedUpload>
+  /** 这一轮指定的 Skill 正文，按名字索引 */
+  skills?: ReadonlyMap<string, string>
+}
+
+/** 读好的附件：图片给 base64，文本给正文，其余两样都没有 */
+export interface LoadedUpload {
+  text?: string
+  base64?: string
+}
+
+/** user.input 里的附件、文件引用、指定技能 → 拼进这句话（PRD-M8-010） */
+function renderInput(
+  ev: { text: string; uploads?: UploadRef[] | undefined; files?: string[] | undefined; skills?: string[] | undefined },
+  policy: ContextPolicy,
+): { text: string; images: Array<{ mime: string; data: string; name: string }> } {
+  const head: string[] = []
+  const images: Array<{ mime: string; data: string; name: string }> = []
+  for (const name of ev.skills ?? []) {
+    const body = policy.skills?.get(name)
+    head.push(
+      body === undefined
+        ? `[运行时提示] 用户为这一轮指定了技能「${name}」，但它现在读不到了（可能已被删除）。`
+        : `[运行时提示] 用户为这一轮指定了技能「${name}」，按它的说明做：\n${body}`,
+    )
+  }
+  if (ev.files && ev.files.length > 0) {
+    head.push(
+      `[运行时提示] 用户引用了这些文件（相对工作目录，需要时用 fs.read 读取）：\n${ev.files.map((f) => `- ${f}`).join('\n')}`,
+    )
+  }
+  for (const u of ev.uploads ?? []) {
+    const got = policy.uploads?.get(u.id)
+    if (got?.base64 !== undefined) {
+      images.push({ mime: u.mime, data: got.base64, name: u.name })
+      head.push(`[附件] ${u.name}（图片，见随附图片）`)
+    } else if (got?.text !== undefined) {
+      head.push(`[附件] ${u.name}：\n\`\`\`\n${got.text}\n\`\`\``)
+    } else {
+      head.push(`[附件] ${u.name}（${u.mime}，${u.size} 字节）：${got ? '这个格式读不了' : '附件读不到了'}`)
+    }
+  }
+  return { text: head.length > 0 ? `${head.join('\n\n')}\n\n${ev.text}` : ev.text, images }
 }
 
 export type ContextStrategy = (events: readonly EventEnvelope[], policy: ContextPolicy) => ModelMessages
@@ -91,11 +142,14 @@ const fullStrategy: ContextStrategy = (events, policy) => {
   for (const { ev } of events) {
     if (!isKnownEvent(ev)) continue
     switch (ev.t) {
-      case 'user.input':
+      case 'user.input': {
         flush()
-        out.push({ role: 'user', content: quoted.length > 0 ? `${quoted.join('\n\n')}\n\n${ev.text}` : ev.text })
+        const input = renderInput(ev, policy)
+        const content = quoted.length > 0 ? `${quoted.join('\n\n')}\n\n${input.text}` : input.text
+        out.push(input.images.length > 0 ? { role: 'user', content, images: input.images } : { role: 'user', content })
         quoted = []
         break
+      }
       case 'ctx.ref':
         quoted.push(renderRef(ev, policy.refs?.get(refKey(ev))))
         break
@@ -151,10 +205,21 @@ registerContextStrategy('incremental', incrementalPlaceholder)
  * 故意粗糙——M0 不做压缩，这个数只用来在超长时**明确报错**而不是让模型 400。
  * 真正的计数在 M1 的状态栏（PRD-M1-004）接 provider 返回的 usage。
  */
+/** 一张图按多少 token 估（各家按像素算，量级在 1~2k；base64 的长度和它无关） */
+const IMAGE_TOKENS = 1600
+
 function estimateTokens(msgs: ModelMessages): number {
   let chars = 0
-  for (const m of msgs) chars += JSON.stringify(m).length
-  return Math.ceil(chars / 4)
+  let images = 0
+  for (const m of msgs) {
+    if (m.role === 'user' && m.images) {
+      images += m.images.length
+      chars += JSON.stringify({ ...m, images: undefined }).length
+    } else {
+      chars += JSON.stringify(m).length
+    }
+  }
+  return Math.ceil(chars / 4) + images * IMAGE_TOKENS
 }
 
 export function buildContext(events: readonly EventEnvelope[], policy: ContextPolicy): ModelMessages {

@@ -9,8 +9,8 @@ import { createSessionStore, DomiClient, type TranscriptItem, type WireSocket } 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { App, SessionTools, SessionView } from '../src/App.tsx'
 import { ConfirmDialog } from '../src/ConfirmDialog.tsx'
-import { PendingRefs } from '../src/PendingRefs.tsx'
 import { StatusBar } from '../src/StatusBar.tsx'
+import { PendingRefs } from '../src/session/Composer.tsx'
 import { ModelSwitch } from '../src/session/SessionView.tsx'
 import { groupRows, Transcript, turnRanges } from '../src/Transcript.tsx'
 

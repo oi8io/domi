@@ -19,7 +19,7 @@ export function withPrompt(messages: ModelMessages, prompt: PromptParts): ModelM
     for (let i = out.length - 1; i >= 0; i--) {
       const m = out[i]
       if (m?.role !== 'user') continue
-      out[i] = { role: 'user', content: `${m.content}\n\n${prompt.dynamic}` }
+      out[i] = { ...m, content: `${m.content}\n\n${prompt.dynamic}` }
       break
     }
   }

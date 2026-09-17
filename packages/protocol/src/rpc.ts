@@ -393,6 +393,57 @@ export const METHODS = {
       planned: z.boolean(),
     }),
   },
+  'fs.list': {
+    summary:
+      '会话工作目录下的文件清单（PRD-M8-010 AC-2，`@` 引用用）：遵守 .gitignore，按 query 模糊匹配。只给路径不给内容，不经权限询问',
+    params: z.object({
+      sessionId: z.string(),
+      query: z.string().optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+    }),
+    result: z.object({ files: z.array(z.string()), truncated: z.boolean() }),
+  },
+  'attachment.put': {
+    summary:
+      '上传一个附件（PRD-M8-010 AC-3），存到 ~/.domi/attachments/<会话>/。返回的 id 在 session.submit 的 uploads 里用。' +
+      '超过单个上限（config attachments.maxMB，默认 20）→ INVALID_PARAMS，data.reason = TOO_LARGE',
+    params: z.object({
+      sessionId: z.string(),
+      name: z.string().min(1).max(255),
+      mime: z.string().max(255),
+      dataBase64: z.string(),
+    }),
+    result: z.object({
+      id: z.string(),
+      name: z.string(),
+      mime: z.string(),
+      size: z.number().int(),
+      sha256: z.string(),
+    }),
+  },
+  'skill.list': {
+    summary: '可以指定的技能（PRD-M8-010 AC-4）。给 sessionId 时含该会话仓库里的项目技能',
+    params: z.object({ sessionId: z.string().optional() }),
+    result: z.object({
+      skills: z.array(z.object({ name: z.string(), description: z.string(), source: z.string() })),
+    }),
+  },
+  'model.list': {
+    summary:
+      '可选的模型（PRD-M8-010 AC-5）：配了凭据的供应商 × 已知的模型名（配置 + 价目表），带能力；current 是默认模型',
+    params: z.object({}),
+    result: z.object({
+      models: z.array(
+        z.object({
+          provider: z.string(),
+          name: z.string(),
+          vision: z.boolean(),
+          toolCall: z.boolean(),
+        }),
+      ),
+      current: z.object({ provider: z.string(), name: z.string() }),
+    }),
+  },
   'schedule.list': {
     summary: '定时任务列表（PRD-M8-007），带下一次运行时间与最近一次触发',
     params: z.object({}),
@@ -574,8 +625,19 @@ export const METHODS = {
   'session.submit': {
     summary:
       '提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃。' +
-      'refs 引用其他会话的片段（PRD-M3-005）：接受之前校验，会话不存在或起点越界 → INVALID_PARAMS；终点超出时截到末尾',
-    params: z.object({ sessionId: z.string(), text: z.string(), refs: z.array(RefLinkSchema).max(20).optional() }),
+      'refs 引用其他会话的片段（PRD-M3-005）：接受之前校验，会话不存在或起点越界 → INVALID_PARAMS；终点超出时截到末尾。' +
+      'uploads / files / skills（PRD-M8-010）同样先校验：附件不存在、文件不在工作目录里、技能不存在、当前模型不支持图片 → ' +
+      'INVALID_PARAMS，data.reason 为 NOT_FOUND / INVALID / UNSUPPORTED_ATTACHMENT',
+    params: z.object({
+      sessionId: z.string(),
+      text: z.string(),
+      refs: z.array(RefLinkSchema).max(20).optional(),
+      /** attachment.put 返回的 id */
+      uploads: z.array(z.string()).max(20).optional(),
+      /** 相对工作目录的文件路径 */
+      files: z.array(z.string()).max(50).optional(),
+      skills: z.array(z.string()).max(10).optional(),
+    }),
     result: z.object({ accepted: z.literal(true) }),
   },
   'session.subscribe': {

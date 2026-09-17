@@ -4,16 +4,16 @@
  */
 import type { ConnectionState, DomiClient, SessionStore } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
-import { IconEye, IconPaperclip, IconTrash, IconZap } from '../icons.tsx'
+import { IconEye, IconTrash } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
-import { type PendingRef, PendingRefs } from '../PendingRefs.tsx'
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
 import { ChangesBar } from './ChangesBar.tsx'
+import { Composer, ModelSwitch, ModeToggle, type PendingRef } from './Composer.tsx'
 import { ReviewFindings } from './ReviewFindings.tsx'
 import { Trajectory } from './Trajectory.tsx'
 
@@ -160,9 +160,12 @@ export function SessionView({
         notice={notice}
         refs={refs}
         onRemoveRef={(i) => onRefsChange?.(refs.filter((_, j) => j !== i))}
-        placeholder={status.busy ? '正在处理上一条…' : '说点什么…  (Enter 发送，Shift+Enter 换行)'}
-        onSubmit={(text) =>
-          client.submit(sessionId, text, refs).then(
+        placeholder={
+          status.busy ? '正在处理上一条…' : '说点什么…  (Enter 发送，Shift+Enter 换行，@ 引用文件，/ 指定技能)'
+        }
+        tools={{ client, sessionId }}
+        onSubmit={(text, extras) =>
+          client.submit(sessionId, text, refs, extras).then(
             () => {
               setNotice(null)
               if (refs.length > 0) onRefsChange?.([])
@@ -180,6 +183,7 @@ export function SessionView({
           sessionId={sessionId}
           busy={status.busy}
           current={status.model}
+          provider={status.provider}
           onNotice={setNotice}
         />
         <ModeToggle
@@ -271,183 +275,6 @@ function SessionTitle({
  * 输入框（原型 .composer）：多行输入 + 底部工具栏。Enter 发送、Shift+Enter 换行，输入法组合中不发送。
  * 「文件」「技能」要等 PRD-M8-010 的接口，先占位。
  */
-export function Composer({
-  busy,
-  notice,
-  refs = [],
-  onRemoveRef,
-  placeholder,
-  submitLabel = '发送',
-  onSubmit,
-  children,
-  className,
-}: {
-  busy: boolean
-  notice?: string | null
-  refs?: readonly PendingRef[]
-  onRemoveRef?: (i: number) => void
-  placeholder: string
-  submitLabel?: string
-  /** 返回的 Promise 成功后清空输入框；失败时保留原文 */
-  onSubmit: (text: string) => Promise<unknown>
-  children?: React.ReactNode
-  className?: string
-}) {
-  const [text, setText] = useState('')
-  const submit = (e?: FormEvent): void => {
-    e?.preventDefault()
-    const t = text.trim()
-    if (t === '' || busy) return
-    onSubmit(t).then(
-      () => setText(''),
-      () => undefined,
-    )
-  }
-  const onKey = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault()
-      submit()
-    }
-  }
-  return (
-    <form className={cn('shrink-0 px-5 pb-3.5', className)} onSubmit={submit} data-part="composer">
-      {notice !== null && notice !== undefined && <p className="mb-1.5 text-[13px] text-bad">{notice}</p>}
-      {onRemoveRef !== undefined && <PendingRefs refs={refs} onRemove={onRemoveRef} />}
-      <div className="rounded-lg border border-border bg-panel transition-[border-color,box-shadow] duration-150 focus-within:border-accent focus-within:shadow-[0_0_0_3px_var(--accent-d)]">
-        <textarea
-          value={text}
-          rows={2}
-          placeholder={placeholder}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={onKey}
-          aria-label="输入"
-          className="block max-h-40 w-full resize-none bg-transparent px-3.5 pt-2.5 pb-0.5 text-sm text-ink outline-none"
-        />
-        <div className="flex flex-wrap items-center gap-1.5 px-2.5 pt-1.5 pb-2">
-          <Button variant="ghost" size="xs" disabled title="引用项目文件、上传附件（即将支持）">
-            <IconPaperclip size={13} />
-            文件
-          </Button>
-          <Button variant="ghost" size="xs" disabled title="指定技能（即将支持）">
-            <IconZap size={13} />
-            技能
-          </Button>
-          <span className="flex-1" />
-          {children}
-          <Button type="submit" variant="primary" disabled={busy} data-action="send">
-            {submitLabel}
-          </Button>
-        </div>
-      </div>
-    </form>
-  )
-}
-
-/** 计划模式开关（PRD-M7-005）：计划模式下 domi 只读代码，想好方案提交审批，批准后才动手 */
-export function ModeToggle({
-  client,
-  sessionId,
-  busy,
-  mode,
-  onNotice,
-}: {
-  client: DomiClient
-  sessionId: string
-  busy: boolean
-  mode: 'plan' | 'act'
-  onNotice: (msg: string | null) => void
-}) {
-  const toggle = (): void => {
-    client.setMode(sessionId, mode === 'plan' ? 'act' : 'plan').then(
-      () => onNotice(null),
-      (err: Error) => onNotice(err.message),
-    )
-  }
-  return (
-    <button
-      type="button"
-      className={cn(
-        'rounded-sm border px-2.5 py-1 text-xs font-medium',
-        mode === 'plan' ? 'border-info bg-info-d text-info' : 'border-border text-mut hover:text-ink2',
-      )}
-      data-mode={mode}
-      disabled={busy}
-      onClick={toggle}
-      title="计划模式下 domi 只读代码，想好方案后提交给你审批，批准后才动手"
-    >
-      {mode === 'plan' ? '计划模式' : '执行模式'}
-    </button>
-  )
-}
-
-/**
- * 切换模型（原型 .ctb-select 的位置）。模型清单接口（PRD-M8-010 AC-5）落地前，点开是一个「名字 [provider]」输入框。
- * 切换成功后 model.switch 事件自己会出现在对话里，这里只显示会失去的能力。
- */
-export function ModelSwitch({
-  client,
-  sessionId,
-  busy,
-  current,
-  onNotice,
-}: {
-  client: DomiClient
-  sessionId: string
-  busy: boolean
-  current: string
-  onNotice: (msg: string | null) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [model, setModel] = useState('')
-  const switchModel = (): void => {
-    const [name, provider] = model.trim().split(/\s+/)
-    if (!name) return
-    client.switchModel(sessionId, name, provider).then(
-      (lost) => {
-        setModel('')
-        setOpen(false)
-        onNotice(lost.length > 0 ? `已切换。新模型不支持：${lost.join('、')}` : null)
-      },
-      (err: Error) => onNotice(err.message),
-    )
-  }
-  return (
-    <span className="relative">
-      <button
-        type="button"
-        className="rounded-sm border border-border bg-bg2 px-2 py-1 font-mono text-xs text-ink"
-        disabled={busy}
-        onClick={() => setOpen(!open)}
-        title="切换模型"
-        aria-expanded={open}
-      >
-        {current === '' ? '模型' : current} ▾
-      </button>
-      {open && (
-        <span className="absolute right-0 bottom-full z-10 mb-1.5 flex w-72 gap-1.5 rounded-md border border-border bg-bg2 p-2 shadow-pop">
-          <input
-            className="field-input font-mono text-xs"
-            value={model}
-            placeholder="切换模型：名字 [provider]"
-            onChange={(e) => setModel(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                switchModel()
-              }
-              if (e.key === 'Escape') setOpen(false)
-            }}
-            disabled={busy}
-          />
-          <Button variant="primary" disabled={busy || model.trim() === ''} onClick={switchModel}>
-            切换
-          </Button>
-        </span>
-      )}
-    </span>
-  )
-}
-
 /**
  * 会话级操作：删除要点两下——第一下变成「确认删除」，防手滑（软删除，可以在全部会话里恢复）。
  */
@@ -520,3 +347,5 @@ export function SessionTools({
     </span>
   )
 }
+
+export { Composer, ModelSwitch, ModeToggle } from './Composer.tsx'

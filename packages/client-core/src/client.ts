@@ -312,11 +312,44 @@ export class DomiClient {
   }
 
   /** refs：引用其他会话的片段（PRD-M3-005），终点可以给得大，daemon 会截到末尾 */
-  submit(sessionId: string, text: string, refs?: readonly RefLink[]): Promise<ResultOf<'session.submit'>> {
-    return this.request(
-      'session.submit',
-      refs && refs.length > 0 ? { sessionId, text, refs: [...refs] } : { sessionId, text },
-    )
+  /** extras：附件 id、引用的文件、指定的技能（PRD-M8-010） */
+  submit(
+    sessionId: string,
+    text: string,
+    refs?: readonly RefLink[],
+    extras: { uploads?: readonly string[]; files?: readonly string[]; skills?: readonly string[] } = {},
+  ): Promise<ResultOf<'session.submit'>> {
+    const nonEmpty = (k: 'uploads' | 'files' | 'skills') => {
+      const v = extras[k]
+      return v && v.length > 0 ? { [k]: [...v] } : {}
+    }
+    return this.request('session.submit', {
+      sessionId,
+      text,
+      ...(refs && refs.length > 0 ? { refs: [...refs] } : {}),
+      ...nonEmpty('uploads'),
+      ...nonEmpty('files'),
+      ...nonEmpty('skills'),
+    })
+  }
+
+  // ── Composer（PRD-M8-010） ──
+
+  async listFiles(sessionId: string, query = '', limit = 50): Promise<ResultOf<'fs.list'>> {
+    return this.request('fs.list', { sessionId, query, limit })
+  }
+
+  /** 上传附件。dataBase64 不带 data: 前缀；超过上限抛 DomiRpcError（data.reason = TOO_LARGE） */
+  putAttachment(sessionId: string, file: { name: string; mime: string; dataBase64: string }) {
+    return this.request('attachment.put', { sessionId, ...file })
+  }
+
+  async listSkills(sessionId?: string): Promise<ResultOf<'skill.list'>['skills']> {
+    return (await this.request('skill.list', sessionId === undefined ? {} : { sessionId })).skills
+  }
+
+  listModels(): Promise<ResultOf<'model.list'>> {
+    return this.request('model.list', {})
   }
 
   /**

@@ -57,7 +57,22 @@ export function toAiMessages(messages: ModelMessages): AiMessage[] {
       case 'system':
         break
       case 'user':
-        out.push({ role: m.role, content: m.content })
+        if (m.images && m.images.length > 0) {
+          out.push({
+            role: 'user',
+            content: [
+              { type: 'text', text: m.content },
+              ...m.images.map((i) => ({
+                type: 'file',
+                data: { type: 'data', data: i.data },
+                mediaType: i.mime,
+                ...(i.name === undefined ? {} : { filename: i.name }),
+              })),
+            ],
+          } as AiMessage)
+        } else {
+          out.push({ role: m.role, content: m.content })
+        }
         break
       case 'assistant': {
         const parts: Array<Record<string, unknown>> = []

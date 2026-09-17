@@ -234,6 +234,8 @@ export const ConfigSchema = z.object({
       compactAt: z.number().int().min(30).max(95).default(70),
     })
     .default({ maxTokens: 150_000, includeReasoning: false, strategy: 'full', keepTurns: 2, compactAt: 70 }),
+  /** 上传附件（PRD-M8-010 AC-3）：单个上限，MB */
+  attachments: z.object({ maxMB: z.number().positive().max(200).default(20) }).default({ maxMB: 20 }),
 })
 
 export type DomiConfig = z.infer<typeof ConfigSchema>

@@ -26,6 +26,7 @@ import { DagSpecError } from '@domi/orchestrator'
 import type { PluginHost } from '@domi/plugin'
 import type { DomiEvent, EventEnvelope, Schedule } from '@domi/protocol'
 import {
+  AttachmentError,
   AUTO_PLAN_REASON,
   applyWorktree,
   collectDiff,
@@ -38,6 +39,7 @@ import {
   MAX_SPAWN_DEPTH,
   MemoryService,
   makeReviewReportTool,
+  modelCatalog,
   officialSkillsPlugin,
   ProjectError,
   ProjectService,
@@ -69,6 +71,7 @@ import {
   type HostAsk,
   type HostMetrics,
   HostRequestError,
+  InvalidInputError,
   InvalidRefError,
   InvalidTaskError,
   type ProjectSummary,
@@ -461,7 +464,14 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       let head = 0
       return {
         id: sessionId,
-        submit: (text, refs) => s.submit(text, refs === undefined ? {} : { refs }),
+        submit: (text, refs, inputs) => s.submit(text, { ...(refs === undefined ? {} : { refs }), ...(inputs ?? {}) }),
+        async checkInputs(inputs) {
+          try {
+            s.checkInputs(inputs)
+          } catch (e) {
+            throw e instanceof AttachmentError ? new InvalidInputError(e.message, e.reason) : e
+          }
+        },
         async checkRefs(refs) {
           try {
             return await s.checkRefs(refs)
@@ -534,6 +544,27 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     },
 
     createTask: (p) => createGoalTask(p),
+
+    composer: {
+      async files(sessionId, query, limit) {
+        return (await live(sessionId)).listFiles(query, limit)
+      },
+      async attach(sessionId, file) {
+        const s = await live(sessionId)
+        try {
+          return s.attachments.put(sessionId, file)
+        } catch (e) {
+          throw e instanceof AttachmentError ? new InvalidInputError(e.message, e.reason) : e
+        }
+      },
+      async skills(sessionId) {
+        if (sessionId !== undefined) return (await live(sessionId)).listSkills()
+        return (skills?.list() ?? []).map((k) => ({ name: k.name, description: k.description, source: k.source }))
+      },
+      async models() {
+        return modelCatalog(opts.config)
+      },
+    },
 
     schedules: {
       store: index.schedules,

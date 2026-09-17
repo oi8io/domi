@@ -100,7 +100,27 @@ export function Root({
   // 弹层（PRD-M8-015）与 `/` 补全的选中项
   const [overlay, setOverlay] = useState<OverlayState | null>(null)
   const [slashSel, setSlashSel] = useState(0)
-  const slash = completeSlash(draft)
+  // `@` 文件补全：候选从 daemon 的 fs.list 来；选过的路径提交时作为 files 带上（PRD-M8-010 AC-2）
+  const atQuery = draft.match(/(^|\s)@([^\s@]*)$/)?.[2]
+  const [fileHits, setFileHits] = useState<string[]>([])
+  const [picked, setPicked] = useState<string[]>([])
+  useEffect(() => {
+    if (atQuery === undefined) return
+    let stale = false
+    const t = setTimeout(() => {
+      client.listFiles(sessionId, atQuery, 6).then(
+        (r) => {
+          if (!stale) setFileHits(r.files)
+        },
+        () => undefined,
+      )
+    }, 80)
+    return () => {
+      stale = true
+      clearTimeout(t)
+    }
+  }, [client, sessionId, atQuery])
+  const slash = atQuery !== undefined ? fileHits.map((f) => ({ name: f })) : completeSlash(draft)
 
   /** 切到另一个会话：先订阅新的再放掉旧的（id 不存在时 watch 抛错，留在原会话里） */
   const switchTo = useCallback(
@@ -175,7 +195,12 @@ export function Root({
       const cur = Math.min(slashSel, slash.length - 1)
       if (key.tab) {
         const c = slash[cur]
-        if (c) setDraft(c.args === undefined ? c.name : `${c.name} `)
+        if (c && atQuery !== undefined) {
+          setDraft(`${draft.slice(0, draft.length - atQuery.length)}${c.name} `)
+          setPicked((xs) => (xs.includes(c.name) ? xs : [...xs, c.name]))
+        } else if (c) {
+          setDraft('args' in c && c.args !== undefined ? `${c.name} ` : c.name)
+        }
         setSlashSel(0)
         return
       }
@@ -332,8 +357,13 @@ export function Root({
             return
           }
           case 'submit': {
-            const r = await client.submit(sessionId, cmd.text, pendingRefs)
+            // 输入里还留着的、补全选过的 @路径 → 文件引用
+            const files = [...cmd.text.matchAll(/(?:^|\s)@(\S+)/g)]
+              .map((m) => m[1] as string)
+              .filter((f) => picked.includes(f))
+            const r = await client.submit(sessionId, cmd.text, pendingRefs, files.length > 0 ? { files } : {})
             setPendingRefs([])
+            setPicked([])
             return r
           }
         }
@@ -375,7 +405,11 @@ export function Root({
         <Box borderStyle="single" borderLeft={false} borderRight={false} borderBottom={false} borderDimColor>
           <Prompt value={draft} disabled={busy} />
         </Box>
-        <SlashHints items={slash} selected={Math.min(slashSel, Math.max(slash.length - 1, 0))} />
+        <SlashHints
+          items={slash}
+          wide={atQuery !== undefined}
+          selected={Math.min(slashSel, Math.max(slash.length - 1, 0))}
+        />
       </App>
     </ThemeContext.Provider>
   )

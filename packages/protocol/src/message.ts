@@ -16,7 +16,12 @@ export type ToolCall = z.infer<typeof ToolCallSchema>
 
 export const ModelMessageSchema = z.discriminatedUnion('role', [
   z.object({ role: z.literal('system'), content: z.string() }),
-  z.object({ role: z.literal('user'), content: z.string() }),
+  z.object({
+    role: z.literal('user'),
+    content: z.string(),
+    /** 随这句话一起发的图片（PRD-M8-010 AC-3）。base64，不带 data: 前缀 */
+    images: z.array(z.object({ mime: z.string(), data: z.string(), name: z.string().optional() })).optional(),
+  }),
   z.object({ role: z.literal('assistant'), content: z.string(), toolCalls: z.array(ToolCallSchema).optional() }),
   z.object({ role: z.literal('tool'), toolCallId: z.string(), ok: z.boolean(), content: z.string() }),
 ])

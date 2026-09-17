@@ -42,6 +42,15 @@ import {
 
 export const DAEMON_VERSION = '0.1.0'
 
+const hasExtras = (p: SubmitExtras): boolean =>
+  (p.uploads?.length ?? 0) + (p.files?.length ?? 0) + (p.skills?.length ?? 0) > 0
+
+const extrasOf = (p: SubmitExtras): SubmitExtras => ({
+  ...(p.uploads && p.uploads.length > 0 ? { uploads: p.uploads } : {}),
+  ...(p.files && p.files.length > 0 ? { files: p.files } : {}),
+  ...(p.skills && p.skills.length > 0 ? { skills: p.skills } : {}),
+})
+
 /** 调度器触发任务时用的内部连接：不订阅、不收推送 */
 const SYSTEM_CONN: ClientConn = { id: '_scheduler', send() {} }
 
@@ -86,9 +95,11 @@ export interface ClientConn {
 /** daemon 需要的会话能力。runtime 的 DomiSession 满足它——但 core 不 import runtime */
 export interface SessionHandle {
   readonly id: string
-  submit(text: string, refs?: readonly RefLink[]): Promise<unknown>
+  submit(text: string, refs?: readonly RefLink[], inputs?: SubmitExtras): Promise<unknown>
   /** 校验并规整引用；不成立时抛 InvalidRefError。在接受提交之前调 */
   checkRefs?(refs: readonly RefLink[]): Promise<RefLink[]>
+  /** 校验附件 / 文件 / 技能（PRD-M8-010）；不成立时抛 InvalidInputError */
+  checkInputs?(inputs: SubmitExtras): Promise<void>
   switchModel(model: string, provider?: string): Promise<{ lost: string[] }>
   /** 计划 / 执行模式（M7-005）。老宿主没有 */
   setMode?(mode: 'plan' | 'act'): Promise<{ mode: 'plan' | 'act'; changed: boolean }>
@@ -98,6 +109,32 @@ export interface SessionHandle {
   readEvents(fromSeq: number): Promise<EventEnvelope[]>
   head(): Promise<number>
   close(): Promise<void>
+}
+
+/** 一轮输入里除文字之外的东西（PRD-M8-010） */
+export interface SubmitExtras {
+  uploads?: readonly string[]
+  files?: readonly string[]
+  skills?: readonly string[]
+}
+
+/** 附件 / 文件引用 / 技能不成立（PRD-M8-010）。→ INVALID_PARAMS，data.reason 带原因 */
+export class InvalidInputError extends Error {
+  constructor(
+    message: string,
+    readonly reason: string,
+  ) {
+    super(message)
+    this.name = 'InvalidInputError'
+  }
+}
+
+/** Composer 要的几样（PRD-M8-010）。老宿主没有 */
+export interface HostComposer {
+  files(sessionId: string, query: string, limit: number): Promise<ResultOf<'fs.list'>>
+  attach(sessionId: string, file: { name: string; mime: string; data: Uint8Array }): Promise<ResultOf<'attachment.put'>>
+  skills(sessionId: string | undefined): Promise<ResultOf<'skill.list'>['skills']>
+  models(): Promise<ResultOf<'model.list'>>
 }
 
 export interface SessionSummary {
@@ -225,6 +262,7 @@ export interface DaemonHost {
   rename?(sessionId: string, title: string): Promise<void>
   projects?: HostProjects
   schedules?: HostSchedules
+  composer?: HostComposer
   /** 设置页（PRD-M8-011）。补丁不合法抛 HostRequestError */
   config?: {
     get(): Promise<ResultOf<'config.get'>>
@@ -356,6 +394,7 @@ export class Daemon {
       ) {
         return fail(req.id, 'INVALID_PARAMS', e.message, e instanceof HostRequestError ? e.data : undefined)
       }
+      if (e instanceof InvalidInputError) return fail(req.id, 'INVALID_PARAMS', e.message, { reason: e.reason })
       if (e instanceof ScheduleBusyError) return fail(req.id, 'SESSION_BUSY', e.message)
       return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
     }
@@ -553,6 +592,37 @@ export class Daemon {
         if (!h) return fail(req.id, 'INTERNAL', '这个 domid 不支持从这里改配置')
         if (method === 'config.get') return ok(req.id, await h.get())
         return ok(req.id, await h.set((params as { patch: Record<string, unknown> }).patch))
+      }
+
+      case 'fs.list':
+      case 'attachment.put':
+      case 'skill.list':
+      case 'model.list': {
+        const h = this.host.composer
+        if (!h) return fail(req.id, 'INTERNAL', '这个 domid 不支持附件与文件引用')
+        const p = params as Record<string, unknown>
+        switch (method) {
+          case 'fs.list':
+            return ok(
+              req.id,
+              await h.files(
+                p.sessionId as string,
+                (p.query as string | undefined) ?? '',
+                (p.limit as number | undefined) ?? 50,
+              ),
+            )
+          case 'attachment.put': {
+            const data = Buffer.from(p.dataBase64 as string, 'base64')
+            return ok(
+              req.id,
+              await h.attach(p.sessionId as string, { name: p.name as string, mime: p.mime as string, data }),
+            )
+          }
+          case 'skill.list':
+            return ok(req.id, { skills: await h.skills(p.sessionId as string | undefined) })
+          default:
+            return ok(req.id, await h.models())
+        }
       }
 
       case 'schedule.list':
@@ -763,7 +833,7 @@ export class Daemon {
       }
 
       case 'session.submit': {
-        const p = params as { sessionId: string; text: string; refs?: RefLink[] }
+        const p = params as { sessionId: string; text: string; refs?: RefLink[] } & SubmitExtras
         // **检查与占位之间不许有 await。**
         // 第一版把 `this.busy.add` 放在 `await this.session(...)` 之后，
         // 于是十个并发请求全都在任何一个占住之前通过了检查——十个全被接受。
@@ -783,6 +853,10 @@ export class Daemon {
             if (!session.checkRefs) throw new InvalidRefError('这个 daemon 不支持跨会话引用')
             refs = await session.checkRefs(p.refs)
           }
+          if (session && hasExtras(p)) {
+            if (!session.checkInputs) throw new InvalidInputError('这个 daemon 不支持附件与文件引用', 'INVALID')
+            await session.checkInputs(extrasOf(p))
+          }
         } catch (e) {
           this.busy.delete(p.sessionId)
           throw e
@@ -795,7 +869,7 @@ export class Daemon {
         // **不 await**：提交是异步的，客户端拿到 accepted 就该回去等事件推送。
         // await 的话，一次长任务会把这条连接的响应通道占住
         void session
-          .submit(p.text, refs.length > 0 ? refs : undefined)
+          .submit(p.text, refs.length > 0 ? refs : undefined, hasExtras(p) ? extrasOf(p) : undefined)
           .catch(() => undefined)
           .finally(() => this.busy.delete(p.sessionId))
         return ok(req.id, { accepted: true })

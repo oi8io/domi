@@ -10,7 +10,8 @@
  * **TUI 一行不用改**——门面的方法签名就是按将来的协议形状设计的。
  */
 
-import { dirname, join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import {
   fsEdit,
   fsGlob,
@@ -18,6 +19,7 @@ import {
   fsRead,
   fsWrite,
   JobTable,
+  listFiles,
   makeShellKillTool,
   makeShellOutputTool,
   makeSkillLoadTool,
@@ -54,8 +56,9 @@ import {
   StructuredOutputError,
 } from '@domi/model'
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
-import type { DomiEvent, EventEnvelope, RefLink } from '@domi/protocol'
+import type { DomiEvent, EventEnvelope, RefLink, UploadRef } from '@domi/protocol'
 import { z } from 'zod'
+import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
 
 /**
  * 在**组合根**注册确定性清理策略（PRD-M2-002）。
@@ -182,6 +185,38 @@ export interface SessionOptions {
   childEvents?: (sessionId: string, envs: EventEnvelope[]) => void
 }
 
+/** 一轮输入里除了文字之外的东西（PRD-M8-010） */
+export interface SubmitInputs {
+  /** attachment.put 返回的 id */
+  uploads?: readonly string[]
+  /** 相对工作目录的路径 */
+  files?: readonly string[]
+  skills?: readonly string[]
+}
+
+/** 文件名模糊匹配：子串优先（文件名命中排前面），其次按字符顺序的子序列 */
+export function fuzzyFiles(all: readonly string[], query: string): string[] {
+  const q = query.trim().toLowerCase()
+  if (q === '') return [...all].sort((a, b) => a.length - b.length || a.localeCompare(b))
+  const scored: Array<[number, string]> = []
+  for (const f of all) {
+    const l = f.toLowerCase()
+    const base = l.slice(l.lastIndexOf('/') + 1)
+    let score: number
+    if (base.startsWith(q)) score = 0
+    else if (base.includes(q)) score = 1
+    else if (l.includes(q)) score = 2
+    else {
+      let i = 0
+      for (const ch of l) if (ch === q[i]) i++
+      if (i < q.length) continue
+      score = 3
+    }
+    scored.push([score * 10_000 + Math.min(l.length, 9_999), f])
+  }
+  return scored.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])).map(([, f]) => f)
+}
+
 export class DomiSession {
   private readonly log: SqliteEventLog
   private readonly tools: ToolRegistry
@@ -198,6 +233,8 @@ export class DomiSession {
   private readonly skillSource: SkillOverlay | undefined
   /** 用户配置的钩子（M7-003）。只从 config 来 */
   private readonly hooks: HookRunner
+  /** 上传的附件（M8-010） */
+  readonly attachments: AttachmentStore
   private provider: ModelProvider
   /** 注入的替身不随切换重建——测试要的就是同一个实例 */
   private readonly injectedProvider: boolean
@@ -237,6 +274,10 @@ export class DomiSession {
     )
     this.permissions = permissions
     const outputDir = join(dirname(opts.dbPath), 'outputs', opts.sessionId)
+    this.attachments = new AttachmentStore(
+      dirname(opts.dbPath),
+      (opts.config.attachments?.maxMB ?? DEFAULT_ATTACHMENT_MAX_BYTES / 1024 / 1024) * 1024 * 1024,
+    )
     this.hooks = new HookRunner(opts.config.hooks ?? [], { sessionId: opts.sessionId, cwd: opts.cwd })
     this.jobs = new JobTable({ outputDir })
     this.tools = new ToolRegistry({
@@ -912,7 +953,48 @@ export class DomiSession {
   }
 
   /** refs 应当先经过 checkRefs；这里不再校验 */
-  async submit(text: string, opts: { refs?: readonly RefLink[] } = {}): Promise<TurnResult> {
+  /**
+   * 这一轮带的附件、文件引用、技能（PRD-M8-010）：提交之前校验，接受之后的错误用户看不见。
+   * 图片附件而当前模型不支持图片 → 拒绝（UNSUPPORTED_ATTACHMENT），不静默丢掉
+   */
+  checkInputs(i: SubmitInputs): { uploads: UploadRef[]; files: string[]; skills: string[] } {
+    const uploads = (i.uploads ?? []).map((id) => this.attachments.get(this.opts.sessionId, id))
+    const images = uploads.filter((u) => isImage(u.mime))
+    if (images.length > 0 && !this.provider.capabilities.vision) {
+      throw new AttachmentError(
+        `当前模型 ${this.currentModel} 不支持图片输入（${images.map((u) => u.name).join('、')}）。换一个支持图片的模型再发`,
+        'UNSUPPORTED_ATTACHMENT',
+      )
+    }
+    const files = (i.files ?? []).map((f) => {
+      const rel = relative(this.opts.cwd, resolve(this.opts.cwd, f))
+      if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
+        throw new AttachmentError(`引用的文件不在工作目录里：${f}`, 'INVALID')
+      }
+      if (!existsSync(join(this.opts.cwd, rel))) throw new AttachmentError(`引用的文件不存在：${f}`, 'NOT_FOUND')
+      return rel.split(sep).join('/')
+    })
+    const skills = (i.skills ?? []).map((name) => {
+      if (!this.skillSource?.get(name)) throw new AttachmentError(`没有这个技能：${name}`, 'NOT_FOUND')
+      return name
+    })
+    return { uploads, files, skills }
+  }
+
+  /** 可以指定的技能（skill.list） */
+  listSkills(): Array<{ name: string; description: string; source: string }> {
+    return (this.skillSource?.list() ?? []).map((s) => ({ name: s.name, description: s.description, source: s.source }))
+  }
+
+  /** 工作目录下的文件清单（fs.list）：遵守 .gitignore，按 query 模糊匹配 */
+  listFiles(query = '', limit = 50): { files: string[]; truncated: boolean } {
+    const all = listFiles(this.opts.cwd).files
+    const hits = fuzzyFiles(all, query)
+    return { files: hits.slice(0, limit), truncated: hits.length > limit }
+  }
+
+  async submit(text: string, opts: { refs?: readonly RefLink[] } & SubmitInputs = {}): Promise<TurnResult> {
+    const inputs = this.checkInputs(opts)
     this.busy = true
     this.listeners.onBusy?.(true)
     for (const t of this.opts.extraTools?.(this.opts.cwd) ?? []) this.tools.register(t)
@@ -938,11 +1020,20 @@ export class DomiSession {
           policy,
           model: this.currentModel,
           refs: { resolve: (ref) => this.readRef(ref) },
+          inputs: {
+            upload: async (ref) =>
+              this.attachments.load(this.opts.sessionId, ref, { vision: this.provider.capabilities.vision }),
+            skill: async (name) => this.skillSource?.get(name)?.prompt,
+          },
           prompt: this.prompt(),
           beforeComplete: (events) => this.verifyGate(events),
         },
         this.opts.sessionId,
-        opts.refs && opts.refs.length > 0 ? { text, refs: opts.refs } : text,
+        {
+          text,
+          ...(opts.refs && opts.refs.length > 0 ? { refs: opts.refs } : {}),
+          ...inputs,
+        },
       )
       return { ...result, verify: verifyState(await this.view(), { command: this.opts.config.verify?.command }) }
     } finally {

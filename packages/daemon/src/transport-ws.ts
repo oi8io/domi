@@ -95,6 +95,8 @@ export function serveWs(daemon: Daemon, opts: WsServerOptions = {}): WsServer {
       return new Response('domid：这里只接受 WebSocket（Domi Protocol）', { status: 426 })
     },
     websocket: {
+      // 附件经 attachment.put 以 base64 整块上来（PRD-M8-010）：默认 16MB 装不下 20MB 的文件
+      maxPayloadLength: 64 * 1024 * 1024,
       open(ws) {
         seq++
         ws.data.conn = {

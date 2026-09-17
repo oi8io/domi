@@ -33,6 +33,15 @@ export const SCHEMA_VERSION = 11
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
 
+/** 上传的附件（PRD-M8-010 AC-3） */
+export const UploadRefSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  mime: z.string(),
+  size: z.number().int().nonnegative(),
+})
+export type UploadRef = z.infer<typeof UploadRefSchema>
+
 /**
  * 指向另一个会话里一段事件的链接（PRD-M3-005 AC-2）。seq 是那个会话的**视图**编号（含父链，见 session.subscribe），
  * 闭区间。事件只增不改，所以这段内容永远不会变——存链接就够了，不必拷贝
@@ -77,7 +86,17 @@ export type SoulChange = z.infer<typeof SoulChangeSchema>
  * 轨迹与导出都看不到。那是 INV-01 的另一种违反方式。
  */
 export const DomiEventSchema = z.discriminatedUnion('t', [
-  z.looseObject({ t: z.literal('user.input'), text: z.string(), attachments: z.array(RefSchema).optional() }),
+  z.looseObject({
+    t: z.literal('user.input'),
+    text: z.string(),
+    attachments: z.array(RefSchema).optional(),
+    /** M8-010：这一轮上传的附件（内容在 ~/.domi/attachments/<会话>/，事件里只存引用） */
+    uploads: z.array(UploadRefSchema).optional(),
+    /** M8-010：引用的项目文件（相对工作目录）。只是引用，内容由模型自己读（仍过权限） */
+    files: z.array(z.string()).optional(),
+    /** M8-010：这一轮强制注入的 Skill 名字 */
+    skills: z.array(z.string()).optional(),
+  }),
   z.looseObject({
     t: z.literal('model.request'),
     provider: z.string(),

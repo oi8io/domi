@@ -1679,6 +1679,254 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `fs.list`
+
+会话工作目录下的文件清单（PRD-M8-010 AC-2，`@` 引用用）：遵守 .gitignore，按 query 模糊匹配。只给路径不给内容，不经权限询问
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "query": {
+      "type": "string"
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "truncated": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "files",
+    "truncated"
+  ]
+}
+```
+
+### `attachment.put`
+
+上传一个附件（PRD-M8-010 AC-3），存到 ~/.domi/attachments/<会话>/。返回的 id 在 session.submit 的 uploads 里用。超过单个上限（config attachments.maxMB，默认 20）→ INVALID_PARAMS，data.reason = TOO_LARGE
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "mime": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "dataBase64": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "name",
+    "mime",
+    "dataBase64"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "mime": {
+      "type": "string"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "sha256": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "mime",
+    "size",
+    "sha256"
+  ]
+}
+```
+
+### `skill.list`
+
+可以指定的技能（PRD-M8-010 AC-4）。给 sessionId 时含该会话仓库里的项目技能
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  }
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "source"
+        ]
+      }
+    }
+  },
+  "required": [
+    "skills"
+  ]
+}
+```
+
+### `model.list`
+
+可选的模型（PRD-M8-010 AC-5）：配了凭据的供应商 × 已知的模型名（配置 + 价目表），带能力；current 是默认模型
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "vision": {
+            "type": "boolean"
+          },
+          "toolCall": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "provider",
+          "name",
+          "vision",
+          "toolCall"
+        ]
+      }
+    },
+    "current": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "name"
+      ]
+    }
+  },
+  "required": [
+    "models",
+    "current"
+  ]
+}
+```
+
 ### `schedule.list`
 
 定时任务列表（PRD-M8-007），带下一次运行时间与最近一次触发
@@ -3426,7 +3674,7 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 
 ### `session.submit`
 
-提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃。refs 引用其他会话的片段（PRD-M3-005）：接受之前校验，会话不存在或起点越界 → INVALID_PARAMS；终点超出时截到末尾
+提交一次用户输入。同一会话串行处理，正忙时返回 SESSION_BUSY 而不是静默丢弃。refs 引用其他会话的片段（PRD-M3-005）：接受之前校验，会话不存在或起点越界 → INVALID_PARAMS；终点超出时截到末尾。uploads / files / skills（PRD-M8-010）同样先校验：附件不存在、文件不在工作目录里、技能不存在、当前模型不支持图片 → INVALID_PARAMS，data.reason 为 NOT_FOUND / INVALID / UNSUPPORTED_ATTACHMENT
 
 **params**
 
@@ -3466,6 +3714,27 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
           "fromSeq",
           "toSeq"
         ]
+      }
+    },
+    "uploads": {
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "files": {
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "skills": {
+      "maxItems": 10,
+      "type": "array",
+      "items": {
+        "type": "string"
       }
     }
   },
@@ -3719,6 +3988,46 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                             "kind",
                             "id"
                           ]
+                        }
+                      },
+                      "uploads": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "mime": {
+                              "type": "string"
+                            },
+                            "size": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "mime",
+                            "size"
+                          ]
+                        }
+                      },
+                      "files": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "skills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
                         }
                       }
                     },
