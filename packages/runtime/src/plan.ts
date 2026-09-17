@@ -17,8 +17,35 @@ export const PlanStep = z.object({
 export const PlanSubmitArgs = z.object({
   plan: z.string().min(1).describe('给用户看的计划全文：要改哪些文件、怎么改、怎么验证、有什么风险'),
   steps: z.array(PlanStep).optional().describe('可选：拆好的步骤。用户选择「转成长任务」时，每一步成为一个节点'),
+  shape: z
+    .enum(['single', 'dag'])
+    .optional()
+    .describe('建议的执行形态：single = 在这个会话里一口气做完；dag = 步骤多、可并行，拆成多节点长任务（要给 steps）'),
+  writes: z.number().int().min(0).optional().describe('预计会改动 / 新建的文件数'),
 })
+
+export type ReviewPolicy = 'auto' | 'always' | 'never'
+
 export type PlanSubmitArgs = z.infer<typeof PlanSubmitArgs>
+
+/** auto 时要不要先给人审（SPEC-M8-005 取舍-5）：多节点，或者要改的文件多于 5 个 */
+export function needsReview(policy: ReviewPolicy, shape: 'single' | 'dag', writes: number | undefined): boolean {
+  if (policy === 'always') return true
+  if (policy === 'never') return false
+  return shape === 'dag' || (writes ?? 0) > 5
+}
+
+/**
+ * 模型建议的形态再按步骤校正（SPEC-M8-005 取舍-5）：只往 single 降，不往 dag 升——
+ * 拆多节点要步骤 ≥ 3 且确实有能并行的（不止一个起点，或者有一步被两步以上依赖）
+ */
+export function effectiveShape(args: Pick<PlanSubmitArgs, 'shape' | 'steps'>): 'single' | 'dag' {
+  const steps = args.steps ?? []
+  if (args.shape !== 'dag' || steps.length < 3) return 'single'
+  const roots = steps.filter((s) => (s.dependsOn ?? []).length === 0).length
+  const fanOut = steps.some((s) => steps.filter((o) => o.dependsOn?.includes(s.id)).length >= 2)
+  return roots > 1 || fanOut ? 'dag' : 'single'
+}
 
 /** 确认框里的表单 */
 export const PLAN_DECISION_SCHEMA = {
@@ -36,6 +63,11 @@ export interface PlanHost {
   approved(): DomiEvent[]
   /** 转长任务：返回 runId；做不了时抛错 */
   startTask?(spec: unknown): Promise<string>
+  /**
+   * 计划审阅策略（PRD-M8-005 AC-3）。不给 = always（M7 的行为：每个计划都问人）。
+   * 任务会话里取所在项目的设置
+   */
+  reviewPolicy?(): ReviewPolicy
 }
 
 /** 计划步骤 → DAG 定义（agent-step 节点），经 orchestrator 同一套校验 */
@@ -60,9 +92,26 @@ export function makePlanSubmitTool(host: PlanHost): Tool<PlanSubmitArgs, Record<
     schema: PlanSubmitArgs,
     async execute(args, ctx) {
       ctx.emit({ t: 'plan.proposed', plan: args.plan, ...(args.steps ? { steps: args.steps } : {}) })
-      const answer = ctx.elicit
-        ? await ctx.elicit({ message: `审批计划：\n\n${args.plan}`, requestedSchema: PLAN_DECISION_SCHEMA })
-        : { action: 'decline' as const }
+      // 执行形态（PRD-M8-005 AC-2）：模型建议，按步骤校正
+      const shape = effectiveShape(args)
+      const policy = host.reviewPolicy?.() ?? 'always'
+      const review = needsReview(policy, shape, args.writes)
+      let answer: { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, unknown> }
+      if (!review) {
+        // 按策略自动批准：多节点的直接转长任务
+        answer = { action: 'accept', content: shape === 'dag' ? { asTask: true } : {} }
+      } else if (ctx.elicit) {
+        const schema = {
+          ...PLAN_DECISION_SCHEMA,
+          properties: {
+            ...PLAN_DECISION_SCHEMA.properties,
+            asTask: { ...PLAN_DECISION_SCHEMA.properties.asTask, default: shape === 'dag' },
+          },
+        }
+        answer = await ctx.elicit({ message: `审批计划：\n\n${args.plan}`, requestedSchema: schema })
+      } else {
+        answer = { action: 'decline' }
+      }
       const approved = answer.action === 'accept'
       const comment =
         typeof answer.content?.comment === 'string' && answer.content.comment.trim() !== ''
@@ -88,6 +137,8 @@ export function makePlanSubmitTool(host: PlanHost): Tool<PlanSubmitArgs, Record<
         ...(comment === undefined ? {} : { comment }),
         ...(wantTask ? { asTask: true } : {}),
         ...(runId === undefined ? {} : { runId }),
+        shape: runId === undefined ? 'single' : 'dag',
+        source: review ? 'user' : 'policy',
       })
       if (!approved) {
         return {

@@ -1616,6 +1616,69 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `task.create`
+
+按目标新建任务（PRD-M8-005）：在项目下建任务会话，按项目设置决定要不要隔离（PRD-M8-006），目标较长或项目要求时先规划（计划模式），然后把目标作为第一句话提交。返回会话 id 与隔离决定
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "projectId": {
+      "type": "string"
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "projectId",
+    "goal"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "isolation": {
+      "type": "object",
+      "properties": {
+        "isolate": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "isolate",
+        "reason"
+      ]
+    },
+    "planned": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "sessionId",
+    "isolation",
+    "planned"
+  ]
+}
+```
+
 ### `project.list`
 
 列出项目（PRD-M8-003），按最近活动排序。recent：每个项目带几个最近任务（默认 5）
@@ -4189,6 +4252,20 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                       },
                       "runId": {
                         "type": "string"
+                      },
+                      "shape": {
+                        "type": "string",
+                        "enum": [
+                          "single",
+                          "dag"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "policy"
+                        ]
                       }
                     },
                     "required": [

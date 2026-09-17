@@ -1305,6 +1305,57 @@
         ]
       }
     },
+    "task.create": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "projectId",
+          "goal"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "isolation": {
+            "type": "object",
+            "properties": {
+              "isolate": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "isolate",
+              "reason"
+            ]
+          },
+          "planned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sessionId",
+          "isolation",
+          "planned"
+        ]
+      }
+    },
     "project.list": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3656,6 +3707,20 @@
                             },
                             "runId": {
                               "type": "string"
+                            },
+                            "shape": {
+                              "type": "string",
+                              "enum": [
+                                "single",
+                                "dag"
+                              ]
+                            },
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "policy"
+                              ]
                             }
                           },
                           "required": [

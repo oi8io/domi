@@ -185,6 +185,12 @@ export interface DaemonHost {
   open(sessionId: string): Promise<SessionHandle>
   create(cwd?: string, opts?: CreateOptions): Promise<string>
   list(opts: { includeDeleted: boolean; kind?: 'chat' | 'task'; projectId?: string }): Promise<SessionSummary[]>
+  /** 按目标新建任务（PRD-M8-005）。返回会话 id；提交目标由 core 走普通提交那条路 */
+  createTask?(p: {
+    projectId: string
+    goal: string
+    trigger?: 'user' | 'schedule'
+  }): Promise<Omit<ResultOf<'task.create'>, 'sessionId'> & { sessionId: string }>
   /** 改标题（PRD-M8-008）。会话不存在抛 SessionNotFoundError */
   rename?(sessionId: string, title: string): Promise<void>
   projects?: HostProjects
@@ -379,6 +385,18 @@ export class Daemon {
         if (!this.host.rename) return fail(req.id, 'INTERNAL', '这个 domid 不支持改标题')
         await this.host.rename(p.sessionId, p.title.trim())
         return ok(req.id, { ok: true })
+      }
+
+      case 'task.create': {
+        const p = params as { projectId: string; goal: string }
+        if (!this.host.createTask) return fail(req.id, 'INTERNAL', '这个 domid 不支持按目标建任务')
+        const r = await this.host.createTask(p)
+        const submitted = await this.dispatch(conn, req, 'session.submit', {
+          sessionId: r.sessionId,
+          text: p.goal,
+        } as never)
+        if (submitted.error) return submitted
+        return ok(req.id, r)
       }
 
       case 'session.toTask': {

@@ -1,6 +1,7 @@
 export * from './budget.ts'
 export * from './builtin-plugins.ts'
 export * from './hooks.ts'
+export * from './isolation.ts'
 export * from './memory-service.ts'
 export * from './plan.ts'
 export * from './project.ts'

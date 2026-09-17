@@ -303,6 +303,9 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     comment: z.string().optional(),
     asTask: z.boolean().optional(),
     runId: z.string().optional(),
+    /** M8-005：最后按哪种形态执行；谁批的（policy = 项目的审阅策略说不用问人） */
+    shape: z.enum(['single', 'dag']).optional(),
+    source: z.enum(['user', 'policy']).optional(),
   }),
   /** M7-006：隔离会话的 git worktree */
   z.looseObject({

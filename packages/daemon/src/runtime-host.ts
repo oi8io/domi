@@ -26,10 +26,12 @@ import { DagSpecError } from '@domi/orchestrator'
 import type { PluginHost } from '@domi/plugin'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
 import {
+  AUTO_PLAN_REASON,
   applyWorktree,
   collectDiff,
   createWorktree,
   DomiSession,
+  decideIsolation,
   discardFile,
   ensureWorktree,
   MAX_SPAWN_DEPTH,
@@ -164,7 +166,13 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
   /**
    * 建一个任务会话的元数据：归到项目、记两条事件（M8-003 / 004）。cwd 不给就用项目路径
    */
-  async function createTask(id: string, cwd: string | undefined, projectId: string | undefined, title = '') {
+  async function createTask(
+    id: string,
+    cwd: string | undefined,
+    projectId: string | undefined,
+    title = '',
+    isolation?: { isolate: boolean; reason: string },
+  ) {
     const { project, auto, dir } = pj(() => {
       if (projectId !== undefined) {
         const p = projects.get(projectId)
@@ -176,9 +184,36 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     })
     index.sessions.upsert({ id, cwd: dir, title, model: opts.config.model.name, kind: 'task', projectId: project.id })
     await index.append(id, [
-      { t: 'session.kind', kind: 'task', cwd: dir },
+      { t: 'session.kind', kind: 'task', cwd: dir, ...(isolation === undefined ? {} : { isolation }) },
       { t: 'project.assign', projectId: project.id, path: project.path, auto },
     ])
+  }
+
+  /** 按目标建任务（PRD-M8-005 / 006）：隔离决定 → 建会话 → 需要时先进计划模式 */
+  async function createGoalTask(p: { projectId: string; goal: string; trigger?: 'user' | 'schedule' }) {
+    const project = pj(() => projects.get(p.projectId))
+    if (project.archivedAt !== null) throw new HostRequestError(`项目「${project.name}」已归档，先取消归档`)
+    const isolation = decideIsolation({
+      policy: project.settings.isolation,
+      cwd: project.path,
+      ...(p.trigger === undefined ? {} : { trigger: p.trigger }),
+    })
+    const id = newId()
+    if (isolation.isolate) {
+      const { info, cwd: inTree } = await wt(() => createWorktree(project.path, id, home))
+      index.sessions.upsert({ id, cwd: inTree, model: opts.config.model.name, kind: 'task', projectId: project.id })
+      await index.append(id, [
+        { t: 'session.kind', kind: 'task', cwd: inTree, isolation },
+        { t: 'project.assign', projectId: project.id, path: project.path, auto: false },
+        { t: 'worktree.create', ...info },
+      ])
+    } else {
+      await createTask(id, project.path, project.id, '', isolation)
+    }
+    // 小任务不强制先规划（SPEC-M8-005）：目标很短、项目也没要求每次都审
+    const planned = !(p.goal.trim().length < 40 && project.settings.planReview !== 'always')
+    if (planned) await (await live(id)).setMode('plan', AUTO_PLAN_REASON)
+    return { sessionId: id, isolation, planned }
   }
 
   const notifier = new Notifier(opts.config.notify, { log: (l) => process.stderr.write(`${l}\n`) })
@@ -230,6 +265,20 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       // 自由会话（M8-004）：不带项目上下文，命令每次都问
       const chat: Partial<SessionOptions> =
         row.kind === 'chat' ? { projectContext: false, askAlways: ['shell.exec'] } : {}
+      // 任务：计划审阅策略取所在项目的设置，每次现读（设置页改了就生效）
+      const projectId = row.projectId
+      const planReview: Partial<SessionOptions> =
+        projectId === null
+          ? {}
+          : {
+              planReview: () => {
+                try {
+                  return projects.get(projectId).settings.planReview
+                } catch {
+                  return 'always'
+                }
+              },
+            }
       // 隔离会话被删过又恢复时 worktree 目录已经清掉了：按分支重新挂上（M7-006）
       const tree = await worktreeOf(sessionId)
       if (tree) await wt(() => ensureWorktree(tree))
@@ -247,6 +296,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         // 花费与预算的金额上限（M7-009）
         pricing: pricingOf(opts.config),
         ...chat,
+        ...planReview,
         ...extra,
         // 计划批准后转长任务（M7-005）：同一个 TaskService
         startTask: async (spec, cwd) => (await tasks.start(JSON.stringify(spec), cwd)).runId,
@@ -385,6 +435,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           ...(r.projectId === null ? {} : { projectId: r.projectId }),
         }))
     },
+
+    createTask: (p) => createGoalTask(p),
 
     async rename(sessionId, title) {
       if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)

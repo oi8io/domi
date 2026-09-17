@@ -99,6 +99,9 @@ export class RefError extends Error {
   }
 }
 
+/** 新建任务时系统开计划模式用的 reason（M8-005）。审阅策略只对这种规划生效 */
+export const AUTO_PLAN_REASON = '新任务先规划'
+
 export interface PendingAsk {
   capabilityId: string
   args: unknown
@@ -167,6 +170,8 @@ export interface SessionOptions {
    * 带不带项目上下文（PRD-M8-004）。false = 自由会话：不问工作区信任、不加载规矩文件与项目级 Skill。默认 true
    */
   projectContext?: boolean
+  /** 计划审阅策略（PRD-M8-005）。任务会话取项目设置；不给 = 每个计划都问人 */
+  planReview?: () => 'auto' | 'always' | 'never'
   /** 即使规则放行也要问人的能力（PRD-M8-004：自由会话里的 shell.exec）。只收紧不放松 */
   askAlways?: readonly string[]
   /** 这个会话自己的用量上限（M7-009，长任务节点用）。覆盖配置里的 budget */
@@ -206,6 +211,8 @@ export class DomiSession {
   /** 计划模式（M7-005）。从事件流里最后一条 mode.switch 恢复 */
   private mode: 'plan' | 'act' = 'act'
   private modeLoaded = false
+  /** 当前的计划模式是新建任务时系统开的（M8-005），不是用户切的 */
+  private autoPlanned = false
   private planTool!: ReturnType<typeof makePlanSubmitTool>
   private currentModel: string
   private currentProvider: string
@@ -289,6 +296,8 @@ export class DomiSession {
       ...(opts.startTask
         ? { startTask: (spec: unknown) => (opts.startTask as NonNullable<typeof opts.startTask>)(spec, opts.cwd) }
         : {}),
+      // 项目的审阅策略只管系统替用户开的规划（新任务）；用户自己切到计划模式的，照旧每次都问
+      reviewPolicy: () => (this.autoPlanned && opts.planReview ? opts.planReview() : 'always'),
     })
 
     // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
@@ -674,9 +683,10 @@ export class DomiSession {
     this.modeLoaded = true
     const view = await this.view()
     for (let i = view.length - 1; i >= 0; i--) {
-      const ev = (view[i] as EventEnvelope).ev as { t: string; to?: 'plan' | 'act' }
+      const ev = (view[i] as EventEnvelope).ev as { t: string; to?: 'plan' | 'act'; reason?: string }
       if (ev.t === 'mode.switch' && ev.to) {
         this.applyMode(ev.to)
+        this.autoPlanned = ev.reason === AUTO_PLAN_REASON
         break
       }
     }
@@ -693,6 +703,7 @@ export class DomiSession {
     await this.loadMode()
     if (this.mode === to) return { mode: to, changed: false }
     this.applyMode(to)
+    this.autoPlanned = reason === AUTO_PLAN_REASON
     await this.log.append(this.opts.sessionId, [{ t: 'mode.switch', to, ...(reason === undefined ? {} : { reason }) }])
     await this.pump()
     return { mode: to, changed: true }

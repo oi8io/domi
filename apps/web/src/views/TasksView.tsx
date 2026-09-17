@@ -1,6 +1,6 @@
 /**
  * 任务页（`#/tasks`）—— PRD-M8-005 AC-4；新建（`#/tasks/new`，`?schedule=1` 展开计划时间）。
- * 新建 = 在选中的项目下建任务会话并把目标作为第一句话发出去；系统决定执行形态（TASK-M8-006）与定时（TASK-M8-012）接入后替换。
+ * 新建 = task.create：系统按项目设置决定隔离与规划，目标作为第一句话发出去（PRD-M8-005）。定时在 TASK-M8-012。
  * 编排运行（DAG）仍用原来的长任务面板。
  */
 import type { DomiClient } from '@domi/client-core'
@@ -29,7 +29,6 @@ export function NewTask({
   onCreated: (id: string) => void
 }) {
   const [projectId, setProjectId] = useState(initialProject ?? projects[0]?.id ?? '')
-  const [keepTree, setKeepTree] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const project = projects.find((p) => p.id === projectId)
   return (
@@ -52,18 +51,6 @@ export function NewTask({
           <input id="task-cron" className="field-input font-mono" placeholder="0 9 * * 1-5" disabled />
         </div>
       )}
-      <details className="mb-3 text-xs text-mut">
-        <summary className="cursor-pointer select-none">高级</summary>
-        <label className="mt-2 flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={keepTree}
-            onChange={(e) => setKeepTree(e.target.checked)}
-            className="accent-[var(--accent)]"
-          />
-          不直接改动我的工作区（改完先审阅再带回；之后由系统自动判断）
-        </label>
-      </details>
       <Composer
         className="px-0 pb-0"
         busy={!online || schedule || project === undefined}
@@ -73,10 +60,8 @@ export function NewTask({
         onSubmit={async (goal) => {
           if (!project) return
           try {
-            const id = keepTree
-              ? (await client.createIsolatedSession(project.path)).sessionId
-              : await client.createSession(undefined, { kind: 'task', projectId: project.id })
-            await client.submit(id, goal)
+            // 隔离与否、先不先规划，由系统按项目设置决定（PRD-M8-005 / 006）
+            const { sessionId: id } = await client.createTask(project.id, goal)
             setNotice(null)
             onCreated(id)
             navigate({ view: 'session', id, tab: 'chat' })

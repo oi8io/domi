@@ -227,6 +227,11 @@ export class DomiClient {
     return r.sessionId
   }
 
+  /** 按目标新建任务（M8-005）。目标作为第一句话已经提交了 */
+  createTask(projectId: string, goal: string): Promise<ResultOf<'task.create'>> {
+    return this.request('task.create', { projectId, goal })
+  }
+
   async renameSession(sessionId: string, title: string): Promise<void> {
     await this.request('session.rename', { sessionId, title })
   }

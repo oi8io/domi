@@ -180,8 +180,7 @@ export function ProjectView({
           submitLabel="开始任务"
           onSubmit={async (goal) => {
             try {
-              const id = await client.createSession(undefined, { kind: 'task', projectId: project.id })
-              await client.submit(id, goal)
+              const { sessionId: id } = await client.createTask(project.id, goal)
               onChanged()
               navigate({ view: 'session', id, tab: 'chat' })
             } catch (e) {
