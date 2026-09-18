@@ -17,8 +17,12 @@ export interface TranscriptItem {
   ok?: boolean
   /** 工具调用的参数摘要：JSON 序列化后前 80 字符 + …（PRD-M0-005 AC-1 写死的规则） */
   summary?: string
-  /** 工具结果：执行耗时（毫秒，来自 tool.result 事件，M8-008） */
+  /**
+   * 耗时（毫秒）：工具结果来自 `tool.result` 事件；思考段是这一段流式增量的跨度（M8-008 AC-1）
+   */
   ms?: number
+  /** 事件时间戳（流式段是第一条的）。轨迹时间线用（M8-008 AC-3） */
+  ts?: number
 }
 
 export interface MetricsSnapshot {
@@ -129,15 +133,20 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     return last?.kind === 'assistant' ? last.text : ''
   })
 
+  /** 正在处理的那条事件的时间戳：push 都带上它，轨迹时间线才有时间轴 */
+  let at = 0
+
   function push(item: TranscriptItem): void {
-    $items.set([...$items.get(), item])
+    $items.set([...$items.get(), { ts: at, ...item }])
   }
 
   function appendText(kind: 'assistant' | 'reason', seq: number, text: string): void {
     const items = $items.get()
     const last = items[items.length - 1]
     if (last?.kind === kind) {
-      $items.set([...items.slice(0, -1), { ...last, text: last.text + text }])
+      // 思考 / 回答是逐 token 来的：耗时 = 这一段从第一条到最后一条的跨度
+      const ms = last.ts === undefined ? undefined : Math.max(0, at - last.ts)
+      $items.set([...items.slice(0, -1), { ...last, text: last.text + text, ...(ms === undefined ? {} : { ms }) }])
     } else {
       push({ seq, kind, text })
     }
@@ -146,6 +155,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
   function applyEvent(env: EventEnvelope): void {
     const ev: AnyEvent = env.ev
     if (!isKnownEvent(ev)) return
+    at = env.ts
     switch (ev.t) {
       case 'user.input':
         push({ seq: env.seq, kind: 'user', text: ev.text })

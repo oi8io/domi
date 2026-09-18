@@ -5,7 +5,7 @@
  * 工具调用与它的结果配成一组，用原生 <details> 折叠——和 `domi trace --html` 同一个做法：
  * 折叠是展示状态，不是业务状态，不值得进 store。
  */
-import type { TranscriptItem } from '@domi/client-core'
+import { formatElapsed, type TranscriptItem } from '@domi/client-core'
 import type { ReactNode } from 'react'
 import { IconBranch, IconQuote } from './icons.tsx'
 import { cn } from './lib/cn.ts'
@@ -115,6 +115,9 @@ function ItemBody({ item }: { item: TranscriptItem }) {
             <span className="group-open/thought:hidden">▸ </span>
             <span className="hidden group-open/thought:inline">▾ </span>
             思考
+            {item.ms !== undefined && item.ms > 0 && (
+              <span className="ml-1.5 font-mono text-[11px] text-mut2">{formatElapsed(item.ms)}</span>
+            )}
           </summary>
           <div className="pt-1.5 text-[13px] whitespace-pre-wrap text-mut italic">{item.text}</div>
         </details>

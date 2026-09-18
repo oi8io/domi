@@ -1,10 +1,16 @@
 /**
  * Trajectory tab —— PRD-M8-008 AC-3（原型 .traj-view）。
  */
-import type { TranscriptItem } from '@domi/client-core'
+import {
+  filterTurns,
+  formatElapsed,
+  type TrajTag,
+  type TrajTimeline,
+  type TranscriptItem,
+  trajectory,
+} from '@domi/client-core'
 import { useState } from 'react'
 import { cn } from '../lib/cn.ts'
-import { filterTurns, type TrajTag, trajectoryTurns } from './trajectory.ts'
 
 const TAG_CLASS: Record<TrajTag, string> = {
   system: 'bg-border2 text-mut',
@@ -18,14 +24,53 @@ const TAG_CLASS: Record<TrajTag, string> = {
 const CHIP = 'inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-xs text-mut hover:bg-panel-h'
 const CHIP_ON = 'bg-accent-d font-medium text-accent hover:bg-accent-d'
 
+/** 三行时间线（原型 .timeline）：输入、模型、工具各一行，条的位置按时间戳 */
+export function Timeline({ timeline }: { timeline: TrajTimeline }) {
+  const rows: Array<[string, TrajTimeline['input'], string]> = [
+    ['Input', timeline.input, 'bg-accent'],
+    ['Model', timeline.model, 'bg-info'],
+    ['Tools', timeline.tools, 'bg-tool'],
+  ]
+  return (
+    <div className="mb-4 overflow-hidden rounded-md border border-border2" data-part="timeline">
+      {rows.map(([label, spans, color]) => (
+        <div key={label} className="grid grid-cols-[70px_1fr] items-center border-b border-border2 last:border-b-0">
+          <div className="px-2.5 py-2 font-mono text-[11px] text-mut">{label}</div>
+          <div className="relative h-[22px] py-2">
+            {spans.map((s) => (
+              <span
+                key={`${s.left}-${s.label}`}
+                className={cn('absolute top-[7px] h-2 rounded-[2px] opacity-70', color)}
+                style={{ left: `${s.left}%`, width: `${s.width}%` }}
+                title={s.label}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="border-t border-border2 px-2.5 py-1 text-right font-mono text-[10.5px] text-mut2">
+        共 {formatElapsed(timeline.end - timeline.start)}
+      </div>
+    </div>
+  )
+}
+
 export function Trajectory({ items }: { items: readonly TranscriptItem[] }) {
   const [mode, setMode] = useState<'turns' | 'calls'>('turns')
+  const [showTime, setShowTime] = useState(true)
   const [query, setQuery] = useState('')
-  const turns = filterTurns(trajectoryTurns(items), mode, query)
+  const { turns: all, timeline } = trajectory(items)
+  const turns = filterTurns(all, mode, query)
   return (
     <div className="mx-auto max-w-[960px] px-6 py-4">
       <div className="mb-3.5 flex flex-wrap items-center gap-1">
-        <button type="button" className={CHIP} disabled title="时间线需要事件时间投影，稍后提供">
+        <button
+          type="button"
+          className={cn(CHIP, showTime && timeline !== null && CHIP_ON)}
+          disabled={timeline === null}
+          title={timeline === null ? '这个会话的事件没有时间戳' : '显示 / 收起时间线'}
+          onClick={() => setShowTime(!showTime)}
+        >
           ◷ Duration
         </button>
         <button type="button" className={cn(CHIP, mode === 'turns' && CHIP_ON)} onClick={() => setMode('turns')}>
@@ -42,6 +87,7 @@ export function Trajectory({ items }: { items: readonly TranscriptItem[] }) {
           aria-label="搜索轨迹"
         />
       </div>
+      {showTime && timeline !== null && <Timeline timeline={timeline} />}
       {turns.length === 0 && <p className="py-8 text-center text-[13px] text-mut">没有匹配的步骤。</p>}
       {turns.map((t) => (
         <section key={t.index} className="mb-1" data-turn={t.index}>
@@ -67,6 +113,9 @@ export function Trajectory({ items }: { items: readonly TranscriptItem[] }) {
               >
                 {r.text}
               </span>
+              {r.ms !== undefined && (
+                <span className="shrink-0 font-mono text-[11px] text-mut2">{formatElapsed(r.ms)}</span>
+              )}
             </div>
           ))}
         </section>

@@ -68,9 +68,10 @@ describe('事件流投影', () => {
       env({ t: 'model.switch', from: 'a', to: 'b' }),
       env({ t: 'model.switch', from: 'b', to: 'weak', lostCapabilities: ['toolCall', 'vision'] }),
     ])
+    // ts 是事件时间戳（M8-008 的时间线要它）；这里的 env 都给 0
     expect(s.$items.get()).toEqual([
-      { seq: 1, kind: 'context', text: '模型切换 a → b' },
-      { seq: 2, kind: 'context', text: '模型切换 b → weak', summary: '新模型不支持：toolCall、vision' },
+      { seq: 1, ts: 0, kind: 'context', text: '模型切换 a → b' },
+      { seq: 2, ts: 0, kind: 'context', text: '模型切换 b → weak', summary: '新模型不支持：toolCall、vision' },
     ])
   })
 
