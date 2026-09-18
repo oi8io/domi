@@ -39,8 +39,9 @@ import {
   type IsolationDecision,
   MAX_SPAWN_DEPTH,
   MemoryService,
+  ModelCatalog,
+  type ModelCatalogOptions,
   makeReviewReportTool,
-  modelCatalog,
   officialSkillsPlugin,
   ProjectError,
   ProjectService,
@@ -104,6 +105,8 @@ export interface RuntimeHostOptions {
   skillsDir?: string
   /** 已加载的插件（PRD-M6）：skill 进 Skill 清单，UI 面板经协议给客户端 */
   plugins?: PluginHost
+  /** 模型探测用的 fetch（PRD-M9-001）。测试注入假的；不给用全局 fetch */
+  probeFetch?: ModelCatalogOptions['fetch']
   /** 配置从哪读（PRD-M8-011）。给了才开放 config.get / config.set */
   configSource?: LoadOptions
   /** 测试注入：记忆抽取用的模型。不给就用 provider（再不给就按配置建） */
@@ -326,6 +329,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
   const notifier = new Notifier(opts.config.notify, { log: (l) => process.stderr.write(`${l}\n`) })
   /** 同一个会话只有一个 DomiSession：core、编排、子 agent 共用，推送才不会重复 */
   const sessions = new Map<string, Promise<DomiSession>>()
+  // 模型清单与探测缓存（PRD-M9-001）：整个 domid 一份，配置变了靠指纹自己失效
+  const catalog = new ModelCatalog(opts.probeFetch === undefined ? {} : { fetch: opts.probeFetch })
   const pushChild = (id: string, envs: EventEnvelope[]): void => emit?.(id, envs)
 
   /** 这个会话的隔离工作区（从事件流里找；不是隔离会话 → null） */
@@ -620,8 +625,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         if (sessionId !== undefined) return (await live(sessionId)).listSkills()
         return (skills?.list() ?? []).map((k) => ({ name: k.name, description: k.description, source: k.source }))
       },
-      async models() {
-        return modelCatalog(opts.config)
+      async models(refresh) {
+        return catalog.list(opts.config, { refresh: refresh === true })
       },
     },
 

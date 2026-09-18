@@ -1924,7 +1924,11 @@
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
-        "properties": {}
+        "properties": {
+          "refresh": {
+            "type": "boolean"
+          }
+        }
       },
       "result": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1938,8 +1942,19 @@
                 "provider": {
                   "type": "string"
                 },
+                "providerName": {
+                  "type": "string"
+                },
                 "name": {
                   "type": "string"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "probe",
+                    "manual",
+                    "fallback"
+                  ]
                 },
                 "vision": {
                   "type": "boolean"
@@ -1950,9 +1965,40 @@
               },
               "required": [
                 "provider",
+                "providerName",
                 "name",
+                "source",
                 "vision",
                 "toolCall"
+              ]
+            }
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "fallback"
+                  ]
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "status"
               ]
             }
           },
@@ -1974,6 +2020,7 @@
         },
         "required": [
           "models",
+          "providers",
           "current"
         ]
       }

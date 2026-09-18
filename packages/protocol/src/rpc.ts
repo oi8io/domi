@@ -503,15 +503,27 @@ export const METHODS = {
   },
   'model.list': {
     summary:
-      '可选的模型（PRD-M8-010 AC-5）：配了凭据的供应商 × 已知的模型名（配置 + 价目表），带能力；current 是默认模型',
-    params: z.object({}),
+      '可选的模型（PRD-M9-001 · PRD-M9-003 AC-2）：每个启用的供应商探测 GET /models（缓存 10 分钟，refresh 强制重探），' +
+      '过滤掉非对话模型，并上手填的与默认模型；探测失败的那一家降级为手填 + 默认模型，providers 里标出原因。' +
+      '同名模型在不同供应商下各占一条，身份是 (provider, name)；current 是默认模型',
+    params: z.object({ refresh: z.boolean().optional() }),
     result: z.object({
       models: z.array(
         z.object({
           provider: z.string(),
+          providerName: z.string(),
           name: z.string(),
+          source: z.enum(['probe', 'manual', 'fallback']),
           vision: z.boolean(),
           toolCall: z.boolean(),
+        }),
+      ),
+      providers: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          status: z.enum(['ok', 'fallback']),
+          error: z.string().optional(),
         }),
       ),
       current: z.object({ provider: z.string(), name: z.string() }),

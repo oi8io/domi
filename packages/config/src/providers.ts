@@ -44,7 +44,8 @@ export function providerConnection(config: ConfigLike, id: string): ProviderConn
   const protocol = vendor === 'custom' ? (entry?.protocol ?? VENDORS.custom.protocol) : VENDORS[vendor].protocol
   return {
     id,
-    name: entry?.name ?? (entry === undefined && vendor !== 'custom' ? VENDORS[vendor].label : id),
+    // 没写名字：键名就是厂商名（anthropic / deepseek …）时用厂商的品牌名，其余用 id
+    name: entry?.name ?? (vendor !== 'custom' && id === vendor ? VENDORS[vendor].label : id),
     vendor,
     protocol,
     enabled: entry?.enabled ?? true,

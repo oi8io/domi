@@ -2329,7 +2329,7 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 
 ### `model.list`
 
-可选的模型（PRD-M8-010 AC-5）：配了凭据的供应商 × 已知的模型名（配置 + 价目表），带能力；current 是默认模型
+可选的模型（PRD-M9-001 · PRD-M9-003 AC-2）：每个启用的供应商探测 GET /models（缓存 10 分钟，refresh 强制重探），过滤掉非对话模型，并上手填的与默认模型；探测失败的那一家降级为手填 + 默认模型，providers 里标出原因。同名模型在不同供应商下各占一条，身份是 (provider, name)；current 是默认模型
 
 **params**
 
@@ -2337,7 +2337,11 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "properties": {}
+  "properties": {
+    "refresh": {
+      "type": "boolean"
+    }
+  }
 }
 ```
 
@@ -2356,8 +2360,19 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
           "provider": {
             "type": "string"
           },
+          "providerName": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "probe",
+              "manual",
+              "fallback"
+            ]
           },
           "vision": {
             "type": "boolean"
@@ -2368,9 +2383,40 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
         },
         "required": [
           "provider",
+          "providerName",
           "name",
+          "source",
           "vision",
           "toolCall"
+        ]
+      }
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "fallback"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status"
         ]
       }
     },
@@ -2392,6 +2438,7 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
   },
   "required": [
     "models",
+    "providers",
     "current"
   ]
 }

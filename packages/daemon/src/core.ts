@@ -152,7 +152,7 @@ export interface HostComposer {
   files(sessionId: string, query: string, limit: number): Promise<ResultOf<'fs.list'>>
   attach(sessionId: string, file: { name: string; mime: string; data: Uint8Array }): Promise<ResultOf<'attachment.put'>>
   skills(sessionId: string | undefined): Promise<ResultOf<'skill.list'>['skills']>
-  models(): Promise<ResultOf<'model.list'>>
+  models(refresh?: boolean): Promise<ResultOf<'model.list'>>
 }
 
 export interface SessionSummary {
@@ -709,7 +709,7 @@ export class Daemon {
           case 'skill.list':
             return ok(req.id, { skills: await h.skills(p.sessionId as string | undefined) })
           default:
-            return ok(req.id, await h.models())
+            return ok(req.id, await h.models(p.refresh === true))
         }
       }
 
