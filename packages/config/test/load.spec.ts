@@ -130,7 +130,7 @@ describe('PRD-M0-008 AC-3 · 缺凭据的退出路径', () => {
       expect(e).toBeInstanceOf(MissingCredentialError)
       const err = e as MissingCredentialError
       expect(err.messageKey).toBe('error.missing_credential')
-      expect(err.envNames).toEqual(['DOMI_API_KEY', 'ANTHROPIC_API_KEY'])
+      expect(err.envNames).toEqual(['DOMI_API_KEY', 'ANTHROPIC_API_KEY', 'DOMI_ANTHROPIC_API_KEY'])
     }
   })
 

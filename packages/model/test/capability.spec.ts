@@ -2,12 +2,12 @@
  * PRD-M1-001 AC-2/AC-3 · 能力矩阵与提前拒绝
  */
 import { afterEach, describe, expect, test } from 'bun:test'
+import { VENDORS } from '@domi/config'
 import type { ToolSchema } from '@domi/protocol'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
 import {
   AiSdkProvider,
   assertCapability,
-  CAPABILITIES,
   capabilitiesFor,
   lostCapabilities,
   UnsupportedCapabilityError,
@@ -23,14 +23,14 @@ const USAGE = { inputTokens: 10, outputTokens: 5, totalTokens: 15 }
 const TOOLS: ToolSchema[] = [{ name: 'fs.read', description: '读文件', inputSchema: { type: 'object' } }]
 
 describe('AC-2 · 五个布尔字段', () => {
-  test.each(Object.keys(CAPABILITIES))('%s 的矩阵字段齐全', (kind) => {
-    const caps = CAPABILITIES[kind as keyof typeof CAPABILITIES]
+  test.each(Object.keys(VENDORS))('%s 的矩阵字段齐全', (kind) => {
+    const caps = VENDORS[kind as keyof typeof VENDORS].capabilities
     expect(Object.keys(caps).sort()).toEqual(['promptCache', 'reasoning', 'structuredOutput', 'toolCall', 'vision'])
     for (const v of Object.values(caps)) expect(typeof v).toBe('boolean')
   })
 
-  test('openai-compatible 全部保守声明为 false —— 后面挂什么我们不知道', () => {
-    expect(Object.values(CAPABILITIES['openai-compatible']).every((v) => v === false)).toBe(true)
+  test('自定义厂商（custom）全部保守声明为 false —— 后面挂什么我们不知道', () => {
+    expect(Object.values(VENDORS.custom.capabilities).every((v) => v === false)).toBe(true)
   })
 
   test('配置可以覆盖矩阵（用户知道自己的网关支持什么）', () => {
@@ -59,7 +59,7 @@ describe('AC-3 · 在发出 HTTP 请求之前抛错', () => {
 
     const p = new AiSdkProvider({
       id: 'openai-compatible',
-      capabilities: CAPABILITIES['openai-compatible'],
+      capabilities: VENDORS.custom.capabilities,
       model: new MockLanguageModelV4({
         doStream: async () => ({ stream: simulateReadableStream({ chunks: [], chunkDelayInMs: 0 }) }),
       }),
@@ -83,7 +83,7 @@ describe('AC-3 · 在发出 HTTP 请求之前抛错', () => {
   test('不传工具时不检查 toolCall —— 只有真要用才拦', async () => {
     const p = new AiSdkProvider({
       id: 'openai-compatible',
-      capabilities: CAPABILITIES['openai-compatible'],
+      capabilities: VENDORS.custom.capabilities,
       model: new MockLanguageModelV4({
         doStream: async () => ({
           stream: simulateReadableStream({
@@ -114,7 +114,7 @@ describe('AC-3 · 在发出 HTTP 请求之前抛错', () => {
 
   test('错误信息告诉用户怎么办，而不只是说不支持', () => {
     try {
-      assertCapability('openai-compatible', CAPABILITIES['openai-compatible'], 'structuredOutput')
+      assertCapability('openai-compatible', VENDORS.custom.capabilities, 'structuredOutput')
       throw new Error('should throw')
     } catch (e) {
       expect((e as Error).message).toContain('config.yaml')
@@ -124,7 +124,7 @@ describe('AC-3 · 在发出 HTTP 请求之前抛错', () => {
 
 describe('PRD-M1-002 AC-2 · 能力差集', () => {
   test('切到更弱的模型时能列出将失去的能力', () => {
-    expect(lostCapabilities(CAPABILITIES.openai, CAPABILITIES['openai-compatible']).sort()).toEqual([
+    expect(lostCapabilities(VENDORS.openai.capabilities, VENDORS.custom.capabilities).sort()).toEqual([
       'promptCache',
       'reasoning',
       'structuredOutput',
@@ -134,10 +134,10 @@ describe('PRD-M1-002 AC-2 · 能力差集', () => {
   })
 
   test('切到更强的模型时差集为空，不该弹确认', () => {
-    expect(lostCapabilities(CAPABILITIES['openai-compatible'], CAPABILITIES.openai)).toEqual([])
+    expect(lostCapabilities(VENDORS.custom.capabilities, VENDORS.openai.capabilities)).toEqual([])
   })
 
   test('anthropic → openai 只失去…什么都不失去（anthropic 没声明 structuredOutput）', () => {
-    expect(lostCapabilities(CAPABILITIES.anthropic, CAPABILITIES.openai)).toEqual([])
+    expect(lostCapabilities(VENDORS.anthropic.capabilities, VENDORS.openai.capabilities)).toEqual([])
   })
 })

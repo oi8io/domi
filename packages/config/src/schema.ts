@@ -5,6 +5,7 @@
  * 内置的就够用时，引库只是多一个要跟版本的东西）。
  */
 import { z } from 'zod'
+import { DEFAULT_MODEL } from './vendors.ts'
 
 export const PermissionRuleSchema = z.object({
   name: z.string(),
@@ -52,8 +53,8 @@ export const McpConfigSchema = z
 
 export const ConfigSchema = z.object({
   model: z.object({
-    provider: z.string().default('anthropic'),
-    name: z.string().default('claude-sonnet-4-5'),
+    provider: z.string().default(DEFAULT_MODEL.provider),
+    name: z.string().default(DEFAULT_MODEL.name),
     /** 自定义网关：LiteLLM / OpenRouter / 本地模型都从这里进来（DESIGN §5） */
     baseUrl: z.string().optional(),
     /**

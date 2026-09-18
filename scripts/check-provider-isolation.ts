@@ -10,14 +10,25 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-/** 只有这一个文件允许知道 provider 的名字 */
-const ALLOWED = 'packages/model/src/factory.ts'
-const PROVIDER_NAMES = ['anthropic', 'openai', 'google', 'openai-compatible'] as const
+/**
+ * 「有哪些厂商」只许写在厂商模板里（PRD-M9-002 AC-2 · SPEC-M9-002 取舍-1）。
+ * factory 按适配器选 SDK、probe 按协议拼请求——适配器 / 协议的名字恰好与两个厂商同名，这两处也放行
+ */
+const ALLOWED = 'packages/config/src/vendors.ts'
+const ALSO_ALLOWED = ['packages/model/src/factory.ts', 'packages/model/src/probe.ts']
+const PROVIDER_NAMES = ['anthropic', 'openai', 'google', 'gemini', 'deepseek', 'openai-compatible'] as const
 
-/** 能力矩阵表按定义就要列出 provider 名 —— 它和 factory 是同一份知识的两半 */
-const ALSO_ALLOWED = ['packages/model/src/capability.ts']
-
-const SCAN_ROOTS = ['packages/kernel/src', 'packages/model/src', 'packages/runtime/src', 'packages/capability/src']
+/**
+ * 扫描范围（v1.12 扩大）：原来只扫 kernel / model / runtime / capability，
+ * 结果厂商名单在 config（环境变量表、设置页白名单）与 Web 设置页各长出一份——守卫看不见的地方就会腐蚀
+ */
+const SCAN_ROOTS = [
+  'packages/kernel/src',
+  'packages/model/src',
+  'packages/runtime/src',
+  'packages/capability/src',
+  // TASK-M9-002 / 005 清掉 config/write.ts 与 Web 设置页里的厂商名单后，扩到 config / daemon / cli / client-core / apps
+]
 
 function files(root: string): string[] {
   const out: string[] = []
@@ -25,7 +36,7 @@ function files(root: string): string[] {
     for (const name of readdirSync(d)) {
       const p = join(d, name)
       if (statSync(p).isDirectory()) walk(p)
-      else if (name.endsWith('.ts')) out.push(p)
+      else if (name.endsWith('.ts') || name.endsWith('.tsx')) out.push(p)
     }
   }
   walk(root)
@@ -49,9 +60,9 @@ for (const root of SCAN_ROOTS) {
 if (violations.length > 0) {
   for (const v of violations) console.error(`[PRD-M1-001 AC-4] ${v}`)
   console.error(
-    `\n「有哪些 provider」这件知识只许存在于 ${ALLOWED}（能力矩阵在 ${ALSO_ALLOWED[0]}）。` +
-      '\n否则加第五个 provider 就要改内核，AC-4 说的「只需实现接口 + 注册」就不成立了。',
+    `\n「有哪些厂商」这件知识只许存在于 ${ALLOWED}（适配器选择在 ${ALSO_ALLOWED.join('、')}）。` +
+      '\n否则加一家厂商就要改一串文件，PRD-M1-001 AC-4 说的「只需实现接口 + 注册」就不成立了。',
   )
   process.exit(1)
 }
-console.log(`[check-provider-isolation] OK —— provider 名只出现在 ${ALLOWED} 与能力矩阵里`)
+console.log(`[check-provider-isolation] OK —— 厂商名只出现在 ${ALLOWED} 与适配器选择里`)

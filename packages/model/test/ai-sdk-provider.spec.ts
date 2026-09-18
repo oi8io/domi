@@ -6,19 +6,13 @@
  * providerOptions 原样下去、provider 的原始 usage 字段整块上来。
  */
 import { describe, expect, test } from 'bun:test'
+import { VENDORS } from '@domi/config'
 import type { ToolSchema } from '@domi/protocol'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
-import {
-  AiSdkProvider,
-  buildToolNameMap,
-  CAPABILITIES,
-  encodeToolName,
-  type ModelEvent,
-  toAiMessages,
-} from '../src/index.ts'
+import { AiSdkProvider, buildToolNameMap, encodeToolName, type ModelEvent, toAiMessages } from '../src/index.ts'
 
 /** 这些用例不验能力拒绝，所以给一个全支持的矩阵 */
-const CAPS = CAPABILITIES.openai
+const CAPS = VENDORS.openai.capabilities
 
 /**
  * AI SDK 在 finish 阶段会读 usage 的内部结构，给 `{}` 会炸。

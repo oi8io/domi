@@ -4,8 +4,12 @@
  * 这里只有类型；「哪个 provider 怎么建 embedding 模型」和 createProvider 一样只在 factory.ts 里（PRD-M1-001 AC-4）。
  */
 
+import type { Protocol, VendorId } from '@domi/config'
+
 export interface EmbeddingConfig {
   provider: string
+  vendor?: VendorId | undefined
+  protocol?: Protocol | undefined
   model: string
   apiKey?: string | undefined
   baseUrl?: string | undefined

@@ -12,7 +12,8 @@
  * 顺带这条也是真需求：企业代理 / mTLS 场景要的就是自定义 fetch。
  */
 import { describe, expect, test } from 'bun:test'
-import { assertAsciiKey, CAPABILITIES, capabilitiesFor, createProvider } from '../src/index.ts'
+import { VENDORS } from '@domi/config'
+import { assertAsciiKey, capabilitiesFor, createProvider } from '../src/index.ts'
 
 interface Captured {
   url: string
@@ -90,7 +91,7 @@ describe('自定义 base_url 走 anthropic 协议', () => {
       baseUrl: 'https://my-gateway.internal/v1',
       fetch,
     })
-    expect(caps).toEqual(CAPABILITIES.anthropic)
+    expect(caps).toEqual(VENDORS.anthropic.capabilities)
     expect(caps.toolCall).toBe(true)
     expect(caps.promptCache).toBe(true)
   })

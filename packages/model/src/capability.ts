@@ -7,6 +7,8 @@
  * 代价是声明会过时。缓解办法是把矩阵放在**紧挨 provider 构造的地方**——
  * 改 provider 的人一眼就能看到它，而不是散在另一个文件里等着被遗忘。
  */
+import { VENDORS, type VendorId } from '@domi/config'
+
 export interface ModelCapabilities {
   toolCall: boolean
   vision: boolean
@@ -15,25 +17,13 @@ export interface ModelCapabilities {
   structuredOutput: boolean
 }
 
-export type ProviderKind = 'anthropic' | 'openai' | 'google' | 'openai-compatible'
-
 /**
- * openai-compatible 全部声明 false 是**有意的保守**：
- * 它后面可能是 llama.cpp、vLLM、Ollama 或任何网关，我们无从知道。
- * 声明 false 的后果是"想用得显式打开"，声明 true 的后果是"运行时才炸"。
- * fail-closed 在这里和 INV-03 是同一个立场。
+ * 各厂商的默认矩阵在 `@domi/config` 的厂商模板里（PRD-M9-002 AC-2）；这里只剩类型与判断。
+ * 自定义厂商全部声明 false 是**有意的保守**：它后面可能是 llama.cpp、vLLM、Ollama 或任何网关，我们无从知道。
+ * 声明 false 的后果是"想用得显式打开"，声明 true 的后果是"运行时才炸"。fail-closed 在这里和 INV-03 是同一个立场。
  */
-export const CAPABILITIES: Record<ProviderKind, ModelCapabilities> = {
-  anthropic: { toolCall: true, vision: true, reasoning: true, promptCache: true, structuredOutput: false },
-  openai: { toolCall: true, vision: true, reasoning: true, promptCache: true, structuredOutput: true },
-  google: { toolCall: true, vision: true, reasoning: true, promptCache: true, structuredOutput: true },
-  'openai-compatible': {
-    toolCall: false,
-    vision: false,
-    reasoning: false,
-    promptCache: false,
-    structuredOutput: false,
-  },
+export function vendorCapabilities(vendor: VendorId): ModelCapabilities {
+  return { ...VENDORS[vendor].capabilities }
 }
 
 export class UnsupportedCapabilityError extends Error {
@@ -44,7 +34,7 @@ export class UnsupportedCapabilityError extends Error {
   ) {
     super(
       `error.unsupported_capability: provider "${provider}" 未声明支持 ${capability}。\n` +
-        `若它其实支持（常见于 openai-compatible 网关），在 ~/.domi/config.yaml 的 model.capabilities 里显式打开（例如 toolCall: true）。`,
+        `若它其实支持（常见于自定义网关），在「设置 › 模型供应商」里打开，或在 ~/.domi/config.yaml 的 providers.${provider}.capabilities 里显式打开（例如 toolCall: true）。`,
     )
     this.name = 'UnsupportedCapabilityError'
   }

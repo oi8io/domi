@@ -41,8 +41,10 @@ describe('providerConnection', () => {
 
 describe('DOMI_API_KEY 只给默认模型所在的那一家（PRD-M9-002 AC-6）', () => {
   test('环境变量名', () => {
-    expect(credentialEnvNames('anthropic')).toEqual(['DOMI_API_KEY', 'ANTHROPIC_API_KEY'])
-    expect(credentialEnvNames('openai', false)).toEqual(['OPENAI_API_KEY'])
+    expect(credentialEnvNames('anthropic')).toEqual(['DOMI_API_KEY', 'ANTHROPIC_API_KEY', 'DOMI_ANTHROPIC_API_KEY'])
+    expect(credentialEnvNames('openai', false)).toEqual(['OPENAI_API_KEY', 'DOMI_OPENAI_API_KEY'])
+    // 自定义 id：DOMI_<ID>_API_KEY（- 转 _）
+    expect(credentialEnvNames('my-gw', false)).toEqual(['DOMI_MY_GW_API_KEY'])
   })
 
   test('装载：DOMI_API_KEY 不会变成别家的 key', () => {

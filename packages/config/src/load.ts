@@ -13,6 +13,7 @@ import { ConfigParseError } from './errors.ts'
 import { providerConnection } from './providers.ts'
 import { ConfigSchema, type DomiConfig } from './schema.ts'
 import { readSecrets, type Secrets, secretsPath } from './secrets.ts'
+import { DEFAULT_MODEL, providerEnvNames, type VendorId } from './vendors.ts'
 
 export class MissingCredentialError extends Error {
   /** 文案 key 而非句子：TUI 与 CLI 各自渲染，测试也断言它（AC-3） */
@@ -107,14 +108,8 @@ export function readConfigFile(src: ConfigSource): Record<string, unknown> {
  * 按 provider 找它惯用的环境变量名。`DOMI_API_KEY` 这个统一入口**只给默认模型所在的那一家**（PRD-M9-002 AC-6）：
  * 否则设了它，切到任何没配 key 的别家都会把这把 key 发过去（BUG-M9-002 的同一类问题）
  */
-export function credentialEnvNames(provider: string, isDefault = true): string[] {
-  const perProvider: Record<string, string> = {
-    anthropic: 'ANTHROPIC_API_KEY',
-    openai: 'OPENAI_API_KEY',
-    deepseek: 'DEEPSEEK_API_KEY',
-  }
-  const specific = perProvider[provider]
-  const names = specific ? [specific] : []
+export function credentialEnvNames(provider: string, isDefault = true, vendor?: VendorId): string[] {
+  const names = providerEnvNames(provider, vendor)
   return isDefault ? ['DOMI_API_KEY', ...names] : names
 }
 
@@ -166,7 +161,7 @@ export function loadConfig(opts: LoadOptions = {}): DomiConfig {
   const secrets = readSecrets(secretsPath(dirname(src.path)))
 
   const fileModel = (fromFile.model ?? {}) as Record<string, unknown>
-  const provider = env.DOMI_MODEL_PROVIDER ?? (fileModel.provider as string | undefined) ?? 'anthropic'
+  const provider = env.DOMI_MODEL_PROVIDER ?? (fileModel.provider as string | undefined) ?? DEFAULT_MODEL.provider
   const ctx = { env, file: fromFile, secrets, defaultProvider: provider }
   const apiKey = resolveCredential(provider, ctx)?.value
   const fileProviders = (fromFile.providers ?? {}) as FileProviders
@@ -192,7 +187,7 @@ export function loadConfig(opts: LoadOptions = {}): DomiConfig {
     providers,
     model: {
       provider,
-      name: env.DOMI_MODEL ?? (fileModel.name as string | undefined) ?? 'claude-sonnet-4-5',
+      name: env.DOMI_MODEL ?? (fileModel.name as string | undefined) ?? DEFAULT_MODEL.name,
       ...((env.DOMI_BASE_URL ?? fileModel.base_url ?? providerBase)
         ? { baseUrl: env.DOMI_BASE_URL ?? (fileModel.base_url as string | undefined) ?? providerBase }
         : {}),

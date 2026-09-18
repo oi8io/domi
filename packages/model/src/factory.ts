@@ -6,21 +6,33 @@
  * 「有哪些 provider」的地方，kernel 一无所知。
  */
 import { createAnthropic } from '@ai-sdk/anthropic'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
+import {
+  adapterFor,
+  CUSTOM_OPENAI_FALLBACK_BASE,
+  inferVendor,
+  type Protocol,
+  VENDORS,
+  type VendorId,
+} from '@domi/config'
 import { embedMany } from 'ai'
 import { AiSdkProvider } from './ai-sdk-provider.ts'
-import { CAPABILITIES, type ModelCapabilities, type ProviderKind } from './capability.ts'
+import { type ModelCapabilities, vendorCapabilities } from './capability.ts'
 import { type EmbeddingConfig, EmbeddingUnsupportedError, type EmbedFn } from './embedding.ts'
 import type { ModelProvider } from './provider.ts'
 
 export interface ProviderConfig {
+  /** provider id（配置里的键）。只用于标识与报错；怎么连由 vendor / protocol 决定 */
   provider: string
   name: string
+  /** 厂商模板（PRD-M9-002 AC-2）。不给就按 provider id 推断（旧配置） */
+  vendor?: VendorId | undefined
+  /** 只对 custom 有意义：openai 或 anthropic 协议 */
+  protocol?: Protocol | undefined
   apiKey?: string | undefined
   baseUrl?: string | undefined
-  /** 允许在配置里覆盖能力矩阵——openai-compatible 后面挂什么只有用户知道 */
+  /** 显式覆盖能力矩阵——自定义网关后面挂什么只有用户知道 */
   capabilities?: { [K in keyof ModelCapabilities]?: boolean | undefined } | undefined
   /**
    * 自定义 fetch。两个真实用途：
@@ -31,33 +43,19 @@ export interface ProviderConfig {
   fetch?: typeof globalThis.fetch | undefined
 }
 
-export function isKnownProvider(p: string): p is ProviderKind {
-  return p in CAPABILITIES
-}
-
-/** 价目表里的模型名归哪一家（按前缀认，模型下拉用，PRD-M8-010 AC-5）。认不出 → undefined */
-const MODEL_FAMILY: Array<[RegExp, string]> = [
-  [/^claude-/, 'anthropic'],
-  [/^(gpt-|o\d|chatgpt-)/, 'openai'],
-  [/^deepseek-/, 'deepseek'],
-  [/^gemini-/, 'google'],
-]
-
-/** 价目表里没有、但这家的 API 名字长期稳定的（模型下拉兜底；更多的在 providers.<p>.models 里配） */
-const KNOWN_MODELS: Record<string, readonly string[]> = {
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
-}
-
-export function knownModels(provider: string): readonly string[] {
-  return KNOWN_MODELS[provider] ?? []
-}
-
-export function providerOfModelName(name: string): string | undefined {
-  return MODEL_FAMILY.find(([re]) => re.test(name))?.[1]
+/** 这个 provider 最终用哪家模板、哪种协议、哪种适配器（PRD-M9-002 AC-3） */
+export function connectionShape(cfg: Pick<ProviderConfig, 'provider' | 'vendor' | 'protocol'>): {
+  vendor: VendorId
+  protocol: Protocol
+  adapter: ReturnType<typeof adapterFor>
+} {
+  const vendor = cfg.vendor ?? inferVendor(cfg.provider)
+  const protocol = vendor === 'custom' ? (cfg.protocol ?? VENDORS.custom.protocol) : VENDORS[vendor].protocol
+  return { vendor, protocol, adapter: adapterFor(vendor, protocol) }
 }
 
 export function capabilitiesFor(cfg: ProviderConfig): ModelCapabilities {
-  const base = isKnownProvider(cfg.provider) ? CAPABILITIES[cfg.provider] : CAPABILITIES['openai-compatible']
+  const base = vendorCapabilities(connectionShape(cfg).vendor)
   // 只覆盖显式给了值的项：undefined 不是 false，不能把默认值冲掉
   const overrides = Object.entries(cfg.capabilities ?? {}).filter(([, v]) => typeof v === 'boolean')
   return { ...base, ...Object.fromEntries(overrides) }
@@ -150,9 +148,15 @@ export function diagnosticFetch(base: FetchLike, trace: RequestTrace): typeof gl
   return wrapped as unknown as typeof globalThis.fetch
 }
 
-/** 走 OpenAI 兼容协议、但有固定官方地址的几家（PRD-M8-012 AC-2）。没配 base_url 时用这里的 */
-const COMPATIBLE_DEFAULT_BASE: Record<string, string> = {
-  deepseek: 'https://api.deepseek.com/v1',
+/** 这个 provider 实际连的地址：填了用填的（anthropic 协议规整成带 /v1），没填用模板默认 */
+export function effectiveBaseUrl(
+  cfg: Pick<ProviderConfig, 'provider' | 'vendor' | 'protocol' | 'baseUrl'>,
+): string | undefined {
+  const { vendor, adapter } = connectionShape(cfg)
+  const url = cfg.baseUrl || VENDORS[vendor].defaultBaseUrl
+  if (adapter === 'anthropic') return url ? normalizeAnthropicBaseUrl(url) : undefined
+  if (adapter === 'openai-compatible') return url ?? CUSTOM_OPENAI_FALLBACK_BASE
+  return url
 }
 
 export function createProvider(cfg: ProviderConfig): ModelProvider {
@@ -161,54 +165,50 @@ export function createProvider(cfg: ProviderConfig): ModelProvider {
   assertAsciiKey(apiKey)
 
   const trace: RequestTrace = { lastUrl: undefined }
-  const baseUrl = cfg.baseUrl && cfg.provider === 'anthropic' ? normalizeAnthropicBaseUrl(cfg.baseUrl) : cfg.baseUrl
+  const { adapter } = connectionShape(cfg)
+  const baseURL = effectiveBaseUrl(cfg)
   const common = {
     apiKey,
-    ...(baseUrl ? { baseURL: baseUrl } : {}),
+    ...(baseURL ? { baseURL } : {}),
     fetch: diagnosticFetch(cfg.fetch ?? ((input, init) => globalThis.fetch(input, init)), trace),
   }
 
   const model = (() => {
-    switch (cfg.provider) {
+    switch (adapter) {
       case 'anthropic':
         return createAnthropic(common)(cfg.name)
-      case 'openai':
+      case 'openai-official':
         return createOpenAI(common)(cfg.name)
-      case 'google':
-        return createGoogleGenerativeAI(common)(cfg.name)
-      default:
-        // 未知 provider 一律按 openai-compatible 处理——LiteLLM / OpenRouter / Ollama
-        // 都走这条（DESIGN §5：网关只作为可选后端，不作为依赖）
-        return createOpenAICompatible({
-          ...common,
-          name: cfg.provider,
-          baseURL: cfg.baseUrl ?? COMPATIBLE_DEFAULT_BASE[cfg.provider] ?? 'http://localhost:11434/v1',
-        })(cfg.name)
+      case 'openai-compatible':
+        // LiteLLM / OpenRouter / Ollama / DeepSeek / Gemini 兼容端点都走这条（DESIGN §5：网关只作为可选后端，不作为依赖）
+        return createOpenAICompatible({ ...common, name: cfg.provider, baseURL: baseURL as string })(cfg.name)
     }
   })()
 
   return new AiSdkProvider({ id: cfg.provider, model: model as never, capabilities, trace })
 }
 
-/** Embedding（PRD-M4-001 AC-3 · docs/adr/018）。anthropic 没有这个接口，配了就在构造时报错 */
+/**
+ * Embedding（PRD-M4-001 AC-3 · docs/adr/018）。anthropic 协议没有这个接口，配了就在构造时报错。
+ * Gemini 走兼容端点的 /embeddings（PRD-M9-002 AC-3 去掉了 Google 专用适配器）
+ */
 export function createEmbedder(cfg: EmbeddingConfig): EmbedFn {
   const apiKey = cfg.apiKey ?? ''
   assertAsciiKey(apiKey)
-  const common = { apiKey, ...(cfg.baseUrl ? { baseURL: cfg.baseUrl } : {}) }
+  const shape = { provider: cfg.provider, vendor: cfg.vendor, protocol: cfg.protocol, baseUrl: cfg.baseUrl }
+  const { adapter } = connectionShape(shape)
+  const baseURL = effectiveBaseUrl(shape)
+  const common = { apiKey, ...(baseURL ? { baseURL } : {}) }
   const model = (() => {
-    switch (cfg.provider) {
+    switch (adapter) {
       case 'anthropic':
         throw new EmbeddingUnsupportedError(cfg.provider)
-      case 'openai':
+      case 'openai-official':
         return createOpenAI(common).embeddingModel(cfg.model)
-      case 'google':
-        return createGoogleGenerativeAI(common).embeddingModel(cfg.model)
-      default:
-        return createOpenAICompatible({
-          ...common,
-          name: cfg.provider,
-          baseURL: cfg.baseUrl ?? 'http://localhost:11434/v1',
-        }).embeddingModel(cfg.model)
+      case 'openai-compatible':
+        return createOpenAICompatible({ ...common, name: cfg.provider, baseURL: baseURL as string }).embeddingModel(
+          cfg.model,
+        )
     }
   })()
   return async (texts) => {
