@@ -37,7 +37,7 @@ const TABS: Array<[SettingsTab, string]> = [
 
 type TabProps = { s: ReturnType<typeof useSettings> }
 
-function GeneralTab({ s }: TabProps) {
+export function GeneralTab({ s }: TabProps) {
   const choice = useStore($themeChoice)
   const accent = useStore($accent)
   const mode = resolveMode(choice, useStore($systemDark))
@@ -113,7 +113,7 @@ function keyHint(
   return `当前 ${sec.masked ?? ''}${where}${env}。留空不改`
 }
 
-function ModelsTab({ s }: TabProps) {
+export function ModelsTab({ s }: TabProps) {
   const d = s.data
   const [draft, setDraft] = useState<Record<string, string>>({})
   if (d === null) return <Saved error={s.error} saved={null} />
@@ -245,7 +245,7 @@ const STRATEGY = [
   ['compact', '清理 + 自动压缩（到阈值时摘要旧的轮次）'],
 ] as const
 
-function MemoryTab({ s }: TabProps) {
+export function MemoryTab({ s }: TabProps) {
   const d = s.data
   const [draft, setDraft] = useState<Record<string, string>>({})
   if (d === null) return <Saved error={s.error} saved={null} />

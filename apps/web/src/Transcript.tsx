@@ -191,6 +191,9 @@ export function Transcript({
                 <code className="text-[12.5px] font-medium">{row.call.text}</code>
                 <ToolStatus result={row.result} />
                 <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-mut2">{row.call.summary}</span>
+                {row.result?.ms !== undefined && (
+                  <span className="shrink-0 font-mono text-[11px] text-mut2">{formatElapsed(row.result.ms)}</span>
+                )}
               </summary>
               <pre className="max-h-[260px] overflow-y-auto border-t border-border2 bg-code px-3 py-2 text-xs break-all whitespace-pre-wrap">
                 {row.call.summary}
