@@ -10,13 +10,14 @@
   "dependencies": {
     "@domi/checkpoint": "workspace:*",
     "@domi/config": "workspace:*",
+    "@domi/eval": "workspace:*",
+    "@domi/i18n": "workspace:*",
+    "@domi/model": "workspace:*",
     "@domi/observability": "workspace:*",
+    "@domi/plugin": "workspace:*",
     "@domi/prompt": "workspace:*",
     "@domi/runtime": "workspace:*",
     "@domi/store": "workspace:*",
-    "@domi/model": "workspace:*",
-    "@domi/eval": "workspace:*",
-    "@domi/trace": "workspace:*",
-    "@domi/plugin": "workspace:*"
+    "@domi/trace": "workspace:*"
   }
 }

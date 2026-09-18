@@ -4,6 +4,7 @@
  * 把 TranscriptItem 按轮分组、贴上六类标签，并从事件时间戳投影出三行时间线（输入 / 模型 / 工具）。
  * 纯函数：不读时钟、不碰 IO；`ts` 缺失（老 daemon 推的事件没进过 store）时没有时间线。
  */
+import { tr } from '@domi/i18n'
 import type { TranscriptItem } from './store.ts'
 
 export type TrajTag = 'system' | 'context' | 'user' | 'assistant' | 'tool' | 'permission'
@@ -126,7 +127,13 @@ export function trajectoryTimeline(items: readonly TranscriptItem[]): TrajTimeli
         break
       case 'reason':
       case 'assistant':
-        timeline.model.push(span(it.kind === 'reason' ? '思考' : '回答', at, at + (it.ms ?? next - at)))
+        timeline.model.push(
+          span(
+            it.kind === 'reason' ? tr('core.timeline.thinking') : tr('core.timeline.answer'),
+            at,
+            at + (it.ms ?? next - at),
+          ),
+        )
         break
       case 'tool-call':
         timeline.tools.push(span(it.text, at, it.ms === undefined ? next : at + it.ms))

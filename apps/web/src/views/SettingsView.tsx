@@ -4,11 +4,14 @@
  * 模型供应商在 `settings/ProvidersTab.tsx`（PRD-M9-002：任意多家、增删改、默认是一个模型）。
  * Soul 与人格、插件两个 tab 吸收了原来的 SoulPanel / PluginPanel（PRD-M8-012 AC-5 / AC-6）。
  */
+
 import { type DomiClient, PALETTES, TOKENS } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
 import { useState } from 'react'
 import { Button } from '../components/ui/button.tsx'
 import { cn } from '../lib/cn.ts'
+import { syncLocale } from '../locale.ts'
 import { formatRoute, type SettingsTab } from '../router.ts'
 import {
   $accent,
@@ -27,14 +30,14 @@ import { SoulTab } from './settings/SoulTab.tsx'
 import { UsageTab } from './settings/UsageTab.tsx'
 import { str, useSettings } from './settings/useSettings.ts'
 
-const TABS: Array<[SettingsTab, string]> = [
-  ['general', '通用'],
-  ['models', '模型供应商'],
-  ['messaging', '通讯工具'],
-  ['memory', '记忆管理'],
-  ['soul', 'Soul 与人格'],
-  ['plugins', '插件'],
-  ['usage', '用量统计'],
+const TABS = (): Array<[SettingsTab, string]> => [
+  ['general', tr('web.settings.general')],
+  ['models', tr('web.settings.models')],
+  ['messaging', tr('web.settings.messaging')],
+  ['memory', tr('web.settings.memory')],
+  ['soul', tr('web.settings.soul')],
+  ['plugins', tr('web.settings.plugins')],
+  ['usage', tr('web.settings.usage')],
 ]
 
 type TabProps = { s: ReturnType<typeof useSettings> }
@@ -46,29 +49,34 @@ export function GeneralTab({ s }: TabProps) {
   return (
     <>
       <Saved error={s.error} saved={s.saved} />
-      <Field label="界面语言" hint="选择 domi 界面显示语言" id="set-lang">
-        <select id="set-lang" className="field-input" defaultValue="zh-CN">
-          <option value="zh-CN">简体中文</option>
-          <option value="en" disabled>
-            English（即将支持）
-          </option>
-          <option value="ja" disabled>
-            日本語（即将支持）
-          </option>
+      <Field label={tr('web.settings.language')} hint={tr('web.settings.languageHint')} id="set-lang">
+        <select
+          id="set-lang"
+          className="field-input"
+          value={str(s.data?.values['ui.locale']) || 'auto'}
+          disabled={s.data === null}
+          onChange={(e) => {
+            const v = e.target.value
+            void s.save({ 'ui.locale': v }).then((ok) => ok && syncLocale(v))
+          }}
+        >
+          <option value="auto">{tr('common.followSystem')}</option>
+          <option value="zh">{tr('web.settings.langZh')}</option>
+          <option value="en">{tr('web.settings.langEn')}</option>
         </select>
       </Field>
-      <Field label="主题" hint="深浅跟随这台设备；主题色在 Web 与 TUI 之间共用" id="set-theme">
+      <Field label={tr('web.settings.theme')} hint={tr('web.settings.themeHint')} id="set-theme">
         <select
           id="set-theme"
           className="field-input mb-2.5"
           value={choice}
           onChange={(e) => setThemeChoice(e.target.value as ThemeChoice)}
         >
-          <option value="system">跟随系统</option>
-          <option value="dark">深色</option>
-          <option value="light">浅色</option>
+          <option value="system">{tr('common.followSystem')}</option>
+          <option value="dark">{tr('web.settings.dark')}</option>
+          <option value="light">{tr('web.settings.light')}</option>
         </select>
-        <fieldset className="flex flex-wrap gap-2" aria-label="主题色">
+        <fieldset className="flex flex-wrap gap-2" aria-label={tr('web.settings.accent')}>
           {PALETTES.map((p) => (
             <button
               key={p.id}
@@ -102,18 +110,19 @@ export function GeneralTab({ s }: TabProps) {
 function MessagingTab() {
   return (
     <>
-      <Notice>通讯工具即将支持。</Notice>
-      <ToggleRow label="Telegram 桥接" hint="只读轨迹 + 远程审批（即将支持）" on={false} disabled />
-      <ToggleRow label="微信桥接" hint="仅只读通知（即将支持）" on={false} disabled />
+      <Notice>{tr('web.settings.messagingSoon')}</Notice>
+      <ToggleRow label={tr('web.settings.telegram')} hint={tr('web.settings.telegramHint')} on={false} disabled />
+      <ToggleRow label={tr('web.settings.wechat')} hint={tr('web.settings.wechatHint')} on={false} disabled />
     </>
   )
 }
 
-const STRATEGY = [
-  ['full', '不处理（整段历史原样发给模型）'],
-  ['clean', '结构化清理（去重工具结果、清错误、截断堆栈）'],
-  ['compact', '清理 + 自动压缩（到阈值时摘要旧的轮次）'],
-] as const
+const STRATEGY = () =>
+  [
+    ['full', tr('web.settings.strategyFull')],
+    ['clean', tr('web.settings.strategyClean')],
+    ['compact', tr('web.settings.strategyCompact')],
+  ] as const
 
 export function MemoryTab({ s }: TabProps) {
   const d = s.data
@@ -144,30 +153,25 @@ export function MemoryTab({ s }: TabProps) {
       }}
     >
       <Saved error={s.error} saved={s.saved} />
-      <Field label="上下文策略" hint="发给模型之前怎么处理历史">
+      <Field label={tr('web.settings.strategy')} hint={tr('web.settings.strategyHint')}>
         <select
           className="field-input"
-          aria-label="上下文策略"
+          aria-label={tr('web.settings.strategy')}
           value={val('context.strategy')}
           onChange={(e) => set('context.strategy', e.target.value)}
         >
-          {STRATEGY.map(([v, l]) => (
+          {STRATEGY().map(([v, l]) => (
             <option key={v} value={v}>
               {l}
             </option>
           ))}
         </select>
       </Field>
-      {num('context.keepTurns', '最近 N 轮逐字保留', '压缩时最近 N 轮不摘要，建议 6-10（自动压缩时才用）', !compact)}
-      {num(
-        'context.compactAt',
-        'Context 压缩触发阈值',
-        '上下文占用超此百分比自动压缩，建议 70-75（自动压缩时才用）',
-        !compact,
-      )}
-      {num('memory.extractEvery', '记忆抽取间隔', '每多少轮自动抽取 L3 语义记忆，0 = 不自动抽（重启 domid 后生效）')}
+      {num('context.keepTurns', tr('web.settings.keepTurns'), tr('web.settings.keepTurnsHint'), !compact)}
+      {num('context.compactAt', tr('web.settings.compactAt'), tr('web.settings.compactAtHint'), !compact)}
+      {num('memory.extractEvery', tr('web.settings.extractEvery'), tr('web.settings.extractEveryHint'))}
       <Button type="submit" variant="primary" disabled={Object.keys(draft).length === 0}>
-        保存
+        {tr('common.save')}
       </Button>
     </form>
   )
@@ -176,10 +180,10 @@ export function MemoryTab({ s }: TabProps) {
 export function SettingsView({ client, tab, online }: { client: DomiClient; tab: SettingsTab; online: boolean }) {
   const s = useSettings(client, online)
   return (
-    <Page view="settings" title="设置" sub="配置 domi 的行为、外观和连接。">
+    <Page view="settings" title={tr('web.sidebar.settings')} sub={tr('web.settings.sub')}>
       <div className="grid grid-cols-[160px_1fr] gap-7">
-        <nav className="flex flex-col gap-0.5" aria-label="设置分类">
-          {TABS.map(([id, label]) => (
+        <nav className="flex flex-col gap-0.5" aria-label={tr('web.settings.nav')}>
+          {TABS().map(([id, label]) => (
             <a
               key={id}
               href={formatRoute({ view: 'settings', tab: id })}
@@ -196,10 +200,11 @@ export function SettingsView({ client, tab, online }: { client: DomiClient; tab:
         <div className="min-w-0" data-tab={tab}>
           {tab === 'general' && <GeneralTab s={s} />}
           {tab === 'models' &&
-            (online ? <ProvidersTab client={client} s={s} /> : <Notice>连上 daemon 后显示。</Notice>)}
+            (online ? <ProvidersTab client={client} s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
           {tab === 'messaging' && <MessagingTab />}
-          {tab === 'memory' && (online ? <MemoryTab s={s} /> : <Notice>连上 daemon 后显示。</Notice>)}
-          {tab === 'usage' && (online ? <UsageTab client={client} /> : <Notice>连上 daemon 后显示。</Notice>)}
+          {tab === 'memory' && (online ? <MemoryTab s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
+          {tab === 'usage' &&
+            (online ? <UsageTab client={client} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
           {(tab === 'soul' || tab === 'plugins') &&
             (online ? (
               tab === 'soul' ? (
@@ -208,7 +213,7 @@ export function SettingsView({ client, tab, online }: { client: DomiClient; tab:
                 <PluginsTab client={client} />
               )
             ) : (
-              <Notice>连上 daemon 后显示。</Notice>
+              <Notice>{tr('web.common.connectFirstDot')}</Notice>
             ))}
         </div>
       </div>

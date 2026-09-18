@@ -7,6 +7,7 @@
  * 这里做的是**投影**，不是存储：事件流是唯一真相，atom 里的东西随时可以从
  * 事件流重算出来。所以任何"只在 atom 里、事件流里没有"的状态都是 bug。
  */
+import { tr } from '@domi/i18n'
 import { type AnyEvent, type EventEnvelope, isKnownEvent } from '@domi/protocol'
 import { atom, computed } from 'nanostores'
 
@@ -84,7 +85,18 @@ export interface AskSnapshot {
 
 /** 状态栏的「本轮」段。一分钟以内到 0.1 秒，以上到秒 */
 /** 验证状态的显示文字（TUI 与 Web 共用） */
-export const VERIFY_LABEL = { unverified: '已改未验', verified: '已验证', failed: '验证失败' } as const
+export const VERIFY_LABEL = {
+  // 取值时才翻译（模块加载时界面语言可能还没定，PRD-M9-004）
+  get unverified() {
+    return tr('core.verify.unverified')
+  },
+  get verified() {
+    return tr('core.verify.verified')
+  },
+  get failed() {
+    return tr('core.verify.failed')
+  },
+}
 
 export function formatElapsed(ms: number): string {
   if (ms < 60_000) return `${(Math.floor(ms / 100) / 10).toFixed(1)}s`
@@ -195,32 +207,56 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         push({
           seq: env.seq,
           kind: 'context',
-          text: `上下文清理 ${ev.tokensBefore} → ${ev.tokensAfter} tokens`,
-          summary: `去重 ${ev.saved.dedupe} · 截断 ${ev.saved.verbose} · 已解决错误 ${ev.saved.resolvedError} · 堆栈 ${ev.saved.stack}`,
+          text: tr('core.ev.cleanup', { tokensBefore: ev.tokensBefore, tokensAfter: ev.tokensAfter }),
+          summary: tr('core.ev.cleanupDetail', {
+            dedupe: ev.saved.dedupe,
+            verbose: ev.saved.verbose,
+            resolvedError: ev.saved.resolvedError,
+            stack: ev.saved.stack,
+          }),
         })
         break
       case 'ctx.compact':
         push({
           seq: env.seq,
           kind: 'context',
-          text: `上下文已压缩 ${ev.tokensBefore} → ${ev.tokensAfter} tokens（保留最近 ${ev.keptTurns} 轮）`,
+          text: tr('core.ev.compact', {
+            tokensBefore: ev.tokensBefore,
+            tokensAfter: ev.tokensAfter,
+            keptTurns: ev.keptTurns,
+          }),
           summary: ev.summary.intent,
         })
         break
       // 编排（M5）：运行与节点的进展都是事件，投影成对话里的一行
       case 'task.spawn':
-        push({ seq: env.seq, kind: 'task', text: `派出子 agent：${ev.goal}`, summary: ev.childSessionId, ok: true })
-        break
-      case 'task.run':
-        push({ seq: env.seq, kind: 'task', text: `任务开始：${ev.name}` })
-        break
-      case 'task.node': {
-        const label = { started: '开始', done: '完成', failed: '失败' }[ev.status]
-        const ms = ev.ms === undefined ? '' : `（${formatElapsed(ev.ms)}）`
         push({
           seq: env.seq,
           kind: 'task',
-          text: `节点 ${ev.nodeId} ${label}${ev.attempt > 1 ? `（第 ${ev.attempt} 次）` : ''}${ms}`,
+          text: tr('core.ev.spawn', { goal: ev.goal }),
+          summary: ev.childSessionId,
+          ok: true,
+        })
+        break
+      case 'task.run':
+        push({ seq: env.seq, kind: 'task', text: tr('core.ev.runStart', { name: ev.name }) })
+        break
+      case 'task.node': {
+        const label = {
+          started: tr('core.ev.nodeStart'),
+          done: tr('core.ev.nodeDone'),
+          failed: tr('core.ev.nodeFailed'),
+        }[ev.status]
+        const ms = ev.ms === undefined ? '' : tr('core.ev.elapsed', { formatElapsed: formatElapsed(ev.ms) })
+        push({
+          seq: env.seq,
+          kind: 'task',
+          text: tr('core.ev.node', {
+            nodeId: ev.nodeId,
+            label,
+            v: ev.attempt > 1 ? tr('core.ev.attempt', { attempt: ev.attempt }) : '',
+            ms,
+          }),
           ...(ev.status === 'started' ? {} : { ok: ev.status === 'done' }),
           ...((ev.error ?? ev.output) === undefined ? {} : { summary: (ev.error ?? ev.output ?? '').slice(0, 200) }),
         })
@@ -230,7 +266,10 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         push({
           seq: env.seq,
           kind: 'task',
-          text: `任务恢复：已完成 ${ev.completed.length} 个节点${ev.rerun.length > 0 ? `，重跑 ${ev.rerun.join('、')}` : ''}`,
+          text: tr('core.ev.resume', {
+            length: ev.completed.length,
+            v: ev.rerun.length > 0 ? tr('core.ev.rerun', { join: ev.rerun.join(tr('common.listSep')) }) : '',
+          }),
         })
         break
       case 'hook.run':
@@ -238,7 +277,14 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           push({
             seq: env.seq,
             kind: 'permission',
-            text: `钩子 ${ev.name}${ev.timedOut ? ' 超时' : ev.blocked ? ' 拦下了调用' : `（${ev.on}，退出码 ${ev.exitCode}）`}`,
+            text: tr('core.ev.hook', {
+              name: ev.name,
+              v: ev.timedOut
+                ? tr('core.ev.hookTimeout')
+                : ev.blocked
+                  ? tr('core.ev.hookBlocked')
+                  : tr('core.ev.hookExit', { on: ev.on, exitCode: String(ev.exitCode) }),
+            }),
             ok: !ev.blocked,
             ...(ev.output ? { summary: ev.output.slice(0, 200) } : {}),
           })
@@ -247,7 +293,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         push({
           seq: env.seq,
           kind: 'permission',
-          text: ev.trusted ? `信任这个仓库：${ev.root}` : `没有加载这个仓库的规矩文件（未信任）：${ev.root}`,
+          text: ev.trusted ? tr('core.ev.trust', { root: ev.root }) : tr('core.ev.untrusted', { root: ev.root }),
           ok: ev.trusted,
         })
         break
@@ -255,46 +301,57 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         push({
           seq: env.seq,
           kind: 'context',
-          text: ev.final ? '没有通过验证就结束了' : '提醒模型先验证再结束',
+          text: ev.final ? tr('core.ev.unverifiedEnd') : tr('core.ev.verifyNudge'),
           summary: ev.message,
         })
         break
       case 'mode.switch':
-        push({ seq: env.seq, kind: 'context', text: ev.to === 'plan' ? '进入计划模式（只读）' : '进入执行模式' })
+        push({ seq: env.seq, kind: 'context', text: ev.to === 'plan' ? tr('core.ev.planMode') : tr('core.ev.actMode') })
         break
       case 'plan.proposed':
-        push({ seq: env.seq, kind: 'task', text: '提交了计划，等你审批', summary: ev.plan.slice(0, 400) })
+        push({ seq: env.seq, kind: 'task', text: tr('core.ev.planProposed'), summary: ev.plan.slice(0, 400) })
         break
       case 'plan.decided':
         push({
           seq: env.seq,
           kind: 'task',
-          text: ev.approved ? `计划已批准${ev.runId ? `，转成长任务 ${ev.runId}` : ''}` : '计划被驳回',
+          text: ev.approved
+            ? tr('core.ev.planApproved', { v: ev.runId ? tr('core.ev.toRun', { runId: ev.runId }) : '' })
+            : tr('core.ev.planRejected'),
           ok: ev.approved,
           ...(ev.comment ? { summary: ev.comment } : {}),
         })
         break
       case 'worktree.create':
         $status.set({ ...$status.get(), worktree: { path: ev.path, branch: ev.branch, repo: ev.repo } })
-        push({ seq: env.seq, kind: 'context', text: `在隔离工作区里干活：${ev.branch}`, summary: ev.path })
+        push({ seq: env.seq, kind: 'context', text: tr('core.ev.worktree', { branch: ev.branch }), summary: ev.path })
         break
       case 'worktree.apply':
         push({
           seq: env.seq,
           kind: 'task',
-          text: `改动${ev.ok ? '已' : '没能'}带回原仓库（${ev.mode}）`,
+          text: tr('core.ev.applied', {
+            v: ev.ok ? tr('core.ev.appliedOk') : tr('core.ev.appliedFail'),
+            mode: ev.mode,
+          }),
           ok: ev.ok,
           ...(ev.message ? { summary: ev.message } : {}),
         })
         break
       case 'budget.warn':
-        push({ seq: env.seq, kind: 'context', text: `用量到了上限的 80%（${ev.kind}：${ev.used} / ${ev.limit}）` })
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: tr('core.ev.budgetWarn', { kind: ev.kind, used: ev.used, limit: ev.limit }),
+        })
         break
       case 'budget.decided':
         push({
           seq: env.seq,
           kind: 'context',
-          text: `用量到顶，你选择了：${{ continue: '继续', stop: '停止', raise: '提高上限' }[ev.action]}`,
+          text: tr('core.ev.budgetDecided', {
+            v: { continue: tr('core.ev.continue'), stop: tr('core.ev.stop'), raise: tr('core.ev.raise') }[ev.action],
+          }),
         })
         break
       case 'review.findings':
@@ -302,32 +359,44 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         push({
           seq: env.seq,
           kind: 'task',
-          text: `审阅发现 ${ev.findings.length} 条问题`,
+          text: tr('core.ev.findings', { length: ev.findings.length }),
           summary: ev.findings
             .slice(0, 5)
             .map((f) => `${f.file}${f.line ? `:${f.line}` : ''} ${f.problem}`)
-            .join('；'),
+            .join(tr('core.listSepStrong')),
         })
         break
       case 'plugin.error':
         push({
           seq: env.seq,
           kind: 'error',
-          text: `插件 ${ev.plugin}${ev.tool ? ` 的 ${ev.tool}` : ''} 出错：${ev.message}`,
+          text: tr('core.ev.pluginError', {
+            plugin: ev.plugin,
+            v: ev.tool ? tr('core.ev.pluginTool', { tool: ev.tool }) : '',
+            message: ev.message,
+          }),
           ok: false,
         })
         break
       case 'task.retry':
-        push({ seq: env.seq, kind: 'task', text: `重试节点 ${ev.nodeId}` })
+        push({ seq: env.seq, kind: 'task', text: tr('core.ev.retry', { nodeId: ev.nodeId }) })
         break
       case 'task.end': {
-        const label = { done: '完成', failed: '失败', cancelled: '已取消' }[ev.status]
-        push({ seq: env.seq, kind: 'task', text: `任务${label}`, ok: ev.status === 'done' })
+        const label = {
+          done: tr('core.ev.runDone'),
+          failed: tr('core.ev.runFailed'),
+          cancelled: tr('core.ev.runCancelled'),
+        }[ev.status]
+        push({ seq: env.seq, kind: 'task', text: tr('core.ev.runEnd', { label }), ok: ev.status === 'done' })
         break
       }
       // 引用了哪段别的会话，要在对话里看得见（PRD-M3-005 AC-3）
       case 'ctx.ref':
-        push({ seq: env.seq, kind: 'context', text: `引用了会话 ${ev.sessionId} 的第 ${ev.fromSeq}–${ev.toSeq} 条` })
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: tr('core.ev.ref', { sessionId: ev.sessionId, fromSeq: ev.fromSeq, toSeq: ev.toSeq }),
+        })
         break
       // 切换模型要在对话里看得见：之后的回答换了人答（parity 第 10 项）
       case 'model.switch': {
@@ -335,9 +404,13 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         push({
           seq: env.seq,
           kind: 'context',
-          text: `模型切换 ${ev.from} → ${ev.to}${ev.provider === undefined ? '' : `（${ev.provider}）`}`,
+          text: tr('core.ev.modelSwitch', {
+            from: ev.from,
+            to: ev.to,
+            v: ev.provider === undefined ? '' : tr('core.ev.provider', { provider: ev.provider }),
+          }),
           ...(lost.length > 0
-            ? { summary: `新模型不支持：${lost.join('、')}` }
+            ? { summary: tr('core.ev.lost', { join: lost.join(tr('common.listSep')) }) }
             : ev.reason === undefined
               ? {}
               : { summary: ev.reason }),
@@ -348,10 +421,15 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         $status.set({ ...$status.get(), lastUsage: ev.raw })
         break
       case 'worktree.discard':
-        push({ seq: env.seq, kind: 'context', text: `丢弃了 ${ev.path} 的改动`, summary: `撤销：回收站 ${ev.trash}` })
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: tr('core.ev.discard', { path: ev.path }),
+          summary: tr('core.ev.undoHint', { trash: ev.trash }),
+        })
         break
       case 'worktree.restore':
-        push({ seq: env.seq, kind: 'context', text: `恢复了 ${ev.path} 的改动` })
+        push({ seq: env.seq, kind: 'context', text: tr('core.ev.undone', { path: ev.path }) })
         break
       case 'error':
         push({ seq: env.seq, kind: 'error', text: ev.message, ok: false })

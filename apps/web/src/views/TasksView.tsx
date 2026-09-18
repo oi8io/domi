@@ -3,7 +3,9 @@
  * 新建 = task.create：系统按项目设置决定隔离与规划，目标作为第一句话发出去（PRD-M8-005）。
  * 定时 = schedule.create：到点由 daemon 按同一个目标建任务。多节点运行在「编排运行」里。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useCallback, useState } from 'react'
 import { IconClock } from '../icons.tsx'
 import { dotOf, type ProjectRow, type SessionRow, titleOf } from '../layout/data.ts'
@@ -39,11 +41,13 @@ export function NewTask({
   const project = projects.find((p) => p.id === projectId)
   return (
     <Card>
-      <h3 className="mb-2.5 text-sm font-semibold">{schedule ? '新建定时任务' : '新建任务'}</h3>
+      <h3 className="mb-2.5 text-sm font-semibold">
+        {schedule ? tr('web.tasks.newSchedule') : tr('web.sidebar.createTask')}
+      </h3>
       <label className="mb-0.5 block text-[13px] font-medium" htmlFor="task-project">
-        项目
+        {tr('web.sidebar.projects')}
       </label>
-      <p className="mb-1.5 text-[11.5px] text-mut">任务一定属于某个项目；没有的话先在侧栏「项目」里添加</p>
+      <p className="mb-1.5 text-[11.5px] text-mut">{tr('web.tasks.projectHint')}</p>
       <div className="mb-3">
         <ProjectSelect id="task-project" projects={projects} value={projectId} onChange={setProjectId} />
       </div>
@@ -51,9 +55,9 @@ export function NewTask({
         <div className="mb-3">
           <label className="mb-0.5 flex items-center gap-1.5 text-[13px] font-medium" htmlFor="task-cron">
             <IconClock size={13} />
-            计划时间
+            {tr('web.tasks.when')}
           </label>
-          <p className="mb-1.5 text-[11.5px] text-mut">cron 表达式与时区；到点时按下面的目标新建一个任务</p>
+          <p className="mb-1.5 text-[11.5px] text-mut">{tr('web.tasks.whenHint')}</p>
           <CronFields
             client={client}
             cron={when.cron}
@@ -68,8 +72,8 @@ export function NewTask({
         className="px-0 pb-0"
         busy={!online || project === undefined || (schedule && !cronOk)}
         notice={notice}
-        placeholder={schedule ? '每次运行要达成什么？  (Enter 创建)' : '这个任务要达成什么？  (Enter 开始)'}
-        submitLabel={schedule ? '创建定时任务' : '开始任务'}
+        placeholder={schedule ? tr('web.tasks.schedulePlaceholder') : tr('web.tasks.taskPlaceholder')}
+        submitLabel={schedule ? tr('web.tasks.createSchedule') : tr('common.startTask')}
         onSubmit={async (goal) => {
           if (!project) return
           if (schedule) {
@@ -133,11 +137,15 @@ export function TasksView({
       href={formatRoute({ view: 'session', id: t.id, tab: 'chat' })}
       state={dotOf(t, active)}
       title={titleOf(t)}
-      meta={`${t.projectId === undefined ? '' : `${names.get(t.projectId) ?? t.projectId} · `}${t.model} · ${t.eventCount} 事件`}
+      meta={tr('web.tasks.meta', {
+        v: t.projectId === undefined ? '' : `${names.get(t.projectId) ?? t.projectId} · `,
+        model: t.model,
+        eventCount: t.eventCount,
+      })}
     />
   )
   return (
-    <Page view="tasks" title="任务" sub="有明确目标与产出的工作。后台执行，进程重启后自动恢复。">
+    <Page view="tasks" title={tr('web.tasks.title')} sub={tr('web.tasks.sub')}>
       {create && (
         <NewTask
           key={`${projectId ?? ''}${schedule ? '-s' : ''}`}
@@ -152,13 +160,17 @@ export function TasksView({
       )}
       {running.length > 0 && (
         <>
-          <div className="caps mb-2">进行中</div>
+          <div className="caps mb-2">{tr('common.inProgress')}</div>
           <Card className="px-0 py-2">{running.map(row)}</Card>
         </>
       )}
-      <div className="caps mb-2">最近任务</div>
+      <div className="caps mb-2">{tr('web.tasks.recent')}</div>
       <Card className="px-0 py-2">
-        {recent.length === 0 ? <p className="px-3.5 py-2 text-[13px] text-mut">还没有任务。</p> : recent.map(row)}
+        {recent.length === 0 ? (
+          <p className="px-3.5 py-2 text-[13px] text-mut">{tr('web.project.noTasks')}</p>
+        ) : (
+          recent.map(row)
+        )}
       </Card>
       {online ? (
         <>
@@ -169,13 +181,13 @@ export function TasksView({
             projects={projects}
             onChanged={sched.reload}
           />
-          <div className="caps mb-2">编排运行</div>
+          <div className="caps mb-2">{tr('web.tasks.runs')}</div>
           <Card className="px-0 py-2">
             <RunsPanel client={client} onOpen={(id) => navigate({ view: 'session', id, tab: 'chat' })} />
           </Card>
         </>
       ) : (
-        <p className="text-[13px] text-mut">连上 daemon 后显示定时任务与编排运行。</p>
+        <p className="text-[13px] text-mut">{tr('web.tasks.connectFirst')}</p>
       )}
     </Page>
   )

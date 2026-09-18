@@ -3,7 +3,9 @@
  * 与 TUI 显示同样的几段、同样的格式（formatTokens 在 client-core）。
  * 一个数都不自己算：指标由 runtime 算好，经 session.metrics 推过来。
  */
+
 import { type ConnectionState, formatElapsed, formatTokens, type StatusSnapshot, VERIFY_LABEL } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
 import { IconClock, IconDatabase, IconMoon, IconSun } from './icons.tsx'
 import { STATE_LABEL } from './layout/Sidebar.tsx'
@@ -21,8 +23,8 @@ export function ThemeToggle() {
     <button
       type="button"
       className="inline-flex items-center rounded-sm px-[9px] py-1 text-mut hover:bg-panel-h hover:text-ink2"
-      title={mode === 'dark' ? '切换到浅色' : '切换到深色'}
-      aria-label="切换主题"
+      title={mode === 'dark' ? tr('web.status.toLight') : tr('web.status.toDark')}
+      aria-label={tr('web.status.toggleTheme')}
       onClick={toggleTheme}
     >
       {mode === 'dark' ? <IconSun size={14} /> : <IconMoon size={14} />}
@@ -42,7 +44,7 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
         {connection !== undefined && (
           <span className="pill">
             <span className={cn('size-[7px] rounded-full', connection === 'open' ? 'bg-ok' : 'bg-warn')} />
-            {STATE_LABEL[connection]}
+            {STATE_LABEL()[connection]}
           </span>
         )}
         <span className="pill font-mono">{status.model === '' ? '—' : `${status.provider}/${status.model}`}</span>
@@ -58,8 +60,8 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
               <b>{m.tokPerSec} tok/s</b> ·{' '}
             </>
           )}
-          {m?.turnMs !== undefined && <>本轮 {formatElapsed(m.turnMs)} · </>}
-          {status.toolCalls} 次工具
+          {m?.turnMs !== undefined && <>{tr('web.status.turnElapsed', { formatElapsed: formatElapsed(m.turnMs) })}</>}
+          {tr('web.status.toolCalls', { toolCalls: status.toolCalls })}
         </span>
         <span className="pill" data-pill="tokens">
           <IconDatabase size={12} className="opacity-60" />
@@ -75,7 +77,7 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
         <span className={cn('pill', CTX_CLASS[level])} data-ctx={level}>
           ctx {m?.contextPercent ?? 0}%
         </span>
-        {m?.mode === 'plan' && <span className="pill border-info bg-info-d text-info">计划模式</span>}
+        {m?.mode === 'plan' && <span className="pill border-info bg-info-d text-info">{tr('common.planMode')}</span>}
         {m?.verify !== undefined && m.verify !== 'clean' && (
           <span className={cn('pill', VERIFY_CLASS[m.verify])} data-verify={m.verify}>
             {VERIFY_LABEL[m.verify]}
@@ -84,7 +86,7 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
         {status.busy && (
           <span className="pill text-accent">
             <span className="size-[7px] animate-blink rounded-full bg-accent" />
-            运行中
+            {tr('common.running')}
           </span>
         )}
       </div>

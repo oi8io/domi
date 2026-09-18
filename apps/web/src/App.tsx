@@ -5,11 +5,14 @@
  * 状态全在 client-core 的 atom 与 daemon 里，这个文件里没有一行是在算「事件意味着什么」（INV-04）。
  * 与 TUI 的逐项对等见 docs/parity-checklist.md。
  */
+
 import { createSessionStore, type DomiClient, PALETTES, type PaletteId, type SessionStore } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 import type { ProjectRow, SessionRow } from './layout/data.ts'
 import { Sidebar } from './layout/Sidebar.tsx'
+import { syncLocale } from './locale.ts'
 import { $route, navigate, type Route } from './router.ts'
 import type { PendingRef } from './session/Composer.tsx'
 import { SessionView } from './session/SessionView.tsx'
@@ -80,6 +83,8 @@ export function App({
       (d) => {
         const a = d.values['ui.accent']
         if (typeof a === 'string' && PALETTES.some((p) => p.id === a)) setAccent(a as PaletteId)
+        // 界面语言同样以 daemon 为准（PRD-M9-004 AC-1）
+        syncLocale(d.values['ui.locale'])
       },
       () => undefined,
     )
@@ -156,7 +161,9 @@ export function App({
             onRefsChange={setRefs}
           />
         ) : (
-          <p className="m-auto text-[13px] text-mut">{online ? '正在打开会话…' : '连上 daemon 后打开会话。'}</p>
+          <p className="m-auto text-[13px] text-mut">
+            {online ? tr('web.app.openingSession') : tr('web.app.connectToOpen')}
+          </p>
         )
       break
     case 'project':

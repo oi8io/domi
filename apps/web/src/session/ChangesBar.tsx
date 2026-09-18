@@ -4,7 +4,9 @@
  * 「N 个文件改动 · 查看 · 带回」。展开是逐文件审阅：看 diff、丢弃（可撤销）、带回三选一（daemon 会再问一次人）。
  * 数据都从 daemon 拿（worktree.diff），这里不算任何东西（INV-02）。
  */
+
 import type { DomiClient, TranscriptItem } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '../components/ui/button.tsx'
 import { cn } from '../lib/cn.ts'
@@ -12,17 +14,17 @@ import { cn } from '../lib/cn.ts'
 type Diff = Awaited<ReturnType<DomiClient['worktreeDiff']>>
 type ApplyMode = 'squash' | 'merge' | 'branch'
 
-const MARK: Record<string, { label: string; cls: string }> = {
-  added: { label: '新增', cls: 'bg-ok-d text-ok' },
-  modified: { label: '修改', cls: 'bg-accent-d text-accent' },
-  deleted: { label: '删除', cls: 'bg-bad-d text-bad' },
-  renamed: { label: '改名', cls: 'bg-warn-d text-warn' },
-}
+const MARK = (): Record<string, { label: string; cls: string }> => ({
+  added: { label: tr('web.changes.added'), cls: 'bg-ok-d text-ok' },
+  modified: { label: tr('web.changes.modified'), cls: 'bg-accent-d text-accent' },
+  deleted: { label: tr('web.changes.deleted'), cls: 'bg-bad-d text-bad' },
+  renamed: { label: tr('web.changes.renamed'), cls: 'bg-warn-d text-warn' },
+})
 
-const APPLY: Array<{ mode: ApplyMode; label: string; hint: string }> = [
-  { mode: 'squash', label: '压成一个提交', hint: '推荐：原仓库多一个提交' },
-  { mode: 'merge', label: '合并带回', hint: '保留这里的每个提交' },
-  { mode: 'branch', label: '只留分支', hint: '不动原仓库的当前分支' },
+const APPLY = (): Array<{ mode: ApplyMode; label: string; hint: string }> => [
+  { mode: 'squash', label: tr('web.changes.squash'), hint: tr('web.changes.squashHint') },
+  { mode: 'merge', label: tr('web.changes.merge'), hint: tr('web.changes.mergeHint') },
+  { mode: 'branch', label: tr('web.changes.branchOnly'), hint: tr('web.changes.branchOnlyHint') },
 ]
 
 /** 丢弃记录里还能撤销的（按事件投影：丢弃之后没被恢复过） */
@@ -52,16 +54,17 @@ export function ChangesView({
   return (
     <div className="grid gap-1.5" data-part="changes">
       <p className="text-[11.5px] text-mut2">
-        分支 <code className="font-mono">{diff.branch}</code>，基于{' '}
+        {tr('web.changes.branch')} <code className="font-mono">{diff.branch}</code>
+        {tr('web.changes.basedOn')}
         <code className="font-mono">{diff.base.slice(0, 8)}</code>
-        ；原仓库 <code className="font-mono">{diff.repo}</code>
+        {tr('web.changes.repo')} <code className="font-mono">{diff.repo}</code>
       </p>
       {diff.files.length === 0 ? (
-        <p className="text-xs text-mut">还没有改动</p>
+        <p className="text-xs text-mut">{tr('web.changes.none')}</p>
       ) : (
         <ul className="overflow-hidden rounded-md border border-border2">
           {diff.files.map((f) => {
-            const mark = MARK[f.status] ?? { label: f.status, cls: 'bg-panel-h text-mut' }
+            const mark = MARK()[f.status] ?? { label: f.status, cls: 'bg-panel-h text-mut' }
             return (
               <li key={f.path} className="border-b border-border2 last:border-b-0" data-file={f.path}>
                 <div className="flex items-center gap-2 bg-panel px-3 py-1.5 hover:bg-panel-h">
@@ -77,14 +80,14 @@ export function ChangesView({
                   </button>
                   {onDiscard && (
                     <Button variant="danger" size="xs" disabled={busy} onClick={() => onDiscard(f.path)}>
-                      丢弃
+                      {tr('web.changes.discard')}
                     </Button>
                   )}
                 </div>
                 {open === f.path && (
                   <pre className="max-h-[320px] overflow-y-auto border-t border-border2 bg-code px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap">
-                    {f.patch === '' ? '（二进制或空文件）' : f.patch}
-                    {f.truncated ? '\n…（太长，已截断）' : ''}
+                    {f.patch === '' ? tr('web.changes.binary') : f.patch}
+                    {f.truncated ? tr('web.changes.truncated') : ''}
                   </pre>
                 )}
               </li>
@@ -142,11 +145,11 @@ export function ChangesBar({
         {count > 0 && (
           <>
             <span className="font-medium text-ink2">
-              <b className="text-accent">{count}</b> 个文件改动
+              <b className="text-accent">{count}</b> {tr('web.changes.filesChanged')}
             </span>
             <span className="text-mut2">·</span>
             <Button variant="ghost" size="xs" onClick={() => setShown(!shown)} data-action="changes-view">
-              {shown ? '收起' : '查看'}
+              {shown ? tr('common.collapse') : tr('common.view')}
             </Button>
             <span className="text-mut2">·</span>
             <Button
@@ -156,13 +159,13 @@ export function ChangesBar({
               onClick={() => setApplying(!applying)}
               data-action="changes-apply"
             >
-              带回
+              {tr('web.changes.apply')}
             </Button>
           </>
         )}
         {undo.length > 0 && (
           <span className="flex flex-wrap items-center gap-1 text-mut">
-            撤销丢弃：
+            {tr('web.changes.undoDiscard')}
             {undo.map((u) => (
               <Button
                 key={u.trash}
@@ -184,8 +187,8 @@ export function ChangesBar({
       </div>
       {applying && count > 0 && (
         <div className="mt-1.5 flex flex-wrap items-center gap-2" data-part="apply-modes">
-          <span className="text-mut">带回原仓库：</span>
-          {APPLY.map((a) => (
+          <span className="text-mut">{tr('web.changes.applyTo')}</span>
+          {APPLY().map((a) => (
             <Button
               key={a.mode}
               variant={a.mode === 'squash' ? 'primary' : 'outline'}
@@ -200,7 +203,7 @@ export function ChangesBar({
               {a.label}
             </Button>
           ))}
-          <span className="text-mut2">会再请你确认一次</span>
+          <span className="text-mut2">{tr('web.changes.confirmAgain')}</span>
         </div>
       )}
       {shown && diff !== null && (

@@ -3,7 +3,9 @@
  * 自由会话与项目脱钩（PRD-M8-004）要等协议落地；在那之前新建的会话仍在 domid 的默认目录里。
  * 默认模型还没有 key 时（OPT-M8-001）顶上挂一条引导去设置页，发送也先拦下——不然会先建出一个空会话再被拒。
  */
+
 import { type DomiClient, defaultProviderMissingKey, missingCredentialOf } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { type ReactNode, useEffect, useState } from 'react'
 import type { SessionRow } from '../layout/data.ts'
 import { dotOf, titleOf } from '../layout/data.ts'
@@ -39,7 +41,7 @@ export function HomeView({
     }
   }, [client, online])
   return (
-    <Page view="home" narrow title="新对话" sub="不关联项目的自由讨论。要在某个仓库里动手，用「新任务」。">
+    <Page view="home" narrow title={tr('web.sidebar.newChat')} sub={tr('web.home.sub')}>
       {missing !== null && (
         <Notice>
           <CredentialNotice provider={missing} />
@@ -49,9 +51,9 @@ export function HomeView({
         className="mb-7 px-0 pb-0"
         busy={!online}
         notice={notice}
-        placeholder="有什么想聊的？  (Enter 发送，Shift+Enter 换行)"
-        submitLabel="开始对话"
-        tools={{ client, hint: '附件与文件引用在对话开始之后可用' }}
+        placeholder={tr('web.home.placeholder')}
+        submitLabel={tr('web.home.start')}
+        tools={{ client, hint: tr('web.home.attachLater') }}
         onSubmit={async (text, extras) => {
           if (missing !== null) {
             setNotice(<CredentialNotice provider={missing} />)
@@ -73,14 +75,14 @@ export function HomeView({
       />
       {recent.length > 0 && (
         <>
-          <div className="caps mb-2">最近会话</div>
+          <div className="caps mb-2">{tr('web.home.recent')}</div>
           {recent.slice(0, 5).map((s) => (
             <ListRow
               key={s.id}
               href={formatRoute({ view: 'session', id: s.id, tab: 'chat' })}
               state={dotOf(s)}
               title={titleOf(s)}
-              meta={`${s.model} · ${s.eventCount} 事件`}
+              meta={tr('web.home.meta', { model: s.model, eventCount: s.eventCount })}
             />
           ))}
         </>

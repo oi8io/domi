@@ -1,6 +1,7 @@
 /**
  * 全部会话（`#/sessions`）—— PRD-M8-004 AC-6：按「无项目 / 各项目」分组，可筛选，含回收站与恢复。
  */
+import { tr } from '@domi/i18n'
 import { useState } from 'react'
 import { Button } from '../components/ui/button.tsx'
 import { IconRestore } from '../icons.tsx'
@@ -18,7 +19,7 @@ export function groupSessions(
   const groups = new Map<string, { key: string; label: string; rows: SessionRow[] }>()
   for (const s of sessions) {
     const key = s.projectId ?? ''
-    const label = key === '' ? '无项目' : (names.get(key) ?? key)
+    const label = key === '' ? tr('common.noProject') : (names.get(key) ?? key)
     const hay = `${titleOf(s)} ${s.model} ${label}`.toLowerCase()
     if (q !== '' && !hay.includes(q)) continue
     const g = groups.get(key) ?? { key, label, rows: [] }
@@ -47,8 +48,8 @@ export function SessionsView({
   const [query, setQuery] = useState('')
   const groups = groupSessions(sessions, projects, query)
   return (
-    <Page view="sessions" title="全部会话" sub="跨项目的所有会话和任务。按项目分组。">
-      <FilterInput value={query} onChange={setQuery} placeholder="筛选会话…" />
+    <Page view="sessions" title={tr('web.sidebar.allChats')} sub={tr('web.sessions.sub')}>
+      <FilterInput value={query} onChange={setQuery} placeholder={tr('web.sessions.filter')} />
       <label className="mb-3 flex items-center gap-1.5 text-xs text-mut">
         <input
           type="checkbox"
@@ -56,10 +57,10 @@ export function SessionsView({
           onChange={(e) => onShowDeleted(e.target.checked)}
           className="accent-[var(--accent)]"
         />
-        显示已删除（回收站）
+        {tr('web.sessions.showDeleted')}
       </label>
       <Card className="px-0 py-2">
-        {groups.length === 0 && <p className="px-3.5 py-2 text-[13px] text-mut">没有匹配的会话。</p>}
+        {groups.length === 0 && <p className="px-3.5 py-2 text-[13px] text-mut">{tr('web.sessions.noMatch')}</p>}
         {groups.map((g, i) => (
           <div key={g.key} data-group={g.label}>
             <div className={`caps px-3.5 ${i === 0 ? 'pt-2' : 'pt-3'} pb-1`}>{g.label}</div>
@@ -70,13 +71,18 @@ export function SessionsView({
                 state={dotOf(s, active)}
                 title={titleOf(s)}
                 muted={s.deleted}
-                badge={s.kind === 'task' ? <Badge>任务</Badge> : undefined}
-                meta={`${s.model} · ${s.eventCount} 事件${s.parentId === undefined ? '' : ' · 分支'}${s.deleted ? ' · 已删除' : ''}`}
+                badge={s.kind === 'task' ? <Badge>{tr('common.task')}</Badge> : undefined}
+                meta={tr('web.sessions.meta', {
+                  model: s.model,
+                  eventCount: s.eventCount,
+                  v: s.parentId === undefined ? '' : tr('common.branchSuffix'),
+                  v2: s.deleted ? tr('common.deletedSuffix') : '',
+                })}
                 aside={
                   s.deleted ? (
                     <Button size="xs" className="mr-3" onClick={() => onRestore(s.id)}>
                       <IconRestore size={12} />
-                      恢复
+                      {tr('common.restore')}
                     </Button>
                   ) : undefined
                 }

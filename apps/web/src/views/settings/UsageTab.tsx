@@ -3,7 +3,9 @@
  * 数字全部由 daemon 从事件投影（usage.summary），这里一个都不算（INV-02 / INV-13）。
  * 未定价的模型花费显示「—」，不是 $0。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useEffect, useState } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { Saved } from './fields.tsx'
@@ -11,10 +13,10 @@ import { Saved } from './fields.tsx'
 type Usage = Awaited<ReturnType<DomiClient['usage']>>
 type Range = 'month' | 'prev' | 'all'
 
-const RANGES: Array<[Range, string]> = [
-  ['month', '本月'],
-  ['prev', '上月'],
-  ['all', '全部'],
+const RANGES = (): Array<[Range, string]> => [
+  ['month', tr('web.usage.thisMonth')],
+  ['prev', tr('web.usage.lastMonth')],
+  ['all', tr('common.all')],
 ]
 
 /** 窗口按本地月份算（显示也按本地），左闭右开 */
@@ -54,7 +56,7 @@ function Stat({ value, label, tone }: { value: string; label: string; tone?: 'ac
 
 /** 按模型的横向柱（手写 SVG：条长按花费，没定价的按 token 数排在后面） */
 export function ModelBars({ rows }: { rows: Usage['byModel'] }) {
-  if (rows.length === 0) return <p className="text-[13px] text-mut">这段时间没有用量。</p>
+  if (rows.length === 0) return <p className="text-[13px] text-mut">{tr('web.usage.none')}</p>
   const max = Math.max(...rows.map((r) => r.costUsd ?? 0), 0.000001)
   return (
     <div className="grid gap-1.5" data-part="usage-bars">
@@ -66,8 +68,18 @@ export function ModelBars({ rows }: { rows: Usage['byModel'] }) {
           <span className="truncate font-mono text-[12px] text-ink2" title={`${r.provider}/${r.model}`}>
             {r.model}
           </span>
-          <svg className="h-3.5 w-full" role="img" aria-label={`${r.model} 花费 ${fmtCost(r.costUsd)}`}>
-            <title>{`${r.model}：${fmtCost(r.costUsd)} · ${fmtTokens(r.tokens.input + r.tokens.output + r.tokens.cacheRead)} tokens`}</title>
+          <svg
+            className="h-3.5 w-full"
+            role="img"
+            aria-label={tr('web.usage.modelSpend', { model: r.model, fmtCost: fmtCost(r.costUsd) })}
+          >
+            <title>
+              {tr('web.usage.modelRow', {
+                model: r.model,
+                fmtCost: fmtCost(r.costUsd),
+                fmtTokens: fmtTokens(r.tokens.input + r.tokens.output + r.tokens.cacheRead),
+              })}
+            </title>
             <rect x="0" y="2" width="100%" height="10" rx="3" fill="var(--border2)" />
             <rect
               x="0"
@@ -93,20 +105,23 @@ export function UsageView({ usage, label }: { usage: Usage; label: string }) {
     <div data-part="usage">
       <div className="mb-3.5 grid grid-cols-3 gap-2.5">
         <Stat value={fmtTokens(total)} label={`${label} Tokens`} tone="accent" />
-        <Stat value={fmtCost(usage.costUsd)} label={`${label}花费`} tone="ok" />
-        <Stat value={String(usage.sessions)} label="会话数" tone="info" />
+        <Stat value={fmtCost(usage.costUsd)} label={tr('web.usage.spend', { label })} tone="ok" />
+        <Stat value={String(usage.sessions)} label={tr('web.usage.sessions')} tone="info" />
       </div>
       <div className="mb-4 grid grid-cols-3 gap-2.5">
-        <Stat value={usage.cacheHitPercent === null ? '—' : `${usage.cacheHitPercent}%`} label="Cache 命中率" />
-        <Stat value={String(usage.toolCalls)} label="工具调用" />
-        <Stat value={String(usage.asks)} label="权限请求" />
+        <Stat
+          value={usage.cacheHitPercent === null ? '—' : `${usage.cacheHitPercent}%`}
+          label={tr('web.usage.cacheHit')}
+        />
+        <Stat value={String(usage.toolCalls)} label={tr('web.providers.cap.toolCall')} />
+        <Stat value={String(usage.asks)} label={tr('web.usage.permissions')} />
       </div>
       {usage.unpricedModels.length > 0 && (
         <p className="mb-3 text-[11.5px] text-mut">
-          价目表里没有这些模型，它们的花费显示为「—」且不计入合计：{usage.unpricedModels.join('、')}
+          {tr('web.usage.unpriced', { join: usage.unpricedModels.join(tr('common.listSep')) })}
         </p>
       )}
-      <div className="caps mb-2">按模型</div>
+      <div className="caps mb-2">{tr('web.usage.byModel')}</div>
       <ModelBars rows={usage.byModel} />
     </div>
   )
@@ -125,7 +140,7 @@ export function UsageTab({ client }: { client: DomiClient }) {
     <div data-part="usage-tab">
       <Saved error={error} saved={null} />
       <div className="mb-3.5 flex gap-1">
-        {RANGES.map(([id, label]) => (
+        {RANGES().map(([id, label]) => (
           <button
             key={id}
             type="button"
@@ -140,9 +155,18 @@ export function UsageTab({ client }: { client: DomiClient }) {
         ))}
       </div>
       {usage === null ? (
-        <p className="text-[13px] text-mut">{error === null ? '加载中…' : ''}</p>
+        <p className="text-[13px] text-mut">{error === null ? tr('common.loading') : ''}</p>
       ) : (
-        <UsageView usage={usage} label={range === 'all' ? '累计 ' : range === 'prev' ? '上月' : '本月'} />
+        <UsageView
+          usage={usage}
+          label={
+            range === 'all'
+              ? tr('web.usage.total')
+              : range === 'prev'
+                ? tr('web.usage.lastMonth')
+                : tr('web.usage.thisMonth')
+          }
+        />
       )}
     </div>
   )

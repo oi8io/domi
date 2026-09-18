@@ -2,7 +2,9 @@
  * 会话视图 —— PRD-M8-008（原型 main#main-session）：tab 条 + 状态栏 pill + Chat / Trajectory + Composer。
  * **只渲染**：状态全在 client-core 的 atom 里（INV-04）。
  */
+
 import { type ConnectionState, type DomiClient, missingCredentialOf, type SessionStore } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from '../ConfirmDialog.tsx'
@@ -104,7 +106,7 @@ export function SessionView({
     client.answer(ask.askId, allowed, content, undefined, grant).then(
       (applied) => {
         // 没生效 = 别的客户端已经答过了；确认卡会随 askDone 关掉，这里只说明一下
-        if (!applied) setNotice('这个询问已经在别处回答过了')
+        if (!applied) setNotice(tr('web.session.answeredElsewhere'))
       },
       (err: Error) => setNotice(err.message),
     )
@@ -146,7 +148,7 @@ export function SessionView({
         />
         {onToTask !== undefined && (
           <Button variant="ghost" size="xs" className="ml-1" onClick={onToTask} data-action="to-task">
-            转为任务
+            {tr('web.session.toTask')}
           </Button>
         )}
         <SessionTools
@@ -192,9 +194,7 @@ export function SessionView({
         notice={notice}
         refs={refs}
         onRemoveRef={(i) => onRefsChange?.(refs.filter((_, j) => j !== i))}
-        placeholder={
-          status.busy ? '正在处理上一条…' : '说点什么…  (Enter 发送，Shift+Enter 换行，@ 引用文件，/ 指定技能)'
-        }
+        placeholder={status.busy ? tr('web.session.busy') : tr('web.session.placeholder')}
         tools={{ client, sessionId }}
         onSubmit={(text, extras) =>
           client.submit(sessionId, text, refs, extras).then(
@@ -271,14 +271,14 @@ function SessionTitle({
           {project.name}
         </a>
       ) : (
-        kind === 'chat' && <span className="shrink-0 text-mut">会话</span>
+        kind === 'chat' && <span className="shrink-0 text-mut">{tr('web.session.chat')}</span>
       )}
       {(project !== undefined || kind === 'chat') && <span className="text-mut2">›</span>}
       {editing ? (
         <input
           className="field-input w-56 py-0.5 text-[12.5px]"
           value={value}
-          aria-label="会话标题"
+          aria-label={tr('web.session.title')}
           onChange={(e) => setValue(e.target.value)}
           onBlur={save}
           onKeyDown={(e) => {
@@ -292,13 +292,13 @@ function SessionTitle({
         <button
           type="button"
           className="min-w-0 truncate rounded-sm px-1 text-ink2 hover:bg-panel-h"
-          title="点击改名"
+          title={tr('web.session.clickRename')}
           onClick={() => {
             setValue(title)
             setEditing(true)
           }}
         >
-          {title === '' ? '未命名' : title}
+          {title === '' ? tr('common.untitled') : title}
         </button>
       )}
     </span>
@@ -360,10 +360,10 @@ export function SessionTools({
           disabled={busy}
           onClick={review}
           data-action="review"
-          title="派一个只读的审阅者，对照需求审这个会话目录里的未提交改动（看不到对话历史）"
+          title={tr('web.session.reviewHint')}
         >
           <IconEye size={12} />
-          审阅改动
+          {tr('web.session.review')}
         </Button>
       )}
       <Button
@@ -373,10 +373,10 @@ export function SessionTools({
         onClick={remove}
         onBlur={() => setArmed(false)}
         data-action="delete"
-        title="删除会话（可在全部会话里恢复）"
+        title={tr('web.session.deleteHint')}
       >
         <IconTrash size={12} />
-        {armed ? '确认删除' : '删除会话'}
+        {armed ? tr('common.confirmDelete') : tr('web.session.delete')}
       </Button>
     </span>
   )

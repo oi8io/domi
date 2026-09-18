@@ -45,6 +45,7 @@ export const WRITABLE_KEYS: readonly string[] = [
   'budget.costUsd',
   'budget.toolCalls',
   'ui.accent',
+  'ui.locale',
   'tui.theme',
 ]
 
@@ -262,6 +263,7 @@ export function readSettings(opts: LoadOptions = {}): SettingsView {
     'budget.costUsd': cfg.budget.costUsd ?? null,
     'budget.toolCalls': cfg.budget.toolCalls ?? null,
     'ui.accent': cfg.ui.accent,
+    'ui.locale': cfg.ui.locale,
     'tui.theme': cfg.tui.theme,
   }
   const ctx = { env, file, secrets, defaultProvider: cfg.model.provider }

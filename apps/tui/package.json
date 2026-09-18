@@ -8,15 +8,16 @@
     "domi": "./src/main.tsx"
   },
   "dependencies": {
+    "@domi/bridge-telegram": "workspace:*",
+    "@domi/cli": "workspace:*",
     "@domi/client-core": "workspace:*",
     "@domi/config": "workspace:*",
+    "@domi/daemon": "workspace:*",
+    "@domi/i18n": "workspace:*",
     "@nanostores/react": "^1.0.0",
     "ink": "^7.1.1",
     "nanostores": "^1.5.3",
-    "react": "^19.3.0",
-    "@domi/cli": "workspace:*",
-    "@domi/daemon": "workspace:*",
-    "@domi/bridge-telegram": "workspace:*"
+    "react": "^19.3.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

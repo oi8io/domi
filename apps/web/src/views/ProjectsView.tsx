@@ -1,7 +1,9 @@
 /**
  * 全部项目（`#/projects`）与项目详情（`#/p/<id>`）—— PRD-M8-003 AC-4 / AC-5。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../components/ui/button.tsx'
 import { IconFolder, IconPencil } from '../icons.tsx'
@@ -27,14 +29,14 @@ export function ProjectsView({
   const q = query.trim().toLowerCase()
   const rows = projects.filter((p) => q === '' || `${p.name} ${p.path}`.toLowerCase().includes(q))
   return (
-    <Page view="projects" title="全部项目" sub="所有 workspace / 仓库。点击进入项目详情。">
+    <Page view="projects" title={tr('web.sidebar.allProjects')} sub={tr('web.projects.sub')}>
       <div className="flex items-start gap-2">
         <div className="flex-1">
-          <FilterInput value={query} onChange={setQuery} placeholder="筛选项目…" />
+          <FilterInput value={query} onChange={setQuery} placeholder={tr('web.projects.filter')} />
         </div>
         {onAdd !== undefined && (
           <Button size="md" className="py-[5px]" onClick={onAdd}>
-            添加项目
+            {tr('web.sidebar.addProject')}
           </Button>
         )}
       </div>
@@ -45,10 +47,10 @@ export function ProjectsView({
           onChange={(e) => onShowArchived(e.target.checked)}
           className="accent-[var(--accent)]"
         />
-        显示已归档
+        {tr('web.projects.showArchived')}
       </label>
       <Card className="px-0 py-2">
-        {rows.length === 0 && <p className="px-3.5 py-2 text-[13px] text-mut">没有项目。</p>}
+        {rows.length === 0 && <p className="px-3.5 py-2 text-[13px] text-mut">{tr('web.projects.none')}</p>}
         {rows.map((p) => (
           <ListRow
             key={p.id}
@@ -56,16 +58,14 @@ export function ProjectsView({
             state={p.recentTasks.some((t) => t.busy) ? 'running' : 'idle'}
             title={p.name}
             muted={p.archived === true}
-            badge={p.archived ? <Badge>已归档</Badge> : undefined}
+            badge={p.archived ? <Badge>{tr('common.archived')}</Badge> : undefined}
             meta={
-              <span className="font-mono">
-                {p.path} · {p.taskCount} 个任务
-              </span>
+              <span className="font-mono">{tr('web.projects.meta', { path: p.path, taskCount: p.taskCount })}</span>
             }
             aside={
               p.archived ? (
                 <Button size="xs" className="mr-3" onClick={() => onUnarchive(p.id)}>
-                  取消归档
+                  {tr('common.unarchive')}
                 </Button>
               ) : undefined
             }
@@ -76,7 +76,7 @@ export function ProjectsView({
   )
 }
 
-const MODE_LABEL = { auto: '自动', always: '总是', never: '从不' } as const
+const MODE_LABEL = () => ({ auto: tr('common.auto'), always: tr('common.always'), never: tr('common.never') }) as const
 
 export function ProjectView({
   client,
@@ -106,8 +106,13 @@ export function ProjectView({
 
   if (project === undefined)
     return (
-      <Page view="project" narrow title="项目" icon={<IconFolder size={22} className="text-accent" />}>
-        <Notice>{online ? '找不到这个项目。' : '连上 daemon 后显示。'}</Notice>
+      <Page
+        view="project"
+        narrow
+        title={tr('web.sidebar.projects')}
+        icon={<IconFolder size={22} className="text-accent" />}
+      >
+        <Notice>{online ? tr('web.project.notFound') : tr('web.common.connectFirst')}</Notice>
       </Page>
     )
 
@@ -140,7 +145,7 @@ export function ProjectView({
             <input
               className="field-input py-0.5 text-lg font-bold"
               value={name}
-              aria-label="项目名"
+              aria-label={tr('web.project.name')}
               onChange={(e) => setName(e.target.value)}
               onBlur={() => setEditing(false)}
               onKeyDown={(e) => {
@@ -153,12 +158,12 @@ export function ProjectView({
         ) : (
           <span className="group flex items-center gap-2">
             {project.name}
-            {project.archived && <Badge>已归档</Badge>}
+            {project.archived && <Badge>{tr('common.archived')}</Badge>}
             <button
               type="button"
               className="rounded-sm p-1 text-mut opacity-0 group-hover:opacity-100 hover:bg-panel-h hover:text-accent focus-visible:opacity-100"
-              title="改名"
-              aria-label="改名"
+              title={tr('common.rename')}
+              aria-label={tr('common.rename')}
               onClick={() => {
                 setName(project.name)
                 setEditing(true)
@@ -176,8 +181,8 @@ export function ProjectView({
           className="mb-7 px-0 pb-0"
           busy={!online || project.archived === true}
           notice={notice}
-          placeholder={project.archived ? '项目已归档，取消归档后才能开始新任务' : '在这个项目里开始新任务…'}
-          submitLabel="开始任务"
+          placeholder={project.archived ? tr('web.project.archivedNoTask') : tr('web.project.startPlaceholder')}
+          submitLabel={tr('common.startTask')}
           onSubmit={async (goal) => {
             try {
               const { sessionId: id } = await client.createTask(project.id, goal)
@@ -190,25 +195,27 @@ export function ProjectView({
           }}
         />
       </div>
-      <div className="caps mb-2">历史任务</div>
-      {tasks.length === 0 && <p className="px-3.5 py-2 text-[13px] text-mut">还没有任务。</p>}
+      <div className="caps mb-2">{tr('web.project.history')}</div>
+      {tasks.length === 0 && <p className="px-3.5 py-2 text-[13px] text-mut">{tr('web.project.noTasks')}</p>}
       {tasks.map((t) => (
         <ListRow
           key={t.id}
           href={formatRoute({ view: 'session', id: t.id, tab: 'chat' })}
           state={dotOf(t, active)}
           title={titleOf(t)}
-          meta={`${t.model} · ${t.eventCount} 事件${t.parentId === undefined ? '' : ' · 分支'}`}
+          meta={tr('web.sidebar.chatMeta', {
+            model: t.model,
+            eventCount: t.eventCount,
+            v: t.parentId === undefined ? '' : tr('common.branchSuffix'),
+          })}
         />
       ))}
       <details className="mt-8 text-[13px]">
-        <summary className="cursor-pointer text-mut select-none">项目设置</summary>
+        <summary className="cursor-pointer text-mut select-none">{tr('web.project.settings')}</summary>
         <div className="mt-3 grid gap-3">
           <label className="grid gap-1">
-            <span className="font-medium">在单独的工作区里改</span>
-            <span className="text-[11.5px] text-mut">
-              自动 = 你的工作区有未提交改动、或由定时触发时，任务在单独的工作区里改，改完在任务顶部审阅、带回
-            </span>
+            <span className="font-medium">{tr('web.project.isolate')}</span>
+            <span className="text-[11.5px] text-mut">{tr('web.project.isolateHint')}</span>
             <select
               className="field-input"
               value={settings.isolation}
@@ -216,7 +223,7 @@ export function ProjectView({
                 act(client.updateProject(project.id, { settings: { isolation: e.target.value as 'auto' } }))
               }
             >
-              {Object.entries(MODE_LABEL).map(([v, l]) => (
+              {Object.entries(MODE_LABEL()).map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
                 </option>
@@ -224,10 +231,8 @@ export function ProjectView({
             </select>
           </label>
           <label className="grid gap-1">
-            <span className="font-medium">计划先给我审</span>
-            <span className="text-[11.5px] text-mut">
-              自动 = 多步任务或要改的文件较多时才先审；只作用于新建任务时系统开的规划
-            </span>
+            <span className="font-medium">{tr('web.project.reviewPlan')}</span>
+            <span className="text-[11.5px] text-mut">{tr('web.project.reviewPlanHint')}</span>
             <select
               className="field-input"
               value={settings.planReview}
@@ -235,7 +240,7 @@ export function ProjectView({
                 act(client.updateProject(project.id, { settings: { planReview: e.target.value as 'auto' } }))
               }
             >
-              {Object.entries(MODE_LABEL).map(([v, l]) => (
+              {Object.entries(MODE_LABEL()).map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
                 </option>
@@ -244,7 +249,7 @@ export function ProjectView({
           </label>
           <div>
             <Button variant="danger" onClick={() => act(client.archiveProject(project.id, project.archived !== true))}>
-              {project.archived ? '取消归档' : '归档项目'}
+              {project.archived ? tr('common.unarchive') : tr('web.project.archive')}
             </Button>
           </div>
         </div>

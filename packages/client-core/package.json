@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@domi/i18n": "workspace:*",
     "@domi/protocol": "workspace:*",
     "nanostores": "^1.5.3"
   }

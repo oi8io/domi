@@ -3,7 +3,9 @@
  * 卡片列出已装插件、提供的东西与沙箱状态；开关写 config 的 plugins.disabled，daemon 即时生效。
  * 插件的 UI 面板在无同源的沙箱 iframe 里渲染——页面拿不到 cookie、拿不到父页面、连不上 daemon（ADR-022）。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'
 import { cn } from '../../lib/cn.ts'
@@ -14,9 +16,9 @@ type Plugin = List['plugins'][number]
 
 function tagOf(p: Plugin): string {
   const parts = [`v${p.version}`]
-  if (p.tools.length > 0) parts.push(`${p.tools.length} 个工具`)
-  if (p.skills > 0) parts.push(`${p.skills} 个 skill`)
-  if (p.mcp.length > 0) parts.push(`MCP · ${p.mcp.join('、')}`)
+  if (p.tools.length > 0) parts.push(tr('web.plugins.tools', { length: p.tools.length }))
+  if (p.skills > 0) parts.push(tr('web.plugins.skills', { skills: p.skills }))
+  if (p.mcp.length > 0) parts.push(`MCP · ${p.mcp.join(tr('common.listSep'))}`)
   return parts.join(' · ')
 }
 
@@ -34,11 +36,12 @@ export function PluginList({
   return (
     <div data-part="plugins">
       <p className={cn('mb-3 text-[12.5px]', list.sandbox === 'none' ? 'text-bad' : 'text-mut')}>
-        沙箱：{list.sandbox === 'none' ? '没有（带代码的插件不会运行）' : list.sandbox}
+        {tr('web.plugins.sandbox', { v: list.sandbox === 'none' ? tr('web.plugins.noSandbox') : list.sandbox })}
       </p>
       {list.plugins.length === 0 && (
         <p className="text-[13px] text-mut">
-          还没有安装插件。终端里：<code className="font-mono">domi plugin install &lt;目录&gt;</code>
+          {tr('web.plugins.none')}
+          <code className="font-mono">{tr('web.plugins.installCmd')}</code>
         </p>
       )}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
@@ -56,16 +59,16 @@ export function PluginList({
                   type="button"
                   role="switch"
                   aria-checked={on}
-                  aria-label={`${on ? '停用' : '启用'} ${p.name}`}
+                  aria-label={`${on ? tr('common.disable') : tr('common.enable')} ${p.name}`}
                   disabled={busy === p.name || onToggle === undefined}
                   onClick={() => onToggle?.(p.name, !on)}
                   className={cn(
                     'shrink-0 rounded-[10px] px-[7px] py-px text-[10.5px] font-semibold',
                     on ? 'bg-ok-d text-ok' : 'bg-border2 text-mut',
                   )}
-                  title={on ? '点一下停用' : '点一下启用'}
+                  title={on ? tr('web.plugins.clickDisable') : tr('web.plugins.clickEnable')}
                 >
-                  {on ? '启用' : '未启用'}
+                  {on ? tr('common.enabled') : tr('common.notEnabled')}
                 </button>
               </div>
               <p className="mt-[3px] mb-2 text-xs text-mut">{p.description}</p>
@@ -128,8 +131,8 @@ export function PluginsTab({ client }: { client: DomiClient }) {
         (r) => {
           setSaved(
             r.restartRequired.length > 0
-              ? `已${enabled ? '启用' : '停用'} ${name}。它带的 MCP server 要重启 domid 才会连上`
-              : `已${enabled ? '启用' : '停用'} ${name}`,
+              ? tr('web.plugins.enabledRestart', { name })
+              : tr(enabled ? 'web.plugins.enabledOne' : 'web.plugins.disabledOne', { name }),
           )
           if (!enabled && frame !== null) setFrame(null)
           load()
@@ -151,7 +154,7 @@ export function PluginsTab({ client }: { client: DomiClient }) {
     <div data-part="plugins-tab">
       <Saved error={error} saved={saved} />
       {list === null ? (
-        <p className="text-[13px] text-mut">加载中…</p>
+        <p className="text-[13px] text-mut">{tr('common.loading')}</p>
       ) : (
         <PluginList list={list} busy={busy} onToggle={toggle} onOpen={open} />
       )}

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@domi/client-core": "workspace:*",
+    "@domi/i18n": "workspace:*",
     "@domi/protocol": "workspace:*",
     "@nanostores/react": "^1.1.0",
     "class-variance-authority": "^0.7.1",

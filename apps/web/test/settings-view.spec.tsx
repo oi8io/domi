@@ -49,10 +49,11 @@ const settings: Settings = {
 const s = { data: settings, error: null, saved: null, save: async () => true, reload: () => undefined }
 
 describe('PRD-M8-012 AC-2 · 通用（模型供应商见 settings-providers.spec，PRD-M9-002）', () => {
-  test('通用：语言（只有简体中文）、主题三选一、5 个色板', () => {
+  test('通用：语言三选一（跟随系统 / 简体中文 / English，PRD-M9-004 AC-1）、主题三选一、5 个色板', () => {
     const html = renderToStaticMarkup(<GeneralTab s={s} />)
+    expect(html).toContain('<option value="auto"')
     expect(html).toContain('简体中文')
-    expect(html).toContain('English（即将支持）')
+    expect(html).toContain('<option value="en">English</option>')
     expect(html).toContain('跟随系统')
     expect(html).toContain('深色')
     expect(html).toContain('浅色')

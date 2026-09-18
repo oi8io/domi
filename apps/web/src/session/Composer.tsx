@@ -5,7 +5,9 @@
  * - 待发送的东西以 chip 显示在输入框上方：跨会话引用（PRD-M3-005）、文件、附件、技能
  * 校验都在 daemon：附件太大、模型不支持图片，提交时原样把错误给人看。
  */
+
 import type { DomiClient, RefLink } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import {
   type ClipboardEvent,
   type DragEvent,
@@ -45,7 +47,7 @@ function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader()
     r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''))
-    r.onerror = () => reject(r.error ?? new Error('读不了这个文件'))
+    r.onerror = () => reject(r.error ?? new Error(tr('web.composer.cannotRead')))
     r.readAsDataURL(file)
   })
 }
@@ -79,11 +81,11 @@ function Chip({
         type="button"
         className="inline-flex items-center rounded-sm p-0.5 text-mut hover:bg-panel-h hover:text-ink"
         onClick={onRemove}
-        title="去掉"
-        aria-label="去掉"
+        title={tr('common.remove')}
+        aria-label={tr('common.remove')}
       >
         <IconX size={11} />
-        <span className="sr-only">去掉</span>
+        <span className="sr-only">{tr('common.remove')}</span>
       </button>
     </li>
   )
@@ -97,7 +99,7 @@ export function PendingRefs({ refs, onRemove }: { refs: readonly PendingRef[]; o
       {refs.map((r, i) => (
         <Chip
           key={`${r.sessionId}#${r.fromSeq}`}
-          tone={`引用 ${r.sessionId}`}
+          tone={tr('web.composer.quoteSession', { sessionId: r.sessionId })}
           label={r.label}
           onRemove={() => onRemove(i)}
         />
@@ -141,7 +143,7 @@ function Popover({
           // biome-ignore lint/a11y/noAutofocus: 点工具栏按钮打开时，焦点直接给搜索框
           autoFocus
           className="block w-full border-b border-border2 bg-transparent px-3 py-2 text-[12.5px] text-ink outline-none"
-          placeholder={pop.kind === 'files' ? '搜索文件…' : '搜索技能…'}
+          placeholder={pop.kind === 'files' ? tr('web.composer.searchFiles') : tr('web.composer.searchSkills')}
           value={pop.query}
           onChange={(e) => onQuery(e.target.value)}
           onKeyDown={onKey}
@@ -155,13 +157,14 @@ function Popover({
           onClick={onUpload}
         >
           <IconPaperclip size={12} />
-          上传附件…<span className="text-mut2">（也可以直接粘贴或拖进输入框）</span>
+          {tr('web.composer.upload')}
+          <span className="text-mut2">{tr('web.composer.uploadHint')}</span>
         </button>
       )}
       <ul className="max-h-64 overflow-y-auto py-1">
         {rows.length === 0 && (
           <li className="px-3 py-1.5 text-[12.5px] text-mut">
-            {pop.kind === 'files' ? '没有匹配的文件' : '没有匹配的技能'}
+            {pop.kind === 'files' ? tr('web.composer.noFiles') : tr('web.composer.noSkills')}
           </li>
         )}
         {rows.map((r, i) => (
@@ -181,7 +184,7 @@ function Popover({
           </li>
         ))}
       </ul>
-      <div className="border-t border-border2 px-3 py-1 text-[11px] text-mut2">↑↓ 选择 · Enter 确定 · Esc 关闭</div>
+      <div className="border-t border-border2 px-3 py-1 text-[11px] text-mut2">{tr('web.composer.pickerKeys')}</div>
     </div>
   )
 }
@@ -192,7 +195,7 @@ export function Composer({
   refs = [],
   onRemoveRef,
   placeholder,
-  submitLabel = '发送',
+  submitLabel = tr('web.composer.send'),
   onSubmit,
   children,
   className,
@@ -319,7 +322,7 @@ export function Composer({
     const t = text.trim()
     if (t === '' || busy || pending) return
     if (failed) {
-      setLocalNotice('有附件没传上去，去掉它再发')
+      setLocalNotice(tr('web.composer.uploadFailed'))
       return
     }
     onSubmit(t, { uploads: uploads.map((u) => u.id as string), files, skills }).then(
@@ -388,7 +391,7 @@ export function Composer({
 
   const shownNotice = notice ?? localNotice
   const chips = refs.length + files.length + skills.length + uploads.length
-  const disabledHint = tools?.hint ?? '开始之后可以引用文件、上传附件'
+  const disabledHint = tools?.hint ?? tr('web.composer.startFirst')
   const fromToolbar = (k: Pop['kind']): boolean => pop?.kind === k && pop.at === null
 
   return (
@@ -409,7 +412,7 @@ export function Composer({
           {refs.map((r, i) => (
             <Chip
               key={`${r.sessionId}#${r.fromSeq}`}
-              tone={`引用 ${r.sessionId}`}
+              tone={tr('web.composer.quoteSession', { sessionId: r.sessionId })}
               label={r.label}
               onRemove={() => onRemoveRef?.(i)}
             />
@@ -417,7 +420,7 @@ export function Composer({
           {files.map((f) => (
             <Chip
               key={`f:${f}`}
-              tone="文件"
+              tone={tr('web.composer.file')}
               label={<span className="font-mono">{f}</span>}
               onRemove={() => setFiles((xs) => xs.filter((x) => x !== f))}
             />
@@ -425,7 +428,13 @@ export function Composer({
           {uploads.map((u) => (
             <Chip
               key={u.key}
-              tone={u.error !== undefined ? '失败' : u.id === undefined ? '上传中' : '附件'}
+              tone={
+                u.error !== undefined
+                  ? tr('common.failed')
+                  : u.id === undefined
+                    ? tr('web.composer.uploading')
+                    : tr('web.composer.attachment')
+              }
               title={u.error}
               label={
                 <span className={cn(u.error !== undefined && 'text-bad')}>
@@ -436,7 +445,12 @@ export function Composer({
             />
           ))}
           {skills.map((s) => (
-            <Chip key={`s:${s}`} tone="技能" label={s} onRemove={() => setSkills((xs) => xs.filter((x) => x !== s))} />
+            <Chip
+              key={`s:${s}`}
+              tone={tr('web.composer.skill')}
+              label={s}
+              onRemove={() => setSkills((xs) => xs.filter((x) => x !== s))}
+            />
           ))}
         </ul>
       )}
@@ -473,7 +487,7 @@ export function Composer({
           onBlur={() => {
             if (pop !== null && pop.at !== null) setPop(null)
           }}
-          aria-label="输入"
+          aria-label={tr('web.composer.input')}
           className="block max-h-40 w-full resize-none bg-transparent px-3.5 pt-2.5 pb-0.5 text-sm text-ink outline-none"
         />
         <input
@@ -491,25 +505,25 @@ export function Composer({
             variant="ghost"
             size="xs"
             disabled={!canFiles}
-            title={canFiles ? '引用工作目录里的文件，或上传附件（也可以输入 @）' : disabledHint}
+            title={canFiles ? tr('web.composer.fileHint') : disabledHint}
             className={cn(fromToolbar('files') && 'bg-panel-h text-ink2')}
             onClick={() => open(fromToolbar('files') ? null : { kind: 'files', query: '', at: null })}
             data-action="files"
           >
             <IconPaperclip size={13} />
-            文件
+            {tr('web.composer.file')}
           </Button>
           <Button
             variant="ghost"
             size="xs"
             disabled={!canSkills}
-            title={canSkills ? '这一轮指定一个技能（也可以输入 /）' : disabledHint}
+            title={canSkills ? tr('web.composer.skillHint') : disabledHint}
             className={cn(fromToolbar('skills') && 'bg-panel-h text-ink2')}
             onClick={() => open(fromToolbar('skills') ? null : { kind: 'skills', query: '', at: null })}
             data-action="skills"
           >
             <IconZap size={13} />
-            技能
+            {tr('web.composer.skill')}
           </Button>
           <span className="flex-1" />
           {children}
@@ -552,9 +566,9 @@ export function ModeToggle({
       data-mode={mode}
       disabled={busy}
       onClick={toggle}
-      title="计划模式下 domi 只读代码，想好方案后提交给你审批，批准后才动手"
+      title={tr('web.composer.planHint')}
     >
-      {mode === 'plan' ? '计划模式' : '执行模式'}
+      {mode === 'plan' ? tr('common.planMode') : tr('common.actMode')}
     </button>
   )
 }
@@ -608,7 +622,7 @@ export function ModelSwitch({
       (lost) => {
         setModel('')
         setCustom(false)
-        onNotice(lost.length > 0 ? `已切换。新模型不支持：${lost.join('、')}` : null)
+        onNotice(lost.length > 0 ? tr('web.composer.switchedLost', { join: lost.join(tr('common.listSep')) }) : null)
       },
       (err: Error) => onNotice(err.message),
     )
@@ -638,7 +652,7 @@ export function ModelSwitch({
           // biome-ignore lint/a11y/noAutofocus: 选了「搜索 / 手填…」就是要马上输入
           autoFocus={custom}
           list="domi-models"
-          placeholder={current || '模型名'}
+          placeholder={current || tr('web.composer.modelName')}
           onChange={(e) => setModel(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -648,8 +662,8 @@ export function ModelSwitch({
             if (e.key === 'Escape') setCustom(false)
           }}
           disabled={busy}
-          aria-label="切换模型"
-          title="搜索或填模型名，回车"
+          aria-label={tr('web.composer.switchModel')}
+          title={tr('web.composer.switchModelHint')}
         />
         <datalist id="domi-models">
           {models.map((m) => (
@@ -658,7 +672,7 @@ export function ModelSwitch({
         </datalist>
         {custom && (
           <Button variant="ghost" size="xs" onClick={() => setCustom(false)}>
-            取消
+            {tr('common.cancel')}
           </Button>
         )}
       </span>
@@ -673,8 +687,8 @@ export function ModelSwitch({
       className="max-w-56 rounded-sm border border-border bg-bg2 px-2 py-1 font-mono text-xs text-ink"
       disabled={busy}
       value={value}
-      title="切换模型"
-      aria-label="切换模型"
+      title={tr('web.composer.switchModel')}
+      aria-label={tr('web.composer.switchModel')}
       onChange={(e) => {
         if (e.target.value === '__custom') {
           setCustom(true)
@@ -684,18 +698,18 @@ export function ModelSwitch({
         if (name && e.target.value !== value) switchTo(name, p)
       }}
     >
-      {!known && <option value={value}>{current === '' ? '模型' : current}</option>}
+      {!known && <option value={value}>{current === '' ? tr('web.composer.model') : current}</option>}
       {groupByProvider(models).map(([providerName, group]) => (
         <optgroup key={group[0]?.provider} label={providerName}>
           {group.map((m) => (
             <option key={`${m.provider}/${m.name}`} value={`${m.provider}${SEP}${m.name}`}>
               {m.name}
-              {m.vision ? '' : ' · 不支持图片'}
+              {m.vision ? '' : tr('web.composer.noImages')}
             </option>
           ))}
         </optgroup>
       ))}
-      <option value="__custom">搜索 / 手填…</option>
+      <option value="__custom">{tr('web.composer.searchOrType')}</option>
     </select>
   )
 }

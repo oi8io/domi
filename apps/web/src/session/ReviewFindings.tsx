@@ -2,14 +2,16 @@
  * 审阅发现（PRD-M7-010 AC-2）：审阅会话交出的结构化发现，按文件分组展示。
  * 数据来自 client-core 的 `$review` 投影（review.findings 事件），这里只排版。
  */
+
 import type { ReviewFindingSnapshot } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { cn } from '../lib/cn.ts'
 
-const SEVERITY: Record<ReviewFindingSnapshot['severity'], [string, string]> = {
-  high: ['高', 'bg-bad-d text-bad'],
-  medium: ['中', 'bg-warn-d text-warn'],
-  low: ['低', 'bg-border2 text-mut'],
-}
+const SEVERITY = (): Record<ReviewFindingSnapshot['severity'], [string, string]> => ({
+  high: [tr('common.severity.high'), 'bg-bad-d text-bad'],
+  medium: [tr('common.severity.medium'), 'bg-warn-d text-warn'],
+  low: [tr('common.severity.low'), 'bg-border2 text-mut'],
+})
 
 export function groupFindings(findings: readonly ReviewFindingSnapshot[]): Array<[string, ReviewFindingSnapshot[]]> {
   const byFile = new Map<string, ReviewFindingSnapshot[]>()
@@ -23,9 +25,9 @@ export function ReviewFindings({ findings }: { findings: readonly ReviewFindingS
   return (
     <section className="my-3 overflow-hidden rounded-md border border-border2" data-part="review-findings">
       <header className="flex items-center gap-2 bg-panel px-3.5 py-2 text-[13px] font-semibold">
-        审阅发现
+        {tr('web.review.title')}
         <span className="font-normal text-mut">
-          {findings.length === 0 ? '没有发现问题' : `${findings.length} 个问题`}
+          {findings.length === 0 ? tr('web.review.none') : tr('web.review.count', { length: findings.length })}
         </span>
       </header>
       {groupFindings(findings).map(([file, list]) => (
@@ -35,15 +37,15 @@ export function ReviewFindings({ findings }: { findings: readonly ReviewFindingS
             {list.map((f) => (
               <li key={`${f.line ?? 0}-${f.problem}`} className="flex items-baseline gap-2 text-[13px]">
                 <span
-                  className={cn('shrink-0 rounded px-1.5 text-[10.5px] font-semibold', SEVERITY[f.severity][1])}
+                  className={cn('shrink-0 rounded px-1.5 text-[10.5px] font-semibold', SEVERITY()[f.severity][1])}
                   data-severity={f.severity}
                 >
-                  {SEVERITY[f.severity][0]}
+                  {SEVERITY()[f.severity][0]}
                 </span>
                 <span className="min-w-0">
                   {f.line !== undefined && <span className="mr-1 font-mono text-xs text-mut">L{f.line}</span>}
                   {f.problem}
-                  <span className="block text-xs text-mut">依据：{f.basis}</span>
+                  <span className="block text-xs text-mut">{tr('web.review.basis', { basis: f.basis })}</span>
                 </span>
               </li>
             ))}

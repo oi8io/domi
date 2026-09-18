@@ -2,7 +2,9 @@
  * 设置页的数据（PRD-M8-011 / 012）：config.get 读、config.set 写。
  * 写完重新读一遍——显示的永远是 daemon 那边生效的值，不是页面自己记的。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useCallback, useEffect, useState } from 'react'
 
 export type Settings = Awaited<ReturnType<DomiClient['getSettings']>>
@@ -30,8 +32,8 @@ export function useSettings(client: DomiClient, online: boolean) {
         setError(null)
         setSaved(
           r.restartRequired.length > 0
-            ? `已保存。${r.restartRequired.join('、')} 要重启 domid 才生效`
-            : '已保存，下一轮生效',
+            ? tr('web.settings.savedRestart', { join: r.restartRequired.join(tr('common.listSep')) })
+            : tr('web.settings.savedNextTurn'),
         )
         load()
         return true

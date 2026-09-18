@@ -2,7 +2,9 @@
  * 侧栏 —— PRD-M8-002 · SPEC-M8-002
  * 自上而下：品牌 → 新对话 → 新任务 / 定时任务 → 项目树 → 会话（只放自由会话）→ 设置。
  */
+
 import type { ConnectionState } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { type ReactNode, useState } from 'react'
 import { StatusDot } from '../components/StatusDot.tsx'
 import { Button } from '../components/ui/button.tsx'
@@ -27,14 +29,14 @@ export const RECENT_CHATS = 10
 const COLLAPSED_KEY = 'domi.sidebar.collapsed'
 const EXPANDED_KEY = 'domi.sidebar.expanded'
 
-export const STATE_LABEL: Record<ConnectionState, string> = {
-  idle: '未连接',
-  connecting: '连接中…',
-  open: '已连接',
-  reconnecting: '断线，重连中…',
-  incompatible: '协议版本不兼容',
-  closed: '已断开',
-}
+export const STATE_LABEL = (): Record<ConnectionState, string> => ({
+  idle: tr('web.conn.offline'),
+  connecting: tr('web.conn.connecting'),
+  open: tr('web.conn.connected'),
+  reconnecting: tr('web.conn.reconnecting'),
+  incompatible: tr('web.conn.incompatible'),
+  closed: tr('web.conn.closed'),
+})
 
 export interface SidebarProps {
   state: ConnectionState
@@ -148,16 +150,16 @@ export function ProjectNode({
           <a
             href={detail}
             className="rounded-[3px] p-0.5 text-mut hover:bg-panel-h hover:text-accent"
-            title="项目详情"
-            aria-label={`${project.name} 项目详情`}
+            title={tr('web.sidebar.projectDetails')}
+            aria-label={tr('web.sidebar.projectDetailsOf', { name: project.name })}
           >
             <IconArrowUpRight size={12} />
           </a>
           <a
             href={formatRoute({ view: 'project', id: project.id, create: true })}
             className="rounded-[3px] p-0.5 text-mut hover:bg-panel-h hover:text-accent"
-            title="在这个项目下新建任务"
-            aria-label={`在 ${project.name} 下新建任务`}
+            title={tr('web.sidebar.newTaskHere')}
+            aria-label={tr('web.sidebar.newTaskIn', { name: project.name })}
           >
             <IconPencil size={12} />
           </a>
@@ -179,14 +181,14 @@ export function ProjectNode({
               </a>
             </li>
           ))}
-          {tasks.length === 0 && <li className="px-2 py-[3px] text-[11.5px] text-mut2">还没有任务</li>}
+          {tasks.length === 0 && <li className="px-2 py-[3px] text-[11.5px] text-mut2">{tr('web.sidebar.noTasks')}</li>}
           {project.taskCount > tasks.length && (
             <li>
               <a
                 href={detail}
                 className="block rounded-sm px-2 py-[3px] text-[11.5px] text-mut hover:bg-panel-h hover:text-accent"
               >
-                查看全部 ({project.taskCount})
+                {tr('web.sidebar.viewAllTasks', { taskCount: project.taskCount })}
               </a>
             </li>
           )}
@@ -224,7 +226,7 @@ export function Sidebar(props: SidebarProps) {
       {!online && (
         <p className="mx-3 mb-2 flex items-center gap-1.5 text-xs text-mut" title={props.daemonUrl}>
           <span className="size-[7px] rounded-full bg-warn" />
-          {STATE_LABEL[state]}
+          {STATE_LABEL()[state]}
         </p>
       )}
       {lastError !== null && <p className="mx-3 mb-2 text-xs text-bad">{lastError}</p>}
@@ -238,7 +240,7 @@ export function Sidebar(props: SidebarProps) {
           onClick={props.onNewChat}
         >
           <IconPlus size={15} />
-          新对话
+          {tr('web.sidebar.newChat')}
         </Button>
         <div className="flex gap-[5px]">
           <a
@@ -246,36 +248,36 @@ export function Sidebar(props: SidebarProps) {
             className="flex flex-1 items-center gap-1.5 rounded-sm border border-border px-2.5 py-[7px] text-[12.5px] text-ink2 hover:bg-panel-h"
           >
             <IconCalendar size={13} />
-            新任务
+            {tr('common.newTask')}
           </a>
           <a
             href={formatRoute({ view: 'tasks', create: true, schedule: true })}
             className="flex flex-1 items-center gap-1.5 rounded-sm border border-border px-2.5 py-[7px] text-[12.5px] text-ink2 hover:bg-panel-h"
           >
             <IconClock size={13} />
-            定时任务
+            {tr('web.sidebar.schedules')}
           </a>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <SectionHeader
-          title="项目"
+          title={tr('web.sidebar.projects')}
           collapsed={collapsed.has('projects')}
           onToggle={() => toggle(collapsed, 'projects', COLLAPSED_KEY, setCollapsed)}
           actions={
             <>
               <HeaderAction
-                title="添加项目"
+                title={tr('web.sidebar.addProject')}
                 onClick={props.onAddProject}
                 disabled={!props.projectsAvailable || props.onAddProject === undefined}
               >
                 <IconFolderPlus size={13} />
               </HeaderAction>
-              <HeaderAction title="新建任务" href={formatRoute({ view: 'tasks', create: true })}>
+              <HeaderAction title={tr('web.sidebar.createTask')} href={formatRoute({ view: 'tasks', create: true })}>
                 <IconPlus size={14} />
               </HeaderAction>
-              <HeaderAction title="全部项目" href={formatRoute({ view: 'projects' })}>
+              <HeaderAction title={tr('web.sidebar.allProjects')} href={formatRoute({ view: 'projects' })}>
                 <IconList size={12} />
               </HeaderAction>
             </>
@@ -296,18 +298,18 @@ export function Sidebar(props: SidebarProps) {
             ))}
             {projects.length === 0 && (
               <li className="px-2.5 py-1 text-[11.5px] text-mut2">
-                {props.projectsAvailable ? '还没有项目' : '项目功能即将可用'}
+                {props.projectsAvailable ? tr('web.sidebar.noProjects') : tr('web.sidebar.projectsSoon')}
               </li>
             )}
           </ul>
         )}
 
         <SectionHeader
-          title="会话"
+          title={tr('web.sidebar.chats')}
           collapsed={collapsed.has('sessions')}
           onToggle={() => toggle(collapsed, 'sessions', COLLAPSED_KEY, setCollapsed)}
           actions={
-            <HeaderAction title="全部会话" href={formatRoute({ view: 'sessions' })}>
+            <HeaderAction title={tr('web.sidebar.allChats')} href={formatRoute({ view: 'sessions' })}>
               <IconList size={12} />
             </HeaderAction>
           }
@@ -328,20 +330,24 @@ export function Sidebar(props: SidebarProps) {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12.5px] font-medium">{titleOf(s)}</span>
                     <span className="block truncate text-[11px] text-mut">
-                      {s.model} · {s.eventCount} 事件{s.parentId === undefined ? '' : ' · 分支'}
+                      {tr('web.sidebar.chatMeta', {
+                        model: s.model,
+                        eventCount: s.eventCount,
+                        v: s.parentId === undefined ? '' : tr('common.branchSuffix'),
+                      })}
                     </span>
                   </span>
                 </a>
               </li>
             ))}
-            {chats.length === 0 && <li className="px-2.5 py-1 text-[11.5px] text-mut2">还没有会话</li>}
+            {chats.length === 0 && <li className="px-2.5 py-1 text-[11.5px] text-mut2">{tr('web.sidebar.noChats')}</li>}
             {chats.length > RECENT_CHATS && (
               <li>
                 <a
                   href={formatRoute({ view: 'sessions' })}
                   className="block rounded-sm px-2.5 py-1 text-[11.5px] text-mut hover:bg-panel-h hover:text-accent"
                 >
-                  查看全部 ({chats.length})
+                  {tr('web.sidebar.viewAllChats', { length: chats.length })}
                 </a>
               </li>
             )}
@@ -358,7 +364,7 @@ export function Sidebar(props: SidebarProps) {
           )}
         >
           <IconGear size={14} className="opacity-70" />
-          设置
+          {tr('web.sidebar.settings')}
         </a>
       </div>
     </aside>

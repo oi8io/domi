@@ -13,6 +13,7 @@
  *    于是断开期间 daemon 上发生的事一条不漏地补回来。
  * 3. **去重**。同一个 seq 只进一次 store——投影是追加式的，重复一次就是重复一条消息。
  */
+import { tr } from '@domi/i18n'
 import {
   type EventEnvelope,
   type MethodName,
@@ -107,7 +108,7 @@ export class DomiClient {
 
   async request<M extends MethodName>(method: M, params: ParamsOf<M>): Promise<ResultOf<M>> {
     const socket = this.socket
-    if (!socket || socket.readyState !== OPEN) throw new Error(`未连接到 daemon，无法调用 ${method}`)
+    if (!socket || socket.readyState !== OPEN) throw new Error(tr('core.client.notConnected', { method }))
     const id = this.nextId++
     const result = new Promise<unknown>((resolve, reject) => this.pending.set(id, { resolve, reject }))
     socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }))
@@ -520,10 +521,10 @@ export class DomiClient {
       })
       socket.addEventListener('close', () => {
         this.onClose(socket)
-        settle(() => reject(new Error('连接已关闭')))
+        settle(() => reject(new Error(tr('core.client.closed'))))
       })
       socket.addEventListener('error', () => {
-        this.$lastError.set('连不上 daemon')
+        this.$lastError.set(tr('core.client.unreachable'))
       })
     })
   }
@@ -617,7 +618,7 @@ export class DomiClient {
   private onClose(socket: WireSocket): void {
     if (this.socket !== socket) return
     this.socket = null
-    for (const p of this.pending.values()) p.reject(new Error('连接已断开'))
+    for (const p of this.pending.values()) p.reject(new Error(tr('core.client.dropped')))
     this.pending.clear()
     if (this.stopped) {
       if (this.$state.get() !== 'incompatible') this.$state.set('closed')

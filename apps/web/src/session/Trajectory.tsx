@@ -1,6 +1,7 @@
 /**
  * Trajectory tab —— PRD-M8-008 AC-3（原型 .traj-view）。
  */
+
 import {
   filterTurns,
   formatElapsed,
@@ -9,6 +10,7 @@ import {
   type TranscriptItem,
   trajectory,
 } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useState } from 'react'
 import { cn } from '../lib/cn.ts'
 
@@ -49,7 +51,7 @@ export function Timeline({ timeline }: { timeline: TrajTimeline }) {
         </div>
       ))}
       <div className="border-t border-border2 px-2.5 py-1 text-right font-mono text-[10.5px] text-mut2">
-        共 {formatElapsed(timeline.end - timeline.start)}
+        {tr('web.trajectory.total', { formatElapsed: formatElapsed(timeline.end - timeline.start) })}
       </div>
     </div>
   )
@@ -68,7 +70,7 @@ export function Trajectory({ items }: { items: readonly TranscriptItem[] }) {
           type="button"
           className={cn(CHIP, showTime && timeline !== null && CHIP_ON)}
           disabled={timeline === null}
-          title={timeline === null ? '这个会话的事件没有时间戳' : '显示 / 收起时间线'}
+          title={timeline === null ? tr('web.trajectory.noTimestamps') : tr('web.trajectory.toggleTimeline')}
           onClick={() => setShowTime(!showTime)}
         >
           ◷ Duration
@@ -81,14 +83,14 @@ export function Trajectory({ items }: { items: readonly TranscriptItem[] }) {
         </button>
         <input
           className="field-input ml-auto w-[200px] text-[12.5px]"
-          placeholder="搜索…"
+          placeholder={tr('common.searchEllipsis')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="搜索轨迹"
+          aria-label={tr('web.trajectory.search')}
         />
       </div>
       {showTime && timeline !== null && <Timeline timeline={timeline} />}
-      {turns.length === 0 && <p className="py-8 text-center text-[13px] text-mut">没有匹配的步骤。</p>}
+      {turns.length === 0 && <p className="py-8 text-center text-[13px] text-mut">{tr('web.trajectory.noMatch')}</p>}
       {turns.map((t) => (
         <section key={t.index} className="mb-1" data-turn={t.index}>
           <div className="pt-2 pb-1 font-mono text-[11px] text-mut2">Turn {t.index}</div>

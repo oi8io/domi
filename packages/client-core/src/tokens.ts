@@ -5,6 +5,7 @@
  * 取值来自已确认的原型 `docs/ui-redesign/index.html` 与 `HANDOFF.md` §1。
  * 纯数据，不 import react（ADR-009）。
  */
+import { tr } from '@domi/i18n'
 
 export type ThemeMode = 'dark' | 'light'
 
@@ -72,7 +73,7 @@ export const TOKENS: Record<ThemeMode, ThemeTokens> = {
  */
 export interface Palette {
   id: PaletteId
-  label: string
+  readonly label: string
   dark: { accent: string; emphasis: string }
   light: { accent: string; emphasis: string }
 }
@@ -82,31 +83,46 @@ export type PaletteId = 'blue' | 'green' | 'orange' | 'purple' | 'pink'
 export const PALETTES: readonly Palette[] = [
   {
     id: 'blue',
-    label: '蓝',
+    // 取值时才翻译：这张表在模块加载时就建好了，界面语言可能在那之后才定（PRD-M9-004）
+    get label() {
+      return tr('core.palette.blue')
+    },
     dark: { accent: '#58a6ff', emphasis: '#1f6feb' },
     light: { accent: '#0969da', emphasis: '#0969da' },
   },
   {
     id: 'green',
-    label: '绿',
+    // 取值时才翻译：这张表在模块加载时就建好了，界面语言可能在那之后才定（PRD-M9-004）
+    get label() {
+      return tr('core.palette.green')
+    },
     dark: { accent: '#3fb950', emphasis: '#238636' },
     light: { accent: '#1a7f37', emphasis: '#1a7f37' },
   },
   {
     id: 'orange',
-    label: '橙',
+    // 取值时才翻译：这张表在模块加载时就建好了，界面语言可能在那之后才定（PRD-M9-004）
+    get label() {
+      return tr('core.palette.orange')
+    },
     dark: { accent: '#f0883e', emphasis: '#bd561d' },
     light: { accent: '#bc4c00', emphasis: '#bc4c00' },
   },
   {
     id: 'purple',
-    label: '紫',
+    // 取值时才翻译：这张表在模块加载时就建好了，界面语言可能在那之后才定（PRD-M9-004）
+    get label() {
+      return tr('core.palette.purple')
+    },
     dark: { accent: '#a371f7', emphasis: '#8957e5' },
     light: { accent: '#8250df', emphasis: '#8250df' },
   },
   {
     id: 'pink',
-    label: '粉',
+    // 取值时才翻译：这张表在模块加载时就建好了，界面语言可能在那之后才定（PRD-M9-004）
+    get label() {
+      return tr('core.palette.pink')
+    },
     dark: { accent: '#db61a2', emphasis: '#bf4b8a' },
     light: { accent: '#bf3989', emphasis: '#bf3989' },
   },

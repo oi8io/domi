@@ -216,6 +216,9 @@ importers:
       '@domi/daemon':
         specifier: workspace:*
         version: link:../../packages/daemon
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@nanostores/react':
         specifier: ^1.0.0
         version: 1.1.0(nanostores@1.5.3)(react@19.3.0)
@@ -241,6 +244,9 @@ importers:
       '@domi/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@domi/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -315,6 +321,9 @@ importers:
       '@domi/eval':
         specifier: workspace:*
         version: link:../eval
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@domi/model':
         specifier: workspace:*
         version: link:../model
@@ -339,6 +348,9 @@ importers:
 
   packages/client-core:
     dependencies:
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@domi/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -427,6 +439,8 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+
+  packages/i18n: {}
 
   packages/kernel:
     dependencies:

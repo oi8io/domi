@@ -145,8 +145,12 @@ export const ConfigSchema = z.object({
     .default({}),
   /** 界面（PRD-M8-001 AC-5）：主题色在 Web 与 TUI 之间共用 */
   ui: z
-    .object({ accent: z.enum(['blue', 'green', 'orange', 'purple', 'pink']).default('blue') })
-    .default({ accent: 'blue' }),
+    .object({
+      accent: z.enum(['blue', 'green', 'orange', 'purple', 'pink']).default('blue'),
+      /** 界面语言（PRD-M9-004 AC-1）。auto = 各端跟随自己的系统（浏览器语言 / LANG） */
+      locale: z.enum(['auto', 'zh', 'en']).default('auto'),
+    })
+    .default({ accent: 'blue', locale: 'auto' }),
   /** TUI 深浅（PRD-M8-014 AC-6）。auto 读 COLORFGBG */
   tui: z.object({ theme: z.enum(['auto', 'dark', 'light']).default('auto') }).default({ theme: 'auto' }),
   /**

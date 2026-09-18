@@ -7,7 +7,9 @@
  *
  * 纯展示（ProvidersView）与取数（ProvidersTab）分开：前者测试直接渲染，后者只管请求。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'
 import { cn } from '../../lib/cn.ts'
@@ -19,22 +21,22 @@ export type Vendor = Awaited<ReturnType<DomiClient['listVendors']>>['vendors'][n
 export type ModelList = Awaited<ReturnType<DomiClient['listModels']>>
 type Caps = Vendor['capabilities']
 
-const CAP_LABEL: Array<[keyof Caps, string, string]> = [
-  ['toolCall', '工具调用', '能读写文件、跑命令；关掉时这家的模型只能聊天'],
-  ['vision', '看图', '附件里的图片作为图片发给模型'],
-  ['reasoning', '思考过程', '模型的思考段单独显示'],
-  ['promptCache', '提示缓存', '稳定前缀走缓存，省钱'],
-  ['structuredOutput', '结构化输出', '标题、摘要等用原生 JSON 模式'],
+const CAP_LABEL = (): Array<[keyof Caps, string, string]> => [
+  ['toolCall', tr('web.providers.cap.toolCall'), tr('web.providers.cap.toolCallHint')],
+  ['vision', tr('web.providers.cap.vision'), tr('web.providers.cap.visionHint')],
+  ['reasoning', tr('web.providers.cap.reasoning'), tr('web.providers.cap.reasoningHint')],
+  ['promptCache', tr('web.providers.cap.promptCache'), tr('web.providers.cap.promptCacheHint')],
+  ['structuredOutput', tr('web.providers.cap.structured'), tr('web.providers.cap.structuredHint')],
 ]
 
 /** 协议下拉：每种协议取第一家说这种协议、且不是 custom 的厂商名作标签（openai → 「OpenAI 兼容」） */
 export function protocolOptions(vendors: readonly Vendor[]): Array<[Vendor['protocol'], string]> {
   const out = new Map<Vendor['protocol'], string>()
   for (const v of vendors) if (v.id !== 'custom' && !out.has(v.protocol)) out.set(v.protocol, v.label)
-  return [...out].map(([p, label]) => [p, `${label} 兼容`])
+  return [...out].map(([p, label]) => [p, tr('web.providers.compatible', { label })])
 }
 
-const SOURCE_LABEL = { env: '环境变量', secrets: 'secrets.yaml', config: 'config.yaml' } as const
+const SOURCE_LABEL = () => ({ env: tr('common.envVar'), secrets: 'secrets.yaml', config: 'config.yaml' }) as const
 
 /** 编辑中的一家 */
 export interface ProviderForm {
@@ -114,10 +116,13 @@ export function providerPatch(f: ProviderForm, original: ProviderRow | null, ven
 }
 
 function keyHint(key: ProviderRow['key'] | undefined, envNames: readonly string[]): string {
-  if (!key?.set) return envNames.length > 0 ? `还没有 key（也可以设环境变量 ${envNames.join(' / ')}）` : '还没有 key'
-  const where = key.source === undefined ? '' : `（来自${SOURCE_LABEL[key.source]}）`
-  const env = key.source === 'env' ? '，环境变量优先，这里改了不会生效' : ''
-  return `当前 ${key.masked ?? ''}${where}${env}。留空不改`
+  if (!key?.set)
+    return envNames.length > 0
+      ? tr('web.providers.noKeyEnv', { join: envNames.join(' / ') })
+      : tr('web.providers.noKey')
+  const where = key.source === undefined ? '' : tr('web.providers.keyFrom', { v: SOURCE_LABEL()[key.source] })
+  const env = key.source === 'env' ? tr('web.providers.envWins') : ''
+  return tr('web.providers.keyCurrent', { v: key.masked ?? '', where, env })
 }
 
 export interface ProvidersViewProps {
@@ -138,7 +143,8 @@ export function ProvidersView(props: ProvidersViewProps) {
   const [editing, setEditing] = useState<string | null>(props.initialEditing ?? null)
   const [armed, setArmed] = useState<string | null>(null)
   const current = { provider: String(settings.values['model.provider']), name: String(settings.values['model.name']) }
-  const vendorOf = (id: string): Vendor => vendors.find((v) => v.id === id) ?? (vendors.at(-1) as Vendor)
+  // 厂商模板还没拿到（首屏）或 daemon 不认识这个厂商时是 undefined：只少了厂商名与环境变量提示，不能让整页崩掉
+  const vendorOf = (id: string): Vendor | undefined => vendors.find((v) => v.id === id)
   const saveAndClose = async (patch: Record<string, unknown>): Promise<boolean> => {
     const ok = await props.onSave(patch)
     if (ok) setEditing(null)
@@ -150,7 +156,7 @@ export function ProvidersView(props: ProvidersViewProps) {
   return (
     <div>
       <Saved error={props.error} saved={props.saved} />
-      <Field label="默认模型" hint="新建会话时使用；在下面任意一家的模型列表里点「设为默认」">
+      <Field label={tr('web.providers.defaultModel')} hint={tr('web.providers.defaultModelHint')}>
         <div className="font-mono text-[13px]" data-testid="default-model">
           {current.name}
           <span className="text-mut">
@@ -162,10 +168,10 @@ export function ProvidersView(props: ProvidersViewProps) {
 
       <div className="mb-3 flex items-center gap-2">
         <Button variant="primary" onClick={() => setEditing('new')} disabled={vendors.length === 0}>
-          新增供应商
+          {tr('web.providers.add')}
         </Button>
         <Button onClick={props.onProbe} disabled={props.probing}>
-          {props.probing ? '探测中…' : '重新探测'}
+          {props.probing ? tr('web.providers.probing') : tr('web.providers.reprobe')}
         </Button>
       </div>
 
@@ -191,42 +197,42 @@ export function ProvidersView(props: ProvidersViewProps) {
           >
             <header className="mb-2 flex items-center gap-2">
               <span className="text-[13px] font-medium">{p.name}</span>
-              <span className="rounded-sm bg-panel-h px-1.5 text-[11px] text-mut">{vendor.label}</span>
+              <span className="rounded-sm bg-panel-h px-1.5 text-[11px] text-mut">{vendor?.label ?? p.vendor}</span>
               <span className="font-mono text-[11px] text-mut">{p.id}</span>
-              {p.isDefault && <span className="text-[11px] text-accent">默认模型在这一家</span>}
+              {p.isDefault && <span className="text-[11px] text-accent">{tr('web.providers.hasDefault')}</span>}
               <span className="ml-auto flex gap-1.5">
                 <Button size="xs" onClick={() => setEditing(editing === p.id ? null : p.id)}>
-                  编辑
+                  {tr('common.edit')}
                 </Button>
                 <Button
                   size="xs"
                   variant={armed === p.id ? 'armed' : 'danger'}
                   disabled={p.isDefault}
-                  title={p.isDefault ? '默认模型在这一家，先把默认模型换到别家' : undefined}
+                  title={p.isDefault ? tr('web.providers.cannotDelete') : undefined}
                   onClick={() => {
                     if (armed !== p.id) return setArmed(p.id)
                     setArmed(null)
                     void props.onSave({ [`providers.${p.id}`]: null })
                   }}
                 >
-                  {armed === p.id ? '确认删除' : '删除'}
+                  {armed === p.id ? tr('common.confirmDelete') : tr('common.delete')}
                 </Button>
               </span>
             </header>
             <div className="mb-2 text-[11.5px] text-mut">
-              {keyHint(p.key, vendor.envNames)}
-              {p.inferred && '。按旧写法推断的厂商，保存一次就固定下来'}
+              {keyHint(p.key, vendor?.envNames ?? [])}
+              {p.inferred && tr('web.providers.inferred')}
             </div>
             {!p.enabled ? (
-              <div className="text-[12px] text-mut">已停用：不探测，也不出现在对话的模型下拉里</div>
+              <div className="text-[12px] text-mut">{tr('web.providers.disabled')}</div>
             ) : (
               <>
                 {status?.status === 'fallback' && (
                   <div className="mb-1.5 text-[12px] text-warn">
-                    探测失败（{status.error ?? '未知原因'}），下面是手填的模型
+                    {tr('web.providers.probeFailed', { v: status.error ?? tr('common.unknownReason') })}
                   </div>
                 )}
-                <ul className="flex flex-wrap gap-1.5" aria-label={`${p.name} 的模型`}>
+                <ul className="flex flex-wrap gap-1.5" aria-label={tr('web.providers.modelsOf', { name: p.name })}>
                   {list.map((m) => {
                     const isDefault = m.provider === current.provider && m.name === current.name
                     return (
@@ -237,20 +243,18 @@ export function ProvidersView(props: ProvidersViewProps) {
                             'rounded-sm border px-2 py-0.5 font-mono text-[12px]',
                             isDefault ? 'border-accent text-accent' : 'border-border text-ink2 hover:bg-panel-h',
                           )}
-                          title={isDefault ? '默认模型' : '设为默认'}
+                          title={isDefault ? tr('web.providers.defaultModel') : tr('web.providers.setDefault')}
                           aria-pressed={isDefault}
                           disabled={isDefault}
                           onClick={() => setDefault(m.provider, m.name)}
                         >
                           {m.name}
-                          {m.source === 'manual' && <span className="text-mut"> ·手填</span>}
+                          {m.source === 'manual' && <span className="text-mut"> {tr('web.providers.manualTag')}</span>}
                         </button>
                       </li>
                     )
                   })}
-                  {list.length === 0 && (
-                    <li className="text-[12px] text-mut">没有可用的模型：填上 key 后重新探测，或手填模型</li>
-                  )}
+                  {list.length === 0 && <li className="text-[12px] text-mut">{tr('web.providers.noModels')}</li>}
                 </ul>
               </>
             )}
@@ -268,9 +272,10 @@ export function ProvidersView(props: ProvidersViewProps) {
       })}
 
       <p className="mb-4 text-[11.5px] text-mut">
-        key 只写进 <code>{settings.paths.secrets}</code>（权限 0600），不写进 <code>{settings.paths.config}</code>
-        ，也不会回显到这里。
-        {settings.secretsTooOpen && <span className="text-bad"> 这个文件的权限比 0600 宽，建议 chmod 600。</span>}
+        {tr('web.providers.keyOnlyIn')} <code>{settings.paths.secrets}</code>
+        {tr('web.providers.keyNotIn')} <code>{settings.paths.config}</code>
+        {tr('web.providers.keyNoEcho')}
+        {settings.secretsTooOpen && <span className="text-bad"> {tr('web.providers.tooOpen')}</span>}
       </p>
     </div>
   )
@@ -302,22 +307,22 @@ function ProviderEditor({
   return (
     <form
       className="mt-3 border-t border-border pt-3"
-      aria-label={isNew ? '新增供应商' : `编辑 ${original.name}`}
+      aria-label={isNew ? tr('web.providers.add') : tr('web.providers.editing', { name: original.name })}
       onSubmit={(e) => {
         e.preventDefault()
         if (idOk && Object.keys(patch).length > 0) void onSave(patch)
       }}
     >
       <div className="grid grid-cols-2 gap-x-3">
-        <Field label="名称" hint="界面上显示的名字">
+        <Field label={tr('web.providers.name')} hint={tr('web.providers.nameHint')}>
           <input
             className="field-input"
-            aria-label="名称"
+            aria-label={tr('web.providers.name')}
             value={f.name}
             onChange={(e) => up({ name: e.target.value })}
           />
         </Field>
-        <Field label="ID" hint={isNew ? '配置里的键；建好后不能改' : '建好后不能改'}>
+        <Field label="ID" hint={isNew ? tr('web.providers.idHint') : tr('web.providers.idFixed')}>
           <input
             className="field-input font-mono"
             aria-label="ID"
@@ -329,10 +334,10 @@ function ProviderEditor({
             }}
           />
         </Field>
-        <Field label="厂商" hint="决定默认地址、协议与能力">
+        <Field label={tr('web.providers.vendor')} hint={tr('web.providers.vendorHint')}>
           <select
             className="field-input"
-            aria-label="厂商"
+            aria-label={tr('web.providers.vendor')}
             value={f.vendor}
             onChange={(e) => {
               const v = vendors.find((x) => x.id === e.target.value) as Vendor
@@ -346,10 +351,13 @@ function ProviderEditor({
             ))}
           </select>
         </Field>
-        <Field label="协议" hint={f.vendor === 'custom' ? '网关说的是哪家的接口' : '由厂商决定'}>
+        <Field
+          label={tr('web.providers.protocol')}
+          hint={f.vendor === 'custom' ? tr('web.providers.protocolHint') : tr('web.providers.protocolFixed')}
+        >
           <select
             className="field-input"
-            aria-label="协议"
+            aria-label={tr('web.providers.protocol')}
             value={f.protocol}
             disabled={f.vendor !== 'custom'}
             onChange={(e) => up({ protocol: e.target.value as ProviderForm['protocol'] })}
@@ -362,7 +370,7 @@ function ProviderEditor({
             ))}
           </select>
         </Field>
-        <Field label="Base URL" hint="留空用厂商默认地址">
+        <Field label="Base URL" hint={tr('web.providers.baseUrlHint')}>
           <input
             className="field-input font-mono"
             aria-label="Base URL"
@@ -373,7 +381,7 @@ function ProviderEditor({
         </Field>
         <Field
           label="API Key"
-          hint={original === null ? '只写进 secrets.yaml' : keyHint(original.key, vendor.envNames)}
+          hint={original === null ? tr('web.providers.keyNew') : keyHint(original.key, vendor.envNames)}
         >
           <input
             className="field-input font-mono"
@@ -386,23 +394,23 @@ function ProviderEditor({
           />
         </Field>
       </div>
-      <Field label="手填模型" hint="探测不到时用它们，也会补进探测结果；逗号分隔">
+      <Field label={tr('web.providers.models')} hint={tr('web.providers.modelsHint')}>
         <input
           className="field-input font-mono"
-          aria-label="手填模型"
+          aria-label={tr('web.providers.models')}
           value={f.models}
           onChange={(e) => up({ models: e.target.value })}
         />
       </Field>
       <ToggleRow
-        label="启用"
-        hint="停用后不探测，也不出现在对话的模型下拉里"
+        label={tr('common.enabled')}
+        hint={tr('web.providers.enabledHint')}
         on={f.enabled}
         onChange={(on) => up({ enabled: on })}
       />
-      <div className="mb-1 text-[13px] font-medium">能力</div>
-      <div className="mb-2 text-[11.5px] text-mut">默认值来自厂商模板；自定义网关全关，确认它支持再打开</div>
-      {CAP_LABEL.map(([c, label, hint]) => (
+      <div className="mb-1 text-[13px] font-medium">{tr('web.providers.caps')}</div>
+      <div className="mb-2 text-[11.5px] text-mut">{tr('web.providers.capsHint')}</div>
+      {CAP_LABEL().map(([c, label, hint]) => (
         <ToggleRow
           key={c}
           label={label}
@@ -413,9 +421,9 @@ function ProviderEditor({
       ))}
       <div className="flex gap-2">
         <Button type="submit" variant="primary" disabled={!idOk || Object.keys(patch).length === 0}>
-          保存
+          {tr('common.save')}
         </Button>
-        <Button onClick={onCancel}>取消</Button>
+        <Button onClick={onCancel}>{tr('common.cancel')}</Button>
       </div>
     </form>
   )

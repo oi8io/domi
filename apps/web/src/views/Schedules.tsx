@@ -2,7 +2,9 @@
  * 定时任务 —— PRD-M8-007：任务页的「定时」分区（列表、暂停 / 恢复、立即运行、编辑、删除、历史运行）
  * 与新建表单里的计划时间（cron + 时区 + 下一次运行预览）。校验与时间计算都在 daemon（schedule.preview）。
  */
+
 import { type DomiClient, DomiRpcError } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useCallback, useEffect, useState } from 'react'
 import { StatusDot } from '../components/StatusDot.tsx'
 import { Button } from '../components/ui/button.tsx'
@@ -90,7 +92,7 @@ export function CronFields({
           id={`${idPrefix}-cron`}
           className="field-input font-mono"
           placeholder="0 9 * * 1-5"
-          aria-label="cron 表达式"
+          aria-label={tr('web.schedule.cron')}
           value={cron}
           onChange={(e) => onChange({ cron: e.target.value, tz })}
         />
@@ -98,30 +100,32 @@ export function CronFields({
           id={`${idPrefix}-tz`}
           className="field-input font-mono"
           placeholder="Asia/Shanghai"
-          aria-label="时区"
+          aria-label={tr('web.schedule.tz')}
           value={tz}
           onChange={(e) => onChange({ cron, tz: e.target.value })}
         />
       </div>
       <p className="text-[11.5px] text-mut" data-part="cron-preview">
         {preview === null ? (
-          '分 时 日 月 周，例如 0 9 * * 1-5 = 工作日早上 9 点'
+          tr('web.schedule.cronHint')
         ) : 'error' in preview ? (
           <span className="text-bad">{preview.error}</span>
         ) : (
-          <>接下来：{preview.runs.map((r) => formatWhen(r, preview.tz)).join('、')}</>
+          tr('web.schedule.next', {
+            join: preview.runs.map((r) => formatWhen(r, preview.tz)).join(tr('common.listSep')),
+          })
         )}
       </p>
     </div>
   )
 }
 
-const RUN_LABEL: Record<Run['status'], { label: string; cls: string }> = {
-  running: { label: '进行中', cls: 'bg-accent-d text-accent' },
-  done: { label: '已运行', cls: 'bg-ok-d text-ok' },
-  skipped: { label: '跳过', cls: 'bg-warn-d text-warn' },
-  failed: { label: '没建成', cls: 'bg-bad-d text-bad' },
-}
+const RUN_LABEL = (): Record<Run['status'], { label: string; cls: string }> => ({
+  running: { label: tr('common.inProgress'), cls: 'bg-accent-d text-accent' },
+  done: { label: tr('web.schedule.ran'), cls: 'bg-ok-d text-ok' },
+  skipped: { label: tr('web.schedule.skipped'), cls: 'bg-warn-d text-warn' },
+  failed: { label: tr('web.schedule.notCreated'), cls: 'bg-bad-d text-bad' },
+})
 
 function Runs({ client, schedule }: { client: DomiClient; schedule: Schedule }) {
   const [runs, setRuns] = useState<Run[] | null>(null)
@@ -134,18 +138,18 @@ function Runs({ client, schedule }: { client: DomiClient; schedule: Schedule }) 
   }, [client, schedule.id, lastFired])
   if (error !== null) return <p className="px-3.5 pb-2 text-xs text-bad">{error}</p>
   if (runs === null) return null
-  if (runs.length === 0) return <p className="px-9 pb-2 text-xs text-mut">还没有运行过。</p>
+  if (runs.length === 0) return <p className="px-9 pb-2 text-xs text-mut">{tr('web.schedule.neverRan')}</p>
   return (
     <ul className="mx-3.5 mb-2 overflow-hidden rounded-md border border-border2" data-part="schedule-runs">
       {runs.map((r) => {
-        const s = RUN_LABEL[r.status]
+        const s = RUN_LABEL()[r.status]
         const body = (
           <>
             <span className={cn('shrink-0 rounded-[10px] px-[7px] py-px text-[10.5px] font-semibold', s.cls)}>
               {s.label}
             </span>
             <span className="font-mono">{formatWhen(r.due, schedule.tz)}</span>
-            {r.late && <span className="text-mut2">补跑</span>}
+            {r.late && <span className="text-mut2">{tr('web.schedule.catchUp')}</span>}
           </>
         )
         const cls = 'flex items-center gap-2 border-b border-border2 px-3 py-1.5 text-xs last:border-b-0'
@@ -161,7 +165,7 @@ function Runs({ client, schedule }: { client: DomiClient; schedule: Schedule }) 
             >
               {body}
               <span className="flex-1" />
-              <span className="text-mut">打开任务</span>
+              <span className="text-mut">{tr('web.schedule.openTask')}</span>
             </a>
           </li>
         )
@@ -190,7 +194,7 @@ function Editor({
     <div className="mx-3.5 mb-2 grid gap-2 rounded-md border border-border2 p-3" data-part="schedule-editor">
       <textarea
         className="field-input min-h-[60px]"
-        aria-label="目标"
+        aria-label={tr('common.goal')}
         value={goal}
         onChange={(e) => setGoal(e.target.value)}
       />
@@ -213,10 +217,10 @@ function Editor({
               .then(onSaved, (e: Error) => setError(e.message))
           }
         >
-          保存
+          {tr('common.save')}
         </Button>
         <Button variant="ghost" onClick={onCancel}>
-          取消
+          {tr('common.cancel')}
         </Button>
       </div>
     </div>
@@ -248,10 +252,10 @@ function ScheduleRow({
     )
   }
   const when = schedule.paused
-    ? '已暂停'
+    ? tr('web.schedule.paused')
     : schedule.nextRun === null
-      ? '不会再运行'
-      : `下次 ${formatWhen(schedule.nextRun, schedule.tz)}`
+      ? tr('web.schedule.noMore')
+      : tr('web.schedule.nextAt', { formatWhen: formatWhen(schedule.nextRun, schedule.tz) })
   return (
     <li data-schedule={schedule.id}>
       <div className="flex items-center gap-2 rounded-md px-3.5 py-2.5 transition-colors duration-150 hover:bg-panel-h">
@@ -267,7 +271,7 @@ function ScheduleRow({
         <Button
           variant="ghost"
           size="xs"
-          title="立即运行一次"
+          title={tr('web.schedule.runNowHint')}
           onClick={() =>
             client.runScheduleNow(schedule.id).then(
               (id) => {
@@ -280,7 +284,7 @@ function ScheduleRow({
           }
         >
           <IconZap size={12} />
-          运行
+          {tr('web.schedule.run')}
         </Button>
         <Button
           variant="ghost"
@@ -288,12 +292,12 @@ function ScheduleRow({
           onClick={() => act(client.updateSchedule({ id: schedule.id, paused: !schedule.paused }))}
           data-action="toggle-pause"
         >
-          {schedule.paused ? '恢复' : '暂停'}
+          {schedule.paused ? tr('common.resume') : tr('common.pause')}
         </Button>
         <Button
           variant="ghost"
           size="xs"
-          title="历史运行"
+          title={tr('web.schedule.history')}
           className={cn(open === 'runs' && 'bg-panel-h text-ink2')}
           onClick={() => setOpen(open === 'runs' ? null : 'runs')}
         >
@@ -302,7 +306,7 @@ function ScheduleRow({
         <Button
           variant="ghost"
           size="xs"
-          title="编辑"
+          title={tr('common.edit')}
           className={cn(open === 'edit' && 'bg-panel-h text-ink2')}
           onClick={() => setOpen(open === 'edit' ? null : 'edit')}
         >
@@ -311,7 +315,7 @@ function ScheduleRow({
         <Button
           variant={armed ? 'armed' : 'ghost'}
           size="xs"
-          title="删除定时任务（已经运行过的任务不动）"
+          title={tr('web.schedule.deleteHint')}
           onBlur={() => setArmed(false)}
           onClick={() => {
             if (!armed) setArmed(true)
@@ -319,7 +323,7 @@ function ScheduleRow({
           }}
         >
           <IconTrash size={12} />
-          {armed ? '确认删除' : ''}
+          {armed ? tr('common.confirmDelete') : ''}
         </Button>
       </div>
       {open === 'runs' && <Runs client={client} schedule={schedule} />}
@@ -379,21 +383,21 @@ export function ScheduleSection({
     <>
       <div className="caps mb-2 flex items-center gap-1.5">
         <IconClock size={12} />
-        定时任务
+        {tr('web.sidebar.schedules')}
         <span className="flex-1" />
         <a
           className="text-[11.5px] font-normal tracking-normal text-accent normal-case hover:underline"
           href={formatRoute({ view: 'tasks', create: true, schedule: true })}
         >
-          新建
+          {tr('common.new')}
         </a>
       </div>
       <Card className="px-0 py-2">
         {(notice ?? error) !== null && <p className="px-3.5 pb-1 text-[12.5px] text-bad">{notice ?? error}</p>}
         {schedules === null ? (
-          <p className="px-3.5 py-2 text-[13px] text-mut">加载中…</p>
+          <p className="px-3.5 py-2 text-[13px] text-mut">{tr('common.loading')}</p>
         ) : schedules.length === 0 ? (
-          <p className="px-3.5 py-2 text-[13px] text-mut">还没有定时任务。每天或每周要做的事，可以交给它按时跑。</p>
+          <p className="px-3.5 py-2 text-[13px] text-mut">{tr('web.schedule.none')}</p>
         ) : (
           <ul>
             {schedules.map((s) => (

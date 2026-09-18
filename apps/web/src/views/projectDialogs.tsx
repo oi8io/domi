@@ -1,7 +1,9 @@
 /**
  * 添加项目、会话转任务 —— PRD-M8-003 AC-2 · PRD-M8-004 AC-4
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { useState } from 'react'
 import { Dialog, FormField } from '../components/Dialog.tsx'
 import { Button } from '../components/ui/button.tsx'
@@ -40,14 +42,14 @@ export function AddProjectDialog({
     )
   }
   return (
-    <Dialog open={open} title="添加项目" onClose={onClose}>
+    <Dialog open={open} title={tr('web.sidebar.addProject')} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           submit()
         }}
       >
-        <FormField label="目录" hint="daemon 那台机器上的已有目录；同一目录只登记一次">
+        <FormField label={tr('web.addProject.dir')} hint={tr('web.addProject.dirHint')}>
           <input
             className="field-input font-mono"
             placeholder="~/Develop/my-repo"
@@ -55,14 +57,14 @@ export function AddProjectDialog({
             onChange={(e) => setPath(e.target.value)}
           />
         </FormField>
-        <FormField label="名字" hint="留空 = 目录名">
+        <FormField label={tr('web.addProject.name')} hint={tr('web.addProject.nameHint')}>
           <input className="field-input" value={name} onChange={(e) => setName(e.target.value)} />
         </FormField>
         {error !== null && <p className="mb-3 text-[13px] text-bad">{error}</p>}
         <div className="flex justify-end gap-2">
-          <Button onClick={onClose}>取消</Button>
+          <Button onClick={onClose}>{tr('common.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={busy || path.trim() === ''}>
-            添加
+            {tr('common.add')}
           </Button>
         </div>
       </form>
@@ -83,7 +85,7 @@ export function ProjectSelect({
 }) {
   return (
     <select id={id} className="field-input" value={value} onChange={(e) => onChange(e.target.value)}>
-      {value === '' && <option value="">选择项目…</option>}
+      {value === '' && <option value="">{tr('web.toTask.pickProject')}</option>}
       {projects.map((p) => (
         <option key={p.id} value={p.id}>
           {p.name} — {p.path}
@@ -123,28 +125,26 @@ export function ToTaskDialog({
     )
   }
   return (
-    <Dialog open={open} title="转为任务" onClose={onClose}>
+    <Dialog open={open} title={tr('web.session.toTask')} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
           submit()
         }}
       >
-        <p className="mb-3.5 text-[12.5px] text-mut">
-          在项目里新建一个任务，这个会话的全文作为引用带过去；这个会话本身不变。
-        </p>
-        <FormField label="项目">
+        <p className="mb-3.5 text-[12.5px] text-mut">{tr('web.toTask.hint')}</p>
+        <FormField label={tr('web.sidebar.projects')}>
           <ProjectSelect projects={projects} value={projectId} onChange={setProjectId} />
         </FormField>
-        <FormField label="目标" hint="这个任务要达成什么、交付什么">
+        <FormField label={tr('common.goal')} hint={tr('web.toTask.goalHint')}>
           <textarea className="field-input min-h-20 resize-y" value={goal} onChange={(e) => setGoal(e.target.value)} />
         </FormField>
-        {projects.length === 0 && <p className="mb-3 text-[13px] text-mut">还没有项目，先在侧栏「项目」里添加一个。</p>}
+        {projects.length === 0 && <p className="mb-3 text-[13px] text-mut">{tr('web.toTask.noProjects')}</p>}
         {error !== null && <p className="mb-3 text-[13px] text-bad">{error}</p>}
         <div className="flex justify-end gap-2">
-          <Button onClick={onClose}>取消</Button>
+          <Button onClick={onClose}>{tr('common.cancel')}</Button>
           <Button type="submit" variant="primary" disabled={projectId === '' || goal.trim() === ''}>
-            开始任务
+            {tr('common.startTask')}
           </Button>
         </div>
       </form>

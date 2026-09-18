@@ -5,7 +5,9 @@
  * 工具要输入时（TASK-M3-016，比如 MCP elicitation）按 JSON Schema 画一个简单表单：
  * 文本、数字、布尔、枚举四种，够 MCP 规范里 elicitation 允许的那几种原始类型。
  */
+
 import type { AskSnapshot } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import type { FormEvent, ReactElement } from 'react'
 import { Button } from './components/ui/button.tsx'
 
@@ -52,7 +54,7 @@ function Field({ name, field, required }: { name: string; field: FieldSchema; re
         className="field-input"
         defaultValue={field.default === undefined ? '' : String(field.default)}
       >
-        {!required && <option value="">（不填）</option>}
+        {!required && <option value="">{tr('web.confirm.empty')}</option>}
         {field.enum.map((v) => (
           <option key={String(v)} value={String(v)}>
             {String(v)}
@@ -139,7 +141,8 @@ export function ConfirmDialog({
     return (
       <form className={CARD} role="dialog" aria-labelledby="confirm-title" onSubmit={submit}>
         <p id="confirm-title" className={TITLE}>
-          {approval ? '等你审批' : '需要你提供信息'} · <code className="font-normal">{ask.capabilityId}</code>
+          {approval ? tr('web.confirm.awaitingApproval') : tr('web.confirm.needsInput')} ·{' '}
+          <code className="font-normal">{ask.capabilityId}</code>
         </p>
         <p className="mx-3.5 mb-2 text-[13px] whitespace-pre-wrap">{form.message}</p>
         <div className="mx-3.5 mb-3 grid gap-2.5">
@@ -151,10 +154,10 @@ export function ConfirmDialog({
           <Button
             onClick={(e) => onAnswer(false, approval && e.currentTarget.form ? read(e.currentTarget.form) : undefined)}
           >
-            {approval ? '驳回' : '拒绝'}
+            {approval ? tr('web.confirm.reject') : tr('common.deny')}
           </Button>
           <Button type="submit" variant="primary">
-            {approval ? '批准' : '提交'}
+            {approval ? tr('web.confirm.approve') : tr('common.submit')}
           </Button>
         </div>
       </form>
@@ -164,25 +167,25 @@ export function ConfirmDialog({
   return (
     <div className={CARD} role="alertdialog" aria-labelledby="confirm-title">
       <p id="confirm-title" className={TITLE}>
-        权限请求 · <code className="font-normal">{ask.capabilityId}</code>
+        {tr('web.confirm.permissionRequest')} <code className="font-normal">{ask.capabilityId}</code>
       </p>
       <pre className={DETAIL}>{ask.detail}</pre>
       <div className={ACTIONS}>
         {/* 默认焦点必须在拒绝上，这是 fail-closed 在交互层的延续 */}
         <Button autoFocus onClick={() => onAnswer(false)}>
-          拒绝
+          {tr('common.deny')}
         </Button>
         {ask.grantable === true && (
           <Button
             onClick={() => onAnswer(true, undefined, true)}
-            title="这个会话里同类操作（同一目录下）不再询问"
+            title={tr('web.confirm.alwaysAllowHint')}
             data-action="grant"
           >
-            本会话始终允许
+            {tr('web.confirm.alwaysAllow')}
           </Button>
         )}
         <Button variant="primary" onClick={() => onAnswer(true)}>
-          允许
+          {tr('common.allow')}
         </Button>
       </div>
     </div>

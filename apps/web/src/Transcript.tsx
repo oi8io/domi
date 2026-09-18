@@ -5,7 +5,9 @@
  * 工具调用与它的结果配成一组，用原生 <details> 折叠——和 `domi trace --html` 同一个做法：
  * 折叠是展示状态，不是业务状态，不值得进 store。
  */
+
 import { formatElapsed, type TranscriptItem } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import type { ReactNode } from 'react'
 import { IconBranch, IconQuote } from './icons.tsx'
 import { cn } from './lib/cn.ts'
@@ -66,11 +68,11 @@ function BranchButton({ seq, onBranch }: { seq: number; onBranch: (seq: number) 
       type="button"
       className={ACTION_BTN}
       data-action="branch"
-      title={`从第 ${seq} 条分支出一个新会话`}
+      title={tr('web.transcript.branchFrom', { seq })}
       onClick={() => onBranch(seq)}
     >
       <IconBranch size={11} />
-      分支
+      {tr('web.transcript.branch')}
     </button>
   )
 }
@@ -81,10 +83,10 @@ const TEXT = 'whitespace-pre-wrap break-words text-sm leading-[1.65]'
 function ToolStatus({ result }: { result: TranscriptItem | null }) {
   const [label, cls] =
     result === null
-      ? ['运行中', 'bg-accent-d text-accent']
+      ? [tr('common.running'), 'bg-accent-d text-accent']
       : result.ok
-        ? ['成功', 'bg-ok-d text-ok']
-        : ['失败', 'bg-bad-d text-bad']
+        ? [tr('common.succeeded'), 'bg-ok-d text-ok']
+        : [tr('common.failed'), 'bg-bad-d text-bad']
   return (
     <span className={cn('rounded-[10px] px-[7px] py-px text-[10.5px] font-semibold', cls)} data-status>
       {label}
@@ -97,7 +99,7 @@ function ItemBody({ item }: { item: TranscriptItem }) {
     case 'user':
       return (
         <div className="rounded-md border border-accent-b bg-accent-d px-3.5 py-2.5">
-          <div className={cn(ROLE, 'text-accent')}>你</div>
+          <div className={cn(ROLE, 'text-accent')}>{tr('web.transcript.you')}</div>
           <div className={TEXT}>{item.text}</div>
         </div>
       )
@@ -114,7 +116,7 @@ function ItemBody({ item }: { item: TranscriptItem }) {
           <summary className="cursor-pointer list-none text-xs text-mut2 select-none [&::-webkit-details-marker]:hidden">
             <span className="group-open/thought:hidden">▸ </span>
             <span className="hidden group-open/thought:inline">▾ </span>
-            思考
+            {tr('web.transcript.thinking')}
             {item.ms !== undefined && item.ms > 0 && (
               <span className="ml-1.5 font-mono text-[11px] text-mut2">{formatElapsed(item.ms)}</span>
             )}
@@ -133,7 +135,7 @@ function ItemBody({ item }: { item: TranscriptItem }) {
       return (
         <div className="flex items-center gap-2 px-3.5 py-1 text-xs text-mut">
           <span className={cn('rounded px-1.5 font-semibold', item.ok ? 'bg-ok-d text-ok' : 'bg-bad-d text-bad')}>
-            权限
+            {tr('web.transcript.permission')}
           </span>
           <span className="min-w-0 truncate">{item.text}</span>
           {item.summary !== undefined && <span className="truncate text-mut2">{item.summary}</span>}
@@ -174,7 +176,8 @@ export function Transcript({
   /** 「引用这一轮」，画在每一轮的用户输入上。不给就不画 */
   onQuote?: (q: QuoteRequest) => void
 }) {
-  if (items.length === 0) return <p className="py-10 text-center text-[13px] text-mut">还没有事件。</p>
+  if (items.length === 0)
+    return <p className="py-10 text-center text-[13px] text-mut">{tr('web.transcript.noEvents')}</p>
   const turns = new Map(turnRanges(items).map((t) => [t.seq, t]))
   return (
     <ol className="flex flex-col gap-1" data-list="transcript">
@@ -220,14 +223,14 @@ export function Transcript({
                     type="button"
                     className={ACTION_BTN}
                     data-action="quote"
-                    title="在别的会话里引用这一轮"
+                    title={tr('web.transcript.quoteTurnHint')}
                     onClick={() => {
                       const t = turns.get(row.item.seq)
                       if (t) onQuote({ fromSeq: t.fromSeq, toSeq: t.toSeq, label: row.item.text.slice(0, 40) })
                     }}
                   >
                     <IconQuote size={11} />
-                    引用这一轮
+                    {tr('web.transcript.quoteTurn')}
                   </button>
                 )}
                 {onBranch !== undefined && <BranchButton seq={row.item.seq} onBranch={onBranch} />}

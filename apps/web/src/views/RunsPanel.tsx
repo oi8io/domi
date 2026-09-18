@@ -2,7 +2,9 @@
  * 编排运行（PRD-M5-002 · PRD-M8-005 AC-4）：多节点运行的列表、节点状态、重试失败节点、取消、打开节点会话；
  * 「高级：粘贴 YAML」保留原来的入口（task.start）。状态都从 daemon 拿（task.get），这里不算任何东西（INV-02）。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 import { StatusDot } from '../components/StatusDot.tsx'
 import { Button } from '../components/ui/button.tsx'
@@ -11,17 +13,17 @@ import { cn } from '../lib/cn.ts'
 type Run = Awaited<ReturnType<DomiClient['listTasks']>>[number]
 type Detail = Awaited<ReturnType<DomiClient['getTask']>>
 
-const STATUS: Record<string, { label: string; cls: string }> = {
-  pending: { label: '等待', cls: 'bg-panel-h text-mut' },
-  running: { label: '进行中', cls: 'bg-accent-d text-accent' },
-  done: { label: '完成', cls: 'bg-ok-d text-ok' },
-  failed: { label: '失败', cls: 'bg-bad-d text-bad' },
-  blocked: { label: '被挡住', cls: 'bg-warn-d text-warn' },
-  cancelled: { label: '已取消', cls: 'bg-panel-h text-mut' },
-}
+const STATUS = (): Record<string, { label: string; cls: string }> => ({
+  pending: { label: tr('web.runs.pending'), cls: 'bg-panel-h text-mut' },
+  running: { label: tr('common.inProgress'), cls: 'bg-accent-d text-accent' },
+  done: { label: tr('web.runs.done'), cls: 'bg-ok-d text-ok' },
+  failed: { label: tr('common.failed'), cls: 'bg-bad-d text-bad' },
+  blocked: { label: tr('web.runs.blocked'), cls: 'bg-warn-d text-warn' },
+  cancelled: { label: tr('web.runs.cancelled'), cls: 'bg-panel-h text-mut' },
+})
 
 function Pill({ status }: { status: string }) {
-  const s = STATUS[status] ?? { label: status, cls: 'bg-panel-h text-mut' }
+  const s = STATUS()[status] ?? { label: status, cls: 'bg-panel-h text-mut' }
   return (
     <span
       className={cn('shrink-0 rounded-[10px] px-[7px] py-px text-[10.5px] font-semibold', s.cls)}
@@ -49,12 +51,12 @@ export function RunView({
         <span className="truncate">{run.name}</span>
         <Pill status={run.status} />
         {run.status === 'running' && !run.active && (
-          <span className="text-[11.5px] font-normal text-mut">等待 domid 恢复</span>
+          <span className="text-[11.5px] font-normal text-mut">{tr('web.runs.waitingDaemon')}</span>
         )}
         <span className="flex-1" />
         {run.status === 'running' && onCancel && (
           <Button variant="danger" size="xs" onClick={onCancel}>
-            取消这次运行
+            {tr('web.runs.cancel')}
           </Button>
         )}
       </div>
@@ -66,18 +68,18 @@ export function RunView({
               <span className="min-w-0 truncate font-medium">{n.title ?? n.id}</span>
               <span className="min-w-0 flex-1 truncate text-[11.5px] text-mut2">
                 {n.type}
-                {n.needs.length > 0 ? ` · 依赖 ${n.needs.join('、')}` : ''}
-                {n.attempt > 1 ? ` · 第 ${n.attempt} 次` : ''}
+                {n.needs.length > 0 ? tr('web.runs.needs', { join: n.needs.join(tr('common.listSep')) }) : ''}
+                {n.attempt > 1 ? tr('web.runs.attempt', { attempt: n.attempt }) : ''}
                 {n.ms === undefined ? '' : ` · ${(n.ms / 1000).toFixed(1)}s`}
               </span>
               {n.sessionId !== undefined && onOpen && (
                 <Button variant="ghost" size="xs" onClick={() => onOpen(n.sessionId as string)}>
-                  看过程
+                  {tr('web.runs.viewProcess')}
                 </Button>
               )}
               {n.status === 'failed' && run.status !== 'running' && onRetry && (
                 <Button variant="outline" size="xs" onClick={() => onRetry(n.id)}>
-                  重试
+                  {tr('common.retry')}
                 </Button>
               )}
             </div>
@@ -142,7 +144,7 @@ export function RunsPanel({ client, onOpen }: { client: DomiClient; onOpen?: (se
     <div data-part="runs">
       {notice !== null && <p className="px-3.5 pb-2 text-[12.5px] text-bad">{notice}</p>}
       {runs.length === 0 ? (
-        <p className="px-3.5 py-2 text-[13px] text-mut">还没有多节点运行。计划拆成多步时会自动出现在这里。</p>
+        <p className="px-3.5 py-2 text-[13px] text-mut">{tr('web.runs.none')}</p>
       ) : (
         <ul>
           {runs.map((r) => (
@@ -174,10 +176,10 @@ export function RunsPanel({ client, onOpen }: { client: DomiClient; onOpen?: (se
         />
       )}
       <details className="mx-3.5 mt-2 text-[13px]">
-        <summary className="cursor-pointer text-mut select-none">高级：粘贴 YAML 开始一次运行</summary>
+        <summary className="cursor-pointer text-mut select-none">{tr('web.runs.yamlAdvanced')}</summary>
         <form className="mt-2 grid gap-2" onSubmit={start}>
           <label className="text-[11.5px] text-mut" htmlFor="task-spec">
-            写法见 docs/tasks-example.yaml
+            {tr('web.runs.yamlDocs')}
           </label>
           <textarea
             id="task-spec"
@@ -188,7 +190,7 @@ export function RunsPanel({ client, onOpen }: { client: DomiClient; onOpen?: (se
           />
           <div>
             <Button type="submit" variant="primary" disabled={spec.trim() === ''}>
-              开始
+              {tr('common.start')}
             </Button>
           </div>
         </form>

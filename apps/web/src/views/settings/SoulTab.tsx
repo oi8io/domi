@@ -4,7 +4,9 @@
  * 记忆条目检索、保留 / 否决；导出 / 导入 soul.md（M4-004，导入先预览、按区勾选）。
  * 数据都从 daemon 拿，这里只负责摆出来和把点击转成请求（INV-02）。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'
 import { cn } from '../../lib/cn.ts'
@@ -55,31 +57,25 @@ export function SoulView({
   return (
     <>
       {changes.length > 0 && (
-        <Field
-          label={`待审阅的改动（${changes.length}）`}
-          hint="domi 根据记忆提议的修改。否决会撤回文件里的那一处，之后不再提"
-        >
+        <Field label={tr('web.soul.pending', { length: changes.length })} hint={tr('web.soul.pendingHint')}>
           <div className="overflow-hidden rounded-lg border border-border2 bg-panel" data-part="soul-changes">
             {changes.map((c) => (
               <div key={c.id} className="flex items-start gap-2 border-b border-border2 px-3.5 py-2 last:border-b-0">
                 <pre className="min-w-0 flex-1 font-mono text-xs break-all whitespace-pre-wrap text-ink2">{c.diff}</pre>
                 <button type="button" className={VOTE} onClick={() => onReview?.(c.id, 'accept')}>
-                  接受
+                  {tr('common.accept')}
                 </button>
                 <button type="button" className={cn(VOTE, 'hover:text-bad')} onClick={() => onReview?.(c.id, 'reject')}>
-                  否决
+                  {tr('common.reject')}
                 </button>
               </div>
             ))}
           </div>
         </Field>
       )}
-      <Field
-        label="最近学到的记忆"
-        hint={mode === 'keyword' ? '只按关键词匹配（daemon 没有配置 memory.embedding）' : undefined}
-      >
+      <Field label={tr('web.soul.recent')} hint={mode === 'keyword' ? tr('web.soul.keywordOnly') : undefined}>
         <div className="mt-1.5 overflow-hidden rounded-lg border border-border2 bg-panel" data-part="memory-items">
-          {items.length === 0 && <p className="px-3.5 py-2.5 text-[13px] text-mut">没有条目。</p>}
+          {items.length === 0 && <p className="px-3.5 py-2.5 text-[13px] text-mut">{tr('web.soul.noItems')}</p>}
           {items.map((i) => (
             <div
               key={i.id}
@@ -100,10 +96,10 @@ export function SoulView({
                     className={cn(VOTE, kept?.has(i.id) && 'text-ok')}
                     onClick={() => onKeep?.(i.id)}
                   >
-                    {kept?.has(i.id) ? '已保留' : '保留'}
+                    {kept?.has(i.id) ? tr('web.soul.kept') : tr('web.soul.keep')}
                   </button>
                   <button type="button" className={cn(VOTE, 'hover:text-bad')} onClick={() => onDelete?.(i.id)}>
-                    否决
+                    {tr('common.reject')}
                   </button>
                 </>
               )}
@@ -184,7 +180,11 @@ export function SoulTab({ client }: { client: DomiClient }) {
       (r) => {
         if (r.findings.length > 0) {
           setError(
-            `导出被拒绝：这些行里有凭据、本机路径或邮箱，改掉再导出——${r.findings.map((f) => `第 ${f.line} 行（${f.kind}）`).join('、')}`,
+            tr('web.soul.exportRejected', {
+              join: r.findings
+                .map((f) => tr('web.soul.lineKind', { line: f.line, kind: f.kind }))
+                .join(tr('common.listSep')),
+            }),
           )
           return
         }
@@ -198,7 +198,7 @@ export function SoulTab({ client }: { client: DomiClient }) {
     file.text().then(
       (text) =>
         client.importSoul(text, file.name).then((r) => {
-          if (r.plans.length === 0) setSaved('没有新内容可导入')
+          if (r.plans.length === 0) setSaved(tr('web.soul.nothingToImport'))
           else setImporting({ name: file.name, text, plans: r.plans, pick: new Set() })
         }),
       (e: Error) => setError(e.message),
@@ -210,38 +210,34 @@ export function SoulTab({ client }: { client: DomiClient }) {
   return (
     <div data-part="soul-tab">
       <Saved error={error} saved={saved} />
-      <Field
-        label="人格描述（Soul Markdown）"
-        hint="人类可读、可 diff、可手改。修改后下次对话生效；你改过的行 domi 不会再动"
-        id="soul-text"
-      >
+      <Field label={tr('web.soul.markdown')} hint={tr('web.soul.markdownHint')} id="soul-text">
         <textarea
           id="soul-text"
           className="field-input min-h-[240px] font-mono text-[12.5px] leading-relaxed"
           value={draft}
-          placeholder="还没有内容。对话攒够几轮之后会自动生成，也可以直接写。"
+          placeholder={tr('web.soul.empty')}
           onChange={(e) => setDraft(e.target.value)}
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Button
             variant="primary"
             disabled={!dirty}
-            onClick={() => act(client.writeSoul(draft, soul?.mtime), '已保存')}
+            onClick={() => act(client.writeSoul(draft, soul?.mtime), tr('common.saved'))}
           >
-            保存
+            {tr('common.save')}
           </Button>
           <Button variant="ghost" size="sm" disabled={!dirty} onClick={() => setDraft(soul?.text ?? '')}>
-            撤销修改
+            {tr('web.soul.revert')}
           </Button>
           <span className="flex-1" />
-          <Button variant="outline" size="sm" onClick={() => act(client.updateSoul(), '已用全部记忆过了一遍')}>
-            用全部记忆更新
+          <Button variant="outline" size="sm" onClick={() => act(client.updateSoul(), tr('web.soul.refreshed'))}>
+            {tr('web.soul.refresh')}
           </Button>
           <Button variant="outline" size="sm" onClick={exportSoul}>
-            导出
+            {tr('common.export')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => picker.current?.click()}>
-            导入…
+            {tr('web.soul.import')}
           </Button>
           <input
             ref={picker}
@@ -259,10 +255,7 @@ export function SoulTab({ client }: { client: DomiClient }) {
       </Field>
 
       {importing !== null && (
-        <Field
-          label={`导入 ${importing.name}`}
-          hint="别人写的内容只作参考资料，不会被当成指令。勾选要导入的区，导入后仍可在待审阅里逐条否决"
-        >
+        <Field label={tr('web.soul.importing', { name: importing.name })} hint={tr('web.soul.importHint')}>
           <div className="overflow-hidden rounded-lg border border-border2 bg-panel" data-part="soul-import">
             {importing.plans.map((p) => (
               <label key={p.section} className="flex gap-2.5 border-b border-border2 px-3.5 py-2 last:border-b-0">
@@ -293,13 +286,17 @@ export function SoulTab({ client }: { client: DomiClient }) {
               onClick={() => {
                 const it = importing
                 setImporting(null)
-                act(client.importSoul(it.text, it.name, [...it.pick]).then((r) => setSaved(`导入了 ${r.imported} 条`)))
+                act(
+                  client
+                    .importSoul(it.text, it.name, [...it.pick])
+                    .then((r) => setSaved(tr('web.soul.imported', { imported: r.imported }))),
+                )
               }}
             >
-              导入选中的 {importing.pick.size} 个区
+              {tr('web.soul.importSelected', { size: importing.pick.size })}
             </Button>
             <Button variant="ghost" onClick={() => setImporting(null)}>
-              取消
+              {tr('common.cancel')}
             </Button>
           </div>
         </Field>
@@ -309,12 +306,12 @@ export function SoulTab({ client }: { client: DomiClient }) {
         <input
           className="field-input"
           value={query}
-          aria-label="检索记忆"
-          placeholder="检索记忆…"
+          aria-label={tr('web.soul.search')}
+          placeholder={tr('web.soul.searchPlaceholder')}
           onChange={(e) => setQuery(e.target.value)}
         />
         <Button type="submit" variant="outline">
-          检索
+          {tr('web.soul.searchButton')}
         </Button>
       </form>
       <SoulView
@@ -329,7 +326,7 @@ export function SoulTab({ client }: { client: DomiClient }) {
           setKept(next)
           saveKept(next)
         }}
-        onDelete={(id) => act(client.deleteMemory(id), '已否决（之后检索不到，事件仍在）')}
+        onDelete={(id) => act(client.deleteMemory(id), tr('web.soul.rejected'))}
       />
     </div>
   )
