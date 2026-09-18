@@ -1,3 +1,4 @@
+import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { useTheme } from '../theme.ts'
 
@@ -17,7 +18,7 @@ export function Prompt({ value, disabled }: { value: string; disabled: boolean }
             {i === 0 ? '› ' : '  '}
           </Text>
           {value === '' ? (
-            <Text {...t.fg('mut2')}>{disabled ? '正在处理上一条…' : '说点什么…  (Enter 发送，Ctrl+J 换行)'}</Text>
+            <Text {...t.fg('mut2')}>{disabled ? tr('web.session.busy') : tr('tui.prompt.placeholder')}</Text>
           ) : (
             <Text>{line}</Text>
           )}

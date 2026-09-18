@@ -4,7 +4,9 @@
  * 不认识 grammY：发消息、收回调都经 `ChatPort`（main.ts 用 grammY 实现它，测试用替身）。
  * 业务一行都没有（INV-02）：推什么由 daemon 的事件决定，怎么答由用户点的按钮决定。
  */
+
 import { createSessionStore, type DomiClient, type SessionStore } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { formatAsk, formatProgress } from './format.ts'
 
 export interface ChatPort {
@@ -35,6 +37,7 @@ export class Bridge {
   async start(): Promise<void> {
     await this.scan()
     this.timer = setInterval(() => {
+      // i18n-ignore：日志（PRD-M9-004 AC-5：日志不翻）
       void this.scan().catch((e) => this.opts.log?.(`bridge: 刷新运行列表失败：${String(e)}`))
     }, this.opts.pollMs ?? 5000)
   }
@@ -64,6 +67,7 @@ export class Bridge {
         await this.opts.chat.send(chatId, text, buttons)
       } catch (e) {
         // Telegram 不可达：记一行，不影响别的（AC-6）
+        // i18n-ignore：日志（PRD-M9-004 AC-5：日志不翻）
         this.opts.log?.(`bridge: 发给 ${chatId} 失败：${String(e)}`)
       }
     }
@@ -92,8 +96,8 @@ export class Bridge {
         const short = String(this.nextAsk++)
         this.asks.set(short, ask.askId)
         void this.broadcast(formatAsk(runId, ask), [
-          { text: '允许', data: `a:${short}:1` },
-          { text: '拒绝', data: `a:${short}:0` },
+          { text: tr('common.allow'), data: `a:${short}:1` },
+          { text: tr('common.deny'), data: `a:${short}:0` },
         ])
       }),
     )
@@ -106,18 +110,19 @@ export class Bridge {
   /** 按钮回调。返回给点按钮的人看的一句话 */
   async onButton(chatId: number, data: string): Promise<string> {
     if (!this.opts.chats().includes(chatId)) {
+      // i18n-ignore：日志（PRD-M9-004 AC-5：日志不翻）
       await this.audit(`未绑定的 chat ${chatId} 点了按钮`)
-      return '这个聊天没有绑定'
+      return tr('bridge.notPaired')
     }
     const m = data.match(/^a:(\d+):([01])$/)
-    if (!m) return '看不懂这个按钮'
+    if (!m) return tr('bridge.badButton')
     const askId = this.asks.get(m[1] as string)
-    if (!askId) return '这个询问已经过期了'
+    if (!askId) return tr('bridge.expired')
     this.asks.delete(m[1] as string)
     const allowed = m[2] === '1'
     // 与 TUI 同一条路径，只多一个 channel（AC-3）
     const applied = await this.opts.client.answer(askId, allowed, undefined, 'telegram')
-    return applied ? (allowed ? '已允许' : '已拒绝') : '已经在别处回答过了'
+    return applied ? (allowed ? tr('bridge.allowed') : tr('bridge.denied')) : tr('bridge.answeredElsewhere')
   }
 
   /** 白名单之外的消息：丢弃并记事件（AC-4） */
@@ -125,6 +130,7 @@ export class Bridge {
     try {
       await this.opts.client.recordAudit('bridge.telegram.rejected', detail)
     } catch (e) {
+      // i18n-ignore：日志（PRD-M9-004 AC-5：日志不翻）
       this.opts.log?.(`bridge: 审计事件没记上：${String(e)}`)
     }
   }

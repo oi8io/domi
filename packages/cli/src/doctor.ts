@@ -7,8 +7,10 @@
  *
  * 命令行以 `$ ` 开头，AC 的断言正则就是认这个（`^\$ .+`）。
  */
+
 import { accessSync, constants, existsSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { tr } from '@domi/i18n'
 
 export interface Finding {
   ok: boolean
@@ -52,19 +54,19 @@ export function diagnose(input: DoctorInput): Finding[] {
   if (input.plugins) {
     const p = input.plugins
     if (p.sandbox !== 'none') {
-      out.push({ ok: true, title: '插件沙箱', detail: p.sandbox, fix: null })
+      out.push({ ok: true, title: tr('cli.doctor.sandbox'), detail: p.sandbox, fix: null })
     } else if (p.allowUnsandboxed) {
       out.push({
         ok: false,
-        title: '插件代码在没有沙箱的情况下运行',
-        detail: '你打开了 plugins.allowUnsandboxed：插件能读写任何文件、访问任何网络。只在完全信任已装插件时这样做',
+        title: tr('cli.doctor.unsandboxed'),
+        detail: tr('cli.doctor.unsandboxedDetail'),
         fix: '$ sed -i.bak "s/allowUnsandboxed: true/allowUnsandboxed: false/" ~/.domi/config.yaml',
       })
     } else if (p.withCode > 0) {
       out.push({
         ok: false,
-        title: '没有插件沙箱',
-        detail: `这台机器没有 bwrap / sandbox-exec，${p.withCode} 个带代码的插件没有加载（docs/adr/023）`,
+        title: tr('cli.doctor.noSandbox'),
+        detail: tr('cli.doctor.noSandboxDetail', { withCode: p.withCode }),
         fix: '$ sudo apt-get install -y bubblewrap',
       })
     }
@@ -73,21 +75,22 @@ export function diagnose(input: DoctorInput): Finding[] {
   if (input.inferredProviders && input.inferredProviders.length > 0) {
     out.push({
       ok: true,
-      title: '按旧写法推断的 provider',
+      title: tr('cli.doctor.inferred'),
       detail:
-        input.inferredProviders.map((p) => `${p.id} → ${p.vendor}（${p.protocol} 协议）`).join('；') +
-        '。照常可用；想固定下来，在 Web「设置 › 模型供应商」里打开它保存一次，或在 config.yaml 里写上 vendor',
+        input.inferredProviders
+          .map((p) => tr('cli.doctor.inferredItem', { id: p.id, vendor: p.vendor, protocol: p.protocol }))
+          .join(tr('core.listSepStrong')) + tr('cli.doctor.inferredHint'),
       fix: null,
     })
   }
 
   out.push(
     existsSync(input.configPath)
-      ? { ok: true, title: '配置文件', detail: input.configPath, fix: null }
+      ? { ok: true, title: tr('cli.doctor.config'), detail: input.configPath, fix: null }
       : {
           ok: false,
-          title: '配置文件不存在',
-          detail: `${input.configPath} 没找到。没有它也能跑（全部走环境变量），但建议建一个。`,
+          title: tr('cli.doctor.noConfig'),
+          detail: tr('cli.doctor.noConfigDetail', { configPath: input.configPath }),
           fix: `$ mkdir -p ${dirname(input.configPath)} && domi init > ${input.configPath}`,
         },
   )
@@ -99,14 +102,14 @@ export function diagnose(input: DoctorInput): Finding[] {
       ignored
         ? {
             ok: false,
-            title: '旧的 TOML 配置被忽略了',
-            detail: `已经有 YAML 配置，${path} 已被忽略（docs/adr/014）。确认 YAML 里该有的都有了，就可以删掉它。`,
+            title: tr('cli.doctor.tomlIgnored'),
+            detail: tr('cli.doctor.tomlIgnoredDetail', { path }),
             fix: `$ rm ${path}`,
           }
         : {
             ok: false,
-            title: '还在用旧的 TOML 配置',
-            detail: `${path} 现在还能读，但配置格式已改为 YAML（docs/adr/014），TOML 的支持会在 M4 去掉。`,
+            title: tr('cli.doctor.tomlInUse'),
+            detail: tr('cli.doctor.tomlInUseDetail', { path }),
             fix: `$ domi init --from-toml > ${yamlPath}`,
           },
     )
@@ -114,23 +117,31 @@ export function diagnose(input: DoctorInput): Finding[] {
 
   out.push(
     input.hasCredential
-      ? { ok: true, title: '模型凭据', detail: `已设置（${input.provider}）`, fix: null }
+      ? {
+          ok: true,
+          title: tr('cli.doctor.credential'),
+          detail: tr('cli.doctor.credentialSet', { provider: input.provider }),
+          fix: null,
+        }
       : {
           ok: false,
-          title: '没有模型凭据',
-          detail: `${input.provider} 需要 ${input.credentialEnvNames.join(' 或 ')}。`,
-          fix: `$ export ${input.credentialEnvNames[0]}=你的key`,
+          title: tr('cli.doctor.noCredential'),
+          detail: tr('cli.doctor.needs', {
+            provider: input.provider,
+            join: input.credentialEnvNames.join(tr('common.or')),
+          }),
+          fix: tr('cli.doctor.exportKey', { v: input.credentialEnvNames[0] ?? 'DOMI_API_KEY' }),
         },
   )
 
   out.push(
     input.gitAvailable
-      ? { ok: true, title: '步级快照', detail: '可用（影子仓库）', fix: null }
+      ? { ok: true, title: tr('cli.doctor.snapshots'), detail: tr('cli.doctor.snapshotsOk'), fix: null }
       : {
           ok: false,
-          title: '步级快照不可用',
-          detail: '没找到 git，agent 改坏文件时无法一键回滚。domi 仍能跑，但没有安全网。',
-          fix: '$ git --version   # 装上 git 后重启 domi',
+          title: tr('cli.doctor.snapshotsOff'),
+          detail: tr('cli.doctor.noGit'),
+          fix: tr('cli.doctor.gitFix'),
         },
   )
 
@@ -138,28 +149,36 @@ export function diagnose(input: DoctorInput): Finding[] {
     // 没装 rg 不算问题：fs.grep 退回内置实现，只是慢（用户拍板：没装也能用，装了自动用）
     out.push({
       ok: true,
-      title: '代码搜索',
+      title: tr('cli.doctor.search'),
       detail:
-        input.ripgrep === null
-          ? '内置实现（没找到 ripgrep；大仓库里会慢，装上后自动改用：brew install ripgrep / apt install ripgrep）'
-          : `ripgrep（${input.ripgrep}）`,
+        input.ripgrep === null ? tr('cli.doctor.builtinSearch') : tr('cli.doctor.ripgrep', { ripgrep: input.ripgrep }),
       fix: null,
     })
   }
 
   out.push(
     input.baseUrl
-      ? { ok: true, title: '自定义网关', detail: input.baseUrl, fix: null }
-      : { ok: true, title: '模型端点', detail: `${input.provider} 官方端点`, fix: null },
+      ? { ok: true, title: tr('cli.doctor.gateway'), detail: input.baseUrl, fix: null }
+      : {
+          ok: true,
+          title: tr('cli.doctor.endpoint'),
+          detail: tr('cli.doctor.official', { provider: input.provider }),
+          fix: null,
+        },
   )
 
   if (input.ping) {
     out.push(
       input.ping.ok
-        ? { ok: true, title: '连通性', detail: `${input.ping.detail}（${input.ping.ms}ms）`, fix: null }
+        ? {
+            ok: true,
+            title: tr('cli.doctor.connectivity'),
+            detail: tr('cli.doctor.pingDetail', { detail: input.ping.detail, ms: input.ping.ms }),
+            fix: null,
+          }
         : {
             ok: false,
-            title: '连不上模型端点',
+            title: tr('cli.doctor.unreachable'),
             detail: input.ping.detail,
             // 不给「检查一下网络」这种废话：给一条能立刻看到真实响应的命令
             fix: input.baseUrl
@@ -177,11 +196,11 @@ export function diagnose(input: DoctorInput): Finding[] {
   }
   out.push(
     writable
-      ? { ok: true, title: '数据目录可写', detail: input.dataDir, fix: null }
+      ? { ok: true, title: tr('cli.doctor.dataOk'), detail: input.dataDir, fix: null }
       : {
           ok: false,
-          title: '数据目录不可写',
-          detail: `${input.dataDir} 写不进去，会话没法落盘。`,
+          title: tr('cli.doctor.dataBad'),
+          detail: tr('cli.doctor.dataBadDetail', { dataDir: input.dataDir }),
           fix: `$ chmod u+w ${input.dataDir}`,
         },
   )
@@ -198,6 +217,6 @@ export function formatFindings(findings: readonly Finding[]): string {
     lines.push('')
   }
   const bad = findings.filter((f) => !f.ok).length
-  lines.push(bad === 0 ? '一切正常。' : `${bad} 项需要处理，上面每条都给了可以直接粘贴执行的命令。`)
+  lines.push(bad === 0 ? tr('cli.doctor.allGood') : tr('cli.doctor.problems', { bad }))
   return lines.join('\n')
 }

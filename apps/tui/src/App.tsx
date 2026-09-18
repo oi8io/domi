@@ -49,7 +49,7 @@ export function App({
         </>
       )}
       <StatusBar status={status} {...(connection === undefined ? {} : { connection })} />
-      <KeyHints hints={DEFAULT_HINTS} />
+      <KeyHints hints={DEFAULT_HINTS()} />
     </Box>
   )
 }

@@ -86,9 +86,9 @@ describe('PRD-M8-014 AC-5 · 输入行的按键与提示一致', () => {
   })
 
   test('按键提示就是原型那一排，并且都是真能用的键', async () => {
-    expect(DEFAULT_HINTS.map(([k]) => k)).toEqual(['p', 's', 't', '/', '?', 'Ctrl+C'])
+    expect(DEFAULT_HINTS().map(([k]) => k)).toEqual(['p', 's', 't', '/', '?', 'Ctrl+C'])
     const { routeKey } = await import('../src/keys.ts')
-    for (const [key] of DEFAULT_HINTS) {
+    for (const [key] of DEFAULT_HINTS()) {
       if (key === '/' || key === 'Ctrl+C') continue
       expect(routeKey(key, {}, { inputEmpty: true, overlay: null })).not.toBeNull()
     }
@@ -99,7 +99,7 @@ describe('PRD-M8-014 AC-4 · 状态栏与提示行都画得出来（内容见 go
   test('40 列下按键提示整条换行，不把「退出」拆开', async () => {
     const { KeyHints } = await import('../src/components/ContextBar.tsx')
     const { createElement } = await import('react')
-    const out = await renderToString(createElement(KeyHints, { hints: DEFAULT_HINTS }), { columns: 40 })
+    const out = await renderToString(createElement(KeyHints, { hints: DEFAULT_HINTS() }), { columns: 40 })
     for (const line of out.split('\n')) expect(line.trimEnd().endsWith('Ctrl+C')).toBe(false)
     expect(out).toContain('退出')
   })

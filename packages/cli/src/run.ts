@@ -7,6 +7,7 @@
  * 那些都是业务（INV-02）。放在端上的话 M3 拆 daemon 时要整体搬家。
  * `apps/tui` 只负责把 argv 递进来、把字符串打出去。
  */
+
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { ShadowRepo } from '@domi/checkpoint'
@@ -18,6 +19,7 @@ import {
   providerConnection,
   readConfigFile,
 } from '@domi/config'
+import { tr } from '@domi/i18n'
 import { buildManifest, formatManifest } from '@domi/observability'
 import { assemble, BUILTIN_LAYERS, formatDump, layersFromConfig, mergeLayers } from '@domi/prompt'
 import { formatAbsolute, formatMigrate, formatRelative, migrateDatabase, SqliteEventLog } from '@domi/store'
@@ -62,7 +64,7 @@ async function pluginDoctor(
 
 export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
   if (cli.flags.help) {
-    io.out(HELP)
+    io.out(HELP())
     return 0
   }
   if (cli.flags.version) {
@@ -78,7 +80,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       try {
         ;({ runEval } = await import('@domi/eval'))
       } catch {
-        io.err('评估层不可用（packages/eval 不在这份安装里）。其它命令不受影响。')
+        io.err(tr('cli.run.noEval'))
         return 127
       }
       // eval 的子命令自己解析选项（--rounds / --tasks / --out …），给它原始参数（BUG-M6-001）
@@ -91,7 +93,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       try {
         ;({ runTrace } = await import('@domi/trace'))
       } catch {
-        io.err('轨迹层不可用（packages/trace 不在这份安装里）。其它命令不受影响。')
+        io.err(tr('cli.run.noTrace'))
         return 127
       }
       return runTrace(cli.sub, cli.flags.html, io)
@@ -119,30 +121,24 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         const r = initProject(process.cwd())
         io.out(
           r.created.length === 0
-            ? `${r.root} 里已经有 .domi/ 和规矩文件了，什么都没改。`
-            : `在 ${r.root} 里新建了：\n${r.created.map((c) => `  ${c}`).join('\n')}\n` +
-                '规矩写进 AGENT.md，项目级 Skill 放 .domi/skills/<名字>/SKILL.md。第一次在这里打开会话时 domi 会问你是否信任这个仓库。',
+            ? tr('cli.init.alreadyProject', { root: r.root })
+            : tr('cli.init.created', { root: r.root, join: r.created.map((c) => `  ${c}`).join('\n') }) +
+                tr('cli.init.projectHint'),
         )
         return 0
       }
       if (!cli.flags.fromToml) {
-        io.out(CONFIG_TEMPLATE)
+        io.out(CONFIG_TEMPLATE())
         return 0
       }
       // ADR-014 的迁移：结构原样搬过去，api_key 也保留（这是用户自己的文件，不是导出）
       const legacy = join(dataDir(), 'config.toml')
       const src = configSource({ path: legacy })
       if (!src.exists) {
-        io.err(`没有找到 ${legacy}，不需要迁移。\n$ domi init > ${join(dataDir(), 'config.yaml')}   # 从模板开始`)
+        io.err(tr('cli.init.noLegacy', { legacy, join: join(dataDir(), 'config.yaml') }))
         return 1
       }
-      io.out(
-        toYamlWithoutSecrets(
-          readConfigFile(src),
-          `# 由 ${legacy} 转换而来（domi init --from-toml）。原文件的注释没法带过来，需要的话对照着补。`,
-          true,
-        ),
-      )
+      io.out(toYamlWithoutSecrets(readConfigFile(src), tr('cli.init.convertedHeader', { legacy }), true))
       return 0
     }
 
@@ -158,18 +154,20 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         const rows = store.list()
         io.out(
           rows.length === 0
-            ? '还没有答过任何仓库。'
-            : rows.map((r) => `${r.trusted ? '信任  ' : '不信任'}  ${r.root}`).join('\n'),
+            ? tr('cli.trust.none')
+            : rows
+                .map((r) => `${r.trusted ? tr('cli.trust.trusted') : tr('cli.trust.untrusted')}  ${r.root}`)
+                .join('\n'),
         )
         return 0
       }
       const root = findRepoRoot(cli.sub ?? process.cwd())
       if (cli.flags.revoke) {
         store.set(root, false)
-        io.out(`不再信任 ${root}：它的 AGENT.md 与 .domi/skills 不会进提示词（下一个会话起生效）。`)
+        io.out(tr('cli.trust.revoked', { root }))
       } else {
         store.set(root, true)
-        io.out(`已信任 ${root}：它的 AGENT.md 与 .domi/skills 会进提示词（下一个会话起生效）。`)
+        io.out(tr('cli.trust.granted', { root }))
       }
       return 0
     }
@@ -228,7 +226,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       // 用法错误在开库**之前**就返回：让一个打错的命令去碰数据库没有道理
       const restoreId = cli.sub === 'restore' ? cli.args[0] : undefined
       if (cli.sub === 'restore' && !restoreId) {
-        io.err('用法：$ domi session restore <id>')
+        io.err(tr('cli.session.restoreUsage'))
         return 2
       }
       const log = new SqliteEventLog({ path: join(dataDir(), 'events.db'), cwd: process.cwd() })
@@ -236,22 +234,30 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         if (restoreId) {
           // BUG-M3-002：这里原来只打印「已恢复」，一行恢复的动作都没有
           if (!log.sessions.get(restoreId)) {
-            io.err(`没有这个会话：${restoreId}\n$ domi session all   # 列出包括已删除在内的全部会话`)
+            io.err(tr('cli.session.notFound', { restoreId }))
             return 1
           }
           log.sessions.restore(restoreId)
-          io.out(`已恢复 ${restoreId}`)
+          io.out(tr('cli.session.restored', { restoreId }))
           return 0
         }
         const now = Date.now()
         const rows = log.sessions.list({ includeDeleted: cli.sub === 'all' })
         if (rows.length === 0) {
-          io.out('还没有会话。$ domi   # 开始第一次对话')
+          io.out(tr('cli.session.none'))
           return 0
         }
         for (const r of rows) {
           const when = cli.flags.json ? formatAbsolute(r.updatedAt) : formatRelative(r.updatedAt, now)
-          io.out(`${r.id}  ${when}  ${r.model || '—'}  ${r.messageCount} 条  ${r.title || '(未命名)'}`)
+          io.out(
+            tr('cli.session.row', {
+              id: r.id,
+              when,
+              v: r.model || '—',
+              messageCount: r.messageCount,
+              v2: r.title || tr('common.untitledParenAscii'),
+            }),
+          )
         }
         return 0
       } finally {
@@ -263,13 +269,13 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       if (cli.sub === 'export') {
         const out = cli.args[0]
         if (!out) {
-          io.err('用法：$ domi data export <目录>')
+          io.err(tr('cli.data.exportUsage'))
           return 2
         }
         const log = new SqliteEventLog({ path: join(dataDir(), 'events.db'), cwd: process.cwd() })
         try {
           const r = await exportAll(log, out, exportableConfig(configSource({ home: userHome() })))
-          io.out(`导出了 ${r.sessions} 个会话、${r.events} 条事件到 ${r.dir}`)
+          io.out(tr('cli.data.exported', { sessions: r.sessions, events: r.events, dir: r.dir }))
           return 0
         } finally {
           log.close()
@@ -280,10 +286,10 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         io.out(formatPurgePlan(plan))
         // --yes 对 purge **不生效**：这是不可恢复操作，
         // 一个 flag 不该能绕过「看清楚再确认」（AC-2）
-        io.out(`\n请手动输入 ${PURGE_CONFIRM_WORD} 确认（--yes 对 purge 无效）。`)
+        io.out(tr('cli.data.typeConfirm', { PURGE_CONFIRM_WORD }))
         return 0
       }
-      io.err('用法：$ domi data export <目录>   或   $ domi data purge')
+      io.err(tr('cli.data.usage'))
       return 2
     }
 
@@ -306,7 +312,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       return 0
 
     default:
-      io.err(HELP)
+      io.err(HELP())
       return 2
   }
 }

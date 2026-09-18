@@ -7,9 +7,11 @@
  *
  * 录制不写任何新埋点 —— 数据来源只有事件流（INV-13）。
  */
+
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { tr } from '@domi/i18n'
 import { SqliteEventLog } from '@domi/store'
 import { type Fixture, parse, record, serialize } from './fixture.ts'
 import { formatL2Report, L2_DIR, loadL2Tasks, runL2 } from './l2.ts'
@@ -24,16 +26,7 @@ export interface Io {
 /** fixture 默认落在仓库里，跟着代码一起进版本库 —— 它是测试资产，不是用户数据 */
 export const FIXTURE_DIR = join('fixtures', 'sessions')
 
-export const EVAL_HELP = `domi eval —— L1 确定性轨迹回放（不联网、不花钱）
-
-  domi eval record <sessionId>   把一条真实会话导出成 fixture
-  domi eval run [fixture...]     回放 fixture，断言工具调用序列与录制一致
-  domi eval l2 [题 id...] [--rounds N] [--tasks <目录>]
-                                 L2：用真实模型跑 eval/l2 的题集（花钱、不进 CI），默认 3 轮
-  domi eval mine <仓库> [--since 2026-01-01] [--limit 50] [--test-cmd "bun test {files}"] [--setup "..."] [--out eval/mined/<名字>]
-                                 从 git 历史出题：父提交上测试失败、放入该提交的改动后通过的才收（不花钱，但要跑测试）
-
-fixture 默认读写 ${FIXTURE_DIR}/ 。回放全程不发出任何网络请求。`
+export const EVAL_HELP = () => tr('eval.help', { FIXTURE_DIR })
 
 function dbPath(): string {
   return join(homedir(), '.domi', 'events.db')
@@ -41,14 +34,14 @@ function dbPath(): string {
 
 async function cmdRecord(sessionId: string | undefined, io: Io): Promise<number> {
   if (!sessionId) {
-    io.err('用法：domi eval record <sessionId>\n（会话 id 用 `domi session list` 看）')
+    io.err(tr('eval.recordUsage'))
     return 2
   }
   const log = new SqliteEventLog({ path: dbPath() })
   try {
     const events = await log.read(sessionId)
     if (events.length === 0) {
-      io.err(`会话 ${sessionId} 没有任何事件。用 \`domi session list\` 确认 id。`)
+      io.err(tr('trace.noEvents', { sessionId }))
       return 1
     }
     const fixture = record(events, sessionId)
@@ -56,8 +49,12 @@ async function cmdRecord(sessionId: string | undefined, io: Io): Promise<number>
     const out = join(FIXTURE_DIR, `${sessionId}.json`)
     writeFileSync(out, serialize(fixture), 'utf8')
     io.out(
-      `已录制 ${out}\n` +
-        `  ${events.length} 条事件 → ${fixture.turns.length} 轮、${fixture.expectedCalls.length} 次工具调用`,
+      tr('eval.recorded', { out }) +
+        tr('eval.recordedDetail', {
+          length: events.length,
+          length2: fixture.turns.length,
+          length3: fixture.expectedCalls.length,
+        }),
     )
     return 0
   } finally {
@@ -84,7 +81,7 @@ function loadFixtures(paths: readonly string[], io: Io): Array<{ path: string; f
     try {
       out.push({ path: p, fixture: parse(readFileSync(p, 'utf8')) })
     } catch (e) {
-      io.err(`跳过 ${p}：${e instanceof Error ? e.message : String(e)}`)
+      io.err(tr('eval.skip', { p, v: e instanceof Error ? e.message : String(e) }))
     }
   }
   return out
@@ -93,7 +90,7 @@ function loadFixtures(paths: readonly string[], io: Io): Array<{ path: string; f
 async function cmdRun(paths: readonly string[], io: Io): Promise<number> {
   const loaded = loadFixtures(paths, io)
   if (loaded.length === 0) {
-    io.err(`${FIXTURE_DIR}/ 下没有 fixture。先跑一次 \`domi eval record <sessionId>\`。`)
+    io.err(tr('eval.noFixtures', { FIXTURE_DIR }))
     return 1
   }
 
@@ -103,7 +100,7 @@ async function cmdRun(paths: readonly string[], io: Io): Promise<number> {
     io.out(formatResult(r))
     if (!r.ok) failed++
   }
-  io.out(`\n${loaded.length - failed}/${loaded.length} 通过`)
+  io.out(tr('eval.passed', { v: loaded.length - failed, length: loaded.length }))
   return failed === 0 ? 0 : 1
 }
 
@@ -119,18 +116,26 @@ async function cmdL2(args: readonly string[], io: Io): Promise<number> {
   const only = args.filter((a, i) => !a.startsWith('--') && !valueAt.has(i))
   const tasks = loadL2Tasks(tasksArg >= 0 ? args[tasksArg + 1] : undefined, only)
   if (tasks.length === 0) {
-    io.err('eval/l2/tasks 下没有题（或者给的题 id 都不存在）')
+    io.err(tr('eval.noTasks'))
     return 1
   }
   const { loadConfigOrThrow, ConfigSchema } = await import('@domi/config')
   const { DomiSession } = await import('@domi/runtime')
   const base = loadConfigOrThrow({ home: process.env.HOME || homedir() })
-  io.out(`L2：${tasks.length} 题 × ${rounds} 轮，模型 ${base.model.provider}/${base.model.name}。这会产生真实费用。`)
+  io.out(tr('eval.l2Start', { length: tasks.length, rounds, provider: base.model.provider, name: base.model.name }))
   const report = await runL2(tasks, {
     rounds,
     model: `${base.model.provider}/${base.model.name}`,
     pricing: L2_PRICING,
-    onProgress: (a) => io.out(`  ${a.pass ? '✅' : '❌'} ${a.taskId} 第 ${a.round} 轮（${(a.ms / 1000).toFixed(1)}s）`),
+    onProgress: (a) =>
+      io.out(
+        tr('eval.l2Attempt', {
+          v: a.pass ? '✅' : '❌',
+          taskId: a.taskId,
+          round: a.round,
+          toFixed: (a.ms / 1000).toFixed(1),
+        }),
+      ),
     run: async ({ task, workspace, dbPath, sessionId, signal }) => {
       const config = ConfigSchema.parse({
         ...base,
@@ -153,7 +158,12 @@ async function cmdL2(args: readonly string[], io: Io): Promise<number> {
   const stamp = new Date(report.startedAt).toISOString().replace(/[:.]/g, '-')
   writeFileSync(join(dir, `${stamp}.md`), formatL2Report(report), 'utf8')
   writeFileSync(join(dir, `${stamp}.json`), `${JSON.stringify(report, null, 2)}\n`, 'utf8')
-  io.out(`\n${formatL2Report(report).split('\n').slice(0, 6).join('\n')}\n\n报告：${join(dir, `${stamp}.md`)}`)
+  io.out(
+    tr('eval.l2Done', {
+      join: formatL2Report(report).split('\n').slice(0, 6).join('\n'),
+      join2: join(dir, `${stamp}.md`),
+    }),
+  )
   return 0
 }
 
@@ -175,7 +185,7 @@ async function cmdMine(args: readonly string[], io: Io): Promise<number> {
   )
   const repo = args.find((a, i) => !a.startsWith('--') && !values.has(i))
   if (!repo) {
-    io.err('用法：domi eval mine <仓库路径> [--since 日期] [--limit N] [--test-cmd "..."] [--setup "..."] [--out 目录]')
+    io.err(tr('eval.mineUsage'))
     return 2
   }
   const name =
@@ -196,7 +206,7 @@ async function cmdMine(args: readonly string[], io: Io): Promise<number> {
       onProgress: (l) => io.out(l),
     })
     const kept = r.filter((x) => x.kept).length
-    io.out(`\n收下 ${kept} / ${r.length} 题 → ${join(out, 'tasks')}\n报告：${join(out, 'mine-report.md')}`)
+    io.out(tr('eval.mined', { kept, length: r.length, join: join(out, 'tasks'), join2: join(out, 'mine-report.md') }))
     return kept > 0 ? 0 : 1
   } catch (e) {
     io.err(e instanceof Error ? e.message : String(e))
@@ -216,10 +226,10 @@ export async function runEval(sub: string | undefined, args: readonly string[], 
       return cmdMine(args, io)
     case undefined:
     case 'help':
-      io.out(EVAL_HELP)
+      io.out(EVAL_HELP())
       return 0
     default:
-      io.err(`未知子命令：eval ${sub}\n${EVAL_HELP}`)
+      io.err(tr('eval.unknownSub', { sub, EVAL_HELP: EVAL_HELP() }))
       return 2
   }
 }

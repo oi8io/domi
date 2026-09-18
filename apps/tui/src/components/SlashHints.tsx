@@ -1,3 +1,4 @@
+import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { useTheme } from '../theme.ts'
 
@@ -33,7 +34,9 @@ export function SlashHints({
           </Box>
         )
       })}
-      <Text {...t.fg('mut2')}>{`tab 补全 · ↑↓ 选择${items.length > 6 ? ` · 共 ${items.length} 个` : ''}`}</Text>
+      <Text {...t.fg('mut2')}>
+        {tr('tui.slash.hints', { v: items.length > 6 ? tr('tui.slash.total', { length: items.length }) : '' })}
+      </Text>
     </Box>
   )
 }

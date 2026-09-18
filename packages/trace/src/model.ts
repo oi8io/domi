@@ -8,6 +8,7 @@
  * 为什么要有轨迹：**看得懂每一步在想什么，是信任的来源。**
  * 一个你看不见内部的 agent，人只会用它做无关紧要的事。
  */
+import { tr } from '@domi/i18n'
 import { type AnyEvent, type EventEnvelope, isKnownEvent } from '@domi/protocol'
 
 /** AC-2：超过这个字节数的结果默认折叠 */
@@ -128,13 +129,13 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
   for (const env of events) {
     const ev: AnyEvent = env.ev
     if (!isKnownEvent(ev)) {
-      nodes.push(node(env.seq, 'other', `未知事件 ${ev.t}`, JSON.stringify(ev.__unparsed, null, 2)))
+      nodes.push(node(env.seq, 'other', tr('trace.unknownEvent', { t: ev.t }), JSON.stringify(ev.__unparsed, null, 2)))
       continue
     }
 
     switch (ev.t) {
       case 'user.input':
-        nodes.push(node(env.seq, 'input', '你说', ev.text))
+        nodes.push(node(env.seq, 'input', tr('trace.youSaid'), ev.text))
         break
 
       case 'model.request':
@@ -142,7 +143,7 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
         break
 
       case 'model.reason':
-        nodes.push(node(env.seq, 'think', '思考', ev.text))
+        nodes.push(node(env.seq, 'think', tr('core.timeline.thinking'), ev.text))
         break
 
       case 'model.delta': {
@@ -154,7 +155,7 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
           last.collapsed = last.bytes > COLLAPSE_BYTES
           last.preview = previewOf(last.detail)
         } else {
-          nodes.push(node(env.seq, 'answer', '回答', ev.text))
+          nodes.push(node(env.seq, 'answer', tr('core.timeline.answer'), ev.text))
         }
         break
       }
@@ -168,8 +169,13 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
       }
 
       case 'permission': {
-        const line = `${ev.capabilityId} → ${ev.decision}（来源：${ev.source}${ev.matchedRule ? `，规则：${ev.matchedRule}` : ''}）`
-        const n = node(env.seq, 'permission', '权限', line)
+        const line = tr('trace.permission', {
+          capabilityId: ev.capabilityId,
+          decision: ev.decision,
+          source: ev.source,
+          v: ev.matchedRule ? tr('trace.rule', { matchedRule: ev.matchedRule }) : '',
+        })
+        const n = node(env.seq, 'permission', tr('web.transcript.permission'), line)
         if (pendingTool) pendingTool.children.push(n)
         else nodes.push(n)
         break
@@ -178,7 +184,7 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
       case 'tool.result': {
         const parent = byCallId.get(ev.id)
         const detail = textOf(ev.payload)
-        const n = node(env.seq, 'tool', ev.ok ? '结果' : '失败', detail, { ms: ev.ms })
+        const n = node(env.seq, 'tool', ev.ok ? tr('trace.result') : tr('common.failed'), detail, { ms: ev.ms })
         if (parent) {
           parent.ms = ev.ms
           parent.children.push(n)
@@ -220,14 +226,24 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
           host.costUsdCumulative = cumulative
         } else {
           nodes.push(
-            node(env.seq, 'other', '用量', JSON.stringify(raw), { tokens: info, costUsdCumulative: cumulative }),
+            node(env.seq, 'other', tr('trace.usage'), JSON.stringify(raw), {
+              tokens: info,
+              costUsdCumulative: cumulative,
+            }),
           )
         }
         break
       }
 
       case 'error':
-        nodes.push(node(env.seq, 'error', ev.recoverable ? '错误（可恢复）' : '错误', `${ev.scope}: ${ev.message}`))
+        nodes.push(
+          node(
+            env.seq,
+            'error',
+            ev.recoverable ? tr('trace.errorRecoverable') : tr('trace.error'),
+            `${ev.scope}: ${ev.message}`,
+          ),
+        )
         break
 
       case 'ctx.cleanup':
@@ -235,9 +251,13 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
           node(
             env.seq,
             'cleanup',
-            `上下文清理 ${ev.tokensBefore} → ${ev.tokensAfter} tokens`,
-            `去重 ${ev.saved.dedupe} · 截断 ${ev.saved.verbose} · 已解决错误 ${ev.saved.resolvedError} · 堆栈 ${ev.saved.stack}` +
-              (ev.preserved.length > 0 ? `\n引用保留：${ev.preserved.join(', ')}` : ''),
+            tr('core.ev.cleanup', { tokensBefore: ev.tokensBefore, tokensAfter: ev.tokensAfter }),
+            tr('core.ev.cleanupDetail', {
+              dedupe: ev.saved.dedupe,
+              verbose: ev.saved.verbose,
+              resolvedError: ev.saved.resolvedError,
+              stack: ev.saved.stack,
+            }) + (ev.preserved.length > 0 ? tr('trace.preserved', { join: ev.preserved.join(', ') }) : ''),
           ),
         )
         break
@@ -247,8 +267,11 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
         const n = node(
           env.seq,
           'task',
-          `子 agent：${ev.goal}`,
-          `会话 ${ev.childSessionId}${ev.tools ? `\n能力：${ev.tools.join('、')}` : ''}`,
+          tr('trace.subAgent', { goal: ev.goal }),
+          tr('trace.childSession', {
+            childSessionId: ev.childSessionId,
+            v: ev.tools ? tr('trace.tools', { join: ev.tools.join(tr('common.listSep')) }) : '',
+          }),
         )
         const sub = opts.children?.get(ev.childSessionId)
         if (sub) n.children = buildTrace(sub, opts).nodes
@@ -258,18 +281,21 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
       }
 
       case 'task.run':
-        nodes.push(node(env.seq, 'task', `任务：${ev.name}`, JSON.stringify(ev.spec, null, 2)))
+        nodes.push(node(env.seq, 'task', tr('trace.task', { name: ev.name }), JSON.stringify(ev.spec, null, 2)))
         break
 
       case 'task.node': {
         if (ev.status === 'started') {
-          nodes.push(node(env.seq, 'task', `节点 ${ev.nodeId} 开始（第 ${ev.attempt} 次）`, ''))
+          nodes.push(node(env.seq, 'task', tr('trace.nodeStart', { nodeId: ev.nodeId, attempt: ev.attempt }), ''))
           break
         }
         const n = node(
           env.seq,
           ev.status === 'done' ? 'task' : 'error',
-          `节点 ${ev.nodeId} ${ev.status === 'done' ? '完成' : '失败'}`,
+          tr('trace.nodeEnd', {
+            nodeId: ev.nodeId,
+            v: ev.status === 'done' ? tr('core.ev.nodeDone') : tr('core.ev.nodeFailed'),
+          }),
           ev.error ?? ev.output ?? '',
           { ms: ev.ms ?? null },
         )
@@ -284,23 +310,37 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
           node(
             env.seq,
             'task',
-            '恢复',
-            `已完成：${ev.completed.join('、') || '无'}\n重跑：${ev.rerun.join('、') || '无'}`,
+            tr('trace.resume'),
+            tr('trace.resumeDetail', {
+              v: ev.completed.join(tr('common.listSep')) || tr('common.none'),
+              v2: ev.rerun.join(tr('common.listSep')) || tr('common.none'),
+            }),
           ),
         )
         break
 
       case 'plugin.error':
-        nodes.push(node(env.seq, 'error', `插件 ${ev.plugin} 出错`, `${ev.tool ? `${ev.tool}: ` : ''}${ev.message}`))
+        nodes.push(
+          node(
+            env.seq,
+            'error',
+            tr('trace.pluginError', { plugin: ev.plugin }),
+            `${ev.tool ? `${ev.tool}: ` : ''}${ev.message}`,
+          ),
+        )
         break
 
       // ── M7 ──
       case 'hook.run': {
-        const state = ev.timedOut ? '超时' : ev.blocked ? '拦下' : `退出码 ${ev.exitCode}`
+        const state = ev.timedOut
+          ? tr('trace.timeout')
+          : ev.blocked
+            ? tr('trace.blocked')
+            : tr('trace.exitCode', { exitCode: String(ev.exitCode) })
         const n = node(
           env.seq,
           'permission',
-          `钩子 ${ev.name}（${ev.on}）`,
+          tr('trace.hook', { name: ev.name, on: ev.on }),
           `${state} · ${ev.ms}ms${ev.output ? `\n${ev.output}` : ''}`,
         )
         if (pendingTool && ev.on !== 'stop') pendingTool.children.push(n)
@@ -309,72 +349,100 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
       }
       case 'workspace.trust':
         nodes.push(
-          node(env.seq, 'permission', ev.trusted ? '信任这个仓库' : '不信任这个仓库', `${ev.root}（${ev.source}）`),
+          node(
+            env.seq,
+            'permission',
+            ev.trusted ? tr('trace.trusted') : tr('trace.untrusted'),
+            tr('trace.rootSource', { root: ev.root, source: ev.source }),
+          ),
         )
         break
       case 'verify.required':
         nodes.push(
-          node(env.seq, 'other', ev.final ? '没有通过验证就结束了' : `提醒验证（第 ${ev.attempt} 次）`, ev.message),
+          node(
+            env.seq,
+            'other',
+            ev.final ? tr('core.ev.unverifiedEnd') : tr('trace.verifyNudge', { attempt: ev.attempt }),
+            ev.message,
+          ),
         )
         break
       case 'mode.switch':
-        nodes.push(node(env.seq, 'other', ev.to === 'plan' ? '进入计划模式' : '进入执行模式', ev.reason ?? ''))
+        nodes.push(
+          node(env.seq, 'other', ev.to === 'plan' ? tr('trace.planMode') : tr('trace.actMode'), ev.reason ?? ''),
+        )
         break
       case 'plan.proposed':
-        nodes.push(node(env.seq, 'task', '提交计划', ev.plan))
+        nodes.push(node(env.seq, 'task', tr('trace.planProposed'), ev.plan))
         break
       case 'plan.decided':
         nodes.push(
           node(
             env.seq,
             'task',
-            ev.approved ? '计划已批准' : '计划被驳回',
-            `${ev.comment ?? ''}${ev.runId ? `（长任务 ${ev.runId}）` : ''}`,
+            ev.approved ? tr('trace.planApproved') : tr('core.ev.planRejected'),
+            `${ev.comment ?? ''}${ev.runId ? tr('trace.longRun', { runId: ev.runId }) : ''}`,
           ),
         )
         break
       case 'worktree.create':
-        nodes.push(node(env.seq, 'other', '隔离工作区', `${ev.path}（分支 ${ev.branch}，基于 ${ev.base.slice(0, 8)}）`))
+        nodes.push(
+          node(
+            env.seq,
+            'other',
+            tr('trace.worktree'),
+            tr('trace.worktreeDetail', { path: ev.path, branch: ev.branch, slice: ev.base.slice(0, 8) }),
+          ),
+        )
         break
       case 'worktree.discard':
-        nodes.push(node(env.seq, 'other', `丢弃改动：${ev.path}`, ''))
+        nodes.push(node(env.seq, 'other', tr('trace.discard', { path: ev.path }), ''))
         break
       case 'worktree.restore':
-        nodes.push(node(env.seq, 'other', `恢复改动：${ev.path}`, ''))
+        nodes.push(node(env.seq, 'other', tr('trace.undo', { path: ev.path }), ''))
         break
       case 'worktree.apply':
         nodes.push(
           node(
             env.seq,
             ev.ok ? 'other' : 'error',
-            `带回原仓库（${ev.mode}）${ev.ok ? '' : '失败'}`,
+            tr('trace.apply', { mode: ev.mode, v: ev.ok ? '' : tr('trace.failedSuffix') }),
             ev.message ?? ev.commit ?? '',
           ),
         )
         break
       case 'budget.warn':
-        nodes.push(node(env.seq, 'other', `用量到 80%：${ev.kind}`, `${ev.used} / ${ev.limit}`))
+        nodes.push(node(env.seq, 'other', tr('trace.budgetWarn', { kind: ev.kind }), `${ev.used} / ${ev.limit}`))
         break
       case 'budget.decided':
-        nodes.push(node(env.seq, 'other', `用量到顶：${ev.action}`, ev.limit === undefined ? '' : `新上限 ${ev.limit}`))
+        nodes.push(
+          node(
+            env.seq,
+            'other',
+            tr('trace.budgetDecided', { action: ev.action }),
+            ev.limit === undefined ? '' : tr('trace.newLimit', { limit: ev.limit }),
+          ),
+        )
         break
       case 'review.findings':
         nodes.push(
           node(
             env.seq,
             'task',
-            `审阅发现 ${ev.findings.length} 条`,
+            tr('trace.findings', { length: ev.findings.length }),
             ev.findings.map((f) => `[${f.severity}] ${f.file}${f.line ? `:${f.line}` : ''} ${f.problem}`).join('\n'),
           ),
         )
         break
 
       case 'task.retry':
-        nodes.push(node(env.seq, 'task', `重试 ${ev.nodeId}`, ''))
+        nodes.push(node(env.seq, 'task', tr('trace.retry', { nodeId: ev.nodeId }), ''))
         break
 
       case 'task.end':
-        nodes.push(node(env.seq, ev.status === 'done' ? 'task' : 'error', `任务结束：${ev.status}`, ''))
+        nodes.push(
+          node(env.seq, ev.status === 'done' ? 'task' : 'error', tr('trace.runEnd', { status: ev.status }), ''),
+        )
         break
 
       case 'snapshot':

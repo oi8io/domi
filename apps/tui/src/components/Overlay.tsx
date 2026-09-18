@@ -1,3 +1,4 @@
+import { tr } from '@domi/i18n'
 import { Box, Text, useInput, useWindowSize } from 'ink'
 import { type ReactNode, useEffect, useState } from 'react'
 import { moveOf } from '../keys.ts'
@@ -43,9 +44,9 @@ export function Overlay({
   title,
   items,
   searchable = true,
-  placeholder = '搜索…',
+  placeholder = tr('common.searchEllipsis'),
   hints,
-  empty = '没有内容',
+  empty = tr('tui.overlay.empty'),
   notice,
   active = true,
   onSelect,
@@ -169,7 +170,7 @@ export function Overlay({
               })}
               {shown.length > page.length && (
                 <Box paddingX={2}>
-                  <Text {...t.fg('mut2')}>{`… 共 ${shown.length} 项`}</Text>
+                  <Text {...t.fg('mut2')}>{tr('tui.overlay.more', { length: shown.length })}</Text>
                 </Box>
               )}
             </Box>

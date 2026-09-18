@@ -2,7 +2,9 @@
  * 三个弹层与帮助 —— PRD-M8-015 AC-2 / AC-3 / AC-4。
  * 数据都从 daemon 拿（project.list / session.list / schedule.list），这里只排版与转发按键（INV-02）。
  */
+
 import type { DomiClient } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { useCallback, useEffect, useState } from 'react'
 import { COMMANDS } from '../commands.ts'
@@ -22,7 +24,15 @@ type Session = Awaited<ReturnType<DomiClient['listSessions']>>['sessions'][numbe
 type Schedule = Awaited<ReturnType<DomiClient['listSchedules']>>[number]
 type ModelList = Awaited<ReturnType<DomiClient['listModels']>>
 
-const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const WEEK = () => [
+  tr('tui.week.0'),
+  tr('tui.week.1'),
+  tr('tui.week.2'),
+  tr('tui.week.3'),
+  tr('tui.week.4'),
+  tr('tui.week.5'),
+  tr('tui.week.6'),
+]
 const pad = (n: string) => n.padStart(2, '0')
 
 /** 常见的几种 cron 说成人话（原型「每天 23:00」）；认不出的原样给 */
@@ -30,28 +40,29 @@ export function describeCron(cron: string): string {
   const [m, h, dom, mon, dow] = cron.split(' ')
   if (!m || !h || !/^\d+$/.test(m) || !/^\d+$/.test(h) || mon !== '*') return cron
   const at = `${pad(h)}:${pad(m)}`
-  if (dom === '*' && dow === '*') return `每天 ${at}`
-  if (dom === '*' && dow === '1-5') return `工作日 ${at}`
-  if (dom === '*' && dow !== undefined && /^[0-7]$/.test(dow)) return `每${WEEK[Number(dow) % 7]} ${at}`
-  if (dow === '*' && dom !== undefined && /^\d+$/.test(dom)) return `每月 ${dom} 日 ${at}`
+  if (dom === '*' && dow === '*') return tr('tui.cron.daily', { at })
+  if (dom === '*' && dow === '1-5') return tr('tui.cron.weekdays', { at })
+  if (dom === '*' && dow !== undefined && /^[0-7]$/.test(dow))
+    return tr('tui.cron.weekly', { v: WEEK()[Number(dow) % 7] ?? dow, at })
+  if (dow === '*' && dom !== undefined && /^\d+$/.test(dom)) return tr('tui.cron.monthly', { dom, at })
   return cron
 }
 
 function ago(t: number, now: number): string {
   const m = Math.floor((now - t) / 60_000)
-  if (m < 1) return '刚刚'
-  if (m < 60) return `${m} 分钟前`
+  if (m < 1) return tr('tui.ago.now')
+  if (m < 60) return tr('tui.ago.minutes', { m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h} 小时前`
+  if (h < 24) return tr('tui.ago.hours', { h })
   const d = Math.floor(h / 24)
-  return d === 1 ? '昨天' : `${d} 天前`
+  return d === 1 ? tr('tui.ago.yesterday') : tr('tui.ago.days', { d })
 }
 
 export function projectItems(projects: readonly Project[], currentProject?: string): OverlayItem[] {
   return projects.map((p) => ({
     key: p.id,
     label: p.name,
-    meta: `${p.path} · ${p.taskCount} 任务`,
+    meta: tr('tui.projects.meta', { path: p.path, taskCount: p.taskCount }),
     search: p.path,
     dot: p.id === currentProject ? 'accent' : 'off',
   }))
@@ -59,8 +70,9 @@ export function projectItems(projects: readonly Project[], currentProject?: stri
 
 export function sessionItems(sessions: readonly Session[], projects: readonly Project[], now: number): OverlayItem[] {
   const names = new Map(projects.map((p) => [p.id, p.name]))
-  const groupOf = (s: Session) => (s.projectId === undefined ? '无项目' : (names.get(s.projectId) ?? '其他项目'))
-  const order = (g: string) => (g === '无项目' ? 0 : 1)
+  const groupOf = (s: Session) =>
+    s.projectId === undefined ? tr('common.noProject') : (names.get(s.projectId) ?? tr('tui.sessions.otherProject'))
+  const order = (g: string) => (g === tr('common.noProject') ? 0 : 1)
   return [...sessions]
     .filter((s) => !s.deleted && s.parentId === undefined)
     .sort(
@@ -71,7 +83,11 @@ export function sessionItems(sessions: readonly Session[], projects: readonly Pr
       key: s.id,
       label: s.title.trim() === '' ? s.id : s.title,
       group: groupOf(s),
-      meta: s.busy ? '运行中' : s.unread ? `未读 · ${ago(s.updatedAt, now)}` : ago(s.updatedAt, now),
+      meta: s.busy
+        ? tr('common.running')
+        : s.unread
+          ? tr('tui.sessions.unread', { ago: ago(s.updatedAt, now) })
+          : ago(s.updatedAt, now),
       dot: s.busy ? 'running' : s.unread ? 'warn' : 'off',
       search: s.id,
     }))
@@ -83,15 +99,15 @@ export function taskItems(sessions: readonly Session[], schedules: readonly Sche
     .map<OverlayItem>((s) => ({
       key: `s:${s.id}`,
       label: s.title.trim() === '' ? s.id : s.title,
-      group: '进行中',
+      group: tr('common.inProgress'),
       meta: ago(s.updatedAt, now),
       dot: 'running',
     }))
   const timed = schedules.map<OverlayItem>((s) => ({
     key: `c:${s.id}`,
     label: s.goal,
-    group: '定时',
-    meta: s.paused ? `${describeCron(s.cron)} · 已暂停` : describeCron(s.cron),
+    group: tr('tui.tasks.scheduled'),
+    meta: s.paused ? tr('tui.tasks.pausedCron', { describeCron: describeCron(s.cron) }) : describeCron(s.cron),
     dot: s.paused ? 'off' : s.lastRun?.skipped ? 'warn' : 'ok',
   }))
   return [...running, ...timed]
@@ -107,10 +123,10 @@ export function modelItems(list: ModelList, current: { provider: string; name: s
     label: m.name,
     group: m.providerName,
     meta: [
-      m.provider === list.current.provider && m.name === list.current.name ? '默认' : '',
-      m.source === 'manual' ? '手填' : m.source === 'fallback' ? '未探测到' : '',
-      m.toolCall ? '' : '不能用工具',
-      m.vision ? '' : '不支持图片',
+      m.provider === list.current.provider && m.name === list.current.name ? tr('tui.models.default') : '',
+      m.source === 'manual' ? tr('tui.models.manual') : m.source === 'fallback' ? tr('tui.models.notProbed') : '',
+      m.toolCall ? '' : tr('tui.models.noTools'),
+      m.vision ? '' : tr('tui.models.noImages'),
     ]
       .filter(Boolean)
       .join(' · '),
@@ -138,18 +154,24 @@ function ModelsOverlay({
   const failed = list?.providers.filter((p) => p.status === 'fallback') ?? []
   return (
     <Overlay
-      title="切换模型"
-      placeholder="搜索模型或供应商…"
+      title={tr('web.composer.switchModel')}
+      placeholder={tr('tui.models.search')}
       items={list === null ? [] : modelItems(list, current)}
-      empty={list === null ? '加载中…' : '没有可用的模型：到 Web「设置 › 模型供应商」添加'}
+      empty={list === null ? tr('common.loading') : tr('tui.models.none')}
       hints={[
-        ['↑↓', '选择'],
-        ['enter', '切换'],
-        ['esc', '关闭'],
+        ['↑↓', tr('tui.key.select')],
+        ['enter', tr('tui.key.switch')],
+        ['esc', tr('tui.key.close')],
       ]}
       notice={
         notice ??
-        (failed.length > 0 ? `探测失败：${failed.map((p) => `${p.name}（${p.error ?? '未知'}）`).join('、')}` : null)
+        (failed.length > 0
+          ? tr('tui.models.probeFailed', {
+              join: failed
+                .map((p) => tr('tui.models.failedItem', { name: p.name, v: p.error ?? tr('common.unknown') }))
+                .join(tr('common.listSep')),
+            })
+          : null)
       }
       onSelect={(it) => {
         const [provider, name] = it.key.split('\n')
@@ -167,26 +189,26 @@ function ModelsOverlay({
 function HelpOverlay({ onClose }: { onClose(): void }) {
   const t = useTheme()
   const keys: Array<[string, string]> = [
-    ['p / Ctrl+P', '项目'],
-    ['s / Ctrl+R', '会话'],
-    ['t / Ctrl+T', '任务'],
-    ['Enter', '发送'],
-    ['Ctrl+J', '换行'],
-    ['/', '命令（Tab 补全）'],
-    ['y / n / a', '允许 / 拒绝 / 本会话始终允许'],
-    ['Ctrl+C', '退出（任务在 domid 里继续）'],
+    ['p / Ctrl+P', tr('tui.help.projects')],
+    ['s / Ctrl+R', tr('tui.help.sessions')],
+    ['t / Ctrl+T', tr('tui.help.tasks')],
+    ['Enter', tr('tui.help.send')],
+    ['Ctrl+J', tr('tui.help.newline')],
+    ['/', tr('tui.help.commands')],
+    ['y / n / a', tr('tui.help.permission')],
+    ['Ctrl+C', tr('tui.help.quit')],
   ]
   return (
     <Overlay
-      title="帮助"
+      title={tr('tui.help.title')}
       items={[]}
       searchable={false}
-      hints={[['esc', '关闭']]}
+      hints={[['esc', tr('tui.key.close')]]}
       onSelect={() => undefined}
       onClose={onClose}
     >
       <Box flexDirection="column" paddingX={1}>
-        <Text {...t.fg('mut2')}>单键只在输入框为空时生效</Text>
+        <Text {...t.fg('mut2')}>{tr('tui.help.singleKeys')}</Text>
         {keys.map(([k, d]) => (
           <Box key={k}>
             <Box width={14} flexShrink={0}>
@@ -196,9 +218,9 @@ function HelpOverlay({ onClose }: { onClose(): void }) {
           </Box>
         ))}
         <Box marginTop={1}>
-          <Text {...t.fg('mut2')}>命令</Text>
+          <Text {...t.fg('mut2')}>{tr('tui.help.commandsHeader')}</Text>
         </Box>
-        {COMMANDS.map((c) => (
+        {COMMANDS().map((c) => (
           <Box key={c.name}>
             <Box width={14} flexShrink={0}>
               <Text {...t.fg('accent')}>{c.name}</Text>
@@ -272,14 +294,14 @@ export function Overlays({
   if (state.id === 'projects') {
     return (
       <Overlay
-        title="项目选择"
-        placeholder="搜索项目…"
+        title={tr('tui.projects.title')}
+        placeholder={tr('tui.projects.search')}
         items={projectItems(projects ?? [], currentProject)}
-        empty={projects === null ? '加载中…' : '还没有项目'}
+        empty={projects === null ? tr('common.loading') : tr('web.sidebar.noProjects')}
         hints={[
-          ['↑↓', '选择'],
-          ['enter', '新任务'],
-          ['esc', '关闭'],
+          ['↑↓', tr('tui.key.select')],
+          ['enter', tr('tui.key.newTask')],
+          ['esc', tr('tui.key.close')],
         ]}
         notice={notice}
         onSelect={(it) => onChange({ id: 'tasks', form: { projectId: it.key } })}
@@ -291,14 +313,14 @@ export function Overlays({
   if (state.id === 'sessions') {
     return (
       <Overlay
-        title="会话历史"
-        placeholder="搜索会话…"
+        title={tr('tui.sessions.title')}
+        placeholder={tr('tui.sessions.search')}
         items={sessionItems(sessions ?? [], projects ?? [], now)}
-        empty={sessions === null ? '加载中…' : '还没有会话'}
+        empty={sessions === null ? tr('common.loading') : tr('web.sidebar.noChats')}
         hints={[
-          ['↑↓', '选择'],
-          ['enter', '打开'],
-          ['esc', '关闭'],
+          ['↑↓', tr('tui.key.select')],
+          ['enter', tr('tui.key.open')],
+          ['esc', tr('tui.key.close')],
         ]}
         notice={notice}
         onSelect={(it) => {
@@ -317,7 +339,7 @@ export function Overlays({
     setNotice(null)
     const done = v.cron
       ? client.createSchedule({ projectId: v.projectId, goal: v.goal, cron: v.cron }).then(() => {
-          setNotice('定时任务已创建')
+          setNotice(tr('tui.tasks.scheduleCreated'))
           onChange({ id: 'tasks' })
           load()
         })
@@ -329,23 +351,23 @@ export function Overlays({
   }
   return (
     <Overlay
-      title={form ? '新建任务' : '计划任务'}
+      title={form ? tr('web.sidebar.createTask') : tr('tui.tasks.title')}
       searchable={false}
       items={taskItems(sessions ?? [], schedules, now)}
-      empty={sessions === null ? '加载中…' : '没有进行中的任务，也没有定时任务。按 n 新建'}
+      empty={sessions === null ? tr('common.loading') : tr('tui.tasks.none')}
       hints={
         form
           ? [
-              ['tab', '换字段'],
-              ['←→', '选项目'],
-              ['enter', '创建'],
-              ['esc', '返回'],
+              ['tab', tr('tui.key.nextField')],
+              ['←→', tr('tui.key.pickProject')],
+              ['enter', tr('tui.key.create')],
+              ['esc', tr('tui.key.back')],
             ]
           : [
-              ['n', '新建'],
-              ['enter', '打开 / 运行'],
-              ['p', '暂停 / 恢复'],
-              ['esc', '关闭'],
+              ['n', tr('tui.key.new')],
+              ['enter', tr('tui.key.openRun')],
+              ['p', tr('tui.key.pauseResume')],
+              ['esc', tr('tui.key.close')],
             ]
       }
       notice={form ? null : notice}

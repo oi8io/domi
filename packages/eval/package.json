@@ -8,12 +8,13 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@domi/config": "workspace:*",
+    "@domi/i18n": "workspace:*",
     "@domi/kernel": "workspace:*",
     "@domi/model": "workspace:*",
     "@domi/protocol": "workspace:*",
-    "@domi/store": "workspace:*",
-    "zod": "^4.6.5",
     "@domi/runtime": "workspace:*",
-    "@domi/config": "workspace:*"
+    "@domi/store": "workspace:*",
+    "zod": "^4.6.5"
   }
 }

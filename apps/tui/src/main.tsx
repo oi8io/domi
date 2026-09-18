@@ -25,6 +25,7 @@ import {
 } from '@domi/client-core'
 import { ConfigParseError, loadConfig, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
 import { resolveClientToken } from '@domi/daemon'
+import { envLocaleHints, type LocaleSetting, resolveLocale, setLocale, tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
 import { Box, render, Text, useApp, useInput } from 'ink'
 import { useCallback, useEffect, useState } from 'react'
@@ -56,8 +57,17 @@ export function formatSessionLine(
   s: { id: string; title: string; model: string; eventCount: number; deleted: boolean; parentId?: string | undefined },
   current: string,
 ): string {
-  const tags = [s.parentId === undefined ? '' : '分支', s.deleted ? '已删除' : ''].filter(Boolean)
-  return `${s.id === current ? '*' : ' '} ${s.id}  ${s.title || '（无标题）'}  ${s.model} · ${s.eventCount} 条${tags.length ? ` · ${tags.join(' · ')}` : ''}`
+  const tags = [s.parentId === undefined ? '' : tr('tui.tag.branch'), s.deleted ? tr('tui.tag.deleted') : ''].filter(
+    Boolean,
+  )
+  return tr('tui.sessions.row', {
+    v: s.id === current ? '*' : ' ',
+    id: s.id,
+    v2: s.title || tr('common.untitledParen'),
+    model: s.model,
+    eventCount: s.eventCount,
+    v3: tags.length ? ` · ${tags.join(' · ')}` : '',
+  })
 }
 const DAEMON_ROLE_ENV = 'DOMI_INTERNAL_ROLE'
 
@@ -255,20 +265,20 @@ export function Root({
             })
           case 'budget':
             await client.setBudget(sessionId, cmd.budget)
-            setNotice('已设上限：到 80% 会提醒，到顶暂停问你')
+            setNotice(tr('tui.budget.set'))
             return
           case 'changes': {
             const d = await client.worktreeDiff(sessionId)
             if (cmd.path !== undefined) {
               const f = d.files.find((x) => x.path === cmd.path)
-              setNotice(f ? f.patch || '（二进制或空文件）' : `${cmd.path} 没有改动`)
+              setNotice(f ? f.patch || tr('web.changes.binary') : tr('tui.changes.noneFor', { path: cmd.path }))
               return
             }
             setNotice(
               d.files.length === 0
-                ? `隔离工作区（${d.branch}）里还没有改动`
+                ? tr('tui.changes.none', { branch: d.branch })
                 : [
-                    `${d.branch} 相对 ${d.base.slice(0, 8)} 的改动（/changes <文件> 看 diff，/apply 带回）：`,
+                    tr('tui.changes.header', { branch: d.branch, slice: d.base.slice(0, 8) }),
                     ...d.files.map((f) => `  ${CHANGE_MARK[f.status]} ${f.path}`),
                   ].join('\n'),
             )
@@ -276,12 +286,12 @@ export function Root({
           }
           case 'discard': {
             const trash = await client.discardChange(sessionId, cmd.path)
-            setNotice(`已丢弃 ${cmd.path} 的改动（/undo ${trash} 撤销）`)
+            setNotice(tr('tui.changes.discarded', { path: cmd.path, trash }))
             return
           }
           case 'undo': {
             const path = await client.restoreChange(sessionId, cmd.trash)
-            setNotice(`已恢复 ${path} 的改动`)
+            setNotice(tr('tui.changes.restored', { path }))
             return
           }
           case 'apply': {
@@ -291,7 +301,7 @@ export function Root({
           }
           case 'mode': {
             const changed = await client.setMode(sessionId, cmd.mode)
-            if (!changed) setNotice(cmd.mode === 'plan' ? '已经是计划模式了' : '已经是执行模式了')
+            if (!changed) setNotice(cmd.mode === 'plan' ? tr('tui.mode.alreadyPlan') : tr('tui.mode.alreadyAct'))
             return
           }
           case 'branch': {
@@ -301,19 +311,21 @@ export function Root({
             client.unwatch(sessionId)
             await client.watch(id, next)
             setActive({ sessionId: id, store: next })
-            setNotice(`已切到分支 ${id}（从第 ${cmd.atSeq} 条分出）`)
+            setNotice(tr('tui.branch.switched', { id, atSeq: cmd.atSeq }))
             return
           }
           case 'ref': {
             const next = [...pendingRefs, cmd.ref]
             setPendingRefs(next)
-            setNotice(`下一句话会带上 ${next.length} 段引用（最近一段：会话 ${cmd.ref.sessionId}）`)
+            setNotice(tr('tui.ref.pending', { length: next.length, sessionId: cmd.ref.sessionId }))
             return
           }
           case 'sessions': {
             const { sessions } = await client.listSessions({ includeDeleted: cmd.includeDeleted })
             setNotice(
-              sessions.length === 0 ? '还没有会话' : sessions.map((s) => formatSessionLine(s, sessionId)).join('\n'),
+              sessions.length === 0
+                ? tr('web.sidebar.noChats')
+                : sessions.map((s) => formatSessionLine(s, sessionId)).join('\n'),
             )
             return
           }
@@ -322,7 +334,7 @@ export function Root({
             const id = cmd.kind === 'new' ? await client.createSession(process.cwd()) : cmd.sessionId
             if (id === sessionId) return
             await switchTo(id)
-            setNotice(`已切到会话 ${id}`)
+            setNotice(tr('tui.session.switched', { id }))
             return
           }
           case 'delete': {
@@ -336,20 +348,20 @@ export function Root({
               client.unwatch(sessionId)
               setActive({ sessionId: id, store: next })
             }
-            setNotice(`已删除会话 ${cmd.sessionId}（事件都还在，/restore ${cmd.sessionId} 可以恢复）`)
+            setNotice(tr('tui.session.deleted', { sessionId: cmd.sessionId, sessionId2: cmd.sessionId }))
             return
           }
           case 'restore':
             await client.restoreSession(cmd.sessionId)
-            setNotice(`已恢复会话 ${cmd.sessionId}（/open ${cmd.sessionId} 打开）`)
+            setNotice(tr('tui.session.restored', { sessionId: cmd.sessionId, sessionId2: cmd.sessionId }))
             return
           case 'soul': {
             const [{ path }, changes] = await Promise.all([client.getSoul(), client.soulChanges()])
             setNotice(
               changes.length === 0
-                ? `没有待审阅的改动。Soul 在 ${path}，可以直接编辑`
+                ? tr('tui.soul.noPending', { path })
                 : [
-                    `待审阅 ${changes.length} 处（/soul accept|reject <id>）：`,
+                    tr('tui.soul.pending', { length: changes.length }),
                     ...changes.map((c) => `${c.id}\n${c.diff}`),
                   ].join('\n'),
             )
@@ -366,13 +378,15 @@ export function Root({
                 ? { mode: 'keyword', items: (await client.listMemory()).items }
                 : await client.searchMemory(cmd.query)
             setNotice(
-              r.items.length === 0 ? '没有相关的条目' : r.items.map((i) => `${i.id}  [${i.kind}] ${i.text}`).join('\n'),
+              r.items.length === 0
+                ? tr('tui.memory.none')
+                : r.items.map((i) => `${i.id}  [${i.kind}] ${i.text}`).join('\n'),
             )
             return
           }
           case 'extract': {
             const r = await client.extractMemory(sessionId)
-            setNotice(`从这个会话新记下 ${r.added.length} 条，Soul 改了 ${r.soulChanges.length} 处`)
+            setNotice(tr('tui.memory.extracted', { length: r.added.length, length2: r.soulChanges.length }))
             return
           }
           case 'submit': {
@@ -435,6 +449,14 @@ export function Root({
   )
 }
 
+function localeSetting(): LocaleSetting {
+  try {
+    return loadConfig().ui.locale
+  } catch {
+    return 'auto'
+  }
+}
+
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   if (process.env[DAEMON_ROLE_ENV] === 'daemon') {
     // 动态 import：普通的 domi 命令不必加载 daemon 那一整套
@@ -443,6 +465,10 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
     if (code !== 0) process.exit(code)
     return
   }
+
+  // 界面语言（PRD-M9-004 AC-1）：配置里的 ui.locale，auto 时跟 LC_ALL / LC_MESSAGES / LANG。
+  // 在输出任何东西之前定下来；配置读不了就先按环境变量，读配置的报错留给后面正经报
+  setLocale(resolveLocale(localeSetting(), envLocaleHints(process.env)))
 
   const io = {
     out: (t: string) => {

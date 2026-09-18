@@ -5,7 +5,9 @@
  * 工具参数、工具结果、文件内容、命令原文、节点输出一律不发——哪怕它们就在手边的 TranscriptItem.summary 里。
  * `scripts/check-bridge-payload.ts` 拿带内容的事件喂这里，断言输出里没有那些内容。
  */
+
 import type { AskSnapshot, TranscriptItem } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 
 /** 节点进展。只转 task 类条目的标题行（不带 summary：那里是节点输出） */
 export function formatProgress(sessionId: string, item: TranscriptItem): string | null {
@@ -24,7 +26,7 @@ function basename(p: string): string {
  * 文件只报文件名与行数，命令只报程序名，其余一概不报
  */
 export function formatAsk(sessionId: string, ask: AskSnapshot): string {
-  const lines = [`⏸ 需要确认：${ask.capabilityId}`, sessionId]
+  const lines = [tr('bridge.ask', { capabilityId: ask.capabilityId }), sessionId]
   let args: Record<string, unknown> | null = null
   try {
     const parsed = JSON.parse(ask.detail) as unknown
@@ -33,11 +35,12 @@ export function formatAsk(sessionId: string, ask: AskSnapshot): string {
     args = null
   }
   if (args) {
-    if (typeof args.path === 'string') lines.push(`文件：${basename(args.path)}`)
-    if (typeof args.content === 'string') lines.push(`写入 ${args.content.split('\n').length} 行`)
-    if (typeof args.cmd === 'string') lines.push(`程序：${args.cmd.trim().split(/\s+/)[0] ?? ''}`)
+    if (typeof args.path === 'string') lines.push(tr('bridge.file', { basename: basename(args.path) }))
+    if (typeof args.content === 'string')
+      lines.push(tr('bridge.writeLines', { length: args.content.split('\n').length }))
+    if (typeof args.cmd === 'string') lines.push(tr('bridge.program', { v: args.cmd.trim().split(/\s+/)[0] ?? '' }))
   }
-  if (ask.form) lines.push('（这是一个要填表的询问，Telegram 里只能拒绝；要填请去 TUI / Web）')
-  lines.push('完整内容请在 TUI 或 Web 里看')
+  if (ask.form) lines.push(tr('bridge.formAsk'))
+  lines.push(tr('bridge.seeFull'))
   return lines.join('\n')
 }

@@ -264,7 +264,7 @@ describe('PRD-M8-015 AC-5 · `/` 命令补全', () => {
     expect(completeSlash('/s').map((c) => c.name)).toEqual(['/sessions', '/soul'])
     expect(completeSlash('/soul x')).toEqual([])
     expect(completeSlash('你好')).toEqual([])
-    expect(COMMANDS.length).toBeGreaterThan(10)
+    expect(COMMANDS().length).toBeGreaterThan(10)
   })
 
   test('输入 / 时列出候选，Tab 补全选中的那个；带参数的补完留一个空格', async () => {

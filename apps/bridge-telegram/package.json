@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@domi/client-core": "workspace:*",
+    "@domi/i18n": "workspace:*",
     "@domi/protocol": "workspace:*",
     "grammy": "1.46.0"
   }

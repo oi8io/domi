@@ -190,6 +190,9 @@ importers:
       '@domi/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@domi/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -421,6 +424,9 @@ importers:
       '@domi/config':
         specifier: workspace:*
         version: link:../config
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@domi/kernel':
         specifier: workspace:*
         version: link:../kernel
@@ -621,6 +627,9 @@ importers:
 
   packages/trace:
     dependencies:
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@domi/kernel':
         specifier: workspace:*
         version: link:../kernel

@@ -8,9 +8,11 @@
  *
  * 钩子从环境变量拿到这次调用（DOMI_CMD 等），退出码非 0 = 拦下，输出就是给模型的理由。
  */
+
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
+import { tr } from '@domi/i18n'
 import { CREDENTIAL_PATTERNS } from '@domi/store'
 import type { Io } from './io.ts'
 
@@ -69,7 +71,7 @@ export function checkCommitMessage(
       if (m) {
         return {
           ok: false,
-          reason: `提交信息里有不允许的内容：「${m[0].trim()}」。去掉这一行再提交（规则来自用户的 commit-msg 钩子）。`,
+          reason: tr('cli.hook.commitMsg', { trim: m[0].trim() }),
         }
       }
     }
@@ -87,17 +89,19 @@ export function scanStaged(cwd: string): { ok: true } | { ok: false; reason: str
     if (!line.startsWith('+') || line.startsWith('+++')) continue
     for (const re of CREDENTIAL_PATTERNS) {
       const m = line.match(new RegExp(re.source, re.flags.replace('g', '')))
-      if (m) hits.push(`${file}：${m[0].slice(0, 8)}…`)
+      if (m) hits.push(tr('cli.hook.secretHit', { file, slice: m[0].slice(0, 8) }))
     }
   }
   if (hits.length === 0) return { ok: true }
   const unique = [...new Set(hits)]
   return {
     ok: false,
-    reason: `暂存区里有疑似凭据，拒绝提交：\n${unique
-      .slice(0, 10)
-      .map((h) => `  ${h}`)
-      .join('\n')}\n把它们移出暂存区（git restore --staged <文件>）并改用环境变量。`,
+    reason: tr('cli.hook.secrets', {
+      join: unique
+        .slice(0, 10)
+        .map((h) => `  ${h}`)
+        .join('\n'),
+    }),
   }
 }
 
@@ -118,6 +122,6 @@ export function runHook(name: string | undefined, args: readonly string[], io: I
     io.err(r.reason)
     return 1
   }
-  io.err('用法：domi hook commit-msg [额外的正则...] | domi hook secrets（在 config.yaml 的 hooks 里引用）')
+  io.err(tr('cli.hook.usage'))
   return 2
 }

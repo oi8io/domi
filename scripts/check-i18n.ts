@@ -15,7 +15,17 @@ import ts from 'typescript'
 import { en, paramNames, zh } from '../packages/i18n/src/index.ts'
 
 /** 已经迁到 t() 的目录。迁完一处加一处——这是防回退的唯一机制 */
-export const SCANNED = process.env.I18N_SCAN?.split(',') ?? ['apps/web/src', 'packages/client-core/src']
+export const SCANNED = process.env.I18N_SCAN?.split(',') ?? [
+  'apps/web/src',
+  'apps/tui/src',
+  'apps/bridge-telegram/src',
+  'packages/client-core/src',
+  'packages/cli/src',
+  'packages/trace/src',
+  // eval 只扫面向人的命令输出；l2 / mine 生成的是给开发者看的报告与给模型的题面，不算界面（PRD-M9-004 AC-5）
+  'packages/eval/src/cli.ts',
+  'packages/eval/src/replay.ts',
+]
 
 const CJK = /[㐀-鿿＀-￯　-〿]/
 
@@ -26,6 +36,7 @@ interface Hit {
 }
 
 function collect(root: string): string[] {
+  if (statSync(root).isFile()) return [root]
   const out: string[] = []
   const walk = (d: string): void => {
     for (const name of readdirSync(d)) {

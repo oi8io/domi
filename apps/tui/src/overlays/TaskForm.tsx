@@ -1,3 +1,4 @@
+import { tr } from '@domi/i18n'
 import { Box, Text, useInput } from 'ink'
 import { useEffect, useRef, useState } from 'react'
 import { editAction } from '../components/Prompt.tsx'
@@ -65,7 +66,7 @@ export function TaskForm({
     }
     void validateCron(value.trim()).then((e) => {
       setCronError(e)
-      setCronHint(e === null ? '时间表可用' : null)
+      setCronHint(e === null ? tr('tui.form.cronOk') : null)
     })
   }
 
@@ -122,9 +123,9 @@ export function TaskForm({
   return (
     <Box flexDirection="column" paddingX={1} paddingY={1}>
       <Box>
-        <Box width={8}>{label('project', '项目')}</Box>
+        <Box width={8}>{label('project', tr('web.sidebar.projects'))}</Box>
         {projects.length === 0 ? (
-          <Text {...t.fg('warn')}>还没有项目，先在 Web 端或用 domi -p 添加</Text>
+          <Text {...t.fg('warn')}>{tr('tui.form.noProjects')}</Text>
         ) : (
           <Text {...t.fg('ink2')}>
             {field === 'project' ? '◂ ' : ''}
@@ -136,18 +137,18 @@ export function TaskForm({
       </Box>
       <Box>
         <Box width={8} flexShrink={0}>
-          {label('goal', '目标')}
+          {label('goal', tr('common.goal'))}
         </Box>
         <Box flexShrink={1}>
-          <Text {...t.fg(goal === '' ? 'mut2' : 'ink')}>{goal === '' ? '这个任务要达成什么？' : goal}</Text>
+          <Text {...t.fg(goal === '' ? 'mut2' : 'ink')}>{goal === '' ? tr('tui.form.goalPlaceholder') : goal}</Text>
           {caret('goal')}
         </Box>
       </Box>
       <Box>
         <Box width={8} flexShrink={0}>
-          {label('cron', '定时')}
+          {label('cron', tr('tui.form.schedule'))}
         </Box>
-        <Text {...t.fg(cron === '' ? 'mut2' : 'ink')}>{cron === '' ? '可选：0 9 * * 1-5' : cron}</Text>
+        <Text {...t.fg(cron === '' ? 'mut2' : 'ink')}>{cron === '' ? tr('tui.form.cronPlaceholder') : cron}</Text>
         {caret('cron')}
       </Box>
       {cronError !== null && (
@@ -161,7 +162,7 @@ export function TaskForm({
         </Box>
       )}
       {error !== undefined && error !== null && <Text {...t.fg('bad')}>{error}</Text>}
-      {busy && <Text {...t.fg('mut')}>正在创建…</Text>}
+      {busy && <Text {...t.fg('mut')}>{tr('tui.form.creating')}</Text>}
     </Box>
   )
 }

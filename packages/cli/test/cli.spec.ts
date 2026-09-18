@@ -64,7 +64,7 @@ describe('AC-4 · doctor 的每条问题都带可执行命令', () => {
 
   test('一切正常时不编造问题', () => {
     const dir = tmp()
-    writeFileSync(join(dir, 'config.yaml'), CONFIG_TEMPLATE)
+    writeFileSync(join(dir, 'config.yaml'), CONFIG_TEMPLATE())
     const findings = diagnose({
       ...BASE,
       configPath: join(dir, 'config.yaml'),
@@ -102,18 +102,18 @@ describe('AC-4 · doctor 的每条问题都带可执行命令', () => {
 
 describe('AC-3 · 首次运行引导是固定四步', () => {
   test('四步齐全，顺序写死', () => {
-    expect(ONBOARDING_STEPS.map((s) => s.id)).toEqual(['provider', 'credential', 'verify', 'chat'])
+    expect(ONBOARDING_STEPS().map((s) => s.id)).toEqual(['provider', 'credential', 'verify', 'chat'])
   })
 
   test('每一步的提示都能被冒烟脚本逐个断言', () => {
     const out = formatOnboarding()
-    for (const s of ONBOARDING_STEPS) expect(out).toContain(s.prompt)
+    for (const s of ONBOARDING_STEPS()) expect(out).toContain(s.prompt)
     expect(out).toContain('第 1 步 / 共 4 步')
     expect(out).toContain('第 4 步 / 共 4 步')
   })
 
   test('全程无需外部文档：每步都自带提示', () => {
-    for (const s of ONBOARDING_STEPS) expect(s.hint.length).toBeGreaterThan(5)
+    for (const s of ONBOARDING_STEPS()) expect(s.hint.length).toBeGreaterThan(5)
   })
 })
 
@@ -147,19 +147,19 @@ describe('命令面', () => {
     expect(p.command).toBe('chat')
     expect(p.flags.connect).toBe('ws://10.0.0.2:7437')
     expect(parseCli([]).flags.connect).toBeUndefined()
-    expect(HELP).toContain('--connect')
-    expect(HELP).toContain('DOMI_TOKEN')
+    expect(HELP()).toContain('--connect')
+    expect(HELP()).toContain('DOMI_TOKEN')
   })
 
   test('help 把七个命令都列了', () => {
-    for (const c of ['doctor', 'init', 'session', 'data', 'prompt', 'report-bug']) expect(HELP).toContain(c)
+    for (const c of ['doctor', 'init', 'session', 'data', 'prompt', 'report-bug']) expect(HELP()).toContain(c)
   })
 })
 
 describe('PRD-M1-010 · 导出与清除', () => {
   test('配置模板本身就是合法配置（YAML，ADR-014）', () => {
     const dir = tmp()
-    writeFileSync(join(dir, 'config.yaml'), CONFIG_TEMPLATE)
+    writeFileSync(join(dir, 'config.yaml'), CONFIG_TEMPLATE())
     const cfg = loadConfig({ path: join(dir, 'config.yaml'), env: {} })
     expect(cfg.model.provider).toBe('anthropic')
     expect(cfg.permissions.rules.map((r) => r.name)).toContain('confirm-shell')
@@ -172,7 +172,7 @@ describe('PRD-M1-010 · 导出与清除', () => {
     await log.append('b', [{ t: 'user.input', text: '第二个会话' }])
 
     const out = join(tmp(), 'export')
-    const r = await exportAll(log, out, CONFIG_TEMPLATE)
+    const r = await exportAll(log, out, CONFIG_TEMPLATE())
     log.close()
 
     expect(r.sessions).toBe(2)
@@ -198,7 +198,7 @@ describe('PRD-M1-010 · 导出与清除', () => {
 
   test('BUG-M3-011 · 还没有配置文件时导出模板', () => {
     const text = exportableConfig(configSource({ path: join(tmp(), 'none.yaml'), env: {} }))
-    expect(text).toBe(CONFIG_TEMPLATE)
+    expect(text).toBe(CONFIG_TEMPLATE())
   })
 
   test('AC-1 · 软删除的会话也导出 —— 「全部拿走」就是全部', async () => {

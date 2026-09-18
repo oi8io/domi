@@ -1,3 +1,4 @@
+import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { useTheme } from '../theme.ts'
 
@@ -20,13 +21,13 @@ export function ContextBar({
     <Box>
       <Box flexShrink={0}>
         <Text {...t.fg(project === null ? 'mut' : 'accent')} bold={project !== null}>
-          {project === null ? '▸ 会话' : `▸ ${project}`}
+          {project === null ? tr('tui.context.chat') : `▸ ${project}`}
         </Text>
         <Text {...t.fg('mut2')}>{' › '}</Text>
       </Box>
       <Box flexGrow={1} flexShrink={1}>
         <Text {...t.fg('ink2')} wrap="truncate-end">
-          {title === '' ? '新会话' : title}
+          {title === '' ? tr('tui.cmd.new') : title}
         </Text>
       </Box>
       {turns !== undefined && (
@@ -56,11 +57,12 @@ export function KeyHints({ hints }: { hints: ReadonlyArray<readonly [string, str
 }
 
 /** 原型 tui.html 的按键提示（单键在输入框为空时生效；Enter / Ctrl+J 写在输入框的占位里） */
-export const DEFAULT_HINTS = [
-  ['p', '项目'],
-  ['s', '会话'],
-  ['t', '任务'],
-  ['/', '命令'],
-  ['?', '帮助'],
-  ['Ctrl+C', '退出'],
-] as const
+export const DEFAULT_HINTS = () =>
+  [
+    ['p', tr('tui.hint.projects')],
+    ['s', tr('tui.hint.sessions')],
+    ['t', tr('tui.hint.tasks')],
+    ['/', tr('tui.hint.commands')],
+    ['?', tr('tui.hint.help')],
+    ['Ctrl+C', tr('tui.hint.quit')],
+  ] as const

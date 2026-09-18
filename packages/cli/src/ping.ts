@@ -8,6 +8,7 @@
  */
 
 import type { Protocol, VendorId } from '@domi/config'
+import { tr } from '@domi/i18n'
 import type { ModelProvider } from '@domi/model'
 import { createProvider, StubProvider } from '@domi/model'
 import type { PingResult } from './doctor.ts'
@@ -59,8 +60,8 @@ export async function ping(input: PingInput): Promise<PingResult> {
     const ms = now() - t0
     if (error) return { ok: false, ms, detail: classify(error, input) }
     return sawText
-      ? { ok: true, ms, detail: `${input.provider}/${input.model} 有响应` }
-      : { ok: false, ms, detail: '端点接受了请求但什么都没返回——多半是模型名不对' }
+      ? { ok: true, ms, detail: tr('cli.ping.ok', { provider: input.provider, model: input.model }) }
+      : { ok: false, ms, detail: tr('cli.ping.empty') }
   } catch (e) {
     return { ok: false, ms: now() - t0, detail: classify(e instanceof Error ? e.message : String(e), input) }
   }
@@ -70,15 +71,15 @@ export async function ping(input: PingInput): Promise<PingResult> {
 function classify(msg: string, input: PingInput): string {
   const m = msg.toLowerCase()
   if (/401|403|unauthorized|invalid.*key|authentication/.test(m)) {
-    return `端点通了，但 key 不被接受：${msg}`
+    return tr('cli.ping.badKey', { msg })
   }
   if (/404|not found|model/.test(m)) {
-    return `端点通了、key 也过了，但模型名 "${input.model}" 找不到：${msg}`
+    return tr('cli.ping.badModel', { model: input.model, msg })
   }
   if (/enotfound|econnrefused|dns|getaddrinfo/.test(m)) {
-    return `连不上 ${input.baseUrl ?? input.provider}：${msg}`
+    return tr('cli.ping.unreachable', { v: input.baseUrl ?? input.provider, msg })
   }
-  if (/timeout|timed out|abort/.test(m)) return `超时（15 秒）：${msg}`
+  if (/timeout|timed out|abort/.test(m)) return tr('cli.ping.timeout', { msg })
   return msg
 }
 

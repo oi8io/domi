@@ -51,6 +51,6 @@ describe('两份文案不许漂移', () => {
     const src = await Bun.file('packages/checkpoint/src/revert.ts').text()
     const m = src.match(/export const REVERT_SIDE_EFFECT_NOTICE =\s*'([^']+)'/)
     expect(m).not.toBeNull()
-    expect((m as RegExpMatchArray)[1]).toBe(REVERT_NOTICE)
+    expect((m as RegExpMatchArray)[1]).toBe(REVERT_NOTICE())
   })
 })

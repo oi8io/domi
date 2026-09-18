@@ -1,4 +1,5 @@
 import type { TranscriptItem } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { useTheme } from '../theme.ts'
 
@@ -20,7 +21,7 @@ export const PREFIX: Record<TranscriptItem['kind'], string> = {
 
 /** 工具调用那一行右边的「状态 · 耗时」：看紧跟着它的结果 */
 export function toolMeta(result: TranscriptItem | undefined): string {
-  if (result === undefined || result.kind !== 'tool-result') return '运行中'
+  if (result === undefined || result.kind !== 'tool-result') return tr('common.running')
   const state = result.ok ? 'done' : 'failed'
   return result.ms === undefined ? state : `${state} · ${result.ms}ms`
 }

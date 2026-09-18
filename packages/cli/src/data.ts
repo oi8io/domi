@@ -5,9 +5,11 @@
  * 所以导出格式必须是**能自己解析的**（JSONL + YAML），不留私有二进制；
  * purge 必须先把要删什么摆出来。
  */
+
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { type ConfigSource, readConfigFile } from '@domi/config'
+import { tr } from '@domi/i18n'
 import type { SqliteEventLog } from '@domi/store'
 import { CONFIG_TEMPLATE } from './args.ts'
 
@@ -51,8 +53,8 @@ export async function exportAll(log: SqliteEventLog, outDir: string, configYaml:
  * 注释带不过来：重新序列化只保留结构。还没有配置文件时导出模板。
  */
 export function exportableConfig(src: ConfigSource): string {
-  if (!src.exists) return CONFIG_TEMPLATE
-  return toYamlWithoutSecrets(readConfigFile(src), `# 导出自 ${src.path}（已去掉密钥；原文件的注释没有带过来）`)
+  if (!src.exists) return CONFIG_TEMPLATE()
+  return toYamlWithoutSecrets(readConfigFile(src), tr('cli.data.exportHeader', { path: src.path }))
 }
 
 /** 结构原样转成 YAML，去掉 model.api_key 与 server.token。迁移与导出共用 */
@@ -106,10 +108,10 @@ export function planPurge(dataDir: string): PurgePlan {
 export function formatPurgePlan(plan: PurgePlan): string {
   const mb = (n: number): string => `${(n / 1024 / 1024).toFixed(2)} MB`
   return [
-    '将要永久删除：',
+    tr('cli.data.willDelete'),
     ...plan.entries.map((e) => `  ${e.path}  (${mb(e.bytes)})`),
     '',
-    `共 ${plan.entries.length} 项，${mb(plan.totalBytes)}。**不可恢复。**`,
-    `想清楚了就输入 ${plan.confirmWord} 确认；想留一份先跑 domi data export。`,
+    tr('cli.data.total', { length: plan.entries.length, mb: mb(plan.totalBytes) }),
+    tr('cli.data.confirm', { confirmWord: plan.confirmWord }),
   ].join('\n')
 }

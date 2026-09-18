@@ -28,8 +28,8 @@ const FAKE_KEY = ['sk', 'ant', 'x'.repeat(8) + 'FAKEFAKEFAKEFAKE1234'].join('-')
 
 describe('PRD-M7-003 AC-6 · 模板里有两个示例钩子', () => {
   test('init 模板的 hooks 段引用 domi hook commit-msg 与 domi hook secrets', () => {
-    expect(CONFIG_TEMPLATE).toContain('run: domi hook commit-msg')
-    expect(CONFIG_TEMPLATE).toContain('run: domi hook secrets')
+    expect(CONFIG_TEMPLATE()).toContain('run: domi hook commit-msg')
+    expect(CONFIG_TEMPLATE()).toContain('run: domi hook secrets')
   })
 })
 

@@ -5,6 +5,7 @@
  * 它要显示前 200 字符加总字节数，这样人一眼能判断「要不要展开」——
  * 只显示一句「（已折叠）」等于逼人每一个都展开一遍。
  */
+import { tr } from '@domi/i18n'
 import type { TraceNode, TraceTree } from './model.ts'
 
 /**
@@ -38,15 +39,19 @@ function renderNode(n: TraceNode, depth: number, out: string[]): void {
   if (n.ms !== null) bits.push(`${n.ms}ms`)
   if (n.tokens)
     bits.push(`↑${n.tokens.input} ↓${n.tokens.output}${n.tokens.cacheRead > 0 ? ` ⚡${n.tokens.cacheRead}` : ''}`)
-  if (n.costUsdCumulative !== null) bits.push(`累计 ${fmtCost(n.costUsdCumulative)}`)
+  if (n.costUsdCumulative !== null) bits.push(tr('trace.cumulative', { fmtCost: fmtCost(n.costUsdCumulative) }))
   const suffix = bits.length > 0 ? `  [${bits.join(' · ')}]` : ''
 
   out.push(`${pad}${GLYPH[n.kind] ?? '•'} ${n.title}${suffix}`)
 
-  let body = n.collapsed ? `${n.preview}\n（已折叠，共 ${n.bytes} 字节；展开看全文）` : n.detail
+  let body = n.collapsed ? tr('trace.folded', { preview: n.preview, bytes: n.bytes }) : n.detail
   const lines = body.split('\n')
   if (!n.collapsed && lines.length > MAX_LINES) {
-    body = `${lines.slice(0, MAX_LINES).join('\n')}\n（还有 ${lines.length - MAX_LINES} 行，共 ${n.bytes} 字节；导出 HTML 看全文）`
+    body = tr('trace.truncated', {
+      join: lines.slice(0, MAX_LINES).join('\n'),
+      v: lines.length - MAX_LINES,
+      bytes: n.bytes,
+    })
   }
   for (const line of body.split('\n')) out.push(`${pad}    ${line}`)
 
@@ -54,13 +59,13 @@ function renderNode(n: TraceNode, depth: number, out: string[]): void {
 }
 
 export function renderText(tree: TraceTree): string {
-  const out: string[] = [`轨迹 · ${tree.sessionId}`, '']
+  const out: string[] = [tr('trace.title', { sessionId: tree.sessionId }), '']
   for (const n of tree.nodes) renderNode(n, 0, out)
   out.push('')
-  out.push(`总花费：${fmtCost(tree.totalCostUsd)}`)
+  out.push(tr('trace.totalCost', { fmtCost: fmtCost(tree.totalCostUsd) }))
   if (tree.unpricedModels.length > 0) {
     // 显示 0 会让人以为免费，比显示「不知道」更糟 —— 与状态栏同一条口径
-    out.push(`（价目表里没有：${tree.unpricedModels.join('、')}，这部分不参与累计）`)
+    out.push(tr('trace.unpriced', { join: tree.unpricedModels.join(tr('common.listSep')) }))
   }
   return out.join('\n')
 }

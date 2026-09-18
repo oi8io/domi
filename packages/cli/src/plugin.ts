@@ -4,7 +4,9 @@
  * 安装要人确认（非交互直接拒绝，AC-2）。装好之后要重启 domid 才生效：
  * daemon 启动时读一次已安装列表，运行中不热加载——热加载会让「什么时候开始拥有这些权限」变得模糊。
  */
+
 import { resolve } from 'node:path'
+import { tr } from '@domi/i18n'
 import {
   detectSandbox,
   InstallRefusedError,
@@ -18,14 +20,7 @@ import {
 } from '@domi/plugin'
 import type { Io } from './io.ts'
 
-const USAGE = `用法：
-  domi plugin list                        已安装的插件、沙箱状态、没加载上的原因
-  domi plugin install <目录>              安装（逐条列出权限，确认后才装；装好后重启 domid 生效）
-  domi plugin remove <名字>               卸载
-  domi plugin scaffold <tool|skill|mcp> <目录> [名字]
-                                          生成插件骨架（自带 bun test）
-
-写法见 docs/site/plugin-dev.md。`
+const USAGE = () => tr('cli.plugin.usage')
 
 export async function runPlugin(
   sub: string | undefined,
@@ -37,14 +32,19 @@ export async function runPlugin(
     case 'list':
     case undefined: {
       const backend = detectSandbox()
-      io.out(`沙箱：${backend === 'none' ? '没有（带代码的插件不会运行）' : backend}`)
+      io.out(tr('web.plugins.sandbox', { v: backend === 'none' ? tr('web.plugins.noSandbox') : backend }))
       const { plugins, problems } = loadInstalled(opts.pluginsDir)
-      if (readIndex(opts.pluginsDir).plugins.length === 0) io.out('还没有安装插件。')
+      if (readIndex(opts.pluginsDir).plugins.length === 0) io.out(tr('cli.plugin.none'))
       for (const p of plugins) {
         const c = p.manifest.contributes
         io.out(
           `${p.manifest.name} ${p.manifest.version}  ${p.manifest.description}\n` +
-            `    工具 ${c.tools.length} · skill ${c.skills.length} · MCP ${c.mcp.length} · 面板 ${c.ui.length}`,
+            tr('cli.plugin.counts', {
+              length: c.tools.length,
+              length2: c.skills.length,
+              length3: c.mcp.length,
+              length4: c.ui.length,
+            }),
         )
       }
       for (const pr of problems) io.err(`⚠ ${pr.message}`)
@@ -53,7 +53,7 @@ export async function runPlugin(
     case 'install': {
       const dir = args[0]
       if (!dir) {
-        io.err(USAGE)
+        io.err(USAGE())
         return 2
       }
       const ask = io.ask
@@ -63,14 +63,14 @@ export async function runPlugin(
           ...(ask
             ? {
                 confirm: async (m, perms) => {
-                  io.out(`\n插件 ${m.name} ${m.version}：${m.description}\n它需要：`)
+                  io.out(tr('cli.plugin.needs', { name: m.name, version: m.version, description: m.description }))
                   for (const p of perms) io.out(`  · ${p}`)
-                  return (await ask('\n确认安装？[y/N] ')).trim().toLowerCase() === 'y'
+                  return (await ask(tr('cli.plugin.confirm'))).trim().toLowerCase() === 'y'
                 },
               }
             : {}),
         })
-        io.out(`已安装 ${inst.name} ${inst.version}。重启 domid 后生效（关掉所有 domi 窗口，或 kill domid 进程）`)
+        io.out(tr('cli.plugin.installed', { name: inst.name, version: inst.version }))
         return 0
       } catch (e) {
         if (e instanceof InstallRefusedError || e instanceof ManifestError) {
@@ -82,31 +82,29 @@ export async function runPlugin(
     }
     case 'remove': {
       if (!args[0]) {
-        io.err(USAGE)
+        io.err(USAGE())
         return 2
       }
       const ok = removePlugin(opts.pluginsDir, args[0])
-      io.out(ok ? `已卸载 ${args[0]}。重启 domid 后生效` : `没有安装 ${args[0]}`)
+      io.out(ok ? tr('cli.plugin.removed', { v: args[0] }) : tr('cli.plugin.notInstalled', { v: args[0] }))
       return ok ? 0 : 1
     }
     case 'scaffold': {
       const kind = args[0] as ScaffoldKind | undefined
       const dir = args[1]
       if (!kind || !['tool', 'skill', 'mcp'].includes(kind) || !dir) {
-        io.err(USAGE)
+        io.err(USAGE())
         return 2
       }
       const name = (args[2] ?? resolve(dir).split(/[\\/]/).pop() ?? 'my-plugin')
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, '-')
       const files = scaffold(kind, dir, name)
-      io.out(
-        `已生成 ${name}（${kind} 型）：\n${files.map((f) => `  ${f}`).join('\n')}\n\n$ cd ${dir} && bun test\n$ domi plugin install ${dir}`,
-      )
+      io.out(tr('cli.plugin.scaffolded', { name, kind, join: files.map((f) => `  ${f}`).join('\n'), dir, dir2: dir }))
       return 0
     }
     default:
-      io.err(USAGE)
+      io.err(USAGE())
       return 2
   }
 }

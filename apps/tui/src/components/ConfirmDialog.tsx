@@ -1,4 +1,5 @@
 import type { AskSnapshot } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { useTheme } from '../theme.ts'
 
@@ -7,8 +8,7 @@ import { useTheme } from '../theme.ts'
  * 文案的真身在 @domi/checkpoint（REVERT_SIDE_EFFECT_NOTICE），
  * 但 apps 不许 import 那个包（INV-02），所以这里复制一份并用测试锁死两边一致。
  */
-export const REVERT_NOTICE =
-  '注意：回滚只还原文件。已执行的 shell 命令、已发出的网络请求、已 push 的 commit 都不会被撤销。'
+export const REVERT_NOTICE = () => tr('tui.revert.warning')
 
 export interface RevertAsk {
   toSeq: number
@@ -27,23 +27,29 @@ export function ConfirmDialog({ ask }: { ask: AskSnapshot }): React.ReactElement
   const t = useTheme()
   const needsWeb = ask.form !== undefined && formNeedsWeb(ask.form.schema)
   const approval = (ask.form?.schema as Record<string, unknown> | undefined)?.[TUI_ACCEPT_EMPTY] === true
-  const title = ask.form ? (approval ? '等你审批' : '需要你提供信息') : '权限请求'
+  const title = ask.form
+    ? approval
+      ? tr('web.confirm.awaitingApproval')
+      : tr('web.confirm.needsInput')
+    : tr('tui.confirm.permission')
   // 内嵌在对话流里的框（PRD-M8-014 AC-3）。回车 = 拒绝，所以高亮的是「拒绝」（INV-03）
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={t.border('warn')} paddingX={1} marginLeft={2}>
-      <Text {...t.fg('warn')} bold>{`🔑 ${title}：${ask.capabilityId}`}</Text>
+      <Text {...t.fg('warn')} bold>
+        {tr('tui.confirm.title', { title, capabilityId: ask.capabilityId })}
+      </Text>
       <Text {...t.fg('ink2')}>{ask.detail}</Text>
       {needsWeb ? (
-        <Text {...t.fg('mut')}>这个请求要填表：请在 Web 端（pnpm web）回答；n 拒绝</Text>
+        <Text {...t.fg('mut')}>{tr('tui.confirm.formInWeb')}</Text>
       ) : (
         <Box marginTop={1}>
           <Text {...t.fg('warn')} inverse bold>
-            {' n 拒绝 '}
+            {tr('tui.confirm.keyReject')}
           </Text>
           <Text>{'  '}</Text>
-          <Text {...t.fg('ink2')}>{approval ? ' y 批准 ' : ' y 允许 '}</Text>
-          {ask.grantable === true && <Text {...t.fg('ink2')}>{'  a 本会话始终允许 '}</Text>}
-          <Text {...t.fg('mut2')}>{'   Enter = 拒绝'}</Text>
+          <Text {...t.fg('ink2')}>{approval ? tr('tui.confirm.keyApprove') : tr('tui.confirm.keyAllow')}</Text>
+          {ask.grantable === true && <Text {...t.fg('ink2')}>{tr('tui.confirm.keyAlways')}</Text>}
+          <Text {...t.fg('mut2')}>{tr('tui.confirm.enterRejects')}</Text>
         </Box>
       )}
     </Box>
@@ -56,17 +62,17 @@ export function ConfirmDialog({ ask }: { ask: AskSnapshot }): React.ReactElement
  */
 export function RevertDialog({ ask }: { ask: RevertAsk }): React.ReactElement {
   const scopeText = {
-    files: '只还原文件',
-    conversation: '只作废对话',
-    both: '还原文件并作废对话',
+    files: tr('tui.revert.files'),
+    conversation: tr('tui.revert.chat'),
+    both: tr('tui.revert.both'),
   }[ask.scope]
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={1}>
-      <Text color="red">{`回滚到第 ${ask.toSeq} 步`}</Text>
-      <Text>{`${scopeText} · 影响 ${ask.fileCount} 个文件`}</Text>
-      <Text dimColor>{REVERT_NOTICE}</Text>
-      <Text dimColor>y 确认回滚 / n 取消（默认取消）</Text>
+      <Text color="red">{tr('tui.revert.to', { toSeq: ask.toSeq })}</Text>
+      <Text>{tr('tui.revert.scope', { scopeText, fileCount: ask.fileCount })}</Text>
+      <Text dimColor>{REVERT_NOTICE()}</Text>
+      <Text dimColor>{tr('tui.revert.keys')}</Text>
     </Box>
   )
 }

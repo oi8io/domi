@@ -10,6 +10,7 @@
  *
  * 这是**快照**，不含任何与 daemon 通信的能力——与 M3 Web 客户端的边界就在这里。
  */
+import { tr } from '@domi/i18n'
 import type { TraceNode, TraceTree } from './model.ts'
 
 function escapeHtml(s: string): string {
@@ -49,7 +50,7 @@ function bits(n: TraceNode): string {
   if (n.ms !== null) b.push(`${n.ms}ms`)
   if (n.tokens)
     b.push(`↑${n.tokens.input} ↓${n.tokens.output}${n.tokens.cacheRead > 0 ? ` ⚡${n.tokens.cacheRead}` : ''}`)
-  if (n.costUsdCumulative !== null) b.push(`累计 ${fmtCost(n.costUsdCumulative)}`)
+  if (n.costUsdCumulative !== null) b.push(tr('trace.cumulative', { fmtCost: fmtCost(n.costUsdCumulative) }))
   return b.length > 0 ? `<span class="bits">${escapeHtml(b.join(' · '))}</span>` : ''
 }
 
@@ -61,7 +62,7 @@ function renderNode(n: TraceNode): string {
     `${bits(n)}<span class="seq">seq ${n.seq}</span></summary>`
   const body = `<pre>${escapeHtml(n.detail)}</pre>`
   const kids = n.children.map(renderNode).join('')
-  const hint = n.collapsed ? `<div class="note">共 ${n.bytes} 字节，默认折叠</div>` : ''
+  const hint = n.collapsed ? tr('trace.htmlFolded', { bytes: n.bytes }) : ''
   return `<details id="seq-${n.seq}"${open}>${head}${hint}${body}${kids}</details>`
 }
 
@@ -69,22 +70,15 @@ export function exportHtml(tree: TraceTree): string {
   const body = tree.nodes.map(renderNode).join('')
   const note =
     tree.unpricedModels.length > 0
-      ? `<span class="note">（价目表里没有：${escapeHtml(tree.unpricedModels.join('、'))}，这部分不参与累计）</span>`
+      ? tr('trace.htmlUnpriced', { escapeHtml: escapeHtml(tree.unpricedModels.join(tr('common.listSep'))) })
       : ''
-  return `<!doctype html>
-<html lang="zh">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>domi 轨迹 · ${escapeHtml(tree.sessionId)}</title>
-<style>${CSS}</style>
-</head>
-<body>
-<h1>domi 轨迹</h1>
-<div class="meta">会话 ${escapeHtml(tree.sessionId)} · ${tree.nodes.length} 个顶层节点 · 本文件不发出任何网络请求</div>
-${body}
-<div class="total">总花费：${fmtCost(tree.totalCostUsd)} ${note}</div>
-</body>
-</html>
-`
+  return tr('trace.htmlPage', {
+    escapeHtml: escapeHtml(tree.sessionId),
+    CSS,
+    escapeHtml2: escapeHtml(tree.sessionId),
+    length: tree.nodes.length,
+    body,
+    fmtCost: fmtCost(tree.totalCostUsd),
+    note,
+  })
 }

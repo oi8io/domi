@@ -7,8 +7,10 @@
  * 单独成文件是为了能测：Ink 的按键在无 TTY 环境里验不了（docs/adr/001），
  * 但「连上、建会话、订阅」这一段不需要 TTY。
  */
+
 import { authProtocols, createSessionStore, DomiClient, type SessionStore, type WireSocket } from '@domi/client-core'
 import { type DaemonEndpoint, ensureDaemon } from '@domi/daemon'
+import { tr } from '@domi/i18n'
 
 export interface ChatConnection {
   client: DomiClient
@@ -51,9 +53,8 @@ export class RemoteConnectError extends Error {
   constructor(url: string, why: 'auth' | 'unreachable', detail = '') {
     super(
       why === 'auth'
-        ? `${url} 拒绝了连接：token 不对或没带。
-把服务端的 token 设进 DOMI_TOKEN 再试；服务端没配 token 的话，它在那台机器的 ~/.domi/daemon.token 里。`
-        : `连不上 ${url}${detail ? `（${detail}）` : ''}。确认对面的 domid 在跑、监听的是这个地址和端口。`,
+        ? tr('tui.connect.badToken', { url })
+        : tr('tui.connect.unreachable', { url, v: detail ? tr('tui.connect.detail', { detail }) : '' }),
     )
     this.name = 'RemoteConnectError'
   }
@@ -136,7 +137,11 @@ export async function findProject(
   if (byName.length === 1) return (byName[0] as (typeof projects)[number]).id
   if (byName.length > 1) {
     throw new ProjectArgError(
-      `有 ${byName.length} 个项目都叫「${arg}」，请改用路径：${byName.map((p) => p.path).join('、')}`,
+      tr('tui.connect.ambiguous', {
+        length: byName.length,
+        arg,
+        join: byName.map((p) => p.path).join(tr('common.listSep')),
+      }),
     )
   }
   const looksLikePath = arg.includes('/') || arg.startsWith('.') || arg.startsWith('~')
@@ -157,7 +162,10 @@ export async function findProject(
     .slice(0, 5)
     .map((x) => x.p.name)
   throw new ProjectArgError(
-    `没有叫「${arg}」的项目。${near.length > 0 ? `是不是：${near.join('、')}？` : ''}也可以直接给路径：domi -p ./路径`,
+    tr('tui.connect.noProject', {
+      arg,
+      v: near.length > 0 ? tr('tui.connect.didYouMean', { join: near.join(tr('common.listSep')) }) : '',
+    }),
   )
 }
 

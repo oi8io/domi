@@ -9,6 +9,7 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createSessionStore } from '@domi/client-core'
+import { setLocale } from '@domi/i18n'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
 import { App } from '../src/App.tsx'
 import { renderAt } from './render.tsx'
@@ -83,4 +84,37 @@ describe('PRD-M0-005 AC-4 · 四宽度 golden 快照', () => {
     expect(h.lastFrame()).toContain('stub-1')
     h.unmount()
   })
+})
+
+/**
+ * PRD-M9-004 AC-6 · English 界面的一组金样（80 列）。中文四个宽度照旧（上面那组，默认 zh）。
+ * 顺带断言：界面文案一个中文字都不剩——剩下的中文只能来自用户内容（场景里的用户输入与模型输出）
+ */
+describe('PRD-M9-004 AC-6 · English 金样', () => {
+  test('宽度 80（en）', async () => {
+    setLocale('en')
+    try {
+      const h = renderAt(80, <App store={scene()} />)
+      await h.flush()
+      const frame = h.lastFrame()
+      h.unmount()
+      const file = join(DIR, 'scene-80.en.txt')
+      if (process.env.UPDATE_GOLDEN === '1' || !existsSync(file)) {
+        mkdirSync(DIR, { recursive: true })
+        writeFileSync(file, `${frame}\n`, 'utf8')
+      }
+      expect(frame).toBe(readFileSync(file, 'utf8').replace(/\n$/, ''))
+      const userContent = [
+        '把 sum.js 的减号改成加号，然后跑测试',
+        '先看看文件内容',
+        '我先读一下 sum.js。',
+        '减号写错了，改成加号。',
+      ]
+      let rest = frame ?? ''
+      for (const u of userContent) rest = rest.split(u).join('')
+      expect(rest).not.toMatch(/[\u3400-\u9fff]/)
+    } finally {
+      setLocale('zh')
+    }
+  }, 15_000)
 })

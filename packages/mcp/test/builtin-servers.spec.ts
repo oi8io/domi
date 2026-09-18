@@ -25,7 +25,7 @@ afterEach(() => {
 function templateConfig() {
   const d = mkdtempSync(join(tmpdir(), 'domi-builtin-'))
   const p = join(d, 'config.yaml')
-  writeFileSync(p, CONFIG_TEMPLATE, 'utf8')
+  writeFileSync(p, CONFIG_TEMPLATE(), 'utf8')
   const cfg = loadConfig({ path: p, env: {} })
   rmSync(d, { recursive: true, force: true })
   return cfg
@@ -44,7 +44,7 @@ describe('AC-1 · 模板里一键启用', () => {
   })
 
   test('「一键」就是把 enabled 改成 true：别的什么都不用加', () => {
-    const on = CONFIG_TEMPLATE.replace(/enabled: false/g, 'enabled: true')
+    const on = CONFIG_TEMPLATE().replace(/enabled: false/g, 'enabled: true')
     const d = mkdtempSync(join(tmpdir(), 'domi-builtin-'))
     writeFileSync(join(d, 'config.yaml'), on, 'utf8')
     const servers = loadConfig({ path: join(d, 'config.yaml'), env: {} }).mcp.servers

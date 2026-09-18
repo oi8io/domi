@@ -1,4 +1,5 @@
 import { type ConnectionState, formatElapsed, formatTokens, type StatusSnapshot, VERIFY_LABEL } from '@domi/client-core'
+import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { type Tone, useTheme } from '../theme.ts'
 
@@ -20,14 +21,14 @@ const CONTEXT_TONE: Record<keyof typeof CONTEXT_COLOR, Tone> = { ok: 'mut', warn
 export const VERIFY_COLOR = { unverified: 'yellow', verified: 'green', failed: 'red' } as const
 const VERIFY_TONE: Record<keyof typeof VERIFY_COLOR, Tone> = { unverified: 'warn', verified: 'ok', failed: 'bad' }
 
-const CONN_LABEL: Record<ConnectionState, string> = {
-  idle: '未连接',
-  connecting: '连接中',
-  open: '已连接',
-  reconnecting: '重连中',
-  incompatible: '版本不兼容',
-  closed: '已断开',
-}
+const CONN_LABEL = (): Record<ConnectionState, string> => ({
+  idle: tr('web.conn.offline'),
+  connecting: tr('tui.conn.connecting'),
+  open: tr('web.conn.connected'),
+  reconnecting: tr('tui.conn.reconnecting'),
+  incompatible: tr('tui.conn.incompatible'),
+  closed: tr('web.conn.closed'),
+})
 
 export function StatusBar({
   status,
@@ -58,7 +59,7 @@ export function StatusBar({
         {connection !== undefined && (
           <>
             <Text {...t.fg(connection === 'open' ? 'ok' : 'warn')}>●</Text>
-            <Text {...val}>{` ${CONN_LABEL[connection]}`}</Text>
+            <Text {...val}>{` ${CONN_LABEL()[connection]}`}</Text>
             {sep}
           </>
         )}
@@ -74,12 +75,12 @@ export function StatusBar({
         {m?.cacheHitPercent !== undefined && m.cacheHitPercent !== null ? ` · Cache ${m.cacheHitPercent}%` : ''}
         {` · ${cost}`}
         {sep}
-        {m?.turnMs === undefined ? '' : `本轮 ${formatElapsed(m.turnMs)} · `}
-        {`${status.toolCalls} 次工具`}
+        {m?.turnMs === undefined ? '' : tr('tui.status.turn', { formatElapsed: formatElapsed(m.turnMs) })}
+        {tr('web.status.toolCalls', { toolCalls: status.toolCalls })}
         {sep}
         <Text {...t.fg(CONTEXT_TONE[level])}>{`ctx ${pct}%`}</Text>
         {sep}
-        <Text {...t.fg('info')}>{m?.mode === 'plan' ? '计划模式' : '执行模式'}</Text>
+        <Text {...t.fg('info')}>{m?.mode === 'plan' ? tr('common.planMode') : tr('common.actMode')}</Text>
         {m?.verify !== undefined && m.verify !== 'clean' ? (
           <Text {...t.fg(VERIFY_TONE[m.verify])}>{` · ${VERIFY_LABEL[m.verify]}`}</Text>
         ) : (
@@ -88,7 +89,7 @@ export function StatusBar({
         {status.busy ? (
           <>
             {sep}
-            <Text {...t.fg('accent')}>⏵ 运行中</Text>
+            <Text {...t.fg('accent')}>{tr('tui.status.running')}</Text>
           </>
         ) : (
           ''

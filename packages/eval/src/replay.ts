@@ -9,6 +9,7 @@
  * **不花钱、不联网、可进 CI**（INV-08）。AC-3 要求无网络环境下通过，
  * 判据见 `assertNoNetwork`：回放期间任何出站调用都让测试失败。
  */
+import { tr } from '@domi/i18n'
 import {
   type Clock,
   type ContextPolicy,
@@ -108,6 +109,7 @@ class ReplayTools implements ToolRunner {
       this.byId.get(call.id) ?? {
         ok: false,
         reason: 'not_recorded',
+        // i18n-ignore：内部错误（PRD-M9-004 AC-5：日志不翻）
         payload: { message: `fixture 里没有 ${call.id} 的结果——录制时这一步没发生过` },
       }
     )
@@ -170,13 +172,15 @@ function compare(
 }
 
 export function formatResult(r: ReplayResult): string {
-  if (r.ok) return `✓ ${r.fixture} —— ${r.actualCalls} 次工具调用，与录制一致`
+  if (r.ok) return tr('eval.replayOk', { fixture: r.fixture, actualCalls: r.actualCalls })
   const d = r.divergence
-  if (!d) return `✗ ${r.fixture} —— 未知差异`
+  if (!d) return tr('eval.replayUnknown', { fixture: r.fixture })
   return [
-    `✗ ${r.fixture} —— 第 ${d.index + 1} 次工具调用开始分叉（事件 seq ${d.seq ?? '未产生'}）`,
-    `  期望：${d.expected ? `${d.expected.name} ${JSON.stringify(d.expected.args)}` : '（没有更多调用）'}`,
-    `  实际：${d.actual ? `${d.actual.name} ${JSON.stringify(d.actual.args)}` : '（没有更多调用）'}`,
-    `  跳转：轨迹面板 seq ${d.seq ?? '—'}`,
+    tr('eval.replayDiverged', { fixture: r.fixture, v: d.index + 1, v2: d.seq ?? tr('eval.notProduced') }),
+    tr('eval.expected', {
+      v: d.expected ? `${d.expected.name} ${JSON.stringify(d.expected.args)}` : tr('eval.noMoreCalls'),
+    }),
+    tr('eval.actual', { v: d.actual ? `${d.actual.name} ${JSON.stringify(d.actual.args)}` : tr('eval.noMoreCalls') }),
+    tr('eval.jump', { v: d.seq ?? '—' }),
   ].join('\n')
 }

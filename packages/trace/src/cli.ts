@@ -4,9 +4,11 @@
  * 和 `domi eval` 一样住在自己包里，`packages/cli` 只做一次动态 import：
  * AC-4 要求 `packages/trace` 可以被整个删掉，静态 import 会让删除把整个 `domi` 打死。
  */
+
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { tr } from '@domi/i18n'
 import { SqliteEventLog } from '@domi/store'
 import { exportHtml } from './html.ts'
 import { buildTrace, childSessionIds } from './model.ts'
@@ -17,12 +19,7 @@ export interface Io {
   err(s: string): void
 }
 
-export const TRACE_HELP = `domi trace —— 看清每一步在想什么
-
-  domi trace <sessionId>              在终端打印轨迹树
-  domi trace <sessionId> --html <路径>  导出单文件 HTML（无外部请求，可离线打开）
-
-会话 id 用 \`domi session list\` 看。轨迹完全由事件流渲染，没有独立埋点。`
+export const TRACE_HELP = () => tr('trace.help')
 
 /**
  * 价目表。没有的模型显示 `—` 而不是 0 —— 显示 0 会让人以为免费，
@@ -36,7 +33,7 @@ const PRICING = {
 
 export async function runTrace(sessionId: string | undefined, htmlOut: string | undefined, io: Io): Promise<number> {
   if (!sessionId || sessionId === 'help') {
-    io.out(TRACE_HELP)
+    io.out(TRACE_HELP())
     return sessionId ? 0 : 2
   }
 
@@ -44,7 +41,7 @@ export async function runTrace(sessionId: string | undefined, htmlOut: string | 
   try {
     const events = await log.read(sessionId)
     if (events.length === 0) {
-      io.err(`会话 ${sessionId} 没有任何事件。用 \`domi session list\` 确认 id。`)
+      io.err(tr('trace.noEvents', { sessionId }))
       return 1
     }
     // 子 agent 与编排节点的会话一起读出来，嵌在树里（PRD-M5-001 AC-4）。最多三层
@@ -64,12 +61,12 @@ export async function runTrace(sessionId: string | undefined, htmlOut: string | 
 
     if (htmlOut !== undefined) {
       if (htmlOut === '') {
-        io.err('--html 后面要跟一个文件路径')
+        io.err(tr('trace.htmlNeedsPath'))
         return 2
       }
       mkdirSync(dirname(htmlOut), { recursive: true })
       writeFileSync(htmlOut, exportHtml(tree), 'utf8')
-      io.out(`已导出 ${htmlOut}（${events.length} 条事件；这个文件不发出任何网络请求，可以直接双击打开）`)
+      io.out(tr('trace.exported', { htmlOut, length: events.length }))
       return 0
     }
 
