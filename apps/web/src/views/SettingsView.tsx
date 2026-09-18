@@ -22,6 +22,7 @@ import { Notice, Page } from './Page.tsx'
 import { Field, Saved, ToggleRow } from './settings/fields.tsx'
 import { PluginsTab } from './settings/PluginsTab.tsx'
 import { SoulTab } from './settings/SoulTab.tsx'
+import { UsageTab } from './settings/UsageTab.tsx'
 import { str, useSettings } from './settings/useSettings.ts'
 
 const TABS: Array<[SettingsTab, string]> = [
@@ -302,10 +303,6 @@ function MemoryTab({ s }: TabProps) {
   )
 }
 
-function UsageTab() {
-  return <Notice>用量统计即将可用：按月、按模型汇总 tokens、花费与 cache 命中率。</Notice>
-}
-
 export function SettingsView({ client, tab, online }: { client: DomiClient; tab: SettingsTab; online: boolean }) {
   const s = useSettings(client, online)
   return (
@@ -331,7 +328,7 @@ export function SettingsView({ client, tab, online }: { client: DomiClient; tab:
           {tab === 'models' && (online ? <ModelsTab s={s} /> : <Notice>连上 daemon 后显示。</Notice>)}
           {tab === 'messaging' && <MessagingTab />}
           {tab === 'memory' && (online ? <MemoryTab s={s} /> : <Notice>连上 daemon 后显示。</Notice>)}
-          {tab === 'usage' && <UsageTab />}
+          {tab === 'usage' && (online ? <UsageTab client={client} /> : <Notice>连上 daemon 后显示。</Notice>)}
           {(tab === 'soul' || tab === 'plugins') &&
             (online ? (
               tab === 'soul' ? (

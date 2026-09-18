@@ -1866,6 +1866,289 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `usage.summary`
+
+按时间窗口汇总用量（PRD-M8-013）：tokens、花费、会话数、cache 命中率、工具调用、权限询问，另给按模型与按月的明细。只从事件投影；整月的结果会缓存，当月每次现算
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "from": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "to": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "from",
+    "to"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "tokens": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "number"
+        },
+        "output": {
+          "type": "number"
+        },
+        "cacheRead": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "input",
+        "output",
+        "cacheRead"
+      ]
+    },
+    "costUsd": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "unpricedModels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sessions": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "turns": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "toolCalls": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "asks": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "cacheHitPercent": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "from": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "to": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "byModel": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "number"
+              },
+              "output": {
+                "type": "number"
+              },
+              "cacheRead": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "input",
+              "output",
+              "cacheRead"
+            ]
+          },
+          "costUsd": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unpricedModels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sessions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "turns": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "toolCalls": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "asks": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "cacheHitPercent": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tokens",
+          "costUsd",
+          "unpricedModels",
+          "sessions",
+          "turns",
+          "toolCalls",
+          "asks",
+          "cacheHitPercent",
+          "model",
+          "provider"
+        ]
+      }
+    },
+    "byMonth": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "number"
+              },
+              "output": {
+                "type": "number"
+              },
+              "cacheRead": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "input",
+              "output",
+              "cacheRead"
+            ]
+          },
+          "costUsd": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unpricedModels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sessions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "turns": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "toolCalls": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "asks": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "cacheHitPercent": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "month": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tokens",
+          "costUsd",
+          "unpricedModels",
+          "sessions",
+          "turns",
+          "toolCalls",
+          "asks",
+          "cacheHitPercent",
+          "month"
+        ]
+      }
+    }
+  },
+  "required": [
+    "tokens",
+    "costUsd",
+    "unpricedModels",
+    "sessions",
+    "turns",
+    "toolCalls",
+    "asks",
+    "cacheHitPercent",
+    "from",
+    "to",
+    "byModel",
+    "byMonth"
+  ]
+}
+```
+
 ### `fs.list`
 
 会话工作目录下的文件清单（PRD-M8-010 AC-2，`@` 引用用）：遵守 .gitignore，按 query 模糊匹配。只给路径不给内容，不经权限询问

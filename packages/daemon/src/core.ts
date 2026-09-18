@@ -286,6 +286,8 @@ export interface DaemonHost {
     get(): Promise<ResultOf<'config.get'>>
     set(patch: Record<string, unknown>): Promise<ResultOf<'config.set'>>
   }
+  /** 用量汇总（PRD-M8-013）。老宿主没有 */
+  usage?(from: number, to: number): Promise<ResultOf<'usage.summary'>>
   /** 已读位置（PRD-M8-009）。seq 是视图编号；返回是否推进了 */
   markRead?(sessionId: string, seq: number): Promise<boolean>
   /** 软删除 / 恢复。会话不存在时抛 SessionNotFoundError */
@@ -652,6 +654,12 @@ export class Daemon {
         if (!h) return fail(req.id, 'INTERNAL', '这个 domid 不支持从这里改配置')
         if (method === 'config.get') return ok(req.id, await h.get())
         return ok(req.id, await h.set((params as { patch: Record<string, unknown> }).patch))
+      }
+
+      case 'usage.summary': {
+        const p = params as { from: number; to: number }
+        if (!this.host.usage) return fail(req.id, 'INTERNAL', '这个 domid 不支持用量统计')
+        return ok(req.id, await this.host.usage(p.from, p.to))
       }
 
       case 'fs.list':

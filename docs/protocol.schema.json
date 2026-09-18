@@ -1507,6 +1507,277 @@
         ]
       }
     },
+    "usage.summary": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "to": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tokens": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "number"
+              },
+              "output": {
+                "type": "number"
+              },
+              "cacheRead": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "input",
+              "output",
+              "cacheRead"
+            ]
+          },
+          "costUsd": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unpricedModels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sessions": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "turns": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "toolCalls": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "asks": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "cacheHitPercent": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "from": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "to": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "byModel": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tokens": {
+                  "type": "object",
+                  "properties": {
+                    "input": {
+                      "type": "number"
+                    },
+                    "output": {
+                      "type": "number"
+                    },
+                    "cacheRead": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "input",
+                    "output",
+                    "cacheRead"
+                  ]
+                },
+                "costUsd": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "unpricedModels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "sessions": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "turns": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "toolCalls": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "asks": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "cacheHitPercent": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "model": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tokens",
+                "costUsd",
+                "unpricedModels",
+                "sessions",
+                "turns",
+                "toolCalls",
+                "asks",
+                "cacheHitPercent",
+                "model",
+                "provider"
+              ]
+            }
+          },
+          "byMonth": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tokens": {
+                  "type": "object",
+                  "properties": {
+                    "input": {
+                      "type": "number"
+                    },
+                    "output": {
+                      "type": "number"
+                    },
+                    "cacheRead": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "input",
+                    "output",
+                    "cacheRead"
+                  ]
+                },
+                "costUsd": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "unpricedModels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "sessions": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "turns": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "toolCalls": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "asks": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "cacheHitPercent": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "month": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tokens",
+                "costUsd",
+                "unpricedModels",
+                "sessions",
+                "turns",
+                "toolCalls",
+                "asks",
+                "cacheHitPercent",
+                "month"
+              ]
+            }
+          }
+        },
+        "required": [
+          "tokens",
+          "costUsd",
+          "unpricedModels",
+          "sessions",
+          "turns",
+          "toolCalls",
+          "asks",
+          "cacheHitPercent",
+          "from",
+          "to",
+          "byModel",
+          "byMonth"
+        ]
+      }
+    },
     "fs.list": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

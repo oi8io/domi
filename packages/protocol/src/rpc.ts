@@ -102,6 +102,18 @@ const MemoryItemSchema = SemanticItemSchema.extend({
   score: z.number().optional(),
 })
 
+const UsageTotalsSchema = z.object({
+  tokens: z.object({ input: z.number(), output: z.number(), cacheRead: z.number() }),
+  /** null = 这一格里没有任何一次用量能定价，界面显示「—」而不是 $0 */
+  costUsd: z.number().nullable(),
+  unpricedModels: z.array(z.string()),
+  sessions: z.number().int(),
+  turns: z.number().int(),
+  toolCalls: z.number().int(),
+  asks: z.number().int(),
+  cacheHitPercent: z.number().nullable(),
+})
+
 /** 定时任务（PRD-M8-007） */
 export const ScheduleSchema = z.object({
   id: z.string(),
@@ -429,6 +441,18 @@ export const METHODS = {
       sessionId: z.string(),
       isolation: z.object({ isolate: z.boolean(), reason: z.string() }),
       planned: z.boolean(),
+    }),
+  },
+  'usage.summary': {
+    summary:
+      '按时间窗口汇总用量（PRD-M8-013）：tokens、花费、会话数、cache 命中率、工具调用、权限询问，' +
+      '另给按模型与按月的明细。只从事件投影；整月的结果会缓存，当月每次现算',
+    params: z.object({ from: z.number().int(), to: z.number().int() }),
+    result: UsageTotalsSchema.extend({
+      from: z.number().int(),
+      to: z.number().int(),
+      byModel: z.array(UsageTotalsSchema.extend({ model: z.string(), provider: z.string() })),
+      byMonth: z.array(UsageTotalsSchema.extend({ month: z.string() })),
     }),
   },
   'fs.list': {

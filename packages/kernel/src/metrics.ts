@@ -57,7 +57,7 @@ export interface AggregateOptions {
 }
 
 /** provider 的 usage 字段名各家不同，这里只做**读取**的归一，事件流里存的仍是原文（ADR-004） */
-function readUsage(raw: Record<string, unknown>): TokenTotals {
+export function readUsage(raw: Record<string, unknown>): TokenTotals {
   const pick = (...keys: string[]): number => {
     for (const k of keys) {
       const v = raw[k]
@@ -72,7 +72,7 @@ function readUsage(raw: Record<string, unknown>): TokenTotals {
   }
 }
 
-function costOf(t: TokenTotals, p: ModelPrice): number {
+export function costOf(t: TokenTotals, p: ModelPrice): number {
   const cacheRate = p.cacheReadPer1M ?? p.inputPer1M
   return (t.input * p.inputPer1M + t.output * p.outputPer1M + t.cacheRead * cacheRate) / 1_000_000
 }

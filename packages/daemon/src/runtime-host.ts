@@ -54,6 +54,7 @@ import {
   reviewPrompt,
   type SessionOptions,
   SoulConflictError,
+  summarizeUsage,
   TaskService,
   WorktreeError,
   type WorktreeInfo,
@@ -135,6 +136,9 @@ function checkCron(cron: string, tz: string): void {
   }
 }
 
+/** 会话最后活动时间与它里面事件的时间差：按 updated_at 粗筛时留的余量（一天） */
+const SESSION_SLACK_MS = 24 * 60 * 60 * 1000
+
 /** 计划转出来的运行带给宿主的信息（经 TaskService.start 的 meta 透传） */
 interface RunMeta {
   projectId?: string
@@ -167,6 +171,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...(opts.plugins ? { extraFiles: () => opts.plugins?.skillFiles() ?? [] } : {}),
       })
     : undefined
+
+  /** 用量的整月缓存（事件只增不改，过去的窗口不会变） */
+  const usageCache = new Map<string, { value: ReturnType<typeof summarizeUsage>; cachedAt: number }>()
 
   /** 启动时就连上的插件 MCP server（启用启动时停着的插件，要重启才连） */
   const startedServers = new Set(opts.plugins?.mcpServers().map((s) => s.name) ?? [])
@@ -553,6 +560,26 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...(r.projectId === null ? {} : { projectId: r.projectId }),
         ...(read.get(r.id)?.unread ? { unread: true } : {}),
       }))
+    },
+
+    /**
+     * 用量（PRD-M8-013）：按 updated_at 粗筛会话，再按事件 ts 精筛。
+     * 已经过去的整月结果缓存起来（事件只增不改，过去的月份不会再变）
+     */
+    async usage(from, to) {
+      const key = `${from}:${to}`
+      const cached = usageCache.get(key)
+      if (cached) return cached.value
+      const rows = index.sessions
+        .list({ includeDeleted: true, includeSpawned: true, limit: 5000 })
+        .filter((r) => !r.id.startsWith('_') && r.updatedAt >= from - SESSION_SLACK_MS)
+      const sessions = []
+      for (const r of rows) sessions.push({ id: r.id, events: await index.read(r.id) })
+      const value = summarizeUsage(sessions, { from, to, pricing: pricingOf(opts.config) })
+      const now = (opts.now ?? Date.now)()
+      // 只缓存「窗口已经过去」的查询；当月每次现算
+      if (to <= now) usageCache.set(key, { value, cachedAt: now })
+      return value
     },
 
     async markRead(sessionId, seq) {

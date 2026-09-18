@@ -371,6 +371,11 @@ export class DomiClient {
     return this.watches.get(sessionId)?.lastSeq ?? 0
   }
 
+  /** 用量汇总（PRD-M8-013）。from / to 是毫秒时间戳，左闭右开 */
+  usage(from: number, to: number): Promise<ResultOf<'usage.summary'>> {
+    return this.request('usage.summary', { from, to })
+  }
+
   // ── Composer（PRD-M8-010） ──
 
   async listFiles(sessionId: string, query = '', limit = 50): Promise<ResultOf<'fs.list'>> {
