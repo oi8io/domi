@@ -7,7 +7,10 @@
  *    整个补丁里只要有一个键不在白名单，整体拒绝、文件不动。
  * 2. **保留用户的文件**。用 yaml 的 Document API 只改补丁里的节点，注释、顺序、其它键原样留下。
  *
- * key（`providers.<名字>.api_key`）只写进 secrets.yaml，绝不写进 config.yaml。
+ * key（`providers.<id>.api_key`）只写进 secrets.yaml，绝不写进 config.yaml。
+ *
+ * M9（PRD-M9-002 AC-8）：provider 不再是写死的四家，而是任意 id 下固定的一组字段；`providers.<id>: null` 删掉整条（连同 secrets 里的 key）。
+ * 默认模型所在的那一家不能停用、不能删（AC-5）。
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -22,17 +25,15 @@ import {
   readConfigFile,
   resolveCredential,
 } from './load.ts'
+import { type CapabilityOverrides, listProviders, PROVIDER_ID } from './providers.ts'
+import type { DomiConfig } from './schema.ts'
 import { maskSecret, readSecrets, secretsPath, secretsTooOpen, writeSecrets } from './secrets.ts'
+import type { Protocol, VendorId } from './vendors.ts'
 
-/** 能从设置页改的 provider 名 */
-export const EDITABLE_PROVIDERS = ['anthropic', 'openai', 'deepseek', 'openai-compatible'] as const
-
-/** 白名单：文件里的键路径（点分；providers 下按上面四家展开）。值的类型由 ConfigSchema 最后校验 */
+/** 白名单：文件里的键路径（点分）。provider 下的键按 `providers.<id>.<字段>` 另外判断（见 isWritable） */
 export const WRITABLE_KEYS: readonly string[] = [
   'model.provider',
   'model.name',
-  ...EDITABLE_PROVIDERS.flatMap((p) => [`providers.${p}.base_url`, `providers.${p}.api_key`]),
-  'providers.openai-compatible.models',
   'memory.extractEvery',
   'memory.soul',
   'context.strategy',
@@ -47,10 +48,50 @@ export const WRITABLE_KEYS: readonly string[] = [
   'tui.theme',
 ]
 
+/** 每个 provider 能改的字段（PRD-M9-002 AC-8）。能力覆盖是模型特性，不是权限，放开 */
+export const PROVIDER_FIELDS = [
+  'name',
+  'vendor',
+  'protocol',
+  'base_url',
+  'api_key',
+  'enabled',
+  'models',
+  'capabilities',
+] as const
+
+/** config.get 里给界面看的完整白名单（provider 部分用 `<id>` 占位） */
+export const WRITABLE_DESCRIPTION: readonly string[] = [
+  ...WRITABLE_KEYS,
+  'providers.<id>',
+  ...PROVIDER_FIELDS.map((f) => `providers.<id>.${f}`),
+]
+
+/** 解析 `providers.<id>` / `providers.<id>.<字段>`；不是这个形状 → null */
+function providerKey(key: string): { id: string; field: string | null } | null {
+  const m = key.match(/^providers\.([^.]+)(?:\.([^.]+))?$/)
+  if (!m) return null
+  return { id: m[1] as string, field: m[2] ?? null }
+}
+
+function isWritable(key: string, value: unknown, existing: ReadonlySet<string>): boolean {
+  if (WRITABLE_KEYS.includes(key)) return true
+  const pk = providerKey(key)
+  if (pk === null) return false
+  // 新 id 要合规；配置里已有的旧键（比如历史上写过的大写名）照样能改能删
+  if (!PROVIDER_ID.test(pk.id) && !existing.has(pk.id)) return false
+  if (pk.field === null) return value === null // 整条只能删，不能整块写
+  return (PROVIDER_FIELDS as readonly string[]).includes(pk.field)
+}
+
 const SECRET_KEY = /^providers\.[^.]+\.api_key$/
 
 export class ConfigWriteError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** 结构化原因，协议里放进 data.reason（例如 DEFAULT_PROVIDER） */
+    readonly reason?: string,
+  ) {
     super(message)
     this.name = 'ConfigWriteError'
   }
@@ -96,15 +137,21 @@ export interface WriteResult {
  */
 export function writeConfigPatch(patch: ConfigPatch, opts: LoadOptions = {}): WriteResult {
   const keys = Object.keys(patch)
-  const denied = keys.filter((k) => !WRITABLE_KEYS.includes(k))
-  if (denied.length > 0) throw new ConfigWriteError(`这些设置不能从这里改：${denied.join('、')}`)
   const src = configSource(opts)
+  const existing = new Set(Object.keys((readConfigFile(src).providers ?? {}) as Record<string, unknown>))
+  const denied = keys.filter((k) => !isWritable(k, patch[k], existing))
+  if (denied.length > 0) throw new ConfigWriteError(`这些设置不能从这里改：${denied.join('、')}`)
   if (src.legacy)
     throw new ConfigWriteError(`配置还是旧的 TOML 格式（${src.path}），先迁移成 YAML：domi init --from-toml`)
   const sPath = secretsPath(dirname(src.path))
 
+  // 删整条 provider：config 里那一节删掉，secrets 里那一家的 key 也删掉
+  const removed = keys.filter((k) => providerKey(k)?.field === null).map((k) => providerKey(k)?.id as string)
   const plain = Object.entries(patch).filter(([k]) => !SECRET_KEY.test(k))
-  const secret = Object.entries(patch).filter(([k]) => SECRET_KEY.test(k))
+  const secret = [
+    ...Object.entries(patch).filter(([k]) => SECRET_KEY.test(k)),
+    ...removed.map((id) => [`providers.${id}`, null] as [string, unknown]),
+  ]
   for (const [k, v] of secret) {
     if (v !== null && typeof v !== 'string') throw new ConfigWriteError(`${k} 必须是字符串`)
   }
@@ -118,7 +165,15 @@ export function writeConfigPatch(patch: ConfigPatch, opts: LoadOptions = {}): Wr
   readSecrets(sPath) // 现有的 secrets 文件本身要能读
 
   // 校验：用改过的文本走一遍正常装载。放在临时目录里，不碰真文件
-  validate(newConfig, newSecrets)
+  const next = validate(newConfig, newSecrets)
+  // 默认模型所在的那一家不能停用、不能删（PRD-M9-002 AC-5）——先换默认模型
+  const def = next.model.provider
+  if (removed.includes(def) || next.providers[def]?.enabled === false) {
+    throw new ConfigWriteError(
+      `「${def}」是默认模型所在的供应商，不能停用或删除。先把默认模型换到别家。`,
+      'DEFAULT_PROVIDER',
+    )
+  }
 
   const configChanged = newConfig !== oldConfig
   const secretsChanged = newSecrets !== oldSecrets
@@ -130,14 +185,14 @@ export function writeConfigPatch(patch: ConfigPatch, opts: LoadOptions = {}): Wr
   return { configChanged, secretsChanged }
 }
 
-function validate(configText: string, secretsText: string): void {
+function validate(configText: string, secretsText: string): DomiConfig {
   const dir = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), 'domi-cfg-check-'))
   try {
     writeFileSync(join(dir, 'config.yaml'), configText, 'utf8')
     writeFileSync(join(dir, 'secrets.yaml'), secretsText, 'utf8')
     try {
       // env 置空：校验的是文件本身，不受这台机器的环境变量影响
-      loadConfig({ path: join(dir, 'config.yaml'), env: {} })
+      return loadConfig({ path: join(dir, 'config.yaml'), env: {} })
     } catch (e) {
       throw new ConfigWriteError(
         e instanceof Error ? e.message.replace(join(dir, 'config.yaml'), 'config.yaml') : String(e),
@@ -154,18 +209,37 @@ function validate(configText: string, secretsText: string): void {
   }
 }
 
+export interface ProviderView {
+  id: string
+  name: string
+  vendor: VendorId
+  protocol: Protocol
+  /** 文件里写的地址；没写是 null（界面显示模板默认地址作占位） */
+  baseUrl: string | null
+  enabled: boolean
+  models: string[]
+  capabilities: CapabilityOverrides
+  /** vendor / protocol 是按键名推断的 */
+  inferred: boolean
+  /** 默认模型所在的那一家 */
+  isDefault: boolean
+  key: { set: boolean; masked?: string; source?: CredentialSource }
+}
+
 export interface SettingsView {
   /** 白名单里非凭据键的当前生效值（点分键 → 值）；没写的给默认值 */
   values: Record<string, unknown>
   /** 每家的 key：有没有、掩码、从哪来。绝不返回原文 */
   secrets: Record<string, { set: boolean; masked?: string; source?: CredentialSource }>
+  /** 全部 provider（PRD-M9-002）：配置里写了的 + 默认模型所在的那一家 */
+  providers: ProviderView[]
   paths: { config: string; secrets: string }
   /** secrets.yaml 权限比 0600 宽 */
   secretsTooOpen: boolean
   writable: readonly string[]
 }
 
-/** 设置页要显示的东西（PRD-M8-011 AC-1） */
+/** 设置页要显示的东西（PRD-M8-011 AC-1 · PRD-M9-002 AC-4） */
 export function readSettings(opts: LoadOptions = {}): SettingsView {
   const env = opts.env ?? process.env
   const cfg = loadConfig(opts)
@@ -173,7 +247,7 @@ export function readSettings(opts: LoadOptions = {}): SettingsView {
   const file = readConfigFile(src)
   const sPath = secretsPath(dirname(src.path))
   const secrets = readSecrets(sPath)
-  const fileProviders = (file.providers ?? {}) as Record<string, { base_url?: unknown; models?: unknown }>
+  const fileProviders = (file.providers ?? {}) as Record<string, { base_url?: unknown }>
   const values: Record<string, unknown> = {
     'model.provider': cfg.model.provider,
     'model.name': cfg.model.name,
@@ -190,23 +264,36 @@ export function readSettings(opts: LoadOptions = {}): SettingsView {
     'ui.accent': cfg.ui.accent,
     'tui.theme': cfg.tui.theme,
   }
-  for (const p of EDITABLE_PROVIDERS) {
-    const base = fileProviders[p]?.base_url
-    values[`providers.${p}.base_url`] = typeof base === 'string' ? base : null
-  }
-  const models = fileProviders['openai-compatible']?.models
-  values['providers.openai-compatible.models'] = Array.isArray(models) ? models : []
   const ctx = { env, file, secrets, defaultProvider: cfg.model.provider }
   const secretView: SettingsView['secrets'] = {}
-  for (const p of EDITABLE_PROVIDERS) {
-    const r = resolveCredential(p, ctx)
-    secretView[p] = r === null ? { set: false } : { set: true, masked: maskSecret(r.value), source: r.source }
-  }
+  const providers: ProviderView[] = listProviders(cfg).map((p) => {
+    const r = resolveCredential(p.id, ctx)
+    const key = r === null ? { set: false } : { set: true, masked: maskSecret(r.value), source: r.source }
+    secretView[p.id] = key
+    const base = fileProviders[p.id]?.base_url
+    const baseUrl = typeof base === 'string' && base !== '' ? base : null
+    values[`providers.${p.id}.base_url`] = baseUrl
+    values[`providers.${p.id}.models`] = p.models
+    return {
+      id: p.id,
+      name: p.name,
+      vendor: p.vendor,
+      protocol: p.protocol,
+      baseUrl,
+      enabled: p.enabled,
+      models: p.models,
+      capabilities: p.capabilities ?? {},
+      inferred: p.inferred,
+      isDefault: p.id === cfg.model.provider,
+      key,
+    }
+  })
   return {
     values,
     secrets: secretView,
+    providers,
     paths: { config: src.path, secrets: sPath },
     secretsTooOpen: secretsTooOpen(sPath),
-    writable: WRITABLE_KEYS,
+    writable: WRITABLE_DESCRIPTION,
   }
 }

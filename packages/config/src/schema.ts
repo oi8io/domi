@@ -5,7 +5,7 @@
  * 内置的就够用时，引库只是多一个要跟版本的东西）。
  */
 import { z } from 'zod'
-import { DEFAULT_MODEL } from './vendors.ts'
+import { DEFAULT_MODEL, VENDOR_IDS } from './vendors.ts'
 
 export const PermissionRuleSchema = z.object({
   name: z.string(),
@@ -51,6 +51,18 @@ export const McpConfigSchema = z
   })
   .default({ servers: [], allowedHosts: [], timeoutMs: 10_000 })
 
+/** 能力矩阵的显式覆盖：五个布尔，只写要改的 */
+export const CapabilitiesSchema = z
+  .object({
+    toolCall: z.boolean(),
+    vision: z.boolean(),
+    reasoning: z.boolean(),
+    promptCache: z.boolean(),
+    structuredOutput: z.boolean(),
+  })
+  .partial()
+  .strict()
+
 export const ConfigSchema = z.object({
   model: z.object({
     provider: z.string().default(DEFAULT_MODEL.provider),
@@ -66,17 +78,7 @@ export const ConfigSchema = z.object({
      * 能力矩阵的显式覆盖（PRD-M1-001 AC-2）。openai-compatible 默认全关（fail-closed），
      * 后面挂的模型其实支持工具调用的话，在 model.capabilities 里打开
      */
-    capabilities: z
-      .object({
-        toolCall: z.boolean(),
-        vision: z.boolean(),
-        reasoning: z.boolean(),
-        promptCache: z.boolean(),
-        structuredOutput: z.boolean(),
-      })
-      .partial()
-      .strict()
-      .optional(),
+    capabilities: CapabilitiesSchema.optional(),
   }),
   permissions: z.object({ rules: z.array(PermissionRuleSchema).default([]) }).default({ rules: [] }),
   mcp: McpConfigSchema,
@@ -125,10 +127,19 @@ export const ConfigSchema = z.object({
     .record(
       z.string(),
       z.object({
+        /** 界面上的名字（PRD-M9-002 AC-1）。不写就用 id */
+        name: z.string().optional(),
+        /** 厂商模板（`vendors.ts`）。旧配置不写，读的时候按键名推断 */
+        vendor: z.enum(VENDOR_IDS).optional(),
+        /** 只对 custom 有意义 */
+        protocol: z.enum(['openai', 'anthropic']).optional(),
         apiKey: z.string().optional(),
         baseUrl: z.string().optional(),
-        /** OpenAI 兼容网关后面挂了哪些模型（模型下拉用） */
+        enabled: z.boolean().default(true),
+        /** 手填的模型（探测不到时的清单，也用来补探测结果里没有的） */
         models: z.array(z.string()).default([]),
+        /** 能力矩阵覆盖（PRD-M9-002 AC-2）。只覆盖写了的项 */
+        capabilities: CapabilitiesSchema.optional(),
       }),
     )
     .default({}),

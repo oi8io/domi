@@ -7,6 +7,7 @@ import { DomiRpcError, defaultProviderMissingKey, missingCredentialOf } from '..
 const settings = (provider: string, set: Record<string, boolean>) => ({
   values: { 'model.provider': provider },
   secrets: Object.fromEntries(Object.entries(set).map(([p, v]) => [p, { set: v }])),
+  providers: [],
   paths: { config: '/c', secrets: '/s' },
   secretsTooOpen: false,
   writable: [],

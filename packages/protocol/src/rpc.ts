@@ -224,6 +224,17 @@ const AskSchema = z.object({
 /**
  * 方法表。加方法就在这里加一行——客户端类型、服务端类型、JSON Schema、文档全都跟着走。
  */
+/** 能力矩阵覆盖：五个布尔，只写要改的（PRD-M9-002 AC-1） */
+const CapabilityOverridesSchema = z
+  .object({
+    toolCall: z.boolean(),
+    vision: z.boolean(),
+    reasoning: z.boolean(),
+    promptCache: z.boolean(),
+    structuredOutput: z.boolean(),
+  })
+  .partial()
+
 export const METHODS = {
   /** 握手。**必须是第一个调用**，没握手的其它请求一律 NOT_HANDSHAKED */
   handshake: {
@@ -600,15 +611,54 @@ export const METHODS = {
           source: z.enum(['env', 'secrets', 'config']).optional(),
         }),
       ),
+      /** 全部 provider（PRD-M9-002 AC-4）：登记过的 + 默认模型所在的那一家；key 同样只给掩码与来源 */
+      providers: z.array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          vendor: z.string(),
+          protocol: z.enum(['openai', 'anthropic']),
+          baseUrl: z.string().nullable(),
+          enabled: z.boolean(),
+          models: z.array(z.string()),
+          capabilities: CapabilityOverridesSchema,
+          inferred: z.boolean(),
+          isDefault: z.boolean(),
+          key: z.object({
+            set: z.boolean(),
+            masked: z.string().optional(),
+            source: z.enum(['env', 'secrets', 'config']).optional(),
+          }),
+        }),
+      ),
       paths: z.object({ config: z.string(), secrets: z.string() }),
       secretsTooOpen: z.boolean(),
       writable: z.array(z.string()),
     }),
   },
+  'provider.vendors': {
+    summary:
+      '厂商模板（PRD-M9-002 AC-2 / AC-4）：新增 provider 时选哪一家、默认协议 / 地址 / 能力。只读，没有任何凭据；界面不自己写一份厂商名单',
+    params: z.object({}),
+    result: z.object({
+      vendors: z.array(
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          protocol: z.enum(['openai', 'anthropic']),
+          defaultBaseUrl: z.string().optional(),
+          capabilities: CapabilityOverridesSchema.required(),
+          keyHint: z.string(),
+          envNames: z.array(z.string()),
+        }),
+      ),
+    }),
+  },
   'config.set': {
     summary:
       '改配置（PRD-M8-011 AC-2 / AC-3）。patch 的键是 config.get 的 writable 里的点分路径，值为 null 表示删掉；' +
-      '有一个键不在白名单就整体拒绝（INVALID_PARAMS），文件不动。key 写进 secrets.yaml。改完下一轮生效；restartRequired 列出要重启 domid 才生效的键',
+      '有一个键不在白名单就整体拒绝（INVALID_PARAMS），文件不动。key 写进 secrets.yaml。改完下一轮生效；restartRequired 列出要重启 domid 才生效的键。' +
+      'provider 按 providers.<id>.<字段> 改，providers.<id>: null 删整条（连同 key）；默认模型所在的那一家停用 / 删除 → INVALID_PARAMS，data.reason = DEFAULT_PROVIDER（PRD-M9-002）',
     params: z.object({ patch: z.record(z.string(), z.unknown()) }),
     result: z.object({ ok: z.literal(true), restartRequired: z.array(z.string()) }),
   },

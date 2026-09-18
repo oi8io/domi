@@ -36,7 +36,7 @@ import {
   soulForPrompt,
   soulUpdatePrompt,
 } from '@domi/memory'
-import { createEmbedder, createProvider, generateStructured, type ModelProvider } from '@domi/model'
+import { createEmbedder, createProvider, generateStructured, type ModelProvider, providerConfigOf } from '@domi/model'
 import type { SemanticItem, SoulChange } from '@domi/protocol'
 import { MEMORY_SESSION_ID, SqliteEventLog, type StoredItem } from '@domi/store'
 import { type ZodType, z } from 'zod'
@@ -111,6 +111,8 @@ export class MemoryService {
         model: `${e.provider}/${e.model}`,
         embedder: createEmbedder({
           provider: e.provider,
+          vendor: conn.vendor,
+          protocol: conn.protocol,
           model: e.model,
           apiKey: e.apiKey ?? conn.apiKey,
           baseUrl: e.baseUrl ?? conn.baseUrl,
@@ -123,13 +125,7 @@ export class MemoryService {
     if (this.opts.provider) return this.opts.provider
     const { provider, name } = this.opts.config.model
     const conn = providerConnection(this.opts.config, provider)
-    this.providerCache ??= createProvider({
-      provider,
-      name,
-      apiKey: conn.apiKey,
-      baseUrl: conn.baseUrl,
-      capabilities: conn.capabilities,
-    })
+    this.providerCache ??= createProvider(providerConfigOf(conn, name))
     return this.providerCache
   }
 

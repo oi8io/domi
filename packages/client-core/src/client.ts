@@ -271,6 +271,11 @@ export class DomiClient {
     return this.request('config.get', {})
   }
 
+  /** 厂商模板（PRD-M9-002）：新增 provider 的表单从这里拿默认值 */
+  listVendors(): Promise<ResultOf<'provider.vendors'>> {
+    return this.request('provider.vendors', {})
+  }
+
   /** 键是 config.get 的 writable 里的点分路径；null = 删掉 */
   setSettings(patch: Record<string, unknown>): Promise<ResultOf<'config.set'>> {
     return this.request('config.set', { patch })

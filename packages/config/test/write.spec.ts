@@ -96,7 +96,8 @@ describe('PRD-M8-011 AC-1 / AC-3 · key 只进 secrets.yaml，界面只看得到
     expect(view.secrets.deepseek).toMatchObject({ set: true, source: 'secrets' })
     expect(view.secrets.deepseek?.masked).toBe(maskSecret('sk-deepseek-abcdef123456'))
     expect(JSON.stringify(view)).not.toContain('abcdef123456')
-    expect(view.secrets.openai).toEqual({ set: false })
+    // M9 起只列出登记过的 provider（加上默认那一家），不再是写死的四家
+    expect(view.secrets.openai).toBeUndefined()
     // 老写法（model.api_key）算默认那一家的
     expect(view.secrets.anthropic).toMatchObject({ set: true, source: 'config' })
     expect(view.paths.secrets).toBe(secretsPath(join(h, '.domi')))
@@ -129,6 +130,6 @@ describe('PRD-M8-011 AC-1 / AC-3 · key 只进 secrets.yaml，界面只看得到
   test('secrets.yaml 不存在时也不报错（还没填过 key）', () => {
     const { home: h, opts } = home()
     expect(existsSync(secretsPath(join(h, '.domi')))).toBe(false)
-    expect(readSettings(opts).secrets.openai).toEqual({ set: false })
+    expect(readSettings(opts).secrets.anthropic).toMatchObject({ set: true, source: 'config' })
   })
 })

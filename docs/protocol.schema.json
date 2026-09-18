@@ -3086,6 +3086,106 @@
               ]
             }
           },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "vendor": {
+                  "type": "string"
+                },
+                "protocol": {
+                  "type": "string",
+                  "enum": [
+                    "openai",
+                    "anthropic"
+                  ]
+                },
+                "baseUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "models": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "capabilities": {
+                  "type": "object",
+                  "properties": {
+                    "toolCall": {
+                      "type": "boolean"
+                    },
+                    "vision": {
+                      "type": "boolean"
+                    },
+                    "reasoning": {
+                      "type": "boolean"
+                    },
+                    "promptCache": {
+                      "type": "boolean"
+                    },
+                    "structuredOutput": {
+                      "type": "boolean"
+                    }
+                  }
+                },
+                "inferred": {
+                  "type": "boolean"
+                },
+                "isDefault": {
+                  "type": "boolean"
+                },
+                "key": {
+                  "type": "object",
+                  "properties": {
+                    "set": {
+                      "type": "boolean"
+                    },
+                    "masked": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "env",
+                        "secrets",
+                        "config"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "set"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "vendor",
+                "protocol",
+                "baseUrl",
+                "enabled",
+                "models",
+                "capabilities",
+                "inferred",
+                "isDefault",
+                "key"
+              ]
+            }
+          },
           "paths": {
             "type": "object",
             "properties": {
@@ -3114,9 +3214,94 @@
         "required": [
           "values",
           "secrets",
+          "providers",
           "paths",
           "secretsTooOpen",
           "writable"
+        ]
+      }
+    },
+    "provider.vendors": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "vendors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "protocol": {
+                  "type": "string",
+                  "enum": [
+                    "openai",
+                    "anthropic"
+                  ]
+                },
+                "defaultBaseUrl": {
+                  "type": "string"
+                },
+                "capabilities": {
+                  "type": "object",
+                  "properties": {
+                    "toolCall": {
+                      "type": "boolean"
+                    },
+                    "vision": {
+                      "type": "boolean"
+                    },
+                    "reasoning": {
+                      "type": "boolean"
+                    },
+                    "promptCache": {
+                      "type": "boolean"
+                    },
+                    "structuredOutput": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "toolCall",
+                    "vision",
+                    "reasoning",
+                    "promptCache",
+                    "structuredOutput"
+                  ]
+                },
+                "keyHint": {
+                  "type": "string"
+                },
+                "envNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "protocol",
+                "capabilities",
+                "keyHint",
+                "envNames"
+              ]
+            }
+          }
+        },
+        "required": [
+          "vendors"
         ]
       }
     },

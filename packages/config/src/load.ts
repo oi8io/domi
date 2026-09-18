@@ -13,7 +13,7 @@ import { ConfigParseError } from './errors.ts'
 import { providerConnection } from './providers.ts'
 import { ConfigSchema, type DomiConfig } from './schema.ts'
 import { readSecrets, type Secrets, secretsPath } from './secrets.ts'
-import { DEFAULT_MODEL, providerEnvNames, type VendorId } from './vendors.ts'
+import { DEFAULT_MODEL, inferVendor, isVendorId, providerEnvNames, type VendorId } from './vendors.ts'
 
 export class MissingCredentialError extends Error {
   /** 文案 key 而非句子：TUI 与 CLI 各自渲染，测试也断言它（AC-3） */
@@ -113,7 +113,25 @@ export function credentialEnvNames(provider: string, isDefault = true, vendor?: 
   return isDefault ? ['DOMI_API_KEY', ...names] : names
 }
 
-type FileProviders = Record<string, { api_key?: unknown; base_url?: unknown; models?: unknown }>
+type FileProviders = Record<
+  string,
+  {
+    api_key?: unknown
+    base_url?: unknown
+    models?: unknown
+    name?: unknown
+    vendor?: unknown
+    protocol?: unknown
+    enabled?: unknown
+    capabilities?: unknown
+  }
+>
+
+/** 文件里写的 vendor（写错了留给 schema 报），没写按键名推断 */
+function vendorOf(file: Record<string, unknown>, provider: string): VendorId {
+  const v = ((file.providers ?? {}) as FileProviders)[provider]?.vendor
+  return typeof v === 'string' && isVendorId(v) ? v : inferVendor(provider)
+}
 
 /** 凭据从哪来（PRD-M8-011 AC-1）。env > secrets.yaml > config.yaml */
 export type CredentialSource = 'env' | 'secrets' | 'config'
@@ -136,7 +154,7 @@ export function resolveCredential(
     defaultProvider: string
   },
 ): ResolvedCredential | null {
-  const fromEnv = credentialEnvNames(provider, provider === ctx.defaultProvider)
+  const fromEnv = credentialEnvNames(provider, provider === ctx.defaultProvider, vendorOf(ctx.file, provider))
     .map((n) => ctx.env[n])
     .find((v) => v !== undefined && v !== '')
   if (fromEnv !== undefined) return { value: fromEnv, source: 'env' }
@@ -176,6 +194,12 @@ export function loadConfig(opts: LoadOptions = {}): DomiConfig {
           ...(key === undefined ? {} : { apiKey: key }),
           ...(typeof fp.base_url === 'string' && fp.base_url !== '' ? { baseUrl: fp.base_url } : {}),
           ...(Array.isArray(fp.models) ? { models: fp.models } : {}),
+          // 其余字段原样交给 schema 校验（类型不对就在那里报，带着路径）
+          ...(fp.name === undefined ? {} : { name: fp.name }),
+          ...(fp.vendor === undefined ? {} : { vendor: fp.vendor }),
+          ...(fp.protocol === undefined ? {} : { protocol: fp.protocol }),
+          ...(fp.enabled === undefined ? {} : { enabled: fp.enabled }),
+          ...(fp.capabilities === undefined ? {} : { capabilities: fp.capabilities }),
         },
       ]
     }),

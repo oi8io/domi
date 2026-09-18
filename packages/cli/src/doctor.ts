@@ -36,6 +36,8 @@ export interface DoctorInput {
   plugins?: { sandbox: 'bwrap' | 'sandbox-exec' | 'none'; allowUnsandboxed: boolean; withCode: number } | undefined
   /** fs.grep 的后端（PRD-M7-001）：ripgrep 的路径，没装是 null。没给就不查 */
   ripgrep?: string | null | undefined
+  /** 配置里没写 vendor、按键名推断出来的 provider（PRD-M9-002 AC-7）。只提示，不算问题 */
+  inferredProviders?: Array<{ id: string; vendor: string; protocol: string }> | undefined
 }
 
 export interface PingResult {
@@ -66,6 +68,17 @@ export function diagnose(input: DoctorInput): Finding[] {
         fix: '$ sudo apt-get install -y bubblewrap',
       })
     }
+  }
+
+  if (input.inferredProviders && input.inferredProviders.length > 0) {
+    out.push({
+      ok: true,
+      title: '按旧写法推断的 provider',
+      detail:
+        input.inferredProviders.map((p) => `${p.id} → ${p.vendor}（${p.protocol} 协议）`).join('；') +
+        '。照常可用；想固定下来，在 Web「设置 › 模型供应商」里打开它保存一次，或在 config.yaml 里写上 vendor',
+      fix: null,
+    })
   }
 
   out.push(

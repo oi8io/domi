@@ -10,7 +10,14 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { ShadowRepo } from '@domi/checkpoint'
-import { configSource, credentialEnvNames, loadConfig, providerConnection, readConfigFile } from '@domi/config'
+import {
+  configSource,
+  credentialEnvNames,
+  listProviders,
+  loadConfig,
+  providerConnection,
+  readConfigFile,
+} from '@domi/config'
 import { buildManifest, formatManifest } from '@domi/observability'
 import { assemble, BUILTIN_LAYERS, formatDump, layersFromConfig, mergeLayers } from '@domi/prompt'
 import { formatAbsolute, formatMigrate, formatRelative, migrateDatabase, SqliteEventLog } from '@domi/store'
@@ -176,6 +183,8 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       const pingResult = cli.flags.ping
         ? await ping({
             provider: cfg.model.provider,
+            vendor: conn.vendor,
+            protocol: conn.protocol,
             model: cfg.model.name,
             apiKey: conn.apiKey,
             baseUrl: conn.baseUrl,
@@ -194,6 +203,9 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         model: cfg.model.name,
         plugins: await pluginDoctor(cfg.plugins.allowUnsandboxed),
         ripgrep: Bun.which('rg'),
+        inferredProviders: listProviders(cfg)
+          .filter((p) => p.inferred && cfg.providers[p.id] !== undefined)
+          .map((p) => ({ id: p.id, vendor: p.vendor, protocol: p.protocol })),
       })
       io.out(formatFindings(findings))
       return findings.every((f) => f.ok) ? 0 : 1

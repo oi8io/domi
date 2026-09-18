@@ -13,6 +13,7 @@ import {
   CUSTOM_OPENAI_FALLBACK_BASE,
   inferVendor,
   type Protocol,
+  type ProviderConnection,
   VENDORS,
   type VendorId,
 } from '@domi/config'
@@ -52,6 +53,22 @@ export function connectionShape(cfg: Pick<ProviderConfig, 'provider' | 'vendor' 
   const vendor = cfg.vendor ?? inferVendor(cfg.provider)
   const protocol = vendor === 'custom' ? (cfg.protocol ?? VENDORS.custom.protocol) : VENDORS[vendor].protocol
   return { vendor, protocol, adapter: adapterFor(vendor, protocol) }
+}
+
+/** 把配置里规整好的一家（`providerConnection`）变成工厂参数 */
+export function providerConfigOf(
+  conn: Pick<ProviderConnection, 'id' | 'vendor' | 'protocol' | 'apiKey' | 'baseUrl' | 'capabilities'>,
+  name: string,
+): ProviderConfig {
+  return {
+    provider: conn.id,
+    name,
+    vendor: conn.vendor,
+    protocol: conn.protocol,
+    apiKey: conn.apiKey,
+    baseUrl: conn.baseUrl,
+    capabilities: conn.capabilities,
+  }
 }
 
 export function capabilitiesFor(cfg: ProviderConfig): ModelCapabilities {

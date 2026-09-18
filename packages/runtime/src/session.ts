@@ -53,6 +53,7 @@ import {
   generateStructured,
   lostCapabilities,
   type ModelProvider,
+  providerConfigOf,
   StructuredOutputError,
 } from '@domi/model'
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
@@ -362,8 +363,7 @@ export class DomiSession {
   private buildProvider(provider: string, name: string): ModelProvider {
     // 凭据、地址、能力覆盖都只按这一家取（providerConnection）：别家没配 key 就是没配，
     // 不回落到默认那一家的——那样会把一家的 key 发往另一家的地址（BUG-M9-002）
-    const c = providerConnection(this.opts.config, provider)
-    return createProvider({ provider, name, apiKey: c.apiKey, baseUrl: c.baseUrl, capabilities: c.capabilities })
+    return createProvider(providerConfigOf(providerConnection(this.opts.config, provider), name))
   }
 
   /**
@@ -539,16 +539,8 @@ export class DomiSession {
     // 带上各自那一家的能力覆盖：不然配置里显式打开的能力会被当成「要失去」
     const cfg = this.opts.config
     const target = toProvider ?? this.currentProvider
-    const before = capabilitiesFor({
-      provider: this.currentProvider,
-      name: this.currentModel,
-      capabilities: providerConnection(cfg, this.currentProvider).capabilities,
-    })
-    const after = capabilitiesFor({
-      provider: target,
-      name: to,
-      capabilities: providerConnection(cfg, target).capabilities,
-    })
+    const before = capabilitiesFor(providerConfigOf(providerConnection(cfg, this.currentProvider), this.currentModel))
+    const after = capabilitiesFor(providerConfigOf(providerConnection(cfg, target), to))
     return { lost: lostCapabilities(before, after) }
   }
 

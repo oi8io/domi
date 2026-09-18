@@ -40,6 +40,7 @@ const settings: Settings = {
     deepseek: { set: true, masked: 'sk-de…9911', source: 'env' },
     'openai-compatible': { set: false },
   },
+  providers: [],
   paths: { config: '/home/d/.domi/config.yaml', secrets: '/home/d/.domi/secrets.yaml' },
   secretsTooOpen: false,
   writable: ['model.provider', 'model.name', 'ui.accent'],

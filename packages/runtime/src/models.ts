@@ -5,7 +5,7 @@
  * 能力按 model 包的静态矩阵给（默认那一家带上 model.capabilities 的覆盖）。
  */
 import { type DomiConfig, providerConnection } from '@domi/config'
-import { capabilitiesFor } from '@domi/model'
+import { capabilitiesFor, providerConfigOf } from '@domi/model'
 
 export interface ModelEntry {
   provider: string
@@ -30,7 +30,7 @@ export function modelCatalog(config: DomiConfig): {
     if (provider === current.provider) names.add(current.name)
     for (const m of config.providers?.[provider]?.models ?? []) names.add(m)
     for (const name of names) {
-      const caps = capabilitiesFor({ provider, name, capabilities: providerConnection(config, provider).capabilities })
+      const caps = capabilitiesFor(providerConfigOf(providerConnection(config, provider), name))
       out.push({ provider, name, vision: caps.vision, toolCall: caps.toolCall })
     }
   }

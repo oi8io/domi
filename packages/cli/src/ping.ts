@@ -7,12 +7,16 @@
  * 三种情况的修法完全不同，而一句「连接失败」区分不了它们。
  */
 
+import type { Protocol, VendorId } from '@domi/config'
 import type { ModelProvider } from '@domi/model'
 import { createProvider, StubProvider } from '@domi/model'
 import type { PingResult } from './doctor.ts'
 
 export interface PingInput {
   provider: string
+  /** 厂商模板与协议（PRD-M9-002）。不给就按 provider id 推断 */
+  vendor?: VendorId | undefined
+  protocol?: Protocol | undefined
   model: string
   apiKey: string | undefined
   baseUrl: string | undefined
@@ -31,7 +35,15 @@ export async function ping(input: PingInput): Promise<PingResult> {
   const t0 = now()
   const make =
     input.makeProvider ??
-    ((cfg) => createProvider({ provider: cfg.provider, name: cfg.name, apiKey: cfg.apiKey, baseUrl: cfg.baseUrl }))
+    ((cfg) =>
+      createProvider({
+        provider: cfg.provider,
+        name: cfg.name,
+        vendor: input.vendor,
+        protocol: input.protocol,
+        apiKey: cfg.apiKey,
+        baseUrl: cfg.baseUrl,
+      }))
 
   try {
     const p = make({ provider: input.provider, name: input.model, apiKey: input.apiKey, baseUrl: input.baseUrl })

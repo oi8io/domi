@@ -3660,6 +3660,106 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
         ]
       }
     },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "vendor": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "openai",
+              "anthropic"
+            ]
+          },
+          "baseUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "toolCall": {
+                "type": "boolean"
+              },
+              "vision": {
+                "type": "boolean"
+              },
+              "reasoning": {
+                "type": "boolean"
+              },
+              "promptCache": {
+                "type": "boolean"
+              },
+              "structuredOutput": {
+                "type": "boolean"
+              }
+            }
+          },
+          "inferred": {
+            "type": "boolean"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "object",
+            "properties": {
+              "set": {
+                "type": "boolean"
+              },
+              "masked": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "env",
+                  "secrets",
+                  "config"
+                ]
+              }
+            },
+            "required": [
+              "set"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "vendor",
+          "protocol",
+          "baseUrl",
+          "enabled",
+          "models",
+          "capabilities",
+          "inferred",
+          "isDefault",
+          "key"
+        ]
+      }
+    },
     "paths": {
       "type": "object",
       "properties": {
@@ -3688,6 +3788,7 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
   "required": [
     "values",
     "secrets",
+    "providers",
     "paths",
     "secretsTooOpen",
     "writable"
@@ -3695,9 +3796,105 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `provider.vendors`
+
+厂商模板（PRD-M9-002 AC-2 / AC-4）：新增 provider 时选哪一家、默认协议 / 地址 / 能力。只读，没有任何凭据；界面不自己写一份厂商名单
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {}
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "vendors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "openai",
+              "anthropic"
+            ]
+          },
+          "defaultBaseUrl": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "toolCall": {
+                "type": "boolean"
+              },
+              "vision": {
+                "type": "boolean"
+              },
+              "reasoning": {
+                "type": "boolean"
+              },
+              "promptCache": {
+                "type": "boolean"
+              },
+              "structuredOutput": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "toolCall",
+              "vision",
+              "reasoning",
+              "promptCache",
+              "structuredOutput"
+            ]
+          },
+          "keyHint": {
+            "type": "string"
+          },
+          "envNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "protocol",
+          "capabilities",
+          "keyHint",
+          "envNames"
+        ]
+      }
+    }
+  },
+  "required": [
+    "vendors"
+  ]
+}
+```
+
 ### `config.set`
 
-改配置（PRD-M8-011 AC-2 / AC-3）。patch 的键是 config.get 的 writable 里的点分路径，值为 null 表示删掉；有一个键不在白名单就整体拒绝（INVALID_PARAMS），文件不动。key 写进 secrets.yaml。改完下一轮生效；restartRequired 列出要重启 domid 才生效的键
+改配置（PRD-M8-011 AC-2 / AC-3）。patch 的键是 config.get 的 writable 里的点分路径，值为 null 表示删掉；有一个键不在白名单就整体拒绝（INVALID_PARAMS），文件不动。key 写进 secrets.yaml。改完下一轮生效；restartRequired 列出要重启 domid 才生效的键。provider 按 providers.<id>.<字段> 改，providers.<id>: null 删整条（连同 key）；默认模型所在的那一家停用 / 删除 → INVALID_PARAMS，data.reason = DEFAULT_PROVIDER（PRD-M9-002）
 
 **params**
 

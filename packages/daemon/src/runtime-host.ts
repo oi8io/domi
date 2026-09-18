@@ -703,9 +703,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
               try {
                 writeConfigPatch(patch, src)
               } catch (e) {
-                throw e instanceof ConfigWriteError || e instanceof ConfigParseError
-                  ? new HostRequestError(e.message)
-                  : e
+                if (e instanceof ConfigWriteError)
+                  throw new HostRequestError(e.message, e.reason === undefined ? undefined : { reason: e.reason })
+                throw e instanceof ConfigParseError ? new HostRequestError(e.message) : e
               }
               // 热加载（AC-3）：之后新建的会话用新配置；已经开着的会话下一轮用新配置
               const next = loadConfig(src)

@@ -12,6 +12,7 @@
  * 2. **同一会话串行**（AC-2）。第二个请求进来时不排队也不静默丢弃，
  *    直接回 `SESSION_BUSY` —— 排队会让用户以为没发出去，丢弃会让他以为发出去了。
  */
+import { VENDORS } from '@domi/config'
 import {
   type EventEnvelope,
   fail,
@@ -661,6 +662,19 @@ export class Daemon {
         if (method === 'config.get') return ok(req.id, await h.get())
         return ok(req.id, await h.set((params as { patch: Record<string, unknown> }).patch))
       }
+
+      case 'provider.vendors':
+        return ok(req.id, {
+          vendors: Object.values(VENDORS).map((v) => ({
+            id: v.id,
+            label: v.label,
+            protocol: v.protocol,
+            ...(v.defaultBaseUrl === undefined ? {} : { defaultBaseUrl: v.defaultBaseUrl }),
+            capabilities: { ...v.capabilities },
+            keyHint: v.keyHint,
+            envNames: [...v.envNames],
+          })),
+        })
 
       case 'usage.summary': {
         const p = params as { from: number; to: number }
