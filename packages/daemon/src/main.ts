@@ -13,7 +13,7 @@
 import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { credentialEnvNames, loadConfig } from '@domi/config'
+import { credentialEnvNames, loadConfig, providerConnection } from '@domi/config'
 import { McpHub } from '@domi/mcp'
 import { PluginHost } from '@domi/plugin'
 import { type RejectedConnection, resolveServerSettings } from './auth.ts'
@@ -103,7 +103,7 @@ export async function main(env: Record<string, string | undefined> = process.env
     )
   }
   process.stdout.write(`${notes.join('\n')}\n`)
-  if (!config.model.apiKey) {
+  if (!providerConnection(config, config.model.provider).apiKey) {
     process.stderr.write(
       `domid: 还没有配置 ${config.model.provider} 的 API key——到 Web「设置 › 模型供应商」填写，或设置 ${credentialEnvNames(config.model.provider).join(' / ')}\n`,
     )

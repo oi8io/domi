@@ -32,7 +32,7 @@ import {
   ToolRegistry,
 } from '@domi/capability'
 import { DiagnosticsService, makeDiagnosticsTool, makeOutlineTool } from '@domi/codeintel'
-import { credentialEnvNames, type DomiConfig, MissingCredentialError } from '@domi/config'
+import { credentialEnvNames, type DomiConfig, MissingCredentialError, providerConnection } from '@domi/config'
 import {
   aggregate,
   type ContextPolicy,
@@ -360,17 +360,10 @@ export class DomiSession {
   }
 
   private buildProvider(provider: string, name: string): ModelProvider {
-    const m = this.opts.config.model
-    // 默认那一家用 model 下的凭据；换到别家时用 providers 里那一家的（PRD-M8-011），没配就沿用默认的
-    const other = provider === m.provider ? undefined : this.opts.config.providers?.[provider]
-    return createProvider({
-      provider,
-      name,
-      apiKey: other?.apiKey ?? m.apiKey,
-      baseUrl: other === undefined ? m.baseUrl : other.baseUrl,
-      // 能力覆盖是为配置里那个 provider 写的，换了 provider 就不再适用
-      capabilities: provider === m.provider ? m.capabilities : undefined,
-    })
+    // 凭据、地址、能力覆盖都只按这一家取（providerConnection）：别家没配 key 就是没配，
+    // 不回落到默认那一家的——那样会把一家的 key 发往另一家的地址（BUG-M9-002）
+    const c = providerConnection(this.opts.config, provider)
+    return createProvider({ provider, name, apiKey: c.apiKey, baseUrl: c.baseUrl, capabilities: c.capabilities })
   }
 
   /**
@@ -388,10 +381,9 @@ export class DomiSession {
    */
   checkCredential(): void {
     if (this.injectedProvider) return
-    const m = this.opts.config.model
-    const other = this.currentProvider === m.provider ? undefined : this.opts.config.providers?.[this.currentProvider]
-    if (other?.apiKey ?? m.apiKey) return
-    throw new MissingCredentialError(credentialEnvNames(this.currentProvider), this.currentProvider)
+    if (providerConnection(this.opts.config, this.currentProvider).apiKey) return
+    const isDefault = this.currentProvider === this.opts.config.model.provider
+    throw new MissingCredentialError(credentialEnvNames(this.currentProvider, isDefault), this.currentProvider)
   }
 
   /** 当前在用的 provider 与模型（会话中途可能被 switchModel 换掉） */
@@ -521,7 +513,7 @@ export class DomiSession {
     this.currentModel = to
     this.currentProvider = toProvider
     // provider 实例在构造时就绑定了模型名，只改字符串的话请求照旧发给旧模型。
-    // 跨 provider 时沿用同一套 key / base_url——配置里只有一套凭据（多凭据见缺陷登记）
+    // 跨 provider 时用那一家自己的 key / base_url（providerConnection）
     if (!this.injectedProvider) this.provider = this.buildProvider(toProvider, to)
     await this.log.append(this.opts.sessionId, [
       {
@@ -544,8 +536,19 @@ export class DomiSession {
    * 注入替身时后者是「全都支持」，拿它当基准会把每次切换都报成降级。
    */
   previewSwitch(to: string, toProvider?: string): { lost: string[] } {
-    const before = capabilitiesFor({ provider: this.currentProvider, name: this.currentModel })
-    const after = capabilitiesFor({ provider: toProvider ?? this.currentProvider, name: to })
+    // 带上各自那一家的能力覆盖：不然配置里显式打开的能力会被当成「要失去」
+    const cfg = this.opts.config
+    const target = toProvider ?? this.currentProvider
+    const before = capabilitiesFor({
+      provider: this.currentProvider,
+      name: this.currentModel,
+      capabilities: providerConnection(cfg, this.currentProvider).capabilities,
+    })
+    const after = capabilitiesFor({
+      provider: target,
+      name: to,
+      capabilities: providerConnection(cfg, target).capabilities,
+    })
     return { lost: lostCapabilities(before, after) }
   }
 

@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Tool } from '@domi/capability'
-import type { DomiConfig } from '@domi/config'
+import { type DomiConfig, providerConnection } from '@domi/config'
 import {
   applyImport,
   applySoulOps,
@@ -105,14 +105,15 @@ export class MemoryService {
     const e = opts.config.memory.embedding
     if (opts.embed) this.embed = { model: e?.model ?? 'injected', embedder: opts.embed }
     else if (e) {
-      const sameProvider = e.provider === opts.config.model.provider
+      // 没写 key / 地址就用 embedding 所在那一家的（providerConnection）；不同家不共用
+      const conn = providerConnection(opts.config, e.provider)
       this.embed = {
         model: `${e.provider}/${e.model}`,
         embedder: createEmbedder({
           provider: e.provider,
           model: e.model,
-          apiKey: e.apiKey ?? (sameProvider ? opts.config.model.apiKey : undefined),
-          baseUrl: e.baseUrl ?? (sameProvider ? opts.config.model.baseUrl : undefined),
+          apiKey: e.apiKey ?? conn.apiKey,
+          baseUrl: e.baseUrl ?? conn.baseUrl,
         }),
       }
     }
@@ -120,12 +121,14 @@ export class MemoryService {
 
   private get provider(): ModelProvider {
     if (this.opts.provider) return this.opts.provider
+    const { provider, name } = this.opts.config.model
+    const conn = providerConnection(this.opts.config, provider)
     this.providerCache ??= createProvider({
-      provider: this.opts.config.model.provider,
-      name: this.opts.config.model.name,
-      apiKey: this.opts.config.model.apiKey,
-      baseUrl: this.opts.config.model.baseUrl,
-      capabilities: this.opts.config.model.capabilities,
+      provider,
+      name,
+      apiKey: conn.apiKey,
+      baseUrl: conn.baseUrl,
+      capabilities: conn.capabilities,
     })
     return this.providerCache
   }

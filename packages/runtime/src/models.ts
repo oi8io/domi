@@ -4,7 +4,7 @@
  * 来源：配了凭据的供应商（默认那一家总在）× 已知的模型名（该家 providers.<p>.models + 价目表里按前缀认得出的 + 当前默认模型）。
  * 能力按 model 包的静态矩阵给（默认那一家带上 model.capabilities 的覆盖）。
  */
-import { type DomiConfig, pricingOf } from '@domi/config'
+import { type DomiConfig, pricingOf, providerConnection } from '@domi/config'
 import { capabilitiesFor, knownModels, providerOfModelName } from '@domi/model'
 
 export interface ModelEntry {
@@ -33,13 +33,7 @@ export function modelCatalog(config: DomiConfig): {
     for (const n of priced) if (providerOfModelName(n) === provider) names.add(n)
     for (const n of knownModels(provider)) names.add(n)
     for (const name of names) {
-      const caps = capabilitiesFor({
-        provider,
-        name,
-        ...(provider === current.provider && config.model.capabilities
-          ? { capabilities: config.model.capabilities }
-          : {}),
-      } as Parameters<typeof capabilitiesFor>[0])
+      const caps = capabilitiesFor({ provider, name, capabilities: providerConnection(config, provider).capabilities })
       out.push({ provider, name, vision: caps.vision, toolCall: caps.toolCall })
     }
   }

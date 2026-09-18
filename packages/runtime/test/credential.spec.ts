@@ -49,20 +49,31 @@ describe('OPT-M8-001 · 提交时查凭据', () => {
     await s.flushAndClose()
   })
 
-  test('切到别家：查的是那一家的 key；那一家没配就沿用默认的（与建 provider 的规则一致）', async () => {
+  test('切到别家：查的是那一家的 key；那一家没配就报缺凭据，不回落到默认那一家的（BUG-M9-002）', async () => {
     const own = session({}, { openai: { apiKey: 'k-openai' } }).s
     await own.switchModel('gpt-x', { provider: 'openai' })
     expect(() => own.checkCredential()).not.toThrow()
     await own.flushAndClose()
 
-    const inherit = session({ apiKey: 'k' }).s
-    await inherit.switchModel('gpt-x', { provider: 'openai' })
-    expect(() => inherit.checkCredential()).not.toThrow()
-    await inherit.flushAndClose()
+    // 复现：默认那一家有 key、别家只配了地址。修之前这里不抛——请求会带着 k-default 发往 gw.example
+    const leak = session({ apiKey: 'k-default' }, { deepseek: { baseUrl: 'https://gw.example/v1' } }).s
+    await leak.switchModel('deepseek-chat', { provider: 'deepseek' })
+    expect(() => leak.checkCredential()).toThrow(MissingCredentialError)
+    await leak.flushAndClose()
 
-    const none = session({}).s
+    const none = session({ apiKey: 'k-default' }).s
     await none.switchModel('gpt-x', { provider: 'openai' })
-    expect(() => none.checkCredential()).toThrow(/OPENAI_API_KEY/)
+    const err = (() => {
+      try {
+        none.checkCredential()
+      } catch (e) {
+        return e as MissingCredentialError
+      }
+      return null
+    })()
+    expect(err?.provider).toBe('openai')
+    // DOMI_API_KEY 只属于默认那一家（PRD-M9-002 AC-6），别家的提示里不该出现它
+    expect(err?.envNames).toEqual(['OPENAI_API_KEY'])
     await none.flushAndClose()
   })
 })

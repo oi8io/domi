@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { ConfigParseError } from './errors.ts'
+import { providerConnection } from './providers.ts'
 import { ConfigSchema, type DomiConfig } from './schema.ts'
 import { readSecrets, type Secrets, secretsPath } from './secrets.ts'
 
@@ -102,15 +103,19 @@ export function readConfigFile(src: ConfigSource): Record<string, unknown> {
   return raw as Record<string, unknown>
 }
 
-/** 按 provider 找它惯用的环境变量名，顺带保留 DOMI_API_KEY 这个统一入口 */
-export function credentialEnvNames(provider: string): string[] {
+/**
+ * 按 provider 找它惯用的环境变量名。`DOMI_API_KEY` 这个统一入口**只给默认模型所在的那一家**（PRD-M9-002 AC-6）：
+ * 否则设了它，切到任何没配 key 的别家都会把这把 key 发过去（BUG-M9-002 的同一类问题）
+ */
+export function credentialEnvNames(provider: string, isDefault = true): string[] {
   const perProvider: Record<string, string> = {
     anthropic: 'ANTHROPIC_API_KEY',
     openai: 'OPENAI_API_KEY',
     deepseek: 'DEEPSEEK_API_KEY',
   }
   const specific = perProvider[provider]
-  return specific ? ['DOMI_API_KEY', specific] : ['DOMI_API_KEY']
+  const names = specific ? [specific] : []
+  return isDefault ? ['DOMI_API_KEY', ...names] : names
 }
 
 type FileProviders = Record<string, { api_key?: unknown; base_url?: unknown; models?: unknown }>
@@ -136,7 +141,7 @@ export function resolveCredential(
     defaultProvider: string
   },
 ): ResolvedCredential | null {
-  const fromEnv = credentialEnvNames(provider)
+  const fromEnv = credentialEnvNames(provider, provider === ctx.defaultProvider)
     .map((n) => ctx.env[n])
     .find((v) => v !== undefined && v !== '')
   if (fromEnv !== undefined) return { value: fromEnv, source: 'env' }
@@ -206,6 +211,7 @@ export function loadConfig(opts: LoadOptions = {}): DomiConfig {
 /** 装载 + 强制要求凭据。缺了就抛 MissingCredentialError（AC-3 的来源） */
 export function loadConfigOrThrow(opts: LoadOptions = {}): DomiConfig {
   const cfg = loadConfig(opts)
-  if (!cfg.model.apiKey) throw new MissingCredentialError(credentialEnvNames(cfg.model.provider))
+  if (!providerConnection(cfg, cfg.model.provider).apiKey)
+    throw new MissingCredentialError(credentialEnvNames(cfg.model.provider))
   return cfg
 }

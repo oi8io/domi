@@ -10,7 +10,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { ShadowRepo } from '@domi/checkpoint'
-import { configSource, credentialEnvNames, loadConfig, readConfigFile } from '@domi/config'
+import { configSource, credentialEnvNames, loadConfig, providerConnection, readConfigFile } from '@domi/config'
 import { buildManifest, formatManifest } from '@domi/observability'
 import { assemble, BUILTIN_LAYERS, formatDump, layersFromConfig, mergeLayers } from '@domi/prompt'
 import { formatAbsolute, formatMigrate, formatRelative, migrateDatabase, SqliteEventLog } from '@domi/store'
@@ -172,20 +172,21 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       const cfg = loadConfig({ home })
       const src = configSource({ home })
       const legacyPath = src.legacy ? src.path : src.ignoredLegacy
+      const conn = providerConnection(cfg, cfg.model.provider)
       const pingResult = cli.flags.ping
         ? await ping({
             provider: cfg.model.provider,
             model: cfg.model.name,
-            apiKey: cfg.model.apiKey,
-            baseUrl: cfg.model.baseUrl,
+            apiKey: conn.apiKey,
+            baseUrl: conn.baseUrl,
           })
         : undefined
       const findings = diagnose({
         configPath: src.path,
         legacyConfig: legacyPath ? { path: legacyPath, ignored: !src.legacy } : undefined,
-        baseUrl: cfg.model.baseUrl,
+        baseUrl: conn.baseUrl,
         ping: pingResult,
-        hasCredential: Boolean(cfg.model.apiKey),
+        hasCredential: Boolean(conn.apiKey),
         credentialEnvNames: credentialEnvNames(cfg.model.provider),
         dataDir: dataDir(),
         gitAvailable: await new ShadowRepo({ workTree: process.cwd() }).available(),
