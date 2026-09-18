@@ -18,6 +18,7 @@ import {
   answerFromKey,
   createSessionStore,
   type DomiClient,
+  DomiRpcError,
   focusIdOf,
   type RefLink,
   type SessionStore,
@@ -243,8 +244,15 @@ export function Root({
             return
           case 'compact':
             return client.request('session.compact', { sessionId })
+          case 'model-picker':
+            setOverlay({ id: 'models' })
+            return
           case 'model':
-            return client.switchModel(sessionId, cmd.model, cmd.provider)
+            // 好几家都有这个名字：打开模型列表让人选（错误信息里列着候选）
+            return client.switchModel(sessionId, cmd.model).catch((e: unknown) => {
+              if (e instanceof DomiRpcError && e.data?.reason === 'AMBIGUOUS') setOverlay({ id: 'models' })
+              throw e
+            })
           case 'budget':
             await client.setBudget(sessionId, cmd.budget)
             setNotice('已设上限：到 80% 会提醒，到顶暂停问你')
@@ -399,6 +407,7 @@ export function Root({
         client={client}
         state={overlay}
         sessionId={sessionId}
+        currentModel={{ provider: status.provider, name: status.model }}
         onChange={setOverlay}
         onOpenSession={(id) => {
           switchTo(id).then(

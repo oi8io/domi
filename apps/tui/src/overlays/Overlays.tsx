@@ -20,6 +20,7 @@ export interface OverlayState {
 type Project = Awaited<ReturnType<DomiClient['listProjects']>>[number]
 type Session = Awaited<ReturnType<DomiClient['listSessions']>>['sessions'][number]
 type Schedule = Awaited<ReturnType<DomiClient['listSchedules']>>[number]
+type ModelList = Awaited<ReturnType<DomiClient['listModels']>>
 
 const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const pad = (n: string) => n.padStart(2, '0')
@@ -96,6 +97,73 @@ export function taskItems(sessions: readonly Session[], schedules: readonly Sche
   return [...running, ...timed]
 }
 
+/**
+ * 模型列表（PRD-M9-003 AC-4）：按供应商分组，同名模型在不同家各占一行；当前在用的点亮。
+ * key 是 `provider\n模型名`——身份是这两样一起，光有名字认不出是哪一家
+ */
+export function modelItems(list: ModelList, current: { provider: string; name: string }): OverlayItem[] {
+  return list.models.map((m) => ({
+    key: `${m.provider}\n${m.name}`,
+    label: m.name,
+    group: m.providerName,
+    meta: [
+      m.provider === list.current.provider && m.name === list.current.name ? '默认' : '',
+      m.source === 'manual' ? '手填' : m.source === 'fallback' ? '未探测到' : '',
+      m.toolCall ? '' : '不能用工具',
+      m.vision ? '' : '不支持图片',
+    ]
+      .filter(Boolean)
+      .join(' · '),
+    dot: m.provider === current.provider && m.name === current.name ? 'accent' : 'off',
+    search: m.providerName,
+  }))
+}
+
+function ModelsOverlay({
+  client,
+  sessionId,
+  current,
+  onClose,
+}: {
+  client: DomiClient
+  sessionId: string
+  current: { provider: string; name: string }
+  onClose(): void
+}) {
+  const [list, setList] = useState<ModelList | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  useEffect(() => {
+    client.listModels().then(setList, (e: unknown) => setNotice(e instanceof Error ? e.message : String(e)))
+  }, [client])
+  const failed = list?.providers.filter((p) => p.status === 'fallback') ?? []
+  return (
+    <Overlay
+      title="切换模型"
+      placeholder="搜索模型或供应商…"
+      items={list === null ? [] : modelItems(list, current)}
+      empty={list === null ? '加载中…' : '没有可用的模型：到 Web「设置 › 模型供应商」添加'}
+      hints={[
+        ['↑↓', '选择'],
+        ['enter', '切换'],
+        ['esc', '关闭'],
+      ]}
+      notice={
+        notice ??
+        (failed.length > 0 ? `探测失败：${failed.map((p) => `${p.name}（${p.error ?? '未知'}）`).join('、')}` : null)
+      }
+      onSelect={(it) => {
+        const [provider, name] = it.key.split('\n')
+        if (!provider || !name) return
+        client.switchModel(sessionId, name, provider).then(
+          () => onClose(),
+          (e: unknown) => setNotice(e instanceof Error ? e.message : String(e)),
+        )
+      }}
+      onClose={onClose}
+    />
+  )
+}
+
 function HelpOverlay({ onClose }: { onClose(): void }) {
   const t = useTheme()
   const keys: Array<[string, string]> = [
@@ -150,12 +218,15 @@ export function Overlays({
   client,
   state,
   sessionId,
+  currentModel,
   onChange,
   onOpenSession,
 }: {
   client: DomiClient
   state: OverlayState
   sessionId: string
+  /** 这个会话当前用的模型（模型列表里点亮它） */
+  currentModel?: { provider: string; name: string }
   onChange(next: OverlayState | null): void
   onOpenSession(id: string): void
 }): React.ReactElement {
@@ -187,6 +258,16 @@ export function Overlays({
   const currentProject = sessions?.find((s) => s.id === sessionId)?.projectId
 
   if (state.id === 'help') return <HelpOverlay onClose={close} />
+  if (state.id === 'models') {
+    return (
+      <ModelsOverlay
+        client={client}
+        sessionId={sessionId}
+        current={currentModel ?? { provider: '', name: '' }}
+        onClose={close}
+      />
+    )
+  }
 
   if (state.id === 'projects') {
     return (

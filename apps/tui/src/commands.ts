@@ -8,7 +8,8 @@ import type { RefLink } from '@domi/client-core'
 export type SlashCommand =
   | { kind: 'submit'; text: string }
   | { kind: 'compact' }
-  | { kind: 'model'; model: string; provider?: string }
+  | { kind: 'model'; model: string }
+  | { kind: 'model-picker' }
   | { kind: 'branch'; atSeq: number }
   | { kind: 'ref'; ref: RefLink }
   | { kind: 'sessions'; includeDeleted: boolean }
@@ -39,7 +40,7 @@ export const COMMANDS: ReadonlyArray<{ name: string; args?: string; desc: string
   { name: '/ref', args: '<会话 id> [起-止]', desc: '下一句话引用另一个会话' },
   { name: '/plan', desc: '切到计划模式' },
   { name: '/act', desc: '切回执行模式' },
-  { name: '/model', args: '<模型> [provider]', desc: '换模型' },
+  { name: '/model', args: '[模型]', desc: '换模型（不带参数打开模型列表）' },
   { name: '/compact', desc: '压缩上下文' },
   { name: '/budget', args: 'tokens|cost|calls <数>', desc: '设用量上限' },
   { name: '/changes', args: '[文件]', desc: '看单独工作区里的改动' },
@@ -63,9 +64,11 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
   switch (cmd) {
     case '/compact':
       return { kind: 'compact' } // PRD-M2-003 AC-1
-    case '/model': // PRD-M1-002 · parity 第 10 项
-      if (!rest[0]) return { kind: 'invalid', message: '用法：/model <模型名> [provider]' }
-      return rest[1] ? { kind: 'model', model: rest[0], provider: rest[1] } : { kind: 'model', model: rest[0] }
+    case '/model': // PRD-M1-002 · parity 第 10 项 · PRD-M9-003 AC-4
+      // 只接受模型名：归属哪一家由 daemon 定（provider 是配置概念，不在对话里切）
+      if (!rest[0]) return { kind: 'model-picker' }
+      if (rest.length > 1) return { kind: 'invalid', message: '用法：/model [模型名]——只填模型名，供应商由设置决定' }
+      return { kind: 'model', model: rest[0] }
     case '/branch': {
       // parity 第 7 项。常用的是不带数字；带数字时和 Web 端「分支」按钮是同一套视图编号
       const at = rest[0] === undefined ? lastSeq : Number(rest[0])
