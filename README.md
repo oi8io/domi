@@ -8,13 +8,14 @@
 
 ## 文档导航
 
-### 先读这三份
+### 先读这几份
 
 | 文件 | 是什么 | 什么时候读 |
 |---|---|---|
 | [`PRD-VISION.md`](PRD-VISION.md) | 定位 + **12 条不变量** | **每次开工必读。这是唯一的跑偏判定依据** |
 | [`AGENTS.md`](AGENTS.md) | AI 开工必读的硬规则 | AI 会话开始时 |
 | [`NEXT.md`](NEXT.md) | 三行现状：在做什么 / 下一步 / 卡在哪 | 每次开工第一眼；**每次收工前更新** |
+| [`HANDOFF.md`](HANDOFF.md) | 交接：现在在哪 / 下一步做什么 / 哪里会踩坑 | 第一次接手这个仓库时 |
 
 ### 设计与流程
 
@@ -53,18 +54,20 @@ INV-xx ──→ PRD-M{n}-xxx ──→ SPEC-M{n}-xxx ──→ TASK-M{n}-xxx �
 
 ## 当前进度
 
+> 2026-09-18 · 九个里程碑的**功能全部落地**，剩下的是验证补齐与用户侧 DoD。接手请先读 [`HANDOFF.md`](HANDOFF.md)。
+
 | 环节 | 状态 | 产出 |
 |---|---|---|
-| 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.2.1**（50 条）· M2 再批准草稿见 `docs/prd/M2.md` |
-| 架构师 | ✅ 完成 | `docs/spec/M0.md`（9 条取舍）· `docs/spec/M1.md`（11 条取舍），均带"触发重新决策的条件" |
-| 工程师 | 🔵 进行中 | M0 22 个任务（20 done / 1 dropped / 1 review）· **M1 23 个任务全部 done** · 331 测试全绿 |
-| 测试工程师 | ⏳ 待办 | **必须另开独立会话**；对账表见 `docs/qa/M1-reconciliation.md` |
+| 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.11.2**（77 条，M0–M8 全部 `COMMITTED`）· 各里程碑再批准材料在 `docs/prd/` |
+| 架构师 | ✅ 完成 | `docs/spec/M0 / M1 / M2 / M6 / M7 / M8.md`，均带"触发重新决策的条件"· 27 份 ADR |
+| 工程师 | ✅ 功能完成 | M0–M8 共 9 个任务文件；`pnpm check` 全绿：27 道守卫 + **1017 个测试** + L1 回放 |
+| 测试工程师 | 🔵 进行中 | M0 / M1 / M8 已纳入 `check-ac-coverage` 强制范围（151 条 AC）；M4 / M5 / M6 / M7 的「验证补齐」待做 |
+
+**下一步**：OPT-M8-001（没有 key 时 domid 起不来）→ TASK-M7-011（M7 验证补齐）→ M4 / M5 / M6 验证补齐。
+只有用户能做的：各里程碑 DoD、M8 逐屏截图走查、桌面端与 macOS 沙箱的真机验证。详见 `NEXT.md`。
 
 **2026-09-14 方向变更**：见 `docs/adr/003-revert-to-self-built-runtime.md`。
 `docs/RECON-DSH.md` 的"收缩为 DSH 发行版"结论已作废，该文档降级为情报文档。
-
-**M0 开工第一件事**：PRD-M0-007 的 TUI spike（Bun + OpenTUI 验证）。**截至 2026-09-14 仍未执行，TUI 框架留白悬着。**
-（原第二个 spike「`buildContext` 5 万事件压测」已由 `docs/adr/005` 降级为可选，策略改为运行期选项。）
 
 ## 本地开发
 
