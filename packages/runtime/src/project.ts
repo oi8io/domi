@@ -6,6 +6,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
+import type { PromptLayer } from '@domi/prompt'
 
 /** 规矩文件的名字，按优先级。同一目录两个都有只读第一个 */
 export const RULES_FILE_NAMES = ['AGENT.md', 'AGENTS.md'] as const
@@ -83,6 +84,32 @@ export function rulesText(root: string, cwd: string, limit = RULES_MAX_CHARS): s
     used += head.length + body.length
   }
   return parts.join('\n')
+}
+
+/** 规矩层（会话与 `domi prompt dump` 共用同一个 id 与位置，dump 看到的就是会话里的） */
+export function projectRulesLayer(text: string): PromptLayer {
+  return { id: 'project.rules', role: 'system', priority: 320, cacheable: true, render: () => text }
+}
+
+/**
+ * `domi prompt dump` 用（BUG-M7-001）：cwd 所在仓库信任过就给规矩层；
+ * 有规矩文件但没信任时给一句说明——不然用户看不到层，会以为文件没被发现
+ */
+export function dumpRulesLayer(cwd: string, domiHome: string): { layer: PromptLayer | null; note: string | null } {
+  const root = findRepoRoot(cwd)
+  if (rulesFiles(root, cwd).length === 0) return { layer: null, note: null }
+  const trusted = new TrustStore(join(domiHome, 'trust.json')).get(root)
+  if (trusted !== true) {
+    return {
+      layer: null,
+      note: `（${root} 有规矩文件，但这个仓库${trusted === false ? '被标为不信任' : '还没被信任'}（未信任），规矩没有放进提示词。在会话里答应信任后就会出现在 project.rules 层）`,
+    }
+  }
+  const text = rulesText(root, cwd)
+  const from = rulesFiles(root, cwd)
+    .map((f) => relative(root, f))
+    .join(' → ')
+  return { layer: text === '' ? null : projectRulesLayer(text), note: `project.rules 来自（根 → 工作目录）：${from}` }
 }
 
 /**

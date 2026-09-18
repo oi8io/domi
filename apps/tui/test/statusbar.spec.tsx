@@ -79,3 +79,23 @@ describe('AC-1 · 状态栏显示的内容', () => {
     h.unmount()
   })
 })
+
+describe('PRD-M7-004 AC-3 · 验证三态', () => {
+  test.each([
+    ['unverified', '已改未验'],
+    ['verified', '已验证'],
+    ['failed', '验证失败'],
+  ] as const)('%s → %s', async (verify, label) => {
+    const h = renderAt(120, <StatusBar status={status({ ...metrics(10), verify })} />)
+    await h.flush()
+    expect(h.lastFrame()).toContain(label)
+    h.unmount()
+  })
+
+  test('clean（没改文件）不占地方', async () => {
+    const h = renderAt(120, <StatusBar status={status({ ...metrics(10), verify: 'clean' })} />)
+    await h.flush()
+    for (const l of ['已改未验', '已验证', '验证失败']) expect(h.lastFrame()).not.toContain(l)
+    h.unmount()
+  })
+})

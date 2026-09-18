@@ -77,7 +77,15 @@ import { memorySearchPlugin } from './builtin-plugins.ts'
 import { HookRunner } from './hooks.ts'
 import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
 import { makePlanSubmitTool } from './plan.ts'
-import { findRepoRoot, hasProjectContent, projectSkillsDir, rulesFiles, rulesText, TrustStore } from './project.ts'
+import {
+  findRepoRoot,
+  hasProjectContent,
+  projectRulesLayer,
+  projectSkillsDir,
+  rulesFiles,
+  rulesText,
+  TrustStore,
+} from './project.ts'
 import { MAX_SPAWN_DEPTH, makeSpawnTool } from './subagent.ts'
 
 /** 这一轮（最后一条 user.input 之后）有没有改过文件 */
@@ -911,7 +919,7 @@ export class DomiSession {
     // 仓库自带的规矩（M7-002）：信任之后才放。每轮现读，改了下一轮生效
     const rules = this.trusted ? rulesText(this.repoRoot, this.opts.cwd) : ''
     if (rules !== '') {
-      extra.push({ id: 'project.rules', role: 'system', priority: 320, cacheable: true, render: () => rules })
+      extra.push(projectRulesLayer(rules))
     }
     const catalog = this.skillSource?.catalog() ?? ''
     if (catalog !== '') {

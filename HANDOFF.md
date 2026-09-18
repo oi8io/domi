@@ -8,8 +8,8 @@
 ## 1. 一句话现状
 
 M0–M8 九个里程碑的**功能全部落地**：内核 / 守卫 / 三端（CLI、TUI、Web）/ 插件 / 编码能力 / 工作台都通了；
-`pnpm typecheck`、`pnpm guard`（27 个门禁）、`pnpm test`（111 个文件 1024 条）当前全绿。
-剩下的是**验证补齐**（M4 / M5 / M6 / M7 各有一条「最后做」的任务没做）与**用户侧走查**（各里程碑 DoD）。
+`pnpm typecheck`、`pnpm guard`（27 个门禁）、`pnpm test`（122 个文件 1134 条）当前全绿。
+剩下的是**验证补齐**（M4 / M5 / M6 各有一条「最后做」的任务没做）与**用户侧走查**（各里程碑 DoD）。
 
 代码在本地 `master`，**没有配置任何 git remote**——接手第一件事是推到你们的远端，
 否则这 137 个提交只活在一台机器上。
@@ -60,10 +60,10 @@ pnpm check            # = typecheck + guard + test + eval(L1)；必须全绿才�
 | M4 有灵魂 | done | **todo** | TASK-M4-009 |
 | M5 会干活 | done | **todo** | TASK-M5-008；BUG-M5-001（macOS 打包图标）review |
 | M6 生态 | done | **todo** | TASK-M6-008；BUG-M6-001（`eval l2 --rounds`）review |
-| M7 会写代码 | done | **todo** | TASK-M7-011 —— 量最大的一块 |
+| M7 会写代码 | done | done | TASK-M7-011 已补齐（修了 BUG-M7-001…003）；只剩用户侧 DoD |
 | M8 工作台 | done | done | 只剩用户侧 DoD 与逐屏截图走查 |
 
-`check-ac-coverage` 目前只对 **M0 / M1 / M8** 强制（151 条 AC 全部有测试点名）。
+`check-ac-coverage` 目前对 **M0 / M1 / M7 / M8** 强制（190 条 AC 全部有测试点名）。
 中间几个里程碑的 AC 有测试但没在测试里写编号——**补完哪个里程碑的验证，就把它加进 `scripts/check-ac-coverage.ts` 的 `ACTIVE` 正则**，这是唯一防回退的机制。
 
 ---
@@ -74,16 +74,14 @@ pnpm check            # = typecheck + guard + test + eval(L1)；必须全绿才�
 domid 无 key 也能起；提交时报 `error.missing_credential`（`INVALID_PARAMS`，`data.reason = MISSING_CREDENTIAL`），
 Web 首页与 Composer 引导去「设置 › 模型供应商」。细节在 `docs/tasks/M8.md` 末尾。
 
-### 5.2 TASK-M7-011 —— M7 验证补齐（最大一块）
-`docs/tasks/M7.md` 里列了十条 spec：
-`capability/coding-tools` · `runtime/project-rules` · `runtime/hooks` · `runtime/verify-gate` ·
-`runtime/plan-mode` · `runtime/worktree`（+ Web 渲染快照）· `capability/code-intel`（含第二次更快的基准）·
-`eval/mine`（fixture 仓库）· `runtime/budget` · `orchestrator/review`。
-做完把 M7 加进 `ACTIVE`。**照 M8 那一轮的做法**（`docs/tasks/M8.md` 的 TASK-M8-014 笔记）——
-不必一条 spec 一个文件，合并到就近的文件里更省事，但**要在任务文件里写清落到了哪**。
+### 5.2 ~~TASK-M7-011~~ —— 已做（2026-09-18）
+十条 spec 都补了，M7 已进 `ACTIVE`；每条落在哪个文件写在 `docs/tasks/M7.md` 的任务笔记里。
+补的时候找到三处与 AC 不符（dump 看不到规矩层、commit-msg 钩子漏掉单独一段 `-m` 的署名、超长失败输出把失败测试名截掉），
+按缺陷修了，登记为 BUG-M7-001…003。
 
-### 5.3 M4 / M5 / M6 的验证补齐
-同上，各自一条「验证补齐（最后做）」任务。
+### 5.3 M4 / M5 / M6 的验证补齐（下一步）
+各自一条「验证补齐（最后做）」任务。照 M7 / M8 那两轮的做法：先用 `bun scripts/check-ac-coverage.ts --report` 看缺口，
+逐条读 AC 写能证伪它的测试（不是给旧测试贴编号），发现与 AC 不符的按 BUG 先写复现再修，最后把里程碑加进 `ACTIVE`。
 
 ### 5.4 用户侧（只有用户能做，别替他做）
 各里程碑 DoD；M8 还差**对照原型逐屏截图走查**（Web 深浅 × 5 色板抽查、TUI 深浅终端）。

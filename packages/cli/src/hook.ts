@@ -34,6 +34,22 @@ function messageFiles(cmd: string, cwd: string): string[] {
   return out
 }
 
+/**
+ * 命令行里 `-m` / `--message` 给的每一段（BUG-M7-002）。规则按「行首」匹配，
+ * 而 `git commit -m "x" -m "Co-Authored-By: y"` 里署名在命令的行中间——不把每段单独拿出来就漏了
+ */
+function inlineMessages(cmd: string): string[] {
+  const out: string[] = []
+  const re = /(?:^|\s)(?:-m|--message)(?:=|\s+)("(?:[^"\\]|\\.)*"|'[^']*'|[^\s'"]+)/g
+  for (const m of cmd.matchAll(re)) {
+    const v = m[1] as string
+    if (v.startsWith('"')) out.push(v.slice(1, -1).replace(/\\(["\\$`])/g, '$1'))
+    else if (v.startsWith("'")) out.push(v.slice(1, -1))
+    else out.push(v)
+  }
+  return out
+}
+
 export function checkCommitMessage(
   cmd: string,
   cwd: string,
@@ -42,6 +58,7 @@ export function checkCommitMessage(
   if (!GIT_COMMIT.test(cmd)) return { ok: true }
   const texts = [
     cmd,
+    ...inlineMessages(cmd),
     ...messageFiles(cmd, cwd)
       .filter(existsSync)
       .map((f) => readFileSync(f, 'utf8')),

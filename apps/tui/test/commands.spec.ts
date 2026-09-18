@@ -32,3 +32,24 @@ describe('斜杠命令', () => {
     expect(parseSlash('/branch 0', 12)).toMatchObject({ kind: 'invalid' })
   })
 })
+
+describe('PRD-M7-006 AC-2 / AC-3 · TUI 的改动审阅命令', () => {
+  test('/changes 列清单，给文件名看 diff', () => {
+    expect(parseSlash('/changes', 3)).toEqual({ kind: 'changes' })
+    expect(parseSlash('/changes src/a.ts', 3)).toEqual({ kind: 'changes', path: 'src/a.ts' })
+  })
+
+  test('/discard 逐文件丢弃，/undo 按回收站编号撤销', () => {
+    expect(parseSlash('/discard src/a.ts', 3)).toEqual({ kind: 'discard', path: 'src/a.ts' })
+    expect(parseSlash('/discard', 3)).toMatchObject({ kind: 'invalid' })
+    expect(parseSlash('/undo 12', 3)).toEqual({ kind: 'undo', trash: '12' })
+    expect(parseSlash('/undo abc', 3)).toMatchObject({ kind: 'invalid' })
+  })
+
+  test('/apply 默认 squash，三种方式之外的拒绝（带回本身还要在确认框里批准）', () => {
+    expect(parseSlash('/apply', 3)).toEqual({ kind: 'apply', mode: 'squash' })
+    expect(parseSlash('/apply merge', 3)).toEqual({ kind: 'apply', mode: 'merge' })
+    expect(parseSlash('/apply branch', 3)).toEqual({ kind: 'apply', mode: 'branch' })
+    expect(parseSlash('/apply force', 3)).toMatchObject({ kind: 'invalid' })
+  })
+})

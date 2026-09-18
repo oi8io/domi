@@ -108,11 +108,11 @@ if (process.argv.includes('--report')) {
 }
 
 /**
- * 只对**已经做完并补过验证的里程碑**强制：M0 / M1（一开始就在）与 M8（TASK-M8-014 补齐）。
+ * 只对**已经做完并补过验证的里程碑**强制：M0 / M1（一开始就在）、M7（TASK-M7-011 补齐）与 M8（TASK-M8-014 补齐）。
  * 中间几个里程碑的 AC 有测试但没在测试里写 AC 编号，一次性回填的收益不如它的噪音大，
  * 所以不硬拉进来——那会逼人写空壳测试来骗守卫，比没有守卫更糟。
  */
-const ACTIVE = /^PRD-M(?:[01]|8)-/
+const ACTIVE = /^PRD-M(?:[01]|[78])-/
 const active = gaps.filter((g) => ACTIVE.test(g.id))
 
 if (active.length > 0) {
@@ -124,6 +124,6 @@ if (active.length > 0) {
   process.exit(1)
 }
 console.log(
-  `[check-ac-coverage] OK —— M0 / M1 / M8 的 ${covered.filter((c) => ACTIVE.test(c.id)).length} 条 AC 全部有测试提到；` +
+  `[check-ac-coverage] OK —— M0 / M1 / M7 / M8 的 ${covered.filter((c) => ACTIVE.test(c.id)).length} 条 AC 全部有测试提到；` +
     `其余里程碑还有 ${gaps.length - active.length} 条没在测试里点名`,
 )

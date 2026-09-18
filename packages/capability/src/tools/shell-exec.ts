@@ -43,11 +43,41 @@ export function truncateOutput(s: string): { text: string; omitted: number; tota
   const omitted = buf.byteLength - KEEP_HEAD_BYTES - KEEP_TAIL_BYTES
   const head = buf.subarray(0, KEEP_HEAD_BYTES).toString('utf8')
   const tail = buf.subarray(buf.byteLength - KEEP_TAIL_BYTES).toString('utf8')
+  const middle = buf.subarray(KEEP_HEAD_BYTES, buf.byteLength - KEEP_TAIL_BYTES).toString('utf8')
+  const keys = keyLines(middle)
+  const picked =
+    keys.length === 0
+      ? ''
+      : `\n… [省略的部分里像失败 / 报错的行，按原顺序摘出 ${keys.length} 行（全文见 fullOutput）] …\n${keys.join('\n')}`
   return {
-    text: `${head}\n… [已省略 ${omitted} 字节，共 ${buf.byteLength} 字节] …\n${tail}`,
+    text: `${head}\n… [已省略 ${omitted} 字节，共 ${buf.byteLength} 字节] …${picked}\n${tail}`,
     omitted,
     total: buf.byteLength,
   }
+}
+
+/**
+ * 省略掉的中段里像「失败的测试名 / 报错 / 报错位置」的行（BUG-M7-003 · PRD-M7-004 AC-4）。
+ * 测试跑得长时，失败往往在中间：只留头尾就把最要紧的两样——哪个测试挂了、挂在哪一行——一起丢了
+ */
+const KEY_LINE = [
+  /\bFAIL(?:ED|URE)?\b|\(fail\)|✗|✕|×|\bpanicked\b|^Traceback|AssertionError/,
+  /^\s*(?:error|Error|ERROR)\b|\berror(?:\[\w+\])?:|^\s*E\s{2,}/,
+  /^\s+at\s.+:\d+(?::\d+)?\)?$|^\s*-->\s*\S+:\d+|^\s*File "[^"]+", line \d+|\S+\.\w{1,5}:\d+:\d+/,
+]
+const KEY_MAX_LINES = 40
+const KEY_MAX_CHARS = 300
+
+export function keyLines(text: string): string[] {
+  const out: string[] = []
+  for (const line of text.split('\n')) {
+    // 只看每行开头一段：超长的单行（压缩过的 JS、进度条）上跑 \S+ 类的正则是平方级的
+    const probe = line.length > 1000 ? line.slice(0, 1000) : line
+    if (!KEY_LINE.some((re) => re.test(probe))) continue
+    out.push(line.length > KEY_MAX_CHARS ? `${line.slice(0, KEY_MAX_CHARS)}…` : line)
+    if (out.length >= KEY_MAX_LINES) break
+  }
+  return out
 }
 
 export const shellExec: Tool<ShellExecArgs, ShellExecResult> = {

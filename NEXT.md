@@ -1,6 +1,10 @@
-在做: **M8「工作台」已收口**（2026-09-18）。19 个任务全部 done，`pnpm check` 全绿：
-      typecheck（apps/tui、apps/web 在内）+ **27 道守卫** + **1024 个测试**（111 个文件）+ L1 回放。
-      `check-ac-coverage` 现在对 **M0 / M1 / M8** 强制（151 条 AC 全部有测试点名）。
+在做: **M9 PRD 已落地**（2026-09-18）：模型探测（/v1/models）+ Provider 配置升级（厂商/协议/baseUrl/apiKey/启用/默认）+
+      对话内扁平模型下拉、中英双语（UI+错误消息）、TUI 输入区（去提示/Shift+Enter/边框/滚动条）。
+      状态 `PROVISIONAL`，等用户复核拍板后进 SPEC/任务拆分。文档：`docs/prd/M9.md`。
+
+      **M8「工作台」已收口**（2026-09-18）。19 个任务全部 done，`pnpm check` 全绿：
+      typecheck（apps/tui、apps/web 在内）+ **27 道守卫** + **1134 个测试**（122 个文件）+ L1 回放。
+      `check-ac-coverage` 现在对 **M0 / M1 / M7 / M8** 强制（190 条 AC 全部有测试点名）。
       **路线图上九个里程碑的功能全部落地**，剩下的只有验证补齐与你那边的 DoD。
       接手材料写在 `HANDOFF.md`（新人从那份开始读）。
 
@@ -22,7 +26,7 @@
 
 下一步: 用户规矩不变：**先推进功能，测试验证类最后统一查漏补缺**。功能已经走完，现在全是补缺：
         1. ~~OPT-M8-001~~ —— 已做：domid 无 key 也能起，提交时报 `error.missing_credential`，Web 引导去设置页填
-        2. **TASK-M7-011** —— M7 验证补齐（十条 spec，量最大）；做完把 M7 加进 `scripts/check-ac-coverage.ts` 的 `ACTIVE`
+        2. ~~TASK-M7-011~~ —— 已做：十条 spec 补齐、M7 进了 `ACTIVE`；顺带修了 BUG-M7-001…003（见 `docs/tasks/M7.md`）
         3. **TASK-M4-009 / M5-008 / M6-008** —— 同样是各自里程碑的「验证补齐（最后做）」
         4. TASK-M3-008（parity e2e，要先决定引不引 Playwright）、TASK-M3-009（推送延迟基准）
 

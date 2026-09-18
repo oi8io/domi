@@ -3,7 +3,7 @@
  * 走的是和用户一样的入口，不是直接调实现函数。
  */
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfig } from '@domi/config'
@@ -72,6 +72,50 @@ describe('prompt dump', () => {
     } finally {
       if (prev === undefined) delete process.env.DOMI_CONFIG
       else process.env.DOMI_CONFIG = prev
+    }
+  })
+})
+
+describe('BUG-M7-001 · prompt dump 看得到仓库规矩层（PRD-M7-002 AC-6）', () => {
+  function withRepo(trusted: boolean | undefined, fn: (cwd: string) => Promise<void>): Promise<void> {
+    const home = tmp()
+    // macOS 的 tmpdir 经过符号链接（/var → /private/var）；信任表的键是真实路径
+    const repo = realpathSync(tmp())
+    mkdirSync(join(repo, '.git'))
+    mkdirSync(join(repo, 'pkg'))
+    writeFileSync(join(repo, 'AGENT.md'), '根目录的规矩：提交前跑 pnpm check\n')
+    writeFileSync(join(repo, 'pkg', 'AGENTS.md'), '子目录的规矩：不要改 generated/\n')
+    if (trusted !== undefined) {
+      mkdirSync(join(home, '.domi'))
+      writeFileSync(join(home, '.domi', 'trust.json'), JSON.stringify({ [repo]: { trusted, at: 1 } }))
+    }
+    const prev = { home: process.env.HOME, cwd: process.cwd(), cfg: process.env.DOMI_CONFIG }
+    process.env.HOME = home
+    delete process.env.DOMI_CONFIG
+    process.chdir(join(repo, 'pkg'))
+    return fn(repo).finally(() => {
+      process.chdir(prev.cwd)
+      process.env.HOME = prev.home
+      if (prev.cfg !== undefined) process.env.DOMI_CONFIG = prev.cfg
+    })
+  }
+
+  test('信任过的仓库：dump 里有 project.rules 层，按「根 → 工作目录」标来源', () =>
+    withRepo(true, async () => {
+      const r = await run(['prompt'])
+      expect(r.code).toBe(0)
+      expect(r.out).toMatch(/\] project\.rules · system · cacheable/)
+      expect(r.out).toContain('project.rules 来自（根 → 工作目录）：AGENT.md → pkg/AGENTS.md')
+      expect(r.out).not.toContain('未信任')
+    }))
+
+  test('没信任过 / 拒绝过：规矩不进 dump，但说明为什么没有', async () => {
+    for (const t of [undefined, false]) {
+      await withRepo(t, async () => {
+        const r = await run(['prompt'])
+        expect(r.out).not.toMatch(/\] project\.rules · /)
+        expect(r.out).toContain('未信任')
+      })
     }
   })
 })

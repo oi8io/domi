@@ -60,10 +60,10 @@ INV-xx ──→ PRD-M{n}-xxx ──→ SPEC-M{n}-xxx ──→ TASK-M{n}-xxx �
 |---|---|---|
 | 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.11.2**（77 条，M0–M8 全部 `COMMITTED`）· 各里程碑再批准材料在 `docs/prd/` |
 | 架构师 | ✅ 完成 | `docs/spec/M0 / M1 / M2 / M6 / M7 / M8.md`，均带"触发重新决策的条件"· 27 份 ADR |
-| 工程师 | ✅ 功能完成 | M0–M8 共 9 个任务文件；`pnpm check` 全绿：27 道守卫 + **1024 个测试** + L1 回放 |
-| 测试工程师 | 🔵 进行中 | M0 / M1 / M8 已纳入 `check-ac-coverage` 强制范围（151 条 AC）；M4 / M5 / M6 / M7 的「验证补齐」待做 |
+| 工程师 | ✅ 功能完成 | M0–M8 共 9 个任务文件；`pnpm check` 全绿：27 道守卫 + **1134 个测试** + L1 回放 |
+| 测试工程师 | 🔵 进行中 | M0 / M1 / M7 / M8 已纳入 `check-ac-coverage` 强制范围（190 条 AC）；M4 / M5 / M6 的「验证补齐」待做 |
 
-**下一步**：OPT-M8-001（没有 key 时 domid 起不来）→ TASK-M7-011（M7 验证补齐）→ M4 / M5 / M6 验证补齐。
+**下一步**：M4 / M5 / M6 验证补齐（OPT-M8-001 与 TASK-M7-011 已做）。
 只有用户能做的：各里程碑 DoD、M8 逐屏截图走查、桌面端与 macOS 沙箱的真机验证。详见 `NEXT.md`。
 
 **2026-09-14 方向变更**：见 `docs/adr/003-revert-to-self-built-runtime.md`。

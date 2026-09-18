@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import type { ProjectRow, SessionRow } from '../src/layout/data.ts'
 import { ChangesBar, ChangesView, undoable } from '../src/session/ChangesBar.tsx'
 import { CredentialNotice } from '../src/session/CredentialNotice.tsx'
+import { groupFindings, ReviewFindings } from '../src/session/ReviewFindings.tsx'
 import { ProjectsView, ProjectView } from '../src/views/ProjectsView.tsx'
 import { groupSessions, SessionsView } from '../src/views/SessionsView.tsx'
 import { SettingsView } from '../src/views/SettingsView.tsx'
@@ -196,6 +197,10 @@ describe('PRD-M8-006 AC-2 · 改动条：N 个文件改动 · 查看 · 带回',
     expect(html).toContain('domi/t1')
   })
 
+  test('PRD-M7-006 AC-2 · Web 渲染快照：改动清单的结构固定下来', () => {
+    expect(renderToStaticMarkup(<ChangesView diff={diff} busy={false} onDiscard={() => undefined} />)).toMatchSnapshot()
+  })
+
   test('界面上没有「隔离」字样', () => {
     const html = renderToStaticMarkup(<ChangesView diff={diff} busy={false} />)
     expect(html).not.toContain('隔离')
@@ -246,5 +251,29 @@ describe('OPT-M8-001 · 缺 key 的引导', () => {
     expect(html).toContain('href="#/settings/models"')
     // 不知道是哪一家时也说得通
     expect(renderToStaticMarkup(<CredentialNotice provider="" />)).toContain('还没有配置模型的 API key')
+  })
+})
+
+describe('PRD-M7-010 AC-2 · 审阅发现在 Web 里按文件展示', () => {
+  const findings = [
+    { file: 'src/pay.ts', line: 9, severity: 'low' as const, problem: '命名', basis: '代码事实' },
+    { file: 'src/a.ts', line: 2, severity: 'medium' as const, problem: '没处理空值', basis: 'spec 第 1 条' },
+    { file: 'src/pay.ts', line: 3, severity: 'high' as const, problem: '金额没校验', basis: 'spec 第 2 条' },
+  ]
+
+  test('按文件分组（文件名排序），组内按行号排序', () => {
+    expect(groupFindings(findings).map(([f, l]) => [f, l.map((x) => x.line)])).toEqual([
+      ['src/a.ts', [2]],
+      ['src/pay.ts', [3, 9]],
+    ])
+  })
+
+  test('每个文件一块，问题、依据、严重程度都在；没有发现时如实说', () => {
+    const html = renderToStaticMarkup(<ReviewFindings findings={findings} />)
+    expect(html.match(/data-file="/g)).toHaveLength(2)
+    expect(html).toContain('金额没校验')
+    expect(html).toContain('spec 第 2 条')
+    expect(html).toContain('data-severity="high"')
+    expect(renderToStaticMarkup(<ReviewFindings findings={[]} />)).toContain('没有发现问题')
   })
 })

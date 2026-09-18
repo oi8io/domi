@@ -132,6 +132,31 @@ describe('状态栏（parity 第 9 项）', () => {
     )
   })
 
+  test('PRD-M7-004 AC-3 · 验证三态与 TUI 同一套文案；clean 不显示', () => {
+    for (const [verify, label] of [
+      ['unverified', '已改未验'],
+      ['verified', '已验证'],
+      ['failed', '验证失败'],
+      ['clean', null],
+    ] as const) {
+      const store = createSessionStore({ provider: 'anthropic', model: 'glm' })
+      store.setMetrics({
+        tokens: { input: 1, output: 1, cacheRead: 0 },
+        cost: '—',
+        contextPercent: 1,
+        contextLevel: 'ok',
+        unpricedModels: [],
+        verify,
+      })
+      const html = renderToStaticMarkup(<StatusBar status={store.$status.get()} />)
+      if (label === null) expect(html).not.toContain('data-verify')
+      else {
+        expect(html).toContain(`data-verify="${verify}"`)
+        expect(html).toContain(label)
+      }
+    }
+  })
+
   test('还没有指标时不瞎编数字', () => {
     const html = renderToStaticMarkup(<StatusBar status={createSessionStore().$status.get()} />)
     expect(html).toContain('— tok')
