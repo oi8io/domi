@@ -59,6 +59,7 @@
 | M5 · 会干活 | `COMMITTED` | 2026-09-15 再批准，见 `docs/prd/M5.md` |
 | M6 · 生态 | `COMMITTED` | 2026-09-15 再批准，见 `docs/prd/M6.md` |
 | M7 · 会写代码 | `COMMITTED` | 2026-09-16 追加并再批准，见 `docs/prd/M7.md` |
+| M8 · 工作台 | `COMMITTED` | 2026-09-17 追加并再批准（v1.11 并入 TUI），见 `docs/prd/M8.md` |
 
 **再批准门**：进入任何非 `COMMITTED` 里程碑之前，必须把该章重写为 `COMMITTED` 并重过 PM 门禁。跳过 = 跑偏。
 
