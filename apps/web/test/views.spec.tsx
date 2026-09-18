@@ -11,6 +11,7 @@ import { DomiClient, type WireSocket } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ProjectRow, SessionRow } from '../src/layout/data.ts'
 import { ChangesBar, ChangesView, undoable } from '../src/session/ChangesBar.tsx'
+import { CredentialNotice } from '../src/session/CredentialNotice.tsx'
 import { ProjectsView, ProjectView } from '../src/views/ProjectsView.tsx'
 import { groupSessions, SessionsView } from '../src/views/SessionsView.tsx'
 import { SettingsView } from '../src/views/SettingsView.tsx'
@@ -235,5 +236,15 @@ describe('PRD-M8-012 AC-1 / AC-3 · 设置页 7 个 tab，通讯工具是「即�
   test('没连上 daemon 的 tab 说清楚要先连上', () => {
     const html = renderToStaticMarkup(<SettingsView client={client} tab="models" online={false} />)
     expect(html).toContain('连上 daemon 后显示')
+  })
+})
+
+describe('OPT-M8-001 · 缺 key 的引导', () => {
+  test('提示点名是哪一家，并链到设置 › 模型供应商', () => {
+    const html = renderToStaticMarkup(<CredentialNotice provider="deepseek" />)
+    expect(html).toContain('deepseek')
+    expect(html).toContain('href="#/settings/models"')
+    // 不知道是哪一家时也说得通
+    expect(renderToStaticMarkup(<CredentialNotice provider="" />)).toContain('还没有配置模型的 API key')
   })
 })

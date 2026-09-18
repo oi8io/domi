@@ -79,8 +79,11 @@ describe('自动拉起', () => {
     expect(r.spawned).toBe(true)
   }, 30_000)
 
-  test('domid 自己起不来（没有凭据）→ 报错里带日志路径和日志内容，而不是傻等', async () => {
+  // 以前用「没有凭据」造起不来的 domid；OPT-M8-001 之后没 key 也能起，改用写坏的配置文件
+  test('domid 自己起不来（配置文件写坏了）→ 报错里带日志路径和日志内容，而不是傻等', async () => {
     const home = newHome()
+    mkdirSync(join(home, '.domi'), { recursive: true })
+    writeFileSync(join(home, '.domi', 'config.yaml'), 'model: [没闭合\n')
     const started = Date.now()
     const err = await ensureDaemon({
       home,
@@ -90,7 +93,7 @@ describe('自动拉起', () => {
     }).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(DaemonStartError)
     expect((err as Error).message).toContain(daemonPaths(home).log)
-    expect((err as Error).message).toContain('凭据')
+    expect((err as Error).message).toContain('config.yaml')
     expect(Date.now() - started).toBeLessThan(10_000)
   }, 30_000)
 })

@@ -2,9 +2,9 @@
  * 会话视图 —— PRD-M8-008（原型 main#main-session）：tab 条 + 状态栏 pill + Chat / Trajectory + Composer。
  * **只渲染**：状态全在 client-core 的 atom 里（INV-04）。
  */
-import type { ConnectionState, DomiClient, SessionStore } from '@domi/client-core'
+import { type ConnectionState, type DomiClient, missingCredentialOf, type SessionStore } from '@domi/client-core'
 import { useStore } from '@nanostores/react'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
@@ -14,6 +14,7 @@ import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
 import { ChangesBar } from './ChangesBar.tsx'
 import { Composer, ModelSwitch, ModeToggle, type PendingRef } from './Composer.tsx'
+import { CredentialNotice } from './CredentialNotice.tsx'
 import { ReviewFindings } from './ReviewFindings.tsx'
 import { Trajectory } from './Trajectory.tsx'
 
@@ -56,7 +57,7 @@ export function SessionView({
   const status = useStore(store.$status)
   const ask = useStore(store.$ask)
   const review = useStore(store.$review)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<ReactNode>(null)
   const scroller = useRef<HTMLDivElement>(null)
 
   // 新内容进来时贴底（用户往上翻了就不打扰）
@@ -202,8 +203,10 @@ export function SessionView({
               if (refs.length > 0) onRefsChange?.([])
             },
             // SESSION_BUSY 之类的结构化错误原样给人看（PRD-M3-004 AC-3）
+            // 缺凭据（OPT-M8-001）换成带链接的那段，指去设置页
             (err: Error) => {
-              setNotice(err.message)
+              const provider = missingCredentialOf(err)
+              setNotice(provider === null ? err.message : <CredentialNotice provider={provider} />)
               throw err
             },
           )

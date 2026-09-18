@@ -113,6 +113,8 @@ export interface SessionHandle {
   checkRefs?(refs: readonly RefLink[]): Promise<RefLink[]>
   /** 校验附件 / 文件 / 技能（PRD-M8-010）；不成立时抛 InvalidInputError */
   checkInputs?(inputs: SubmitExtras): Promise<void>
+  /** 这个会话现在能不能跑一轮（缺模型凭据 → InvalidInputError，reason = MISSING_CREDENTIAL，OPT-M8-001） */
+  checkReady?(): Promise<void>
   switchModel(model: string, provider?: string): Promise<{ lost: string[] }>
   /** 计划 / 执行模式（M7-005）。老宿主没有 */
   setMode?(mode: 'plan' | 'act'): Promise<{ mode: 'plan' | 'act'; changed: boolean }>
@@ -136,6 +138,8 @@ export class InvalidInputError extends Error {
   constructor(
     message: string,
     readonly reason: string,
+    /** 额外的结构化细节，并进错误响应的 data */
+    readonly detail?: Record<string, unknown>,
   ) {
     super(message)
     this.name = 'InvalidInputError'
@@ -446,7 +450,9 @@ export class Daemon {
       ) {
         return fail(req.id, 'INVALID_PARAMS', e.message, e instanceof HostRequestError ? e.data : undefined)
       }
-      if (e instanceof InvalidInputError) return fail(req.id, 'INVALID_PARAMS', e.message, { reason: e.reason })
+      if (e instanceof InvalidInputError) {
+        return fail(req.id, 'INVALID_PARAMS', e.message, { ...e.detail, reason: e.reason })
+      }
       if (e instanceof ScheduleBusyError) return fail(req.id, 'SESSION_BUSY', e.message)
       return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
     }
@@ -927,6 +933,8 @@ export class Daemon {
         let refs: RefLink[] = []
         try {
           session = await this.session(p.sessionId)
+          // 缺凭据要在接受之前说：接受之后才失败的话，界面只会看到一轮莫名其妙的空转
+          if (session?.checkReady) await session.checkReady()
           // 引用要在接受之前校验：接受之后的错误只会被吞掉，用户以为引用成功了
           if (session && p.refs && p.refs.length > 0) {
             if (!session.checkRefs) throw new InvalidRefError('这个 daemon 不支持跨会话引用')

@@ -1,14 +1,16 @@
 /**
  * 新对话（`#/`）—— PRD-M8-002 AC-5：空白的自由会话。版式沿用原型的项目详情页。
  * 自由会话与项目脱钩（PRD-M8-004）要等协议落地；在那之前新建的会话仍在 domid 的默认目录里。
+ * 默认模型还没有 key 时（OPT-M8-001）顶上挂一条引导去设置页，发送也先拦下——不然会先建出一个空会话再被拒。
  */
-import type { DomiClient } from '@domi/client-core'
-import { useState } from 'react'
+import { type DomiClient, defaultProviderMissingKey, missingCredentialOf } from '@domi/client-core'
+import { type ReactNode, useEffect, useState } from 'react'
 import type { SessionRow } from '../layout/data.ts'
 import { dotOf, titleOf } from '../layout/data.ts'
 import { formatRoute, navigate } from '../router.ts'
+import { CredentialNotice } from '../session/CredentialNotice.tsx'
 import { Composer } from '../session/SessionView.tsx'
-import { ListRow, Page } from './Page.tsx'
+import { ListRow, Notice, Page } from './Page.tsx'
 
 export function HomeView({
   client,
@@ -21,9 +23,28 @@ export function HomeView({
   recent: readonly SessionRow[]
   onCreated: (id: string) => void
 }) {
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<ReactNode>(null)
+  // 缺 key 的那一家；null = 不缺或还不知道。每次回到首页都重新问一遍（设置页填完回来就消失）
+  const [missing, setMissing] = useState<string | null>(null)
+  useEffect(() => {
+    if (!online) return
+    let live = true
+    client.getSettings().then(
+      (s) => live && setMissing(defaultProviderMissingKey(s)),
+      // 老 domid 没有 config.get：不提前引导，提交时 daemon 照样会说
+      () => live && setMissing(null),
+    )
+    return () => {
+      live = false
+    }
+  }, [client, online])
   return (
     <Page view="home" narrow title="新对话" sub="不关联项目的自由讨论。要在某个仓库里动手，用「新任务」。">
+      {missing !== null && (
+        <Notice>
+          <CredentialNotice provider={missing} />
+        </Notice>
+      )}
       <Composer
         className="mb-7 px-0 pb-0"
         busy={!online}
@@ -32,13 +53,20 @@ export function HomeView({
         submitLabel="开始对话"
         tools={{ client, hint: '附件与文件引用在对话开始之后可用' }}
         onSubmit={async (text, extras) => {
+          if (missing !== null) {
+            setNotice(<CredentialNotice provider={missing} />)
+            throw new Error('missing credential')
+          }
           try {
             const id = await client.createSession()
             await client.submit(id, text, undefined, { skills: extras.skills })
             onCreated(id)
             navigate({ view: 'session', id, tab: 'chat' })
           } catch (e) {
-            setNotice(e instanceof Error ? e.message : String(e))
+            const provider = missingCredentialOf(e)
+            setNotice(
+              provider !== null ? <CredentialNotice provider={provider} /> : e instanceof Error ? e.message : String(e),
+            )
             throw e
           }
         }}

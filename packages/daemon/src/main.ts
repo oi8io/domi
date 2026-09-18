@@ -13,7 +13,7 @@
 import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { loadConfigOrThrow } from '@domi/config'
+import { credentialEnvNames, loadConfig } from '@domi/config'
 import { McpHub } from '@domi/mcp'
 import { PluginHost } from '@domi/plugin'
 import { type RejectedConnection, resolveServerSettings } from './auth.ts'
@@ -31,7 +31,8 @@ export const EXIT_LOCK_HELD = 3
 export async function main(env: Record<string, string | undefined> = process.env): Promise<number> {
   const home = join(env.HOME ?? homedir(), '.domi')
   mkdirSync(home, { recursive: true })
-  const config = loadConfigOrThrow({ env, home: env.HOME ?? homedir() })
+  // 没 key 也照样起（OPT-M8-001）：第一把 key 要能在 Web 设置页里填，缺 key 留到提交时报 error.missing_credential
+  const config = loadConfig({ env, home: env.HOME ?? homedir() })
   const server = resolveServerSettings({ config, env, home: env.HOME ?? homedir() })
   const requestedPort = server.port
 
@@ -102,6 +103,11 @@ export async function main(env: Record<string, string | undefined> = process.env
     )
   }
   process.stdout.write(`${notes.join('\n')}\n`)
+  if (!config.model.apiKey) {
+    process.stderr.write(
+      `domid: 还没有配置 ${config.model.provider} 的 API key——到 Web「设置 › 模型供应商」填写，或设置 ${credentialEnvNames(config.model.provider).join(' / ')}\n`,
+    )
+  }
 
   /**
    * 被拒的连接落成事件（AC-3）。同一来源、同一原因一分钟只记一条：

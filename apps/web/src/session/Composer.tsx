@@ -199,7 +199,8 @@ export function Composer({
   tools,
 }: {
   busy: boolean
-  notice?: string | null
+  /** 一句提示；缺凭据时是带链接的那段（CredentialNotice） */
+  notice?: ReactNode
   refs?: readonly PendingRef[]
   onRemoveRef?: (i: number) => void
   placeholder: string

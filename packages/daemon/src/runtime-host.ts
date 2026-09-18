@@ -17,6 +17,7 @@ import {
   type DomiConfig,
   type LoadOptions,
   loadConfig,
+  MissingCredentialError,
   pricingOf,
   readSettings,
   writeConfigPatch,
@@ -482,6 +483,19 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       return {
         id: sessionId,
         submit: (text, refs, inputs) => s.submit(text, { ...(refs === undefined ? {} : { refs }), ...(inputs ?? {}) }),
+        async checkReady() {
+          try {
+            s.checkCredential()
+          } catch (e) {
+            if (!(e instanceof MissingCredentialError)) throw e
+            const provider = e.provider ?? opts.config.model.provider
+            throw new InvalidInputError(
+              `error.missing_credential: 还没有配置 ${provider} 的 API key。到「设置 › 模型供应商」填写（保存后立即生效），或设置环境变量 ${e.envNames.join(' / ')} 后重启 domid。`,
+              'MISSING_CREDENTIAL',
+              { messageKey: e.messageKey, provider, envNames: e.envNames },
+            )
+          }
+        },
         async checkInputs(inputs) {
           try {
             s.checkInputs(inputs)

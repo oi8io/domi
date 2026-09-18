@@ -32,7 +32,7 @@ import {
   ToolRegistry,
 } from '@domi/capability'
 import { DiagnosticsService, makeDiagnosticsTool, makeOutlineTool } from '@domi/codeintel'
-import type { DomiConfig } from '@domi/config'
+import { credentialEnvNames, type DomiConfig, MissingCredentialError } from '@domi/config'
 import {
   aggregate,
   type ContextPolicy,
@@ -372,6 +372,18 @@ export class DomiSession {
   reconfigure(config: DomiConfig): void {
     ;(this.opts as { config: DomiConfig }).config = config
     if (!this.injectedProvider) this.provider = this.buildProvider(this.currentProvider, this.currentModel)
+  }
+
+  /**
+   * 当前 provider 有没有 key（OPT-M8-001）。domid 允许无 key 启动，缺 key 的事留到提交时说：
+   * 不然第一次用的人连设置页都打不开，也就没处填第一把 key。测试注入的替身不查
+   */
+  checkCredential(): void {
+    if (this.injectedProvider) return
+    const m = this.opts.config.model
+    const other = this.currentProvider === m.provider ? undefined : this.opts.config.providers?.[this.currentProvider]
+    if (other?.apiKey ?? m.apiKey) return
+    throw new MissingCredentialError(credentialEnvNames(this.currentProvider), this.currentProvider)
   }
 
   /** 当前在用的 provider 与模型（会话中途可能被 switchModel 换掉） */
@@ -994,6 +1006,7 @@ export class DomiSession {
   }
 
   async submit(text: string, opts: { refs?: readonly RefLink[] } & SubmitInputs = {}): Promise<TurnResult> {
+    this.checkCredential()
     const inputs = this.checkInputs(opts)
     this.busy = true
     this.listeners.onBusy?.(true)

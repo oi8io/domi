@@ -8,7 +8,7 @@
 ## 1. 一句话现状
 
 M0–M8 九个里程碑的**功能全部落地**：内核 / 守卫 / 三端（CLI、TUI、Web）/ 插件 / 编码能力 / 工作台都通了；
-`pnpm typecheck`、`pnpm guard`（27 个门禁）、`pnpm test`（109 个文件 1017 条）当前全绿。
+`pnpm typecheck`、`pnpm guard`（27 个门禁）、`pnpm test`（111 个文件 1024 条）当前全绿。
 剩下的是**验证补齐**（M4 / M5 / M6 / M7 各有一条「最后做」的任务没做）与**用户侧走查**（各里程碑 DoD）。
 
 代码在本地 `master`，**没有配置任何 git remote**——接手第一件事是推到你们的远端，
@@ -24,7 +24,7 @@ pnpm check            # = typecheck + guard + test + eval(L1)；必须全绿才�
 ```
 
 - 运行时是 **Bun**，包管理是 **pnpm workspace**；lint / format 是 **Biome**（不是 ESLint + Prettier）。
-- 起后台：`pnpm domid`（`packages/daemon/src/main.ts`）。**当前没有模型 key 它起不来**，见 OPT-M8-001。
+- 起后台：`pnpm domid`（`packages/daemon/src/main.ts`）。没有模型 key 也能起（OPT-M8-001），第一把 key 在 Web「设置 › 模型供应商」里填。
 - Web：`apps/web`，Vite + React + Tailwind v4；TUI：`apps/tui`，Ink 7。
 - 配置：`~/.domi/config.yaml`（YAML，ADR-014）；**凭据只在 `~/.domi/secrets.yaml`**，任何接口都不回吐给界面。
 
@@ -70,10 +70,9 @@ pnpm check            # = typecheck + guard + test + eval(L1)；必须全绿才�
 
 ## 5. 接手先做什么（按建议顺序）
 
-### 5.1 OPT-M8-001 —— 没有 key 时 domid 起不来（小，但是所有人的第一道坎）
-现在 `domid` 用 `loadConfigOrThrow`，默认模型没 key 就退出；新人只能回终端设环境变量或手写 `secrets.yaml`。
-方向：允许无 key 启动，**会话提交时**再报 `error.missing_credential`，Web 首页引导去设置页「模型供应商」填。
-登记在 `docs/tasks/M8.md` 末尾。
+### 5.1 ~~OPT-M8-001~~ —— 已做（2026-09-18）
+domid 无 key 也能起；提交时报 `error.missing_credential`（`INVALID_PARAMS`，`data.reason = MISSING_CREDENTIAL`），
+Web 首页与 Composer 引导去「设置 › 模型供应商」。细节在 `docs/tasks/M8.md` 末尾。
 
 ### 5.2 TASK-M7-011 —— M7 验证补齐（最大一块）
 `docs/tasks/M7.md` 里列了十条 spec：

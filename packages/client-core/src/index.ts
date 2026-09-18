@@ -1,5 +1,6 @@
 export { authProtocols, type RefLink } from '@domi/protocol'
 export * from './client.ts'
+export * from './credentials.ts'
 export * from './store.ts'
 export * from './tokens.ts'
 export * from './trajectory.ts'

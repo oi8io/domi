@@ -16,7 +16,11 @@ import { readSecrets, type Secrets, secretsPath } from './secrets.ts'
 export class MissingCredentialError extends Error {
   /** 文案 key 而非句子：TUI 与 CLI 各自渲染，测试也断言它（AC-3） */
   readonly messageKey = 'error.missing_credential'
-  constructor(readonly envNames: string[]) {
+  constructor(
+    readonly envNames: string[],
+    /** 缺的是哪一家的 key。domid 在提交时报这个错（OPT-M8-001），界面据此引导去设置页 */
+    readonly provider?: string,
+  ) {
     super(
       `error.missing_credential: 没有找到模型凭据。设置 ${envNames.join(' 或 ')}，或写进 ~/.domi/config.yaml（model.api_key）。`,
     )
