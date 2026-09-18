@@ -1,11 +1,15 @@
 # domi — 产品需求文档（全量）
 
-> 覆盖 M0–M8 全部 9 个里程碑（M7 为 v1.8 追加，M8 为 v1.10 追加）。
-> **v1.2** · 2026-09-14 · 作者：PM 环节
+> 覆盖 M0–M9 全部 10 个里程碑（M7 为 v1.8 追加，M8 为 v1.10 追加，M9 为 v1.12 追加）。
+> **v1.12** · 2026-09-18（初版 v1.0 · 2026-09-14）· 作者：PM 环节
 > 上位文档：`PRD-VISION.md` v1.1（不变量，冲突时以其为准）
 > 变更：v1.0 经两轮独立门禁审计后修订，见 `docs/qa/prd-gate-audit-v1.0.md`
 > **v1.2 回写**（触发：`docs/adr/003` 方向变更）——**原 45 条编号与 AC 全部保留不动**，仅追加 5 条新需求
 > （M1-011 步级快照 · M2-008 L1 回放评估 · M2-009 内置 MCP server · M5-007 聊天端桥接 · M6-005 L2 评估集）
+> **v1.12 回写**（2026-09-18，`docs/prd/M9.md` · `docs/qa/M9-prd-review.md`）——**仅追加** M9 一章（5 条需求，用户拍板后直接 `COMMITTED`）；M0–M8 的编号与 AC 一字未改，不变量不增不改。
+> M8「不做什么」里的「界面多语言」由 M9-004 接手；PRD-M8-014 AC-5 的「提示文案」由底部快捷键行承担（M9-005 AC-6 去掉输入框占位文字），AC 原文仍成立故不划。
+> 同时理顺三处**文档腐蚀**（不涉及任何 AC）：本行之前的抬头版本号停在 v1.2；§0.1 成熟度表里 M2 / M3 仍写 `PROVISIONAL` 而两者早已按 `docs/prd/M2.md` / `M3.md` 进入并实现（M2 的再批准门材料没过 PM 门禁，这里事后补记、不追认为「过了门」）；§1 总览表缺 M7–M9。
+> 已知未理顺：§1 总览表里 M1 / M5 / M6 的预算（17 / 17 / 24）与章首（15 / 15 / 20）不一致——差额是 v1.2 追加的 5 条需求，章首没跟着改；NFR-05 的验收脚本 `scripts/check-egress.ts` 从未建立（出站白名单目前靠各自的单测，M9-001 AC-5 同样如此）。
 > **v1.11.2 回写**（2026-09-17，TASK-M8-007 实现时发现）——PRD-M8-012 AC-4 划掉，改为 AC-7：「结构化清理开关」换成三选一的上下文策略。
 > 理由：runtime 里「清理」和「压缩」是同一个配置项 `context.strategy` 的三个取值（full / clean / compact），一个开关表达不了「自动压缩」，
 > 而逐字保留轮数与压缩阈值只在 compact 下有意义。
@@ -53,13 +57,14 @@
 |---|---|---|
 | M0 · 内核骨架 | `COMMITTED` | 可直接进入架构设计 |
 | M1 · 能用 | `COMMITTED` | 可直接进入架构设计 |
-| M2 · 可信 | `PROVISIONAL` | 方向定，细节会调整 |
-| M3 · 三端 | `PROVISIONAL` | 方向定，细节会调整 |
+| M2 · 可信 | ~~`PROVISIONAL`~~ 已实现 | 2026-09-14 按 `docs/prd/M2.md`（草稿，未过 PM 门禁）进入；v1.12 事后补记 |
+| M3 · 三端 | ~~`PROVISIONAL`~~ `COMMITTED`（骨架范围） | 2026-09-14 再批准，见 `docs/prd/M3.md`；v1.12 补记 |
 | M4 · 有灵魂 | `COMMITTED` | 2026-09-15 再批准，见 `docs/prd/M4.md` |
 | M5 · 会干活 | `COMMITTED` | 2026-09-15 再批准，见 `docs/prd/M5.md` |
 | M6 · 生态 | `COMMITTED` | 2026-09-15 再批准，见 `docs/prd/M6.md` |
 | M7 · 会写代码 | `COMMITTED` | 2026-09-16 追加并再批准，见 `docs/prd/M7.md` |
 | M8 · 工作台 | `COMMITTED` | 2026-09-17 追加并再批准（v1.11 并入 TUI），见 `docs/prd/M8.md` |
+| M9 · 模型配置与体验 | `COMMITTED` | 2026-09-18 追加并批准，见 `docs/prd/M9.md` |
 
 **再批准门**：进入任何非 `COMMITTED` 里程碑之前，必须把该章重写为 `COMMITTED` 并重过 PM 门禁。跳过 = 跑偏。
 
@@ -101,6 +106,9 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 | M4 | 有灵魂 | v0.4 | 20 天 | domi 能否积累出可分享的人格 | Soul（主爆点） |
 | M5 | 会干活 | v0.5 | **17 天** | 能否跑一个 30 分钟不断线的长任务 | 长任务 demo |
 | M6 | 生态 | v1.0 | **24 天** | 别人能否给它写插件 | v1.0 发布 |
+| M7 | 会写代码 | — | 22 天 | 能否在陌生仓库里从一条 issue 做到可审阅的提交 | —（v1.8 追加） |
+| M8 | 工作台 | — | 36.5 天 | Web 能否成为日常主界面，TUI 同一套概念 | —（v1.10 追加） |
+| M9 | 模型配置与体验 | — | 11.5 天 | 模型从哪来、界面说什么语言、终端里长会话看得清不 | —（v1.12 追加） |
 
 合计 **124 天**全职 ≈ 6 个月；业余（每周 10 小时）约 12 个月。（v1.2：+14 天，来自 5 条新增需求）
 （v1.3：MCP 的 5 天从 M2 挪到 M3，**合计不变**——这是排期调整，不是范围变化。见 `docs/adr/011`）
@@ -361,7 +369,9 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 
 ---
 
-# M2 · 可信 `PROVISIONAL`
+# M2 · 可信 ~~`PROVISIONAL`~~ 已实现
+
+> v1.12 补记：2026-09-14 按 `docs/prd/M2.md` 进入并实现（那份材料没过 PM 门禁）。下面这句是当时的原文。
 
 > 进入前需重写为 `COMMITTED` 并重过 PM 门禁。以下方向确定，细节会随 M0/M1 实现反馈调整。
 
@@ -483,7 +493,9 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 
 ---
 
-# M3 · 三端 `PROVISIONAL`
+# M3 · 三端 ~~`PROVISIONAL`~~ `COMMITTED`（骨架范围）
+
+> v1.12 补记：2026-09-14 再批准，见 `docs/prd/M3.md`。
 
 **要回答的问题**：终端里起的任务，能否在浏览器里接着看。
 
@@ -1071,6 +1083,87 @@ AC 原文不变（`docs/adr/011`）。进入 M3 的批准门上必须重新过�
 
 **M8 DoD**：用户连续一周只用 Web 端做日常工作（至少两个项目的任务、一个定时任务、在设置页换过一次 key），
 期间没有因为界面缺功能而回终端；旧的七个面板组件已被替换，`docs/parity-checklist.md` 更新；TUI 按新原型走查一遍（深浅终端各一次）。
+
+---
+
+# M9 · 模型配置与体验 `COMMITTED`
+
+> **v1.12（2026-09-18）新增**。触发：用户提出三个需求点（模型探测与 Provider 配置、中英双语、TUI 输入区）。
+> 再批准门材料与两轮拍板见 `docs/prd/M9.md`，v0.1 的复核见 `docs/qa/M9-prd-review.md`。
+
+**要回答的问题**：模型从哪来（真实可用、多家并存、配置页能管）；界面能不能说英文；终端里的长会话看不看得清。
+
+**不做什么**：模型能力运行时探测 · 第三方 i18n 库 · 对话内的 provider 切换入口 · `openai | anthropic` 之外的协议 ·
+TUI 应用内鼠标拖选复制 · 翻译用户内容 / 事件流 / 轨迹 / soul / 提示词。
+
+**预算**：11.5 天。超 20% 先砍 M9-005 的鼠标滚轮，再砍 M9-004 的 CLI 部分。
+
+### PRD-M9-001 · 模型探测
+- **用户价值**：模型下拉列出真实可用的模型，不用手填模型名、不用维护清单。
+- **AC**
+  - AC-1：daemon 对每个启用的 provider 发 `GET {base}/models`：openai 协议带 `Authorization: Bearer <key>`；anthropic 协议带 `x-api-key` 与 `anthropic-version: 2023-06-01`，base 按「带 /v1」规整，并带 `limit=1000`、按 `has_more` / `last_id` 翻页（至多 5 页）；成功时得到该 provider 的模型 id 列表
+  - AC-2：单个 provider 探测失败（网络错误、401、超时 10s、非 2xx、响应形状不对）时，该 provider 降级为本地清单（`providers.<id>.models` + 默认模型若属于它），并标注 `source: fallback` 与失败原因（原因里不含 key）；多个 provider 并行探测，一个失败不影响其它
+  - AC-3：探测结果缓存 10 分钟；该 provider 的协议 / 地址 / key / 启停变化时立即失效；`model.list { refresh: true }` 强制重探，设置页有「重新探测」
+  - AC-4：探测结果按规则表剔除非对话模型（embedding、tts、whisper / transcribe、dall-e / image、moderation、realtime、audio 等）；规则表只有一份，单测逐条覆盖
+  - AC-5：请求只发往该 provider 配置的 base 或其厂商模板的默认地址（INV-11）；测试全部用注入的 fetch，CI 不发真实请求（INV-08）
+  - AC-6：停用的 provider 不探测、不出现在 `model.list` 里
+- **验收方式**：`bun test runtime/model-probe.spec.ts` + `bun test daemon/model-list.spec.ts`
+- **层级**：Negotiable（AC-5 为 Invariant：INV-08 / INV-11）· **优先级**：P0
+
+### PRD-M9-002 · Provider 配置
+- **用户价值**：一个 provider = 名称 / 厂商 / 协议 / 地址 / key / 启停 / 能力，在设置页增删改，多家并存。
+- **AC**
+  - AC-1：`providers.<id>`（id 为键，`^[a-z0-9][a-z0-9-]{0,31}$`）每项含 `name`、`vendor`（`openai | anthropic | deepseek | gemini | custom`）、`protocol`（`openai | anthropic`）、`baseUrl`、`enabled`（默认 true）、`models`（手填）、`capabilities`（覆盖）；`api_key` 只写 `~/.domi/secrets.yaml`（PRD-M8-011 AC-4 不回退）
+  - AC-2：厂商模板表是「有哪些厂商」的唯一来源（`packages/model`）：每个模板给协议、默认地址、默认能力、惯用环境变量名；`custom` 能力全关（fail-closed）；`guard:providers` 的扫描范围扩到 config / daemon / runtime / apps，模板表以外出现厂商名即红
+  - AC-3：适配器由厂商决定：`openai` → OpenAI 官方适配器；`anthropic`，以及 `custom` + anthropic 协议 → Anthropic 适配器；其余 openai 协议 → OpenAI 兼容适配器（Chat Completions）。去掉 Google 专用适配器，Gemini 的对话与 embedding 都走兼容端点
+  - AC-4：设置页「模型供应商」可新增 / 编辑 / 删除 / 启停 provider；编辑项 = 名称、厂商模板、协议、Base URL、API Key、启用、能力开关、手填模型；id 新建时由名称生成、可改，建好后不可改；选厂商模板时自动带出协议、地址与能力
+  - AC-5：默认模型所在的 provider 不能停用、不能删除：`config.set` 返回 `INVALID_PARAMS`（`data.reason = DEFAULT_PROVIDER`），界面提示先换默认模型
+  - AC-6：凭据优先级不变（环境变量 > secrets.yaml > config.yaml）；环境变量名 = `DOMI_<ID>_API_KEY`（id 转大写、`-` 转 `_`），模板再认惯用名（如 `ANTHROPIC_API_KEY`）；`DOMI_API_KEY` 只作用于默认模型所在的 provider
+  - AC-7：旧配置照常读：`model.apiKey / baseUrl / capabilities` 加载时并入 `providers[model.provider]`（运行期只有 `providers` 一个来源）；缺 `vendor / protocol` 的旧条目按键名推断（键名是模板名 → 该模板；`openai-compatible` → `custom`；`google` → `gemini`；其它 → `custom` + openai）；`domi doctor` 列出被推断的条目（只提示，不强制迁移）
+  - AC-8：`config.set` 白名单改为 `providers.<id>.{name, vendor, protocol, base_url, api_key, enabled, models, capabilities}` 与删除整条 provider；`permissions`、`hooks`、`mcp`、插件安装仍整体拒绝（PRD-M8-011 AC-2 不回退）
+- **验收方式**：`bun test config/providers.spec.ts` + `bun test config/write.spec.ts` + `bun test model/vendors.spec.ts` + `apps/web/test/settings-providers.spec.tsx`
+- **层级**：Negotiable（AC-2 的 fail-closed、AC-8 为 Invariant：INV-03）· **优先级**：P0
+
+### PRD-M9-003 · 默认模型与对话内选择
+- **用户价值**：对话里只选模型；默认用哪个模型在设置页一处定；切过的模型下次打开会话还在。
+- **AC**
+  - AC-1：默认是一个模型：`model.provider`（provider id）+ `model.name`；设置页在每个 provider 的模型列表里「设为默认」；新会话用它；provider 上没有「默认」开关
+  - AC-2：`model.list` 返回扁平条目 `{ provider, providerName, name, source, vision, toolCall }`，只含启用的 provider；Web 下拉按 provider 分组、可搜索；同名模型在不同 provider 下各占一行，能力按所属 provider 计算
+  - AC-3：手填模型名（Composer「其他…」、TUI `/model <名>`）只接受模型名，由 daemon 统一归属：默认 provider 下有同名 → 它；否则唯一命中的 provider；多处命中 → 返回候选让用户选；无命中 → `INVALID_PARAMS`（`data.reason = MODEL_UNRESOLVED`），提示去设置页添加
+  - AC-4：TUI `/model` 不带参数打开按 provider 分组的模型弹层；带参数按 AC-3；provider 参数移除
+  - AC-5：`model.switch` 事件追加可选 `provider`（SCHEMA_VERSION 11 → 12，旧事件照读）；`session.switchModel` 的 `provider` 由端从选中的条目带上，不作为用户可见的切换入口
+  - AC-6：重开会话（含 domid 重启）后，会话用的模型与 provider 与关闭前一致（回放最后一条 `model.switch`）；那个 provider 已停用或删除时回到默认模型，并在对话里提示一次
+  - AC-7：切换仍产生 `model.switch`，切到能力更弱的模型时列出失去的能力（PRD-M1-002 AC-1/2 不回退）
+- **验收方式**：`bun test runtime/model-resolve.spec.ts` + `bun test runtime/model-restore.spec.ts` + `apps/web/test/composer.spec.tsx` + `apps/tui/test/commands.spec.ts`
+- **层级**：Negotiable · **优先级**：P0
+
+### PRD-M9-004 · 国际化（中文 / English）
+- **用户价值**：英文用户看得懂；切语言不用重装。
+- **AC**
+  - AC-1：`ui.locale: auto | zh | en`（默认 auto），Web 与 TUI / CLI 共用；auto 由各端自己解析（浏览器语言；`LC_ALL` > `LC_MESSAGES` > `LANG`），`zh` 开头为中文，其余为英文；Web 切换即时生效，TUI / CLI 下次启动生效（切换时提示）
+  - AC-2：`@domi/i18n` 独立包、零运行时依赖：`t(key, params)` 插值与简单复数；zh 为源 locale，en 覆盖同一键集；`guard:i18n` 检查两份键集一致、参数名一致
+  - AC-3：Web / TUI / CLI 面向用户的静态文案全部经 `t()`；`guard:i18n` 同时扫 `apps/web/src`、`apps/tui/src`、`packages/cli/src` 的字符串字面量与 JSX 文本，出现中文即红（注释、测试与显式允许清单除外）
+  - AC-4：面向用户的错误在端上按当前语言渲染：协议错误的 `data` 带 `messageKey` 与 `params`，daemon 不感知语言；端上没有这个 key 时显示 `message` 原文
+  - AC-5：不翻译：事件流内容、轨迹摘要、soul、记忆、用户输入、日志、提示词层；内置 identity 层要求模型用用户使用的语言回复
+  - AC-6：TUI golden 快照按固定 locale 录制：zh 四个宽度照旧，另加 en 一组（80 列）
+- **验收方式**：`bun test i18n/t.spec.ts` + `pnpm guard:i18n` + `apps/tui/test/golden.spec.tsx` + `apps/web/test/locale.spec.tsx`
+- **层级**：Negotiable · **优先级**：P1
+
+### PRD-M9-005 · TUI 渲染与输入区
+- **用户价值**：长会话不闪、输入框钉在底部、能往回翻；需要原生回滚的人也有退路。
+- **AC**
+  - AC-1：两种渲染器：`tui.renderer: fullscreen | classic`（默认 fullscreen），环境变量 `DOMI_TUI_RENDERER` 优先；非 TTY、`TERM=dumb`、屏幕阅读器模式强制 classic；fullscreen 首帧前出错自动退回 classic 并提示一次
+  - AC-2：fullscreen：进入备用屏；对话流只渲染可见的行（按终端宽度与中日韩双宽字符计算折行）；输入区、状态栏、快捷键行固定在底部；对话流右侧一列滚动条，滑块位置与长度按可见比例计算
+  - AC-3：滚动：PgUp / PgDn 半屏，Ctrl+Home / Ctrl+End 到顶 / 到底；鼠标滚轮（`tui.mouse`，默认开）；往上翻后暂停自动跟随，底部显示「N 条新消息」，到底或 Ctrl+End 恢复跟随
+  - AC-4：Ctrl+O 把完整对话按 classic 格式写进终端原生回滚区（离开备用屏），按任意键回到 fullscreen——终端自带的搜索与选择复制在这时可用
+  - AC-5：classic：已完成的条目只输出一次（进原生回滚后不再重绘），只有进行中的条目与底部区域参与重绘
+  - AC-6：输入区为空时不显示占位文字、不显示 `›`，只有光标；上下各一条横边框（不闭合，颜色随主题）；按键提示由底部快捷键行承担
+  - AC-7：Enter 发送；Shift+Enter（kitty 协议）/ Ctrl+J / Alt+Enter 换行——PRD-M8-014 AC-5 已交付，不回退
+- **验收方式**：`bun test apps/tui/test/viewport.spec.ts` + `apps/tui/test/golden.spec.tsx` + `apps/tui/test/renderer.spec.ts`
+- **层级**：Negotiable · **优先级**：P1
+
+**M9 DoD**：用户在设置页配齐至少两家 provider（其一为 OpenAI 兼容网关），对话里跨 provider 换过模型、重开会话后模型仍在；
+Web 与 TUI 各用英文界面走一遍主要流程；在 fullscreen 下跑一个上百条事件的会话，翻页、Ctrl+O、切 classic 各一次。→ 只有用户能做。
 
 ---
 
