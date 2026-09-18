@@ -8,7 +8,8 @@
  * 放在 config 而不是 model：apps 不许 import model（那里有 AI SDK），而模板本身不需要 SDK。
  */
 
-export type Protocol = 'openai' | 'anthropic'
+export const PROTOCOLS = ['openai', 'anthropic'] as const
+export type Protocol = (typeof PROTOCOLS)[number]
 
 /** openai-official 走 OpenAI 官方 SDK（Responses API）；第三方的 OpenAI 协议只认 Chat Completions，走兼容适配器 */
 export type Adapter = 'openai-official' | 'anthropic' | 'openai-compatible'

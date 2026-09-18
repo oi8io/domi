@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { GeneralTab, MemoryTab, ModelsTab } from '../src/views/SettingsView.tsx'
+import { GeneralTab, MemoryTab } from '../src/views/SettingsView.tsx'
 import { PluginList } from '../src/views/settings/PluginsTab.tsx'
 import { SoulView } from '../src/views/settings/SoulTab.tsx'
 import { fmtCost, fmtTokens, ModelBars, rangeOf, UsageView } from '../src/views/settings/UsageTab.tsx'
@@ -48,7 +48,7 @@ const settings: Settings = {
 
 const s = { data: settings, error: null, saved: null, save: async () => true, reload: () => undefined }
 
-describe('PRD-M8-012 AC-2 · 通用与模型供应商', () => {
+describe('PRD-M8-012 AC-2 · 通用（模型供应商见 settings-providers.spec，PRD-M9-002）', () => {
   test('通用：语言（只有简体中文）、主题三选一、5 个色板', () => {
     const html = renderToStaticMarkup(<GeneralTab s={s} />)
     expect(html).toContain('简体中文')
@@ -57,20 +57,6 @@ describe('PRD-M8-012 AC-2 · 通用与模型供应商', () => {
     expect(html).toContain('深色')
     expect(html).toContain('浅色')
     expect((html.match(/aria-pressed=/g) ?? []).length).toBe(5)
-  })
-
-  test('模型供应商：默认模型 + 四家的 key 与 base URL', () => {
-    const html = renderToStaticMarkup(<ModelsTab s={s} />)
-    expect(html).toContain('claude-sonnet-4-5')
-    for (const p of ['anthropic', 'openai', 'deepseek', 'openai-compatible']) expect(html).toContain(p)
-    expect(html).toContain('https://api.deepseek.com/v1')
-  })
-
-  test('PRD-M8-011 AC-1 · 凭据只给掩码与来源，明文一个字都不出现', () => {
-    const html = renderToStaticMarkup(<ModelsTab s={s} />)
-    expect(html).toContain('sk-ant…4f2a')
-    expect(html).toContain('sk-de…9911')
-    expect(html).not.toContain('sk-ant-api03')
   })
 })
 

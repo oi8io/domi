@@ -1,6 +1,7 @@
 /**
  * 设置（`#/settings/<tab>`）—— PRD-M8-012（原型 #view-settings，7 个 tab）。
  * 通用 / 模型供应商 / 记忆管理经 config.get / config.set 读写（PRD-M8-011）；通讯工具只留入口。
+ * 模型供应商在 `settings/ProvidersTab.tsx`（PRD-M9-002：任意多家、增删改、默认是一个模型）。
  * Soul 与人格、插件两个 tab 吸收了原来的 SoulPanel / PluginPanel（PRD-M8-012 AC-5 / AC-6）。
  */
 import { type DomiClient, PALETTES, TOKENS } from '@domi/client-core'
@@ -21,6 +22,7 @@ import {
 import { Notice, Page } from './Page.tsx'
 import { Field, Saved, ToggleRow } from './settings/fields.tsx'
 import { PluginsTab } from './settings/PluginsTab.tsx'
+import { ProvidersTab } from './settings/ProvidersTab.tsx'
 import { SoulTab } from './settings/SoulTab.tsx'
 import { UsageTab } from './settings/UsageTab.tsx'
 import { str, useSettings } from './settings/useSettings.ts'
@@ -94,138 +96,6 @@ export function GeneralTab({ s }: TabProps) {
         </fieldset>
       </Field>
     </>
-  )
-}
-
-const PROVIDERS: Array<{ id: string; label: string; key: string; url: string }> = [
-  { id: 'anthropic', label: 'Anthropic', key: 'sk-ant-...', url: 'https://api.anthropic.com' },
-  { id: 'openai', label: 'OpenAI', key: 'sk-...', url: 'https://api.openai.com/v1' },
-  { id: 'deepseek', label: 'DeepSeek', key: 'sk-...', url: 'https://api.deepseek.com/v1' },
-]
-const SOURCE_LABEL = { env: '环境变量', secrets: 'secrets.yaml', config: 'config.yaml' } as const
-
-function keyHint(
-  sec: { set: boolean; masked?: string | undefined; source?: 'env' | 'secrets' | 'config' | undefined } | undefined,
-): string {
-  if (!sec?.set) return '还没有 key'
-  const where = sec.source === undefined ? '' : `（来自${SOURCE_LABEL[sec.source]}）`
-  const env = sec.source === 'env' ? '，环境变量优先，这里改了不会生效' : ''
-  return `当前 ${sec.masked ?? ''}${where}${env}。留空不改`
-}
-
-export function ModelsTab({ s }: TabProps) {
-  const d = s.data
-  const [draft, setDraft] = useState<Record<string, string>>({})
-  if (d === null) return <Saved error={s.error} saved={null} />
-  const val = (k: string): string => draft[k] ?? str(d.values[k])
-  const set = (k: string, v: string): void => setDraft({ ...draft, [k]: v })
-  const submit = async (): Promise<void> => {
-    const patch: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(draft)) {
-      if (k.endsWith('.api_key')) {
-        if (v.trim() !== '') patch[k] = v.trim()
-      } else if (k === 'providers.openai-compatible.models') {
-        patch[k] = v
-          .split(/[,，\s]+/)
-          .map((x) => x.trim())
-          .filter(Boolean)
-      } else {
-        patch[k] = v.trim() === '' ? null : v.trim()
-      }
-    }
-    if (Object.keys(patch).length === 0) return
-    if (await s.save(patch)) setDraft({})
-  }
-  const compat = 'openai-compatible'
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        void submit()
-      }}
-    >
-      <Saved error={s.error} saved={s.saved} />
-      <Field label="默认模型" hint="新建会话时使用；已经开着的会话不受影响">
-        <div className="grid grid-cols-[180px_1fr] gap-2.5">
-          <select
-            className="field-input"
-            aria-label="默认供应商"
-            value={val('model.provider')}
-            onChange={(e) => set('model.provider', e.target.value)}
-          >
-            {[...PROVIDERS.map((p) => [p.id, p.label]), [compat, 'OpenAI 兼容网关']].map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <input
-            className="field-input font-mono"
-            aria-label="默认模型名"
-            value={val('model.name')}
-            onChange={(e) => set('model.name', e.target.value)}
-          />
-        </div>
-      </Field>
-      {PROVIDERS.map((p) => (
-        <Field key={p.id} label={p.label} hint={keyHint(d.secrets[p.id])}>
-          <div className="grid grid-cols-2 gap-2.5">
-            <input
-              className="field-input font-mono"
-              type="password"
-              autoComplete="off"
-              aria-label={`${p.label} API Key`}
-              placeholder={p.key}
-              value={draft[`providers.${p.id}.api_key`] ?? ''}
-              onChange={(e) => set(`providers.${p.id}.api_key`, e.target.value)}
-            />
-            <input
-              className="field-input font-mono"
-              type="text"
-              aria-label={`${p.label} Base URL`}
-              placeholder={p.url}
-              value={val(`providers.${p.id}.base_url`)}
-              onChange={(e) => set(`providers.${p.id}.base_url`, e.target.value)}
-            />
-          </div>
-        </Field>
-      ))}
-      <Field label="OpenAI 兼容网关" hint={keyHint(d.secrets[compat])}>
-        <div className="grid grid-cols-2 gap-2.5">
-          <input
-            className="field-input font-mono"
-            type="text"
-            aria-label="网关 Base URL"
-            placeholder="Base URL"
-            value={val(`providers.${compat}.base_url`)}
-            onChange={(e) => set(`providers.${compat}.base_url`, e.target.value)}
-          />
-          <input
-            className="field-input font-mono"
-            type="password"
-            autoComplete="off"
-            aria-label="网关 API Key"
-            placeholder="API Key"
-            value={draft[`providers.${compat}.api_key`] ?? ''}
-            onChange={(e) => set(`providers.${compat}.api_key`, e.target.value)}
-          />
-        </div>
-        <input
-          className="field-input mt-1.5 font-mono"
-          aria-label="网关模型"
-          placeholder="网关上的模型名，逗号分隔"
-          value={draft[`providers.${compat}.models`] ?? (d.values[`providers.${compat}.models`] as string[]).join(', ')}
-          onChange={(e) => set(`providers.${compat}.models`, e.target.value)}
-        />
-      </Field>
-      <p className="mb-4 text-[11.5px] text-mut">
-        key 只写进 <code>{d.paths.secrets}</code>（权限 0600），不写进 <code>{d.paths.config}</code>，也不会回显到这里。
-        {d.secretsTooOpen && <span className="text-bad"> 这个文件的权限比 0600 宽，建议 chmod 600。</span>}
-      </p>
-      <Button type="submit" variant="primary" disabled={Object.keys(draft).length === 0}>
-        保存
-      </Button>
-    </form>
   )
 }
 
@@ -325,7 +195,8 @@ export function SettingsView({ client, tab, online }: { client: DomiClient; tab:
         </nav>
         <div className="min-w-0" data-tab={tab}>
           {tab === 'general' && <GeneralTab s={s} />}
-          {tab === 'models' && (online ? <ModelsTab s={s} /> : <Notice>连上 daemon 后显示。</Notice>)}
+          {tab === 'models' &&
+            (online ? <ProvidersTab client={client} s={s} /> : <Notice>连上 daemon 后显示。</Notice>)}
           {tab === 'messaging' && <MessagingTab />}
           {tab === 'memory' && (online ? <MemoryTab s={s} /> : <Notice>连上 daemon 后显示。</Notice>)}
           {tab === 'usage' && (online ? <UsageTab client={client} /> : <Notice>连上 daemon 后显示。</Notice>)}

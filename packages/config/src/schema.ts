@@ -5,7 +5,7 @@
  * 内置的就够用时，引库只是多一个要跟版本的东西）。
  */
 import { z } from 'zod'
-import { DEFAULT_MODEL, VENDOR_IDS } from './vendors.ts'
+import { DEFAULT_MODEL, PROTOCOLS, VENDOR_IDS } from './vendors.ts'
 
 export const PermissionRuleSchema = z.object({
   name: z.string(),
@@ -132,7 +132,7 @@ export const ConfigSchema = z.object({
         /** 厂商模板（`vendors.ts`）。旧配置不写，读的时候按键名推断 */
         vendor: z.enum(VENDOR_IDS).optional(),
         /** 只对 custom 有意义 */
-        protocol: z.enum(['openai', 'anthropic']).optional(),
+        protocol: z.enum(PROTOCOLS).optional(),
         apiKey: z.string().optional(),
         baseUrl: z.string().optional(),
         enabled: z.boolean().default(true),

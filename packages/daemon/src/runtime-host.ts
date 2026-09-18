@@ -333,7 +333,15 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
   /** 同一个会话只有一个 DomiSession：core、编排、子 agent 共用，推送才不会重复 */
   const sessions = new Map<string, Promise<DomiSession>>()
   // 模型清单与探测缓存（PRD-M9-001）：整个 domid 一份，配置变了靠指纹自己失效
-  const catalog = new ModelCatalog(opts.probeFetch === undefined ? {} : { fetch: opts.probeFetch })
+  // 注入了模型替身（测试）时不向任何地址探测：替身背后没有真实端点，探测只会是一次多余的出站（INV-08）
+  const probeFetch =
+    opts.probeFetch ??
+    (opts.provider !== undefined
+      ? async () => {
+          throw new Error('注入了模型替身，不探测')
+        }
+      : undefined)
+  const catalog = new ModelCatalog(probeFetch === undefined ? {} : { fetch: probeFetch })
   const pushChild = (id: string, envs: EventEnvelope[]): void => emit?.(id, envs)
 
   /** 这个会话的隔离工作区（从事件流里找；不是隔离会话 → null） */

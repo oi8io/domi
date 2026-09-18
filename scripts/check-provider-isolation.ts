@@ -27,7 +27,12 @@ const SCAN_ROOTS = [
   'packages/model/src',
   'packages/runtime/src',
   'packages/capability/src',
-  // TASK-M9-002 / 005 清掉 config/write.ts 与 Web 设置页里的厂商名单后，扩到 config / daemon / cli / client-core / apps
+  'packages/config/src',
+  'packages/daemon/src',
+  'packages/cli/src',
+  'packages/client-core/src',
+  'apps/web/src',
+  'apps/tui/src',
 ]
 
 function files(root: string): string[] {

@@ -560,11 +560,26 @@ export function ModeToggle({
 }
 
 type ModelList = Awaited<ReturnType<DomiClient['listModels']>>
+type ModelItem = ModelList['models'][number]
+
+/** 补全里的一行：模型名为主、供应商作归属标注 */
+export function optionLabel(m: ModelItem): string {
+  return `${m.name} · ${m.providerName}`
+}
+
+/** 按供应商分组，保持 daemon 给的顺序（默认那一家在前） */
+export function groupByProvider(models: readonly ModelItem[]): Array<[string, ModelItem[]]> {
+  const groups = new Map<string, ModelItem[]>()
+  for (const m of models) groups.set(m.provider, [...(groups.get(m.provider) ?? []), m])
+  return [...groups.values()].map((g) => [(g[0] as ModelItem).providerName, g])
+}
 const SEP = ''
 
 /**
- * 切换模型（原型 .ctb-select）：选项来自 model.list（已配置的供应商与模型，PRD-M8-010 AC-5）；
- * 清单里没有的选「其他…」手填。切换成功后 model.switch 事件自己会出现在对话里，这里只显示会失去的能力。
+ * 切换模型（原型 .ctb-select）：选项来自 model.list（PRD-M9-003 AC-2：启用的供应商按组列出，同名模型各占一行）；
+ * 「搜索 / 手填…」给一个带补全的输入框：选中清单里的条目按那一条切，手填的名字交给 daemon 归属（model.resolve，AC-3）——
+ * 只填模型名，不再有 `名字 [provider]` 的写法：provider 是配置概念，不在对话里切。
+ * 切换成功后 model.switch 事件自己会出现在对话里，这里只显示会失去的能力。
  */
 export function ModelSwitch({
   client,
@@ -601,27 +616,46 @@ export function ModelSwitch({
 
   const models = list?.models ?? []
   if (custom || (list !== null && models.length === 0)) {
+    const submit = (): void => {
+      const text = model.trim()
+      if (text === '') return
+      // 补全里选中的是「名字 · 供应商」这一行：按那一条切；否则交给 daemon 归属
+      const picked = models.find((m) => optionLabel(m) === text)
+      if (picked) {
+        switchTo(picked.name, picked.provider)
+        return
+      }
+      client.resolveModel(text).then(
+        (r) => switchTo(r.name, r.provider),
+        (err: Error) => onNotice(err.message),
+      )
+    }
     return (
       <span className="flex items-center gap-1">
         <input
-          className="w-52 rounded-sm border border-border bg-bg2 px-2 py-1 font-mono text-xs text-ink outline-none focus:border-accent"
+          className="w-56 rounded-sm border border-border bg-bg2 px-2 py-1 font-mono text-xs text-ink outline-none focus:border-accent"
           value={model}
-          // biome-ignore lint/a11y/noAutofocus: 选了「其他…」就是要马上输入
+          // biome-ignore lint/a11y/noAutofocus: 选了「搜索 / 手填…」就是要马上输入
           autoFocus={custom}
-          placeholder={`${current || '模型名'} [provider]`}
+          list="domi-models"
+          placeholder={current || '模型名'}
           onChange={(e) => setModel(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
-              const [name, p] = model.trim().split(/\s+/)
-              if (name) switchTo(name, p)
+              submit()
             }
             if (e.key === 'Escape') setCustom(false)
           }}
           disabled={busy}
           aria-label="切换模型"
-          title="切换模型：名字 [provider]，回车"
+          title="搜索或填模型名，回车"
         />
+        <datalist id="domi-models">
+          {models.map((m) => (
+            <option key={`${m.provider}/${m.name}`} value={optionLabel(m)} />
+          ))}
+        </datalist>
         {custom && (
           <Button variant="ghost" size="xs" onClick={() => setCustom(false)}>
             取消
@@ -651,14 +685,17 @@ export function ModelSwitch({
       }}
     >
       {!known && <option value={value}>{current === '' ? '模型' : current}</option>}
-      {models.map((m) => (
-        <option key={`${m.provider}/${m.name}`} value={`${m.provider}${SEP}${m.name}`}>
-          {m.name}
-          {m.provider === here ? '' : ` · ${m.provider}`}
-          {m.vision ? '' : ' · 不支持图片'}
-        </option>
+      {groupByProvider(models).map(([providerName, group]) => (
+        <optgroup key={group[0]?.provider} label={providerName}>
+          {group.map((m) => (
+            <option key={`${m.provider}/${m.name}`} value={`${m.provider}${SEP}${m.name}`}>
+              {m.name}
+              {m.vision ? '' : ' · 不支持图片'}
+            </option>
+          ))}
+        </optgroup>
       ))}
-      <option value="__custom">其他…</option>
+      <option value="__custom">搜索 / 手填…</option>
     </select>
   )
 }
