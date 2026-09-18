@@ -30,6 +30,7 @@ import {
   AttachmentError,
   AUTO_PLAN_REASON,
   applyWorktree,
+  assertResolved,
   collectDiff,
   createWorktree,
   DomiSession,
@@ -41,6 +42,7 @@ import {
   MemoryService,
   ModelCatalog,
   type ModelCatalogOptions,
+  ModelResolveError,
   makeReviewReportTool,
   officialSkillsPlugin,
   ProjectError,
@@ -52,6 +54,7 @@ import {
   ReviewInputError,
   readSpecs,
   removeWorktree,
+  resolveModel,
   restoreDiscard,
   reviewPrompt,
   type SessionOptions,
@@ -515,7 +518,22 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
             throw e instanceof RefError ? new InvalidRefError(e.message) : e
           }
         },
-        switchModel: (model, provider) => s.switchModel(model, provider === undefined ? {} : { provider }),
+        async switchModel(model, provider) {
+          // 端上只给模型名时由这里归属（PRD-M9-003 AC-3）；给了 provider 也要是启用着的那一家
+          const list = await catalog.list(opts.config)
+          let target: { provider: string; name: string }
+          try {
+            if (provider === undefined)
+              target = assertResolved(resolveModel(list.models, model, opts.config.model.provider))
+            else if (list.providers.some((p) => p.id === provider)) target = { provider, name: model }
+            else
+              throw new ModelResolveError(`供应商「${provider}」不存在或已停用`, 'PROVIDER_UNAVAILABLE', { provider })
+          } catch (e) {
+            if (e instanceof ModelResolveError) throw new InvalidInputError(e.message, e.reason, e.detail)
+            throw e
+          }
+          return s.switchModel(target.name, { provider: target.provider })
+        },
         setMode: (mode) => s.setMode(mode),
         setBudget: (b) => s.setBudget(b),
         compactNow: (trigger) => s.compactNow(trigger),
@@ -627,6 +645,16 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       },
       async models(refresh) {
         return catalog.list(opts.config, { refresh: refresh === true })
+      },
+      async resolveModel(name) {
+        const list = await catalog.list(opts.config)
+        const r = resolveModel(list.models, name, opts.config.model.provider)
+        if (r.kind === 'ok') return { provider: r.provider, name: r.name }
+        try {
+          return assertResolved(r)
+        } catch (e) {
+          throw e instanceof ModelResolveError ? new InvalidInputError(e.message, e.reason, e.detail) : e
+        }
       },
     },
 

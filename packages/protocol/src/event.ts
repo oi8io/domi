@@ -26,9 +26,11 @@ import { z } from 'zod'
  *          `permission.source` 新增取值 `mode`（计划模式拒绝的）。
  * v10 → v11：M8 工作台——新增 `session.kind`（自由会话 / 任务）`project.assign`（任务归到哪个项目）`schedule.fire`（定时触发）；
  *          `permission` 新增可选的 `grant`，`permission.source` 新增取值 `session-grant`（本会话内始终允许）。
+ * v11 → v12：M9——`model.switch` 新增可选的 `provider`（切到了哪一家；同名模型可能在多家，恢复会话要靠它，PRD-M9-003 AC-5/6）。
+ *          没有新类型；v11 写下的 `model.switch` 没有 provider，恢复时按名字归属（SPEC-M9-003 取舍-5）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 11
+export const SCHEMA_VERSION = 12
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -146,6 +148,8 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     t: z.literal('model.switch'),
     from: z.string(),
     to: z.string(),
+    /** M9-003：切到的那一家（provider id）。v11 及以前没有 */
+    provider: z.string().optional(),
     reason: z.string().optional(),
     lostCapabilities: z.array(z.string()).optional(),
   }),

@@ -335,8 +335,12 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         push({
           seq: env.seq,
           kind: 'context',
-          text: `模型切换 ${ev.from} → ${ev.to}`,
-          ...(lost.length > 0 ? { summary: `新模型不支持：${lost.join('、')}` } : {}),
+          text: `模型切换 ${ev.from} → ${ev.to}${ev.provider === undefined ? '' : `（${ev.provider}）`}`,
+          ...(lost.length > 0
+            ? { summary: `新模型不支持：${lost.join('、')}` }
+            : ev.reason === undefined
+              ? {}
+              : { summary: ev.reason }),
         })
         break
       }

@@ -1616,7 +1616,7 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 
 ### `session.switchModel`
 
-会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力
+会话中途切换模型（PRD-M1-002）。只追加一条 model.switch（v12 起带 provider），历史不动；返回会失去的能力。provider 由端从 model.list 选中的条目带上；不带时按 model.resolve 的规则归属，归属不了 → INVALID_PARAMS（PRD-M9-003）
 
 **params**
 
@@ -2440,6 +2440,49 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
     "models",
     "providers",
     "current"
+  ]
+}
+```
+
+### `model.resolve`
+
+手填的模型名归属到哪一家（PRD-M9-003 AC-3）：默认模型所在的那一家有 → 它；只有一家有 → 那一家；好几家都有 → INVALID_PARAMS，data = { reason: AMBIGUOUS, candidates: [{ provider, providerName }] }；没有 → data.reason = MODEL_UNRESOLVED
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "provider": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "provider",
+    "name"
   ]
 }
 ```
@@ -5042,6 +5085,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                         "type": "string"
                       },
                       "to": {
+                        "type": "string"
+                      },
+                      "provider": {
                         "type": "string"
                       },
                       "reason": {

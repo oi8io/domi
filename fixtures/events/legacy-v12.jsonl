@@ -1,0 +1,2 @@
+{"seq": 38, "sessionId": "legacy", "parentSeq": 37, "ts": 1758100000000, "schemaVersion": 12, "ev": {"t": "model.switch", "from": "claude-sonnet-4-5", "to": "deepseek-chat", "provider": "deepseek"}}
+{"seq": 39, "sessionId": "legacy", "parentSeq": 38, "ts": 1758100000001, "schemaVersion": 12, "ev": {"t": "model.switch", "from": "deepseek-chat", "to": "gpt-4o", "provider": "my-gw", "reason": "同名模型在两家，按 provider 区分", "lostCapabilities": ["vision"]}}

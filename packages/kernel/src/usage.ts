@@ -102,8 +102,11 @@ export function summarizeUsage(
         model = ev.model
         provider = ev.provider
       }
-      // model.switch 不带 provider：紧随其后的 model.request 会把它补上（换模型总要再发一次请求）
-      if (ev.t === 'model.switch') model = ev.to
+      // v12 起 model.switch 带 provider；更早的没有，紧随其后的 model.request 会把它补上（换模型总要再发一次请求）
+      if (ev.t === 'model.switch') {
+        model = ev.to
+        if (ev.provider !== undefined) provider = ev.provider
+      }
       if (env.ts < opts.from || env.ts >= opts.to) continue
       const month = monthOf(env.ts)
       const m = byModel.get(model) ?? newBucket()

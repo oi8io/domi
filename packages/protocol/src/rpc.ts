@@ -416,7 +416,9 @@ export const METHODS = {
     result: z.object({ ok: z.literal(true) }),
   },
   'session.switchModel': {
-    summary: '会话中途切换模型（PRD-M1-002）。只追加一条 model.switch，历史不动；返回会失去的能力',
+    summary:
+      '会话中途切换模型（PRD-M1-002）。只追加一条 model.switch（v12 起带 provider），历史不动；返回会失去的能力。' +
+      'provider 由端从 model.list 选中的条目带上；不带时按 model.resolve 的规则归属，归属不了 → INVALID_PARAMS（PRD-M9-003）',
     params: z.object({ sessionId: z.string(), model: z.string().min(1), provider: z.string().min(1).optional() }),
     result: z.object({ lost: z.array(z.string()) }),
   },
@@ -528,6 +530,13 @@ export const METHODS = {
       ),
       current: z.object({ provider: z.string(), name: z.string() }),
     }),
+  },
+  'model.resolve': {
+    summary:
+      '手填的模型名归属到哪一家（PRD-M9-003 AC-3）：默认模型所在的那一家有 → 它；只有一家有 → 那一家；' +
+      '好几家都有 → INVALID_PARAMS，data = { reason: AMBIGUOUS, candidates: [{ provider, providerName }] }；没有 → data.reason = MODEL_UNRESOLVED',
+    params: z.object({ name: z.string().min(1) }),
+    result: z.object({ provider: z.string(), name: z.string() }),
   },
   'schedule.list': {
     summary: '定时任务列表（PRD-M8-007），带下一次运行时间与最近一次触发',

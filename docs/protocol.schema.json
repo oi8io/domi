@@ -2025,6 +2025,37 @@
         ]
       }
     },
+    "model.resolve": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "name"
+        ]
+      }
+    },
     "schedule.list": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4293,6 +4324,9 @@
                               "type": "string"
                             },
                             "to": {
+                              "type": "string"
+                            },
+                            "provider": {
                               "type": "string"
                             },
                             "reason": {

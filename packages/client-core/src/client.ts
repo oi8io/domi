@@ -396,8 +396,14 @@ export class DomiClient {
     return (await this.request('skill.list', sessionId === undefined ? {} : { sessionId })).skills
   }
 
-  listModels(): Promise<ResultOf<'model.list'>> {
-    return this.request('model.list', {})
+  /** refresh：跳过 10 分钟缓存重新探测（设置页「重新探测」） */
+  listModels(refresh = false): Promise<ResultOf<'model.list'>> {
+    return this.request('model.list', refresh ? { refresh } : {})
+  }
+
+  /** 手填的模型名归属到哪一家（PRD-M9-003 AC-3） */
+  resolveModel(name: string): Promise<ResultOf<'model.resolve'>> {
+    return this.request('model.resolve', { name })
   }
 
   /**

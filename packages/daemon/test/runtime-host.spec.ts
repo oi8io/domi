@@ -155,7 +155,10 @@ describe('RuntimeHost', () => {
     await call(daemon, c, 'session.create')
     await call(daemon, c, 'session.subscribe', { sessionId: 'sess-1', fromSeq: 0 })
 
-    const sw = await call(daemon, c, 'session.switchModel', { sessionId: 'sess-1', model: 'stub-2' })
+    // 端从 model.list 选中的条目带上 provider（PRD-M9-003 AC-5）；只给名字而清单里没有它 → 归属不了
+    const unknown = await call(daemon, c, 'session.switchModel', { sessionId: 'sess-1', model: 'stub-2' })
+    expect(unknown.error).toMatchObject({ code: 'INVALID_PARAMS', data: { reason: 'MODEL_UNRESOLVED' } })
+    const sw = await call(daemon, c, 'session.switchModel', { sessionId: 'sess-1', model: 'stub-2', provider: 'stub' })
     expect(sw.result).toEqual({ lost: [] })
     for (let i = 0; i < 50 && !c.events().some((e) => e.ev.t === 'model.switch'); i++) await Bun.sleep(10)
     expect(c.events().find((e) => e.ev.t === 'model.switch')?.ev).toMatchObject({ from: 'stub-1', to: 'stub-2' })

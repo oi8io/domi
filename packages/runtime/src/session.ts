@@ -32,7 +32,13 @@ import {
   ToolRegistry,
 } from '@domi/capability'
 import { DiagnosticsService, makeDiagnosticsTool, makeOutlineTool } from '@domi/codeintel'
-import { credentialEnvNames, type DomiConfig, MissingCredentialError, providerConnection } from '@domi/config'
+import {
+  credentialEnvNames,
+  type DomiConfig,
+  listProviders,
+  MissingCredentialError,
+  providerConnection,
+} from '@domi/config'
 import {
   aggregate,
   type ContextPolicy,
@@ -520,6 +526,7 @@ export class DomiSession {
         t: 'model.switch',
         from,
         to,
+        provider: toProvider,
         ...(opts.reason === undefined ? {} : { reason: opts.reason }),
         ...(lost.length > 0 ? { lostCapabilities: lost } : {}),
       },
@@ -806,6 +813,7 @@ export class DomiSession {
    */
   async recover(): Promise<number> {
     const events = await this.view()
+    await this.restoreModel(events)
     // 本会话给过的「始终允许」（M8-016）：重开会话照样生效
     this.permissions.restoreGrants(
       events.flatMap((e) => {
@@ -818,6 +826,48 @@ export class DomiSession {
     await this.log.append(this.opts.sessionId, fix)
     await this.pump()
     return fix.length
+  }
+
+  /**
+   * 重开会话时回到关闭前用的模型（PRD-M9-003 AC-6 · BUG-M9-001）。
+   *
+   * 以前会话一重开就回到配置里的默认模型——切过的模型只活在内存里。事件流才是真相（INV-01）：回放最后一条 `model.switch`。
+   * - 带 provider（v12 起）且那一家还启用 → 用它
+   * - v11 及以前的没有 provider：那时的代码除非显式指定，都是在默认那一家下换模型，按默认那一家算
+   * - 那一家已停用或删除 → 回到默认模型，并**追加一条** `model.switch` 说明原因：模型确实换了，这是一个事实，
+   *   和 recover 补齐中断的工具调用是同一个立场；对话里据此提示一次（之后最后一条就是它，不会重复）
+   */
+  private async restoreModel(events: readonly EventEnvelope[]): Promise<void> {
+    if (this.injectedProvider) return
+    let last: { to: string; provider?: string } | undefined
+    for (const e of events) if (e.ev.t === 'model.switch') last = e.ev as { to: string; provider?: string }
+    if (last === undefined) return
+    const cfg = this.opts.config
+    const provider = last.provider ?? cfg.model.provider
+    const usable = listProviders(cfg).some((p) => p.id === provider && p.enabled)
+    if (usable) {
+      if (provider === this.currentProvider && last.to === this.currentModel) return
+      this.currentModel = last.to
+      this.currentProvider = provider
+      this.provider = this.buildProvider(provider, last.to)
+      return
+    }
+    const to = cfg.model.name
+    const from = last.to
+    this.currentModel = to
+    this.currentProvider = cfg.model.provider
+    this.provider = this.buildProvider(this.currentProvider, to)
+    await this.log.append(this.opts.sessionId, [
+      {
+        t: 'model.switch',
+        from,
+        to,
+        provider: this.currentProvider,
+        reason: `供应商「${provider}」已停用或删除，回到默认模型`,
+      },
+    ])
+    this.log.sessions.upsert({ id: this.opts.sessionId, cwd: this.opts.cwd, model: to })
+    await this.pump()
   }
 
   /** 进程级提示落成事件：走事件流而不是侧信道，事后查轨迹时才看得见（与压缩失败同一个立场） */
