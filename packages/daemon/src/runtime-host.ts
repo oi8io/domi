@@ -22,6 +22,7 @@ import {
   readSettings,
   writeConfigPatch,
 } from '@domi/config'
+import { tr } from '@domi/i18n'
 import { Notifier } from '@domi/notify'
 import { DagSpecError } from '@domi/orchestrator'
 import type { PluginHost } from '@domi/plugin'
@@ -131,7 +132,7 @@ function localTimeZone(): string {
 const normalizeCron = (cron: string): string => cron.trim().split(/\s+/).join(' ')
 
 function cronError(e: unknown): unknown {
-  return e instanceof CronError ? new HostRequestError(e.message, { reason: 'INVALID_CRON', field: e.field }) : e
+  return e instanceof CronError ? HostRequestError.from(e, { reason: 'INVALID_CRON', field: e.field }) : e
 }
 
 /** 校验 cron 与时区（还要确实会触发） */
@@ -203,7 +204,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     try {
       return fn()
     } catch (e) {
-      throw e instanceof ProjectError ? new HostRequestError(e.message) : e
+      throw e instanceof ProjectError ? HostRequestError.from(e) : e
     }
   }
   function toSummary(p: ProjectRow | ProjectSummary | { id: string }): ProjectSummary {
@@ -234,7 +235,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     const { project, auto, dir } = pj(() => {
       if (projectId !== undefined) {
         const p = projects.get(projectId)
-        if (p.archivedAt !== null) throw new ProjectError(`项目「${p.name}」已归档，先取消归档`)
+        if (p.archivedAt !== null) throw new ProjectError('error.project_archived', { name: p.name })
         return { project: p, auto: false, dir: cwd ?? p.path }
       }
       const dir = cwd ?? opts.defaultCwd
@@ -255,7 +256,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     schedule?: { scheduleId: string; due: number; late: boolean }
   }) {
     const project = pj(() => projects.get(p.projectId))
-    if (project.archivedAt !== null) throw new HostRequestError(`项目「${project.name}」已归档，先取消归档`)
+    if (project.archivedAt !== null) throw HostRequestError.keyed('error.project_archived', { name: project.name })
     const isolation = decideIsolation({
       policy: project.settings.isolation,
       cwd: project.path,
@@ -284,7 +285,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
 
   function schedule(id: string): ScheduleRow {
     const row = index.schedules.get(id)
-    if (!row) throw new HostRequestError(`没有这个定时任务：${id}`)
+    if (!row) throw HostRequestError.keyed('error.schedule_not_found', { id })
     return row
   }
 
@@ -355,7 +356,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     try {
       return await fn()
     } catch (e) {
-      throw e instanceof WorktreeError ? new HostRequestError(e.message) : e
+      throw e instanceof WorktreeError ? HostRequestError.from(e) : e
     }
   }
 
@@ -484,9 +485,12 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         .map((n) => n.id)
       void notifier.send({
         kind: end.status === 'done' ? 'done' : 'failed',
-        title: `任务${end.status === 'done' ? '完成' : '失败'}：${st.name}`,
+        // 系统通知按 domid 的语言（ui.locale，PRD-M9-004）
+        title: tr(end.status === 'done' ? 'daemon.notify.done' : 'daemon.notify.failed', { name: st.name }),
         detail:
-          end.status === 'done' ? `${Object.keys(st.nodes).length} 个节点全部完成` : `失败的节点：${failed.join('、')}`,
+          end.status === 'done'
+            ? tr('daemon.notify.allDone', { count: Object.keys(st.nodes).length })
+            : tr('daemon.notify.failedNodes', { nodes: failed.join(', ') }),
         runId,
       })
     },
@@ -505,10 +509,11 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           } catch (e) {
             if (!(e instanceof MissingCredentialError)) throw e
             const provider = e.provider ?? opts.config.model.provider
-            throw new InvalidInputError(
-              `error.missing_credential: 还没有配置 ${provider} 的 API key。到「设置 › 模型供应商」填写（保存后立即生效），或设置环境变量 ${e.envNames.join(' / ')} 后重启 domid。`,
+            throw InvalidInputError.keyed(
               'MISSING_CREDENTIAL',
-              { messageKey: e.messageKey, provider, envNames: e.envNames },
+              'error.missing_credential',
+              { provider, envNames: e.envNames.join(' / ') },
+              { provider, envNames: e.envNames },
             )
           }
         },
@@ -516,14 +521,14 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           try {
             s.checkInputs(inputs)
           } catch (e) {
-            throw e instanceof AttachmentError ? new InvalidInputError(e.message, e.reason) : e
+            throw e instanceof AttachmentError ? InvalidInputError.from(e, e.reason) : e
           }
         },
         async checkRefs(refs) {
           try {
             return await s.checkRefs(refs)
           } catch (e) {
-            throw e instanceof RefError ? new InvalidRefError(e.message) : e
+            throw e instanceof RefError ? new InvalidRefError(e.message, { cause: e }) : e
           }
         },
         async switchModel(model, provider) {
@@ -534,10 +539,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
             if (provider === undefined)
               target = assertResolved(resolveModel(list.models, model, opts.config.model.provider))
             else if (list.providers.some((p) => p.id === provider)) target = { provider, name: model }
-            else
-              throw new ModelResolveError(`供应商「${provider}」不存在或已停用`, 'PROVIDER_UNAVAILABLE', { provider })
+            else throw new ModelResolveError('error.model.providerUnavailable', { provider }, 'PROVIDER_UNAVAILABLE')
           } catch (e) {
-            if (e instanceof ModelResolveError) throw new InvalidInputError(e.message, e.reason, e.detail)
+            if (e instanceof ModelResolveError) throw InvalidInputError.from(e, e.reason, e.detail)
             throw e
           }
           return s.switchModel(target.name, { provider: target.provider })
@@ -644,7 +648,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         try {
           return s.attachments.put(sessionId, file)
         } catch (e) {
-          throw e instanceof AttachmentError ? new InvalidInputError(e.message, e.reason) : e
+          throw e instanceof AttachmentError ? InvalidInputError.from(e, e.reason) : e
         }
       },
       async skills(sessionId) {
@@ -661,7 +665,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         try {
           return assertResolved(r)
         } catch (e) {
-          throw e instanceof ModelResolveError ? new InvalidInputError(e.message, e.reason, e.detail) : e
+          throw e instanceof ModelResolveError ? InvalidInputError.from(e, e.reason, e.detail) : e
         }
       },
     },
@@ -673,7 +677,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       },
       async create(p) {
         const project = pj(() => projects.get(p.projectId))
-        if (project.archivedAt !== null) throw new HostRequestError(`项目「${project.name}」已归档，先取消归档`)
+        if (project.archivedAt !== null) throw HostRequestError.keyed('error.project_archived', { name: project.name })
         const tz = p.tz ?? localTimeZone()
         checkCron(p.cron, tz)
         const at = now()
@@ -745,7 +749,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
                 writeConfigPatch(patch, src)
               } catch (e) {
                 if (e instanceof ConfigWriteError)
-                  throw new HostRequestError(e.message, e.reason === undefined ? undefined : { reason: e.reason })
+                  throw HostRequestError.from(e, e.reason === undefined ? undefined : { reason: e.reason })
                 throw e instanceof ConfigParseError ? new HostRequestError(e.message) : e
               }
               // 热加载（AC-3）：之后新建的会话用新配置；已经开着的会话下一轮用新配置
@@ -850,7 +854,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       try {
         prompt = reviewPrompt(collectDiff(cwd, base), readSpecs(cwd, p.specs ?? []), base)
       } catch (e) {
-        throw e instanceof ReviewInputError ? new HostRequestError(e.message) : e
+        throw e instanceof ReviewInputError ? HostRequestError.from(e) : e
       }
       const id = `${REVIEW_PREFIX}${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
       const report = makeReviewReportTool()
@@ -903,27 +907,27 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       },
       async diff(sessionId) {
         const tree = await worktreeOf(sessionId)
-        if (!tree) throw new HostRequestError(`${sessionId} 不是隔离会话`)
+        if (!tree) throw HostRequestError.keyed('error.not_isolated', { sessionId })
         const files = await wt(() => worktreeDiff(tree))
         return { repo: tree.repo, branch: tree.branch, base: tree.base, files }
       },
       async discard(sessionId, path) {
         const tree = await worktreeOf(sessionId)
-        if (!tree) throw new HostRequestError(`${sessionId} 不是隔离会话`)
+        if (!tree) throw HostRequestError.keyed('error.not_isolated', { sessionId })
         const trash = await wt(() => discardFile(tree, path, home))
         await (await live(sessionId)).appendEvents([{ t: 'worktree.discard', path, trash }])
         return trash
       },
       async restore(sessionId, trash) {
         const tree = await worktreeOf(sessionId)
-        if (!tree) throw new HostRequestError(`${sessionId} 不是隔离会话`)
+        if (!tree) throw HostRequestError.keyed('error.not_isolated', { sessionId })
         const path = await wt(() => restoreDiscard(tree, trash, home))
         await (await live(sessionId)).appendEvents([{ t: 'worktree.restore', path, trash }])
         return path
       },
       async apply(sessionId, mode, message) {
         const tree = await worktreeOf(sessionId)
-        if (!tree) throw new HostRequestError(`${sessionId} 不是隔离会话`)
+        if (!tree) throw HostRequestError.keyed('error.not_isolated', { sessionId })
         const s = await live(sessionId)
         const title = index.sessions.get(sessionId)?.title ?? ''
         const msg = message ?? (title === '' ? `domi 会话 ${sessionId} 的改动` : title)
@@ -1078,7 +1082,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         try {
           return { ok: true as const, mtime: await memory.writeText(text, mtime) }
         } catch (e) {
-          throw e instanceof SoulConflictError ? new HostRequestError(e.message, { reason: 'CONFLICT' }) : e
+          throw e instanceof SoulConflictError ? HostRequestError.from(e, { reason: 'CONFLICT' }) : e
         }
       },
       async exportSoul() {

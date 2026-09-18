@@ -375,6 +375,9 @@ importers:
 
   packages/config:
     dependencies:
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -390,6 +393,9 @@ importers:
       '@domi/config':
         specifier: workspace:*
         version: link:../config
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@domi/mcp':
         specifier: workspace:*
         version: link:../mcp
@@ -591,6 +597,9 @@ importers:
       '@domi/config':
         specifier: workspace:*
         version: link:../config
+      '@domi/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@domi/kernel':
         specifier: workspace:*
         version: link:../kernel

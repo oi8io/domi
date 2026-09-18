@@ -45,8 +45,60 @@ export function isMessageKey(k: unknown): k is MessageKey {
   return typeof k === 'string' && Object.hasOwn(zh, k)
 }
 
-export function t(key: MessageKey, params?: Params): string {
-  return format(TABLES[current][key], params)
+/**
+ * 带文案 key 的错误 —— PRD-M9-004 AC-4 · SPEC-M9-004 取舍-7
+ *
+ * message 按**抛出它的进程**的语言渲染（daemon 的日志、老客户端看的就是它）；
+ * key 与参数随错误一起走，daemon 放进协议错误的 data，端上再按**自己的**语言重新渲染——
+ * 一个 domid 可以同时连着中文的 TUI 和英文的 Web
+ */
+export class KeyedError extends Error {
+  readonly messageKey: MessageKey
+  readonly messageParams: Params
+  constructor(key: MessageKey, params: Params = {}) {
+    super(t(key, params))
+    this.messageKey = key
+    this.messageParams = params
+  }
+}
+
+/** 从错误（或包着它的错误的 cause）里取出 key 与参数：daemon 放进协议错误的 data */
+export function errorKeyData(e: unknown): { messageKey: string; params: Params } | undefined {
+  for (let cur: unknown = e, depth = 0; cur instanceof Error && depth < 3; cur = cur.cause, depth++) {
+    const k = cur as { messageKey?: unknown; messageParams?: unknown }
+    if (typeof k.messageKey === 'string') {
+      const params = typeof k.messageParams === 'object' && k.messageParams !== null ? (k.messageParams as Params) : {}
+      return { messageKey: k.messageKey, params }
+    }
+  }
+  return undefined
+}
+
+/** 协议错误的 data 里带着 key：认识就按当前语言渲染，不认识（新版 daemon 的新 key）就用原文 */
+export function localizeError(message: string, data: Readonly<Record<string, unknown>> | undefined): string {
+  const key = data?.messageKey
+  if (!isMessageKey(key)) return message
+  const params = typeof data?.params === 'object' && data.params !== null ? (data.params as Params) : {}
+  return t(key, params)
+}
+
+/** 参数里引用另一条文案：渲染时按**当时的**语言展开（错误在 daemon 生成、在端上按另一种语言重新渲染时也对） */
+const REF = '\u0001'
+
+/** 把一条文案当参数传：`tr('error.unsupported', { feature: ref('error.feature.usage') })` */
+export function ref(key: MessageKey): string {
+  return `${REF}${key}`
+}
+
+export function t(key: MessageKey, params?: Params, depth = 0): string {
+  if (params === undefined) return format(TABLES[current][key])
+  const resolved: Record<string, string | number> = {}
+  for (const [k, v] of Object.entries(params)) {
+    const inner = typeof v === 'string' && v.startsWith(REF) ? v.slice(1) : null
+    // 被引用的文案用同一组参数渲染（它自己的占位也从这里取）；最多展开两层，防止互相引用
+    resolved[k] = inner !== null && isMessageKey(inner) && depth < 2 ? t(inner, params, depth + 1) : v
+  }
+  return format(TABLES[current][key], resolved)
 }
 
 /**

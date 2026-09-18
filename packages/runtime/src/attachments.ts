@@ -4,9 +4,11 @@
  * 存到 `~/.domi/attachments/<会话>/<id>`，旁边一个 `<id>.json` 记名字、类型、大小、摘要。
  * 事件里只存引用（user.input.uploads），内容按需读：图片给 base64，文本给正文，其余照实说读不了。
  */
+
 import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import type { LoadedUpload } from '@domi/kernel'
 import type { UploadRef } from '@domi/protocol'
 
@@ -15,12 +17,13 @@ export const DEFAULT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024
 /** 文本附件最多读多少进上下文 */
 const TEXT_LIMIT = 200_000
 
-export class AttachmentError extends Error {
+export class AttachmentError extends KeyedError {
   constructor(
-    message: string,
+    key: MessageKey,
+    params: Params,
     readonly reason: 'TOO_LARGE' | 'NOT_FOUND' | 'UNSUPPORTED_ATTACHMENT' | 'INVALID',
   ) {
-    super(message)
+    super(key, params)
     this.name = 'AttachmentError'
   }
 }
@@ -45,7 +48,12 @@ export class AttachmentStore {
   put(sessionId: string, file: { name: string; mime: string; data: Uint8Array }): UploadRef & { sha256: string } {
     if (file.data.byteLength > this.maxBytes) {
       throw new AttachmentError(
-        `「${file.name}」有 ${(file.data.byteLength / 1024 / 1024).toFixed(1)}MB，超过单个附件上限 ${Math.round(this.maxBytes / 1024 / 1024)}MB`,
+        'error.attachment.tooLarge',
+        {
+          name: file.name,
+          sizeMB: (file.data.byteLength / 1024 / 1024).toFixed(1),
+          maxMB: Math.round(this.maxBytes / 1024 / 1024),
+        },
         'TOO_LARGE',
       )
     }
@@ -62,9 +70,9 @@ export class AttachmentStore {
 
   /** 这个会话里有没有这个附件（提交前校验）。id 只许自己发的格式，防路径穿越 */
   get(sessionId: string, id: string): UploadRef {
-    if (!/^up-[a-z0-9]+$/.test(id)) throw new AttachmentError(`附件编号不对：${id}`, 'INVALID')
+    if (!/^up-[a-z0-9]+$/.test(id)) throw new AttachmentError('error.attachment.badId', { id }, 'INVALID')
     const meta = join(attachmentsDir(this.domiHome, sessionId), `${id}.json`)
-    if (!existsSync(meta)) throw new AttachmentError(`这个会话里没有附件 ${id}（先上传再提交）`, 'NOT_FOUND')
+    if (!existsSync(meta)) throw new AttachmentError('error.attachment.notFound', { id }, 'NOT_FOUND')
     const m = JSON.parse(readFileSync(meta, 'utf8')) as UploadRef
     return { id: m.id, name: m.name, mime: m.mime, size: m.size }
   }

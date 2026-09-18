@@ -39,6 +39,7 @@ import {
   MissingCredentialError,
   providerConnection,
 } from '@domi/config'
+import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import {
   aggregate,
   type ContextPolicy,
@@ -110,9 +111,9 @@ function changedThisTurn(events: readonly EventEnvelope[]): boolean {
  * 两种：权限确认（只要是/否），与工具要输入（form 不为空，回答可带内容）
  */
 /** 引用指向的会话不存在、或区间不成立（PRD-M3-005）。daemon 把它翻译成 INVALID_PARAMS */
-export class RefError extends Error {
-  constructor(message: string) {
-    super(message)
+export class RefError extends KeyedError {
+  constructor(key: MessageKey, params?: Params) {
+    super(key, params)
     this.name = 'RefError'
   }
 }
@@ -940,12 +941,12 @@ export class DomiSession {
   async checkRefs(refs: readonly RefLink[]): Promise<RefLink[]> {
     const out: RefLink[] = []
     for (const r of refs) {
-      if (!this.log.sessions.get(r.sessionId)) throw new RefError(`引用的会话不存在：${r.sessionId}`)
+      if (!this.log.sessions.get(r.sessionId)) throw new RefError('error.ref.noSession', { sessionId: r.sessionId })
       const head = this.log.viewOffset(r.sessionId) + (await this.log.head(r.sessionId))
       if (r.fromSeq < 1 || r.fromSeq > head) {
-        throw new RefError(`引用越界：会话 ${r.sessionId} 只有 ${head} 条，没有第 ${r.fromSeq} 条`)
+        throw new RefError('error.ref.outOfRange', { sessionId: r.sessionId, head, fromSeq: r.fromSeq })
       }
-      if (r.toSeq < r.fromSeq) throw new RefError(`引用的区间反了：${r.fromSeq}–${r.toSeq}`)
+      if (r.toSeq < r.fromSeq) throw new RefError('error.ref.reversed', { fromSeq: r.fromSeq, toSeq: r.toSeq })
       out.push({ sessionId: r.sessionId, fromSeq: r.fromSeq, toSeq: Math.min(r.toSeq, head) })
     }
     return out
@@ -1027,20 +1028,22 @@ export class DomiSession {
     const images = uploads.filter((u) => isImage(u.mime))
     if (images.length > 0 && !this.provider.capabilities.vision) {
       throw new AttachmentError(
-        `当前模型 ${this.currentModel} 不支持图片输入（${images.map((u) => u.name).join('、')}）。换一个支持图片的模型再发`,
+        'error.attachment.noVision',
+        { model: this.currentModel, names: images.map((u) => u.name).join(', ') },
         'UNSUPPORTED_ATTACHMENT',
       )
     }
     const files = (i.files ?? []).map((f) => {
       const rel = relative(this.opts.cwd, resolve(this.opts.cwd, f))
       if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
-        throw new AttachmentError(`引用的文件不在工作目录里：${f}`, 'INVALID')
+        throw new AttachmentError('error.attachment.fileOutside', { path: f }, 'INVALID')
       }
-      if (!existsSync(join(this.opts.cwd, rel))) throw new AttachmentError(`引用的文件不存在：${f}`, 'NOT_FOUND')
+      if (!existsSync(join(this.opts.cwd, rel)))
+        throw new AttachmentError('error.attachment.fileMissing', { path: f }, 'NOT_FOUND')
       return rel.split(sep).join('/')
     })
     const skills = (i.skills ?? []).map((name) => {
-      if (!this.skillSource?.get(name)) throw new AttachmentError(`没有这个技能：${name}`, 'NOT_FOUND')
+      if (!this.skillSource?.get(name)) throw new AttachmentError('error.attachment.noSkill', { name }, 'NOT_FOUND')
       return name
     })
     return { uploads, files, skills }

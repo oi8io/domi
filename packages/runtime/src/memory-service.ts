@@ -7,10 +7,12 @@
  * 所有写入先落事件（_memory 会话），L3 表是事件的投影（store 在同一个事务里投影）；
  * soul.md 是人也会改的文件，所以每次都现读现写，domi 写过什么由 L4 事件记着（INV-09）。
  */
+
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Tool } from '@domi/capability'
 import { type DomiConfig, providerConnection } from '@domi/config'
+import { KeyedError } from '@domi/i18n'
 import {
   applyImport,
   applySoulOps,
@@ -54,9 +56,9 @@ export interface MemoryServiceOptions {
 }
 
 /** 审阅列表里的一项 */
-export class SoulConflictError extends Error {
-  constructor(message: string) {
-    super(message)
+export class SoulConflictError extends KeyedError {
+  constructor() {
+    super('error.soul_conflict')
     this.name = 'SoulConflictError'
   }
 }
@@ -276,7 +278,7 @@ export class MemoryService {
       if (mtime !== undefined && existsSync(this.soulPath)) {
         const now = statSync(this.soulPath).mtimeMs
         if (Math.abs(now - mtime) > 1) {
-          throw new SoulConflictError('Soul 在你打开之后被改过（可能是 domi 刚更新，或者你在别处改了）。刷新看看再保存')
+          throw new SoulConflictError()
         }
       }
       mkdirSync(this.opts.soulDir, { recursive: true })

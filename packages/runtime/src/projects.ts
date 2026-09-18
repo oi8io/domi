@@ -6,15 +6,17 @@
  * 2. 都不是时，按「仓库根（向上找 .git）或这个目录本身」自动登记一个
  * 「像不像项目」只看 git 仓库与规矩文件，不读别的内容（远程客户端能触发这里）。
  */
+
 import { existsSync, mkdirSync, realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
+import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import type { ProjectRow, ProjectSettings, ProjectSummary, SqliteEventLog } from '@domi/store'
 import { findRepoRoot, RULES_FILE_NAMES } from './project.ts'
 
-export class ProjectError extends Error {
-  constructor(message: string) {
-    super(message)
+export class ProjectError extends KeyedError {
+  constructor(key: MessageKey, params?: Params) {
+    super(key, params)
     this.name = 'ProjectError'
   }
 }
@@ -26,9 +28,9 @@ export function normalizeDir(p: string): string {
   try {
     real = realpathSync(abs)
   } catch {
-    throw new ProjectError(`目录不存在：${p}`)
+    throw new ProjectError('error.project.dirMissing', { path: p })
   }
-  if (!statSync(real).isDirectory()) throw new ProjectError(`不是目录：${p}`)
+  if (!statSync(real).isDirectory()) throw new ProjectError('error.project.notDir', { path: p })
   return real.length > 1 && real.endsWith(sep) ? real.slice(0, -1) : real
 }
 
@@ -83,13 +85,13 @@ export class ProjectService {
 
   summary(id: string): ProjectSummary {
     const p = this.repo.list({ includeArchived: true, recent: 5 }).find((x) => x.id === id)
-    if (!p) throw new ProjectError(`项目不存在：${id}`)
+    if (!p) throw new ProjectError('error.project.notFound', { id })
     return p
   }
 
   get(id: string): ProjectRow {
     const p = this.repo.get(id)
-    if (!p) throw new ProjectError(`项目不存在：${id}`)
+    if (!p) throw new ProjectError('error.project.notFound', { id })
     return p
   }
 
@@ -137,7 +139,7 @@ export class ProjectService {
 
   update(id: string, patch: { name?: string; settings?: Partial<ProjectSettings> }): ProjectRow {
     const p = this.repo.update(id, patch)
-    if (!p) throw new ProjectError(`项目不存在：${id}`)
+    if (!p) throw new ProjectError('error.project.notFound', { id })
     return p
   }
 

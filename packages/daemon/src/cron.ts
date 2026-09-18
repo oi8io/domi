@@ -5,20 +5,20 @@
  * 不支持 `L` `W` `#` 与秒。日与周都限定时按 Vixie cron 的规矩取「或」。
  * 时区用 Intl 换算（不引依赖）：在 UTC 分钟上走，每一步看它在目标时区里是几月几日几点，按不匹配的那一级往前跳。
  */
+import { KeyedError, type MessageKey, type Params, ref } from '@domi/i18n'
 
 export type CronField = 'minute' | 'hour' | 'day' | 'month' | 'weekday'
 
-export class CronError extends Error {
+export class CronError extends KeyedError {
   constructor(
     readonly field: CronField | 'tz' | 'expression',
-    message: string,
+    key: MessageKey,
+    params?: Params,
   ) {
-    super(message)
+    super(key, params)
     this.name = 'CronError'
   }
 }
-
-const FIELD_LABEL: Record<CronField, string> = { minute: '分', hour: '时', day: '日', month: '月', weekday: '周' }
 const SPEC: Array<{ field: CronField; min: number; max: number; names?: string[] }> = [
   { field: 'minute', min: 0, max: 59 },
   { field: 'hour', min: 0, max: 23 },
@@ -45,25 +45,32 @@ export interface Cron {
 
 function parseField(text: string, spec: (typeof SPEC)[number]): Set<number> {
   const { field, min, max, names } = spec
-  const bad = (why: string): never => {
-    throw new CronError(field, `第 ${SPEC.indexOf(spec) + 1} 段（${FIELD_LABEL[field]}）「${text}」${why}`)
+  // 哪一段、哪一类问题都用文案引用：错误在 daemon 生成，端上按自己的语言重新渲染（PRD-M9-004 AC-4）
+  const bad = (why: MessageKey, extra: Params = {}): never => {
+    throw new CronError(field, 'error.cron.field', {
+      ...extra,
+      index: SPEC.indexOf(spec) + 1,
+      label: ref(`error.cron.label.${field}`),
+      text,
+      why: ref(why),
+    })
   }
   const num = (s: string): number => {
     const i = names?.indexOf(s.toLowerCase()) ?? -1
     if (i >= 0) return i + (field === 'month' ? 1 : 0)
-    if (!/^\d+$/.test(s)) return bad(`里的「${s}」不是数字`)
+    if (!/^\d+$/.test(s)) return bad('error.cron.why.notNumber', { s })
     const n = Number(s)
-    if (n < min || n > max) return bad(`超出范围 ${min}-${max}`)
+    if (n < min || n > max) return bad('error.cron.why.outOfRange', { min, max })
     return n
   }
   const out = new Set<number>()
   for (const part of text.split(',')) {
-    if (part === '') bad('有空的一项')
+    if (part === '') bad('error.cron.why.empty')
     const [range, stepText, extra] = part.split('/')
-    if (extra !== undefined) bad('里有多个 /')
+    if (extra !== undefined) bad('error.cron.why.multiSlash')
     let step = 1
     if (stepText !== undefined) {
-      if (!/^\d+$/.test(stepText) || Number(stepText) === 0) bad(`的步长「${stepText}」要是正整数`)
+      if (!/^\d+$/.test(stepText) || Number(stepText) === 0) bad('error.cron.why.step', { step: stepText })
       step = Number(stepText)
     }
     let lo: number
@@ -73,10 +80,10 @@ function parseField(text: string, spec: (typeof SPEC)[number]): Set<number> {
       hi = field === 'weekday' ? 6 : max
     } else {
       const [a, b, more] = (range as string).split('-')
-      if (more !== undefined) bad('的范围写法不对')
+      if (more !== undefined) bad('error.cron.why.badRange')
       lo = num(a as string)
       hi = b === undefined ? (stepText === undefined ? lo : field === 'weekday' ? 6 : max) : num(b)
-      if (hi < lo) bad(`的范围 ${lo}-${hi} 反了`)
+      if (hi < lo) bad('error.cron.why.reversed', { lo, hi })
     }
     for (let v = lo; v <= hi; v += step) out.add(field === 'weekday' && v === 7 ? 0 : v)
   }
@@ -86,7 +93,7 @@ function parseField(text: string, spec: (typeof SPEC)[number]): Set<number> {
 export function parseCron(expr: string): Cron {
   const parts = expr.trim().split(/\s+/)
   if (parts.length !== 5 || parts[0] === '') {
-    throw new CronError('expression', `要 5 段（分 时 日 月 周），这里是 ${parts[0] === '' ? 0 : parts.length} 段`)
+    throw new CronError('expression', 'error.cron.count', { count: parts[0] === '' ? 0 : parts.length })
   }
   const sets = SPEC.map((s, i) => parseField(parts[i] as string, s))
   return {
@@ -107,7 +114,7 @@ export function checkTimeZone(tz: string): void {
   try {
     formatter(tz)
   } catch {
-    throw new CronError('tz', `不认识的时区「${tz}」，例如 Asia/Shanghai、UTC`)
+    throw new CronError('tz', 'error.cron.tz', { tz })
   }
 }
 
@@ -198,6 +205,6 @@ export function previewCron(expr: string, tz: string, from: number, count = 3): 
     out.push(n)
     t = n
   }
-  if (out.length === 0) throw new CronError('day', '这个时间表永远不会触发（比如 2 月 30 日）')
+  if (out.length === 0) throw new CronError('day', 'error.cron.never')
   return out
 }

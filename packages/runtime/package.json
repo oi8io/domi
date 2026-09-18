@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@domi/i18n": "workspace:*",
     "@domi/capability": "workspace:*",
     "@domi/codeintel": "workspace:*",
     "@domi/config": "workspace:*",

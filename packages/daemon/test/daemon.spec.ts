@@ -5,14 +5,19 @@
  * 这三件是「多端」真正带来的新失败模式，其余的和单端没区别。
  */
 import { describe, expect, test } from 'bun:test'
+import { DomiRpcError } from '@domi/client-core'
+import { errorKeyData, localizeError, setLocale } from '@domi/i18n'
 import type { EventEnvelope, RpcNotification, RpcRequest, RpcResponse } from '@domi/protocol'
 import { PROTOCOL_VERSION } from '@domi/protocol'
 import {
   type ClientConn,
+  CronError,
   Daemon,
   type DaemonHost,
   type HostAsk,
   type HostMetrics,
+  HostRequestError,
+  parseCron,
   type SessionHandle,
   SessionNotFoundError,
   type SessionSummary,
@@ -572,5 +577,73 @@ describe('忙闲状态推给订阅者', () => {
       .filter((m) => 'method' in m && m.method === 'session.busy')
       .map((m) => ((m as RpcNotification).params as { busy: boolean }).busy)
     expect(busyMsgs).toEqual([true, false])
+  })
+})
+
+describe('PRD-M9-004 AC-4 · 错误带文案 key，端上按自己的语言渲染', () => {
+  test('daemon 的错误 data 里有 messageKey 与参数；同一个错误在英文端渲染成英文', async () => {
+    const { host } = makeHost()
+    const d = new Daemon(host)
+    const c = new FakeConn('c1')
+    await handshaked(d, c)
+    const r = await d.handle(c, req('session.nope'))
+    expect(r.error?.data).toMatchObject({ messageKey: 'error.unknown_method', params: { method: 'session.nope' } })
+    // daemon 自己按中文写 message（日志、老客户端看的就是它）
+    expect(r.error?.message).toContain('没有这个方法')
+    setLocale('en')
+    try {
+      const e = new DomiRpcError(r.error as NonNullable<typeof r.error>)
+      expect(e.message).toStartWith('No such method: session.nope')
+      expect(e.rawMessage).toContain('没有这个方法')
+    } finally {
+      setLocale('zh')
+    }
+  })
+
+  test('宿主抛出的领域错误（包在 HostRequestError / InvalidInputError 里）也带着 key', async () => {
+    const { host } = makeHost()
+    const d = new Daemon({
+      ...host,
+      async rename() {
+        throw HostRequestError.from(new CronError('tz', 'error.cron.tz', { tz: 'Mars/Base' }), {
+          reason: 'INVALID_CRON',
+        })
+      },
+    })
+    const c = new FakeConn('c1')
+    await handshaked(d, c)
+    const r = await d.handle(c, req('session.rename', { sessionId: 'x', title: 't' }))
+    expect(r.error?.data).toMatchObject({
+      reason: 'INVALID_CRON',
+      messageKey: 'error.cron.tz',
+      params: { tz: 'Mars/Base' },
+    })
+    setLocale('en')
+    try {
+      expect(new DomiRpcError(r.error as NonNullable<typeof r.error>).message).toBe(
+        'Unknown time zone "Mars/Base"; e.g. Asia/Shanghai, UTC',
+      )
+    } finally {
+      setLocale('zh')
+    }
+  })
+
+  test('嵌套引用的文案（cron 的「哪一段、什么问题」）在另一种语言里整句重新渲染', () => {
+    let err: unknown
+    try {
+      parseCron('61 * * * *')
+    } catch (e) {
+      err = e
+    }
+    const k = errorKeyData(err)
+    expect(k?.messageKey).toBe('error.cron.field')
+    setLocale('en')
+    try {
+      expect(localizeError('x', { messageKey: k?.messageKey, params: k?.params })).toBe(
+        'Field 1 (minute) "61" is out of range 0-59',
+      )
+    } finally {
+      setLocale('zh')
+    }
   })
 })

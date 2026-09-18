@@ -6,9 +6,11 @@
  * 这个顺序不是随便定的：出问题时人要能用一条 `DOMI_API_KEY=... domi` 临时绕开配置文件，
  * 反过来（文件覆盖环境变量）会让"我明明设了环境变量为什么没生效"变成常见困惑。
  */
+
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { t } from '@domi/i18n'
 import { ConfigParseError } from './errors.ts'
 import { providerConnection } from './providers.ts'
 import { ConfigSchema, type DomiConfig } from './schema.ts'
@@ -23,9 +25,8 @@ export class MissingCredentialError extends Error {
     /** 缺的是哪一家的 key。domid 在提交时报这个错（OPT-M8-001），界面据此引导去设置页 */
     readonly provider?: string,
   ) {
-    super(
-      `error.missing_credential: 没有找到模型凭据。设置 ${envNames.join(' 或 ')}，或写进 ~/.domi/config.yaml（model.api_key）。`,
-    )
+    // 前缀是文案 key：preflight 原样打印，测试与脚本都认它（PRD-M0-008 AC-3）；后半句随界面语言
+    super(`error.missing_credential: ${t('error.no_credential', { envNames: envNames.join(' / ') })}`)
     this.name = 'MissingCredentialError'
   }
 }

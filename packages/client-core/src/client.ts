@@ -13,7 +13,7 @@
  *    于是断开期间 daemon 上发生的事一条不漏地补回来。
  * 3. **去重**。同一个 seq 只进一次 store——投影是追加式的，重复一次就是重复一条消息。
  */
-import { tr } from '@domi/i18n'
+import { localizeError, tr } from '@domi/i18n'
 import {
   type EventEnvelope,
   type MethodName,
@@ -44,8 +44,12 @@ export type ConnectionState = 'idle' | 'connecting' | 'open' | 'reconnecting' | 
 export class DomiRpcError extends Error {
   readonly code: RpcError['code']
   readonly data: Record<string, unknown> | undefined
+  /** daemon 给的原文（它自己那个语言） */
+  readonly rawMessage: string
   constructor(err: RpcError) {
-    super(err.message)
+    // daemon 给了文案 key 就按这一端的语言渲染（PRD-M9-004 AC-4）；原文留在 data 之外的 rawMessage 里
+    super(localizeError(err.message, err.data))
+    this.rawMessage = err.message
     this.name = 'DomiRpcError'
     this.code = err.code
     this.data = err.data

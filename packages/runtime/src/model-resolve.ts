@@ -9,6 +9,7 @@
  *   4. 没有一家有 → 报错，提示去设置页添加
  * 「有」查的是 model.list 的同一份清单（探测 + 手填 + 默认模型），所以探测失败时也能按手填清单归属。
  */
+import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import type { ModelEntry } from './model-catalog.ts'
 
 export type ResolveResult =
@@ -32,13 +33,14 @@ export function resolveModel(models: readonly ModelEntry[], name: string, defaul
   return { kind: 'unresolved', name: want }
 }
 
-export class ModelResolveError extends Error {
+export class ModelResolveError extends KeyedError {
   constructor(
-    message: string,
+    key: MessageKey,
+    params: Params,
     readonly reason: 'MODEL_UNRESOLVED' | 'AMBIGUOUS' | 'PROVIDER_UNAVAILABLE',
     readonly detail: Record<string, unknown> = {},
   ) {
-    super(message)
+    super(key, params)
     this.name = 'ModelResolveError'
   }
 }
@@ -48,14 +50,11 @@ export function assertResolved(r: ResolveResult): { provider: string; name: stri
   if (r.kind === 'ok') return { provider: r.provider, name: r.name }
   if (r.kind === 'ambiguous') {
     throw new ModelResolveError(
-      `「${r.name}」在好几家供应商下都有：${r.candidates.map((c) => c.providerName).join('、')}。从下拉里选具体哪一个。`,
+      'error.model.ambiguous',
+      { name: r.name, providers: r.candidates.map((c) => c.providerName).join(', ') },
       'AMBIGUOUS',
       { name: r.name, candidates: r.candidates },
     )
   }
-  throw new ModelResolveError(
-    `没有哪家启用的供应商提供「${r.name}」。到「设置 › 模型供应商」里添加它（手填模型或重新探测）。`,
-    'MODEL_UNRESOLVED',
-    { name: r.name },
-  )
+  throw new ModelResolveError('error.model.unresolved', { name: r.name }, 'MODEL_UNRESOLVED', { name: r.name })
 }

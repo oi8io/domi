@@ -12,9 +12,11 @@
  * M9（PRD-M9-002 AC-8）：provider 不再是写死的四家，而是任意 id 下固定的一组字段；`providers.<id>: null` 删掉整条（连同 secrets 里的 key）。
  * 默认模型所在的那一家不能停用、不能删（AC-5）。
  */
+
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import { isMap, parseDocument } from 'yaml'
 import { ConfigParseError } from './errors.ts'
 import {
@@ -92,9 +94,16 @@ export class ConfigWriteError extends Error {
     message: string,
     /** 结构化原因，协议里放进 data.reason（例如 DEFAULT_PROVIDER） */
     readonly reason?: string,
+    options?: { cause?: unknown },
   ) {
-    super(message)
+    super(message, options)
     this.name = 'ConfigWriteError'
+  }
+
+  /** 由文案 key 构造（PRD-M9-004 AC-4）：key 随错误走，端上按自己的语言渲染 */
+  static keyed(key: MessageKey, params?: Params, reason?: string): ConfigWriteError {
+    const cause = new KeyedError(key, params)
+    return new ConfigWriteError(cause.message, reason, { cause })
   }
 }
 
@@ -141,9 +150,8 @@ export function writeConfigPatch(patch: ConfigPatch, opts: LoadOptions = {}): Wr
   const src = configSource(opts)
   const existing = new Set(Object.keys((readConfigFile(src).providers ?? {}) as Record<string, unknown>))
   const denied = keys.filter((k) => !isWritable(k, patch[k], existing))
-  if (denied.length > 0) throw new ConfigWriteError(`这些设置不能从这里改：${denied.join('、')}`)
-  if (src.legacy)
-    throw new ConfigWriteError(`配置还是旧的 TOML 格式（${src.path}），先迁移成 YAML：domi init --from-toml`)
+  if (denied.length > 0) throw ConfigWriteError.keyed('error.config.denied', { keys: denied.join(', ') })
+  if (src.legacy) throw ConfigWriteError.keyed('error.config.legacyToml', { path: src.path })
   const sPath = secretsPath(dirname(src.path))
 
   // 删整条 provider：config 里那一节删掉，secrets 里那一家的 key 也删掉
@@ -154,7 +162,7 @@ export function writeConfigPatch(patch: ConfigPatch, opts: LoadOptions = {}): Wr
     ...removed.map((id) => [`providers.${id}`, null] as [string, unknown]),
   ]
   for (const [k, v] of secret) {
-    if (v !== null && typeof v !== 'string') throw new ConfigWriteError(`${k} 必须是字符串`)
+    if (v !== null && typeof v !== 'string') throw ConfigWriteError.keyed('error.config.notString', { key: k })
   }
 
   const oldConfig = src.exists ? readFileSync(src.path, 'utf8') : ''
@@ -170,10 +178,7 @@ export function writeConfigPatch(patch: ConfigPatch, opts: LoadOptions = {}): Wr
   // 默认模型所在的那一家不能停用、不能删（PRD-M9-002 AC-5）——先换默认模型
   const def = next.model.provider
   if (removed.includes(def) || next.providers[def]?.enabled === false) {
-    throw new ConfigWriteError(
-      `「${def}」是默认模型所在的供应商，不能停用或删除。先把默认模型换到别家。`,
-      'DEFAULT_PROVIDER',
-    )
+    throw ConfigWriteError.keyed('error.config.defaultProvider', { provider: def }, 'DEFAULT_PROVIDER')
   }
 
   const configChanged = newConfig !== oldConfig

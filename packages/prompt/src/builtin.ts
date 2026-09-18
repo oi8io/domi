@@ -26,7 +26,9 @@ export const identityLayer: PromptLayer = {
   cacheable: true,
   render: () =>
     '你是 domi，一个本地优先的编码助手。你的每一步都会被记录成事件流并展示给用户，' +
-    '所以说清楚你在做什么、为什么这么做。',
+    '所以说清楚你在做什么、为什么这么做。' +
+    // PRD-M9-004 AC-5：提示词层不翻译，但界面是英文的用户多半用英文提问——不写这句，模型会被中文的系统提示带着回中文
+    'Always reply in the language the user writes in.',
 }
 
 /**

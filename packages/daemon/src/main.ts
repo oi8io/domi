@@ -14,6 +14,7 @@ import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { credentialEnvNames, loadConfig, providerConnection } from '@domi/config'
+import { envLocaleHints, resolveLocale, setLocale } from '@domi/i18n'
 import { McpHub } from '@domi/mcp'
 import { PluginHost } from '@domi/plugin'
 import { type RejectedConnection, resolveServerSettings } from './auth.ts'
@@ -33,6 +34,8 @@ export async function main(env: Record<string, string | undefined> = process.env
   mkdirSync(home, { recursive: true })
   // 没 key 也照样起（OPT-M8-001）：第一把 key 要能在 Web 设置页里填，缺 key 留到提交时报 error.missing_credential
   const config = loadConfig({ env, home: env.HOME ?? homedir() })
+  // domid 自己的语言（PRD-M9-004）：日志、系统通知、老客户端看到的错误原文用它；端上按各自的语言重新渲染错误
+  setLocale(resolveLocale(config.ui.locale, envLocaleHints(env)))
   const server = resolveServerSettings({ config, env, home: env.HOME ?? homedir() })
   const requestedPort = server.port
 

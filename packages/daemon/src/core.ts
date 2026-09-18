@@ -13,6 +13,7 @@
  *    直接回 `SESSION_BUSY` —— 排队会让用户以为没发出去，丢弃会让他以为发出去了。
  */
 import { VENDORS } from '@domi/config'
+import { errorKeyData, KeyedError, type MessageKey, type Params, ref, tr } from '@domi/i18n'
 import {
   type EventEnvelope,
   fail,
@@ -73,29 +74,29 @@ const SYSTEM_CONN: ClientConn = { id: '_scheduler', send() {} }
  * 其它异常（配置坏了、库打不开）原样作为 INTERNAL 带回去——
  * 把一切打不开都说成「没有这个会话」，用户会去找一个本来就存在的东西。
  */
-export class SessionNotFoundError extends Error {
+export class SessionNotFoundError extends KeyedError {
   constructor(readonly sessionId: string) {
-    super(`没有这个会话：${sessionId}`)
+    super('error.session_not_found', { sessionId })
     this.name = 'SessionNotFoundError'
   }
 }
 
 /** 分叉点不在会话里（比 head 大）。翻译成 INVALID_PARAMS：是请求错了，不是会话没了 */
-export class BranchPointError extends Error {
+export class BranchPointError extends KeyedError {
   constructor(
     readonly sessionId: string,
     readonly atSeq: number,
     readonly head: number,
   ) {
-    super(`分叉点越界：会话 ${sessionId} 只有 ${head} 条，没有第 ${atSeq} 条`)
+    super('error.branch_out_of_range', { sessionId, head, atSeq })
     this.name = 'BranchPointError'
   }
 }
 
 /** 跨会话引用不成立。翻译成 INVALID_PARAMS */
 export class InvalidRefError extends Error {
-  constructor(message: string) {
-    super(message)
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
     this.name = 'InvalidRefError'
   }
 }
@@ -141,9 +142,22 @@ export class InvalidInputError extends Error {
     readonly reason: string,
     /** 额外的结构化细节，并进错误响应的 data */
     readonly detail?: Record<string, unknown>,
+    /** 带文案 key 的原因（PRD-M9-004 AC-4），key 从这里取 */
+    options?: { cause?: unknown },
   ) {
-    super(message)
+    super(message, options)
     this.name = 'InvalidInputError'
+  }
+
+  /** 由文案 key 构造（message 按 daemon 的语言渲染，key 随错误走） */
+  static keyed(reason: string, key: MessageKey, params?: Params, detail?: Record<string, unknown>): InvalidInputError {
+    const cause = new KeyedError(key, params)
+    return new InvalidInputError(cause.message, reason, detail, { cause })
+  }
+
+  /** 包一个已有的错误：message 照抄，key（如果有）跟着走 */
+  static from(e: Error, reason: string, detail?: Record<string, unknown>): InvalidInputError {
+    return new InvalidInputError(e.message, reason, detail, { cause: e })
   }
 }
 
@@ -248,10 +262,38 @@ export class HostRequestError extends Error {
     message: string,
     /** 结构化细节，原样放进错误响应的 data */
     readonly data?: Record<string, unknown>,
+    /** 带文案 key 的原因（PRD-M9-004 AC-4），key 从这里取 */
+    options?: { cause?: unknown },
   ) {
-    super(message)
+    super(message, options)
     this.name = 'HostRequestError'
   }
+
+  static keyed(key: MessageKey, params?: Params, data?: Record<string, unknown>): HostRequestError {
+    const cause = new KeyedError(key, params)
+    return new HostRequestError(cause.message, data, { cause })
+  }
+
+  /** 包一个已有的错误：message 照抄，key（如果有）跟着走 */
+  static from(e: Error, data?: Record<string, unknown>): HostRequestError {
+    return new HostRequestError(e.message, data, { cause: e })
+  }
+}
+
+/** 带文案 key 的协议错误（PRD-M9-004 AC-4）：message 按 daemon 的语言，data 里带 key 与参数 */
+function failKey(
+  id: string | number,
+  code: Parameters<typeof fail>[1],
+  key: MessageKey,
+  params: Params = {},
+  data: Record<string, unknown> = {},
+): ReturnType<typeof fail> {
+  return fail(id, code, tr(key, params), { ...data, messageKey: key, params })
+}
+
+/** 老宿主缺某项能力 */
+function unsupported(id: string | number, feature: string): ReturnType<typeof fail> {
+  return failKey(id, 'INTERNAL', 'error.unsupported', { feature: ref(`error.feature.${feature}` as MessageKey) })
 }
 
 /** 隔离工作区（PRD-M7-006） */
@@ -419,10 +461,13 @@ export class Daemon {
   async handle(conn: ClientConn, req: RpcRequest): Promise<RpcResponse> {
     const method = req.method as MethodName
     if (!(METHOD_NAMES as string[]).includes(method)) {
-      return fail(req.id, 'UNKNOWN_METHOD', `没有这个方法：${req.method}\n可用：${METHOD_NAMES.join(', ')}`)
+      return failKey(req.id, 'UNKNOWN_METHOD', 'error.unknown_method', {
+        method: req.method,
+        available: METHOD_NAMES.join(', '),
+      })
     }
     if (method !== 'handshake' && !this.handshaked.has(conn.id)) {
-      return fail(req.id, 'NOT_HANDSHAKED', '第一个请求必须是 handshake（PRD-M3-001 AC-2）')
+      return failKey(req.id, 'NOT_HANDSHAKED', 'error.not_handshaked')
     }
 
     const parsed = METHODS[method].params.safeParse(req.params ?? {})
@@ -443,7 +488,9 @@ export class Daemon {
       }
       return res
     } catch (e) {
-      if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message)
+      // 错误带着文案 key（PRD-M9-004 AC-4）：放进 data，端上按自己的语言渲染
+      const keyed = errorKeyData(e)
+      if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message, keyed)
       if (
         e instanceof BranchPointError ||
         e instanceof InvalidRefError ||
@@ -451,13 +498,16 @@ export class Daemon {
         e instanceof HostRequestError ||
         e instanceof ScheduleNotFoundError
       ) {
-        return fail(req.id, 'INVALID_PARAMS', e.message, e instanceof HostRequestError ? e.data : undefined)
+        return fail(req.id, 'INVALID_PARAMS', e.message, {
+          ...(e instanceof HostRequestError ? e.data : {}),
+          ...keyed,
+        })
       }
       if (e instanceof InvalidInputError) {
-        return fail(req.id, 'INVALID_PARAMS', e.message, { ...e.detail, reason: e.reason })
+        return fail(req.id, 'INVALID_PARAMS', e.message, { ...e.detail, reason: e.reason, ...keyed })
       }
-      if (e instanceof ScheduleBusyError) return fail(req.id, 'SESSION_BUSY', e.message)
-      return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e))
+      if (e instanceof ScheduleBusyError) return fail(req.id, 'SESSION_BUSY', e.message, keyed)
+      return fail(req.id, 'INTERNAL', e instanceof Error ? e.message : String(e), keyed)
     }
   }
 
@@ -514,7 +564,7 @@ export class Daemon {
 
   private async scheduleCall(method: MethodName, params: unknown): Promise<unknown> {
     const h = this.host.schedules
-    if (!h) throw new HostRequestError('这个 domid 不支持定时任务')
+    if (!h) throw HostRequestError.keyed('error.unsupported', { feature: ref('error.feature.schedules') })
     const p = params as Record<string, unknown>
     const changed = <T>(v: T): T => {
       this.scheduler?.reschedule()
@@ -531,7 +581,7 @@ export class Daemon {
         await h.remove(p.id as string)
         return changed({ ok: true })
       case 'schedule.runNow': {
-        if (!this.scheduler) throw new HostRequestError('调度器没有启动')
+        if (!this.scheduler) throw HostRequestError.keyed('error.scheduler_off')
         return { sessionId: await this.scheduler.runNow(p.id as string) }
       }
       case 'schedule.runs': {
@@ -625,14 +675,14 @@ export class Daemon {
 
       case 'session.rename': {
         const p = params as { sessionId: string; title: string }
-        if (!this.host.rename) return fail(req.id, 'INTERNAL', '这个 domid 不支持改标题')
+        if (!this.host.rename) return unsupported(req.id, 'rename')
         await this.host.rename(p.sessionId, p.title.trim())
         return ok(req.id, { ok: true })
       }
 
       case 'task.create': {
         const p = params as { projectId: string; goal: string }
-        if (!this.host.createTask) return fail(req.id, 'INTERNAL', '这个 domid 不支持按目标建任务')
+        if (!this.host.createTask) return unsupported(req.id, 'createTask')
         const r = await this.host.createTask(p)
         const submitted = await this.dispatch(conn, req, 'session.submit', {
           sessionId: r.sessionId,
@@ -645,7 +695,7 @@ export class Daemon {
       case 'session.toTask': {
         const p = params as { sessionId: string; projectId: string; goal: string }
         const from = (await this.host.list({ includeDeleted: true })).find((x) => x.id === p.sessionId)
-        if (!from) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
+        if (!from) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
         const id = await this.host.create(undefined, { kind: 'task', projectId: p.projectId })
         // 引用原会话全文（终点给大，daemon 截到末尾）；走和普通提交同一条路
         const submitted = await this.dispatch(conn, req, 'session.submit', {
@@ -660,14 +710,14 @@ export class Daemon {
       case 'config.get':
       case 'config.set': {
         const h = this.host.config
-        if (!h) return fail(req.id, 'INTERNAL', '这个 domid 不支持从这里改配置')
+        if (!h) return unsupported(req.id, 'config')
         if (method === 'config.get') return ok(req.id, await h.get())
         return ok(req.id, await h.set((params as { patch: Record<string, unknown> }).patch))
       }
 
       case 'model.resolve': {
         const h = this.host.composer
-        if (!h?.resolveModel) return fail(req.id, 'INTERNAL', '这个 domid 不支持按名字归属模型')
+        if (!h?.resolveModel) return unsupported(req.id, 'resolveModel')
         return ok(req.id, await h.resolveModel((params as { name: string }).name))
       }
 
@@ -686,7 +736,7 @@ export class Daemon {
 
       case 'usage.summary': {
         const p = params as { from: number; to: number }
-        if (!this.host.usage) return fail(req.id, 'INTERNAL', '这个 domid 不支持用量统计')
+        if (!this.host.usage) return unsupported(req.id, 'usage')
         return ok(req.id, await this.host.usage(p.from, p.to))
       }
 
@@ -695,7 +745,7 @@ export class Daemon {
       case 'skill.list':
       case 'model.list': {
         const h = this.host.composer
-        if (!h) return fail(req.id, 'INTERNAL', '这个 domid 不支持附件与文件引用')
+        if (!h) return unsupported(req.id, 'composer')
         const p = params as Record<string, unknown>
         switch (method) {
           case 'fs.list':
@@ -736,7 +786,7 @@ export class Daemon {
       case 'project.archive':
       case 'project.resolve': {
         const h = this.host.projects
-        if (!h) return fail(req.id, 'INTERNAL', '这个 domid 不支持项目')
+        if (!h) return unsupported(req.id, 'projects')
         const p = params as Record<string, unknown>
         if (method === 'project.list') {
           return ok(req.id, {
@@ -761,7 +811,7 @@ export class Daemon {
 
       case 'session.delete': {
         const p = params as { sessionId: string }
-        if (this.isBusy(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正在处理，等它停下来再删')
+        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.delete')
         await this.host.remove(p.sessionId)
         const open = this.sessions.get(p.sessionId)
         this.sessions.delete(p.sessionId)
@@ -805,7 +855,7 @@ export class Daemon {
         if (method === 'plugin.list') return ok(req.id, await pl.list())
         const p = params as { plugin: string; id: string }
         const html = await pl.ui(p.plugin, p.id)
-        if (html === null) return fail(req.id, 'INVALID_PARAMS', `没有插件面板 ${p.plugin}/${p.id}`)
+        if (html === null) return failKey(req.id, 'INVALID_PARAMS', 'error.no_panel', { plugin: p.plugin, id: p.id })
         return ok(req.id, { html })
       }
 
@@ -831,14 +881,14 @@ export class Daemon {
       case 'session.switchModel': {
         const p = params as { sessionId: string; model: string; provider?: string }
         // 一轮进行到一半换模型，后半轮和前半轮就不是同一个模型答的了
-        if (this.isBusy(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正在处理，等这一轮结束再切')
+        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.switch')
         const session = await this.session(p.sessionId)
-        if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
         return ok(req.id, await session.switchModel(p.model, p.provider))
       }
 
       case 'review.start': {
-        if (!this.host.review) return fail(req.id, 'INTERNAL', '这个 domid 不支持审阅')
+        if (!this.host.review) return unsupported(req.id, 'review')
         const p = params as { cwd?: string; base?: string; specs?: string[]; fromSessionId?: string }
         return ok(req.id, { sessionId: await this.host.review(p) })
       }
@@ -846,25 +896,25 @@ export class Daemon {
       case 'session.budget': {
         const p = params as { sessionId: string; budget: { tokens?: number; costUsd?: number; toolCalls?: number } }
         const session = await this.session(p.sessionId)
-        if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
-        if (!session.setBudget) return fail(req.id, 'INTERNAL', '这个 domid 不支持用量上限')
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
+        if (!session.setBudget) return unsupported(req.id, 'budget')
         await session.setBudget(p.budget)
         return ok(req.id, { ok: true })
       }
 
       case 'session.mode': {
         const p = params as { sessionId: string; mode: 'plan' | 'act' }
-        if (this.isBusy(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正在处理，等这一轮结束再切')
+        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.switch')
         const session = await this.session(p.sessionId)
-        if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
-        if (!session.setMode) return fail(req.id, 'INTERNAL', '这个 domid 不支持计划模式')
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
+        if (!session.setMode) return unsupported(req.id, 'planMode')
         return ok(req.id, await session.setMode(p.mode))
       }
 
       case 'session.create': {
         const p = params as { cwd?: string; isolate?: boolean; kind?: 'chat' | 'task'; projectId?: string }
         if (p.isolate) {
-          if (!this.host.worktrees) return fail(req.id, 'INTERNAL', '这个 domid 不支持隔离工作区')
+          if (!this.host.worktrees) return unsupported(req.id, 'worktrees')
           return ok(req.id, await this.host.worktrees.create(p.cwd))
         }
         const opts: CreateOptions = {
@@ -879,7 +929,7 @@ export class Daemon {
       case 'worktree.restore':
       case 'worktree.apply': {
         const w = this.host.worktrees
-        if (!w) return fail(req.id, 'INTERNAL', '这个 domid 不支持隔离工作区')
+        if (!w) return unsupported(req.id, 'worktrees')
         const p = params as {
           sessionId: string
           path?: string
@@ -889,7 +939,7 @@ export class Daemon {
         }
         if (method === 'worktree.diff') return ok(req.id, await w.diff(p.sessionId))
         // 改工作区的操作和会话里的一轮互斥：模型正在改文件时丢弃 / 带回，结果说不清
-        if (this.isBusy(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正在处理，等这一轮结束再操作')
+        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.operate')
         if (method === 'worktree.discard') return ok(req.id, { trash: await w.discard(p.sessionId, p.path as string) })
         if (method === 'worktree.restore') return ok(req.id, { path: await w.restore(p.sessionId, p.trash as string) })
         return ok(req.id, await w.apply(p.sessionId, p.mode ?? 'squash', p.message))
@@ -898,7 +948,7 @@ export class Daemon {
       case 'session.subscribe': {
         const p = params as { sessionId: string; fromSeq: number }
         const session = await this.session(p.sessionId)
-        if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
 
         const list = this.subs.get(p.sessionId) ?? []
         const existing = list.find((s) => s.conn.id === conn.id)
@@ -947,7 +997,7 @@ export class Daemon {
         // 这是 M3-004 存在的理由本身，而它是被那条十客户端的测试抓出来的，不是想出来的。
         if (this.busy.has(p.sessionId)) {
           // 不排队也不丢弃：排队让用户以为没发出去，丢弃让他以为发出去了（AC-3）
-          return fail(req.id, 'SESSION_BUSY', '这个会话正在处理上一条输入，稍后再试')
+          return failKey(req.id, 'SESSION_BUSY', 'error.busy.submit')
         }
         this.busy.add(p.sessionId)
 
@@ -959,11 +1009,13 @@ export class Daemon {
           if (session?.checkReady) await session.checkReady()
           // 引用要在接受之前校验：接受之后的错误只会被吞掉，用户以为引用成功了
           if (session && p.refs && p.refs.length > 0) {
-            if (!session.checkRefs) throw new InvalidRefError('这个 daemon 不支持跨会话引用')
+            if (!session.checkRefs)
+              throw new InvalidRefError(tr('error.unsupported', { feature: tr('error.feature.refs') }))
             refs = await session.checkRefs(p.refs)
           }
           if (session && hasExtras(p)) {
-            if (!session.checkInputs) throw new InvalidInputError('这个 daemon 不支持附件与文件引用', 'INVALID')
+            if (!session.checkInputs)
+              throw InvalidInputError.keyed('INVALID', 'error.unsupported', { feature: ref('error.feature.composer') })
             await session.checkInputs(extrasOf(p))
           }
         } catch (e) {
@@ -972,7 +1024,7 @@ export class Daemon {
         }
         if (!session) {
           this.busy.delete(p.sessionId)
-          return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
+          return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
         }
 
         // **不 await**：提交是异步的，客户端拿到 accepted 就该回去等事件推送。
@@ -987,8 +1039,8 @@ export class Daemon {
       case 'session.compact': {
         const p = params as { sessionId: string }
         const session = await this.session(p.sessionId)
-        if (!session) return fail(req.id, 'SESSION_NOT_FOUND', `没有这个会话：${p.sessionId}`)
-        if (this.busy.has(p.sessionId)) return fail(req.id, 'SESSION_BUSY', '这个会话正忙')
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
+        if (this.busy.has(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy')
         return ok(req.id, await session.compactNow('manual'))
       }
 
@@ -1019,7 +1071,7 @@ export class Daemon {
       }
 
       default:
-        return fail(req.id, 'UNKNOWN_METHOD', `未实现：${method}`)
+        return failKey(req.id, 'UNKNOWN_METHOD', 'error.not_implemented', { method })
     }
   }
 

@@ -4,10 +4,12 @@
  * 一个只读的新会话：输入是改动 diff 与需求文档，**不带发起会话的任何历史**——
  * 没看过实现过程的眼睛才问得出实现者想不到的问题（PROCESS.md 验收环节的同一个立场）。
  */
+
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { Tool } from '@domi/capability'
+import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import { z } from 'zod'
 
 export const REVIEW_PREFIX = 'review-'
@@ -40,9 +42,9 @@ export function makeReviewReportTool(): Tool<z.infer<typeof ReviewReportArgs>, {
   }
 }
 
-export class ReviewInputError extends Error {
-  constructor(message: string) {
-    super(message)
+export class ReviewInputError extends KeyedError {
+  constructor(key: MessageKey, params?: Params) {
+    super(key, params)
     this.name = 'ReviewInputError'
   }
 }
@@ -50,13 +52,14 @@ export class ReviewInputError extends Error {
 /** 相对 base（默认 HEAD）的改动，含未跟踪文件 */
 export function collectDiff(cwd: string, base = 'HEAD'): string {
   const inRepo = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8' })
-  if (inRepo.status !== 0) throw new ReviewInputError(`${cwd} 不在 git 仓库里，没有 diff 可审`)
+  if (inRepo.status !== 0) throw new ReviewInputError('error.review.notGit', { cwd })
   const tracked = spawnSync('git', ['diff', '--no-color', base, '--'], {
     cwd,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   })
-  if (tracked.status !== 0) throw new ReviewInputError(`git diff ${base} 失败：${(tracked.stderr ?? '').trim()}`)
+  if (tracked.status !== 0)
+    throw new ReviewInputError('error.review.diffFailed', { base, detail: (tracked.stderr ?? '').trim() })
   let out = tracked.stdout
   const untracked = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd, encoding: 'utf8' })
   for (const f of (untracked.stdout ?? '').split('\0').filter(Boolean)) {
@@ -65,14 +68,14 @@ export function collectDiff(cwd: string, base = 'HEAD'): string {
       encoding: 'utf8',
     }).stdout
   }
-  if (out.trim() === '') throw new ReviewInputError(`相对 ${base} 没有任何改动，没什么可审的`)
+  if (out.trim() === '') throw new ReviewInputError('error.review.noChanges', { base })
   return out.length > DIFF_MAX ? `${out.slice(0, DIFF_MAX)}\n…（diff 太长，已截断；需要时用 fs.read 看完整文件）` : out
 }
 
 export function readSpecs(cwd: string, specs: readonly string[]): Array<{ path: string; text: string }> {
   return specs.map((p) => {
     const abs = isAbsolute(p) ? p : join(cwd, p)
-    if (!existsSync(abs)) throw new ReviewInputError(`需求文档不存在：${p}`)
+    if (!existsSync(abs)) throw new ReviewInputError('error.review.noSpec', { path: p })
     const t = readFileSync(abs, 'utf8')
     return { path: p, text: t.length > SPEC_MAX ? `${t.slice(0, SPEC_MAX)}\n…（已截断）` : t }
   })
