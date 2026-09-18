@@ -6,7 +6,7 @@ import { useTheme } from '../theme.ts'
  * 对话流 —— PRD-M0-005 · PRD-M8-014 AC-2（样式按 docs/ui-redesign/tui.html）。
  * 前缀是单宽字符（📁🔍 之类在部分终端里宽度算错，会让整行错位）。
  */
-const PREFIX: Record<TranscriptItem['kind'], string> = {
+export const PREFIX: Record<TranscriptItem['kind'], string> = {
   user: '›',
   assistant: '✓',
   reason: '·',
