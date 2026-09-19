@@ -152,7 +152,15 @@ export const ConfigSchema = z.object({
     })
     .default({ accent: 'blue', locale: 'auto' }),
   /** TUI 深浅（PRD-M8-014 AC-6）。auto 读 COLORFGBG */
-  tui: z.object({ theme: z.enum(['auto', 'dark', 'light']).default('auto') }).default({ theme: 'auto' }),
+  tui: z
+    .object({
+      theme: z.enum(['auto', 'dark', 'light']).default('auto'),
+      /** 渲染方式（PRD-M9-005 AC-1）。fullscreen = 备用屏 + 内部滚动；classic = 留在普通屏，靠终端回滚 */
+      renderer: z.enum(['fullscreen', 'classic']).default('fullscreen'),
+      /** fullscreen 下是否开鼠标上报（滚轮滚对话区）。关掉后终端自己的鼠标选择照常可用 */
+      mouse: z.boolean().default(true),
+    })
+    .default({ theme: 'auto', renderer: 'fullscreen', mouse: true }),
   /**
    * 钩子（PRD-M7-003 · ADR-025）。**只从这个文件读**，仓库里的任何文件都注册不了钩子。
    * pre：权限允许之后、执行之前，非 0 退出 = 拦下；post：执行之后，输出附在结果上；stop：一轮结束后

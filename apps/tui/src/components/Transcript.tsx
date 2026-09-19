@@ -1,7 +1,9 @@
 import type { TranscriptItem } from '@domi/client-core'
 import { tr } from '@domi/i18n'
-import { Box, Text } from 'ink'
-import { useTheme } from '../theme.ts'
+import { Box, renderToString, Static, Text } from 'ink'
+import { useEffect, useState } from 'react'
+import { scrollbarColumn, visibleRange } from '../render/viewport.ts'
+import { ThemeContext, type TuiTheme, useTheme } from '../theme.ts'
 
 /**
  * 对话流 —— PRD-M0-005 · PRD-M8-014 AC-2（样式按 docs/ui-redesign/tui.html）。
@@ -26,7 +28,7 @@ export function toolMeta(result: TranscriptItem | undefined): string {
   return result.ms === undefined ? state : `${state} · ${result.ms}ms`
 }
 
-function Line({ item, next }: { item: TranscriptItem; next: TranscriptItem | undefined }): React.ReactElement {
+export function Line({ item, next }: { item: TranscriptItem; next: TranscriptItem | undefined }): React.ReactElement {
   const t = useTheme()
   const prefix = PREFIX[item.kind]
   switch (item.kind) {
@@ -115,6 +117,131 @@ export function Transcript({ items }: { items: TranscriptItem[] }): React.ReactE
       {items.map((item, i) => (
         <Line key={item.seq} item={item} next={item.kind === 'tool-call' ? resultAfter(items, i) : undefined} />
       ))}
+    </Box>
+  )
+}
+
+/**
+ * classic 渲染器（PRD-M9-005 AC-5）：已经定型的条目进 <Static>——只输出一次，之后留在终端原生回滚区里，不再重绘；
+ * 只有还可能变的尾巴（流式追加的最后一条、还没结果的工具调用）参与每一帧的重绘。长会话不再每个 delta 重画整段历史
+ */
+export function settledCount(items: readonly TranscriptItem[]): number {
+  for (let i = 0; i < items.length; i++) {
+    if (i === items.length - 1) return i
+    if ((items[i] as TranscriptItem).kind === 'tool-call' && resultAfter(items, i) === undefined) return i
+  }
+  return items.length
+}
+
+export function ClassicTranscript({ items }: { items: TranscriptItem[] }): React.ReactElement {
+  const n = settledCount(items)
+  const settled = items.slice(0, n)
+  return (
+    <>
+      <Static items={settled}>
+        {(item, i) => (
+          <Line key={item.seq} item={item} next={item.kind === 'tool-call' ? resultAfter(items, i) : undefined} />
+        )}
+      </Static>
+      <Box flexDirection="column">
+        {items.slice(n).map((item, j) => (
+          <Line key={item.seq} item={item} next={item.kind === 'tool-call' ? resultAfter(items, n + j) : undefined} />
+        ))}
+      </Box>
+    </>
+  )
+}
+
+/**
+ * 一条条目在给定宽度下折成的显示行（带颜色的 ANSI 串）。用 Ink 自己的 renderToString 渲染同一个 <Line>，
+ * 折行、中日韩双宽字符都和直接渲染一模一样。按条目对象缓存：没变的条目不重算（client-core 只替换变了的那一条）
+ *
+ * ⚠️ 不能在 React 的渲染 / 提交阶段里调（组件体、useMemo、useEffect 同步部分）：Ink 的 reconciler 是单例，
+ * 嵌套的 renderToString 在渲染里返回空串、在 effect 里直接把 yoga 弄崩。组件里一律走 useTranscriptLines
+ */
+const lineCache = new WeakMap<
+  TranscriptItem,
+  { width: number; next: TranscriptItem | undefined; theme: TuiTheme; lines: string[] }
+>()
+
+export function itemLines(
+  item: TranscriptItem,
+  next: TranscriptItem | undefined,
+  width: number,
+  theme: TuiTheme,
+): string[] {
+  const hit = lineCache.get(item)
+  if (hit && hit.width === width && hit.next === next && hit.theme === theme) return hit.lines
+  const out = renderToString(
+    <ThemeContext.Provider value={theme}>
+      <Line item={item} next={next} />
+    </ThemeContext.Provider>,
+    { columns: Math.max(10, width) },
+  )
+  const lines = out === '' ? [''] : out.split('\n')
+  lineCache.set(item, { width, next, theme, lines })
+  return lines
+}
+
+export function transcriptLines(items: readonly TranscriptItem[], width: number, theme: TuiTheme): string[] {
+  return items.flatMap((item, i) =>
+    itemLines(item, item.kind === 'tool-call' ? resultAfter(items, i) : undefined, width, theme),
+  )
+}
+
+/**
+ * 组件里拿显示行的唯一入口：条目 / 宽度 / 主题变了之后，在 setImmediate 里（React 的工作循环之外）重算。
+ * 代价是新内容晚一个事件循环出现，换来的是不和 Ink 的 reconciler 抢
+ */
+export function useTranscriptLines(items: readonly TranscriptItem[], width: number, theme: TuiTheme): string[] {
+  const [lines, setLines] = useState<string[]>([])
+  useEffect(() => {
+    const h = setImmediate(() => setLines(transcriptLines(items, width, theme)))
+    return () => clearImmediate(h)
+  }, [items, width, theme])
+  return lines
+}
+
+/**
+ * fullscreen 渲染器的对话区（PRD-M9-005 AC-2）：只画可见的那几行，右边一列滚动条。
+ * lines / offset 由上层算好传进来（上层要拿总行数去处理翻页）
+ */
+export function Viewport({
+  lines,
+  height,
+  offset,
+  unseen,
+}: {
+  lines: readonly string[]
+  height: number
+  offset: number
+  unseen: number
+}): React.ReactElement {
+  const t = useTheme()
+  // 「N 条新消息」自己占底部一行，不压在内容上（压上去会留下半截旧字）
+  const badge = unseen > 0 && height > 1
+  const rows = badge ? height - 1 : height
+  const { start, end } = visibleRange(lines.length, rows, offset)
+  const shown = lines.slice(start, end)
+  // 内容不满一屏时顶部留白，最新的内容贴着输入区
+  const pad = Math.max(0, rows - shown.length)
+  const bar = scrollbarColumn(lines.length, rows, start)
+  return (
+    <Box flexDirection="column" height={height}>
+      <Box flexDirection="row" height={rows}>
+        <Box flexDirection="column" flexGrow={1} overflow="hidden">
+          {pad > 0 && <Box height={pad} />}
+          <Text>{shown.join('\n')}</Text>
+        </Box>
+        <Box flexDirection="column" width={1} flexShrink={0}>
+          <Text {...t.fg('mut2')}>{bar.join('\n')}</Text>
+        </Box>
+      </Box>
+      {badge && (
+        <Box justifyContent="center" height={1} overflow="hidden">
+          <Text {...t.fg('accent')} inverse>{` ${tr('tui.scroll.newItems', { n: unseen })} `}</Text>
+        </Box>
+      )}
     </Box>
   )
 }

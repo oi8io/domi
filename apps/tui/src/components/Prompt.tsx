@@ -1,27 +1,18 @@
-import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
-import { useTheme } from '../theme.ts'
 
 /**
- * 输入行 —— PRD-M8-014 AC-5。Enter 发送；Ctrl+J / Alt+Enter 换行（支持 kitty 键盘协议的终端里 Shift+Enter 也行）。
- * 多行时第一行带提示符，后面的行缩进对齐。
+ * 输入行 —— PRD-M8-014 AC-5 · PRD-M9-005 AC-6 / AC-7。
+ * 空的时候只有光标：不放占位文字、不放 `›`；按键说明在底部快捷键行。上下两条横线由外层的 Box 画。
+ * Enter 发送；Shift+Enter（kitty 键盘协议）/ Ctrl+J / Alt+Enter 换行。忙的时候不显示光标（转圈在上面）。
  */
 export function Prompt({ value, disabled }: { value: string; disabled: boolean }): React.ReactElement {
-  const t = useTheme()
   const lines = value.split('\n')
   return (
     <Box flexDirection="column">
       {lines.map((line, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: 行号就是身份
         <Box key={i}>
-          <Text {...t.fg(disabled ? 'mut2' : 'accent')} bold>
-            {i === 0 ? '› ' : '  '}
-          </Text>
-          {value === '' ? (
-            <Text {...t.fg('mut2')}>{disabled ? tr('web.session.busy') : tr('tui.prompt.placeholder')}</Text>
-          ) : (
-            <Text>{line}</Text>
-          )}
+          <Text>{line}</Text>
           {!disabled && i === lines.length - 1 && <Text inverse> </Text>}
         </Box>
       ))}

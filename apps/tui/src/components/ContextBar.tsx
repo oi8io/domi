@@ -56,13 +56,24 @@ export function KeyHints({ hints }: { hints: ReadonlyArray<readonly [string, str
   )
 }
 
-/** 原型 tui.html 的按键提示（单键在输入框为空时生效；Enter / Ctrl+J 写在输入框的占位里） */
-export const DEFAULT_HINTS = () =>
+/**
+ * 底部按键提示：输入框不再放占位文字（PRD-M9-005 AC-6），发送 / 换行写在这里；
+ * 后面是原型 tui.html 那一排（单键在输入框为空时生效）；fullscreen 下再加翻页与「倒进回滚区」
+ */
+export const DEFAULT_HINTS = (renderer?: 'fullscreen' | 'classic') =>
   [
+    ['Enter', tr('tui.hint.send')],
+    ['Ctrl+J', tr('tui.hint.newline')],
     ['p', tr('tui.hint.projects')],
     ['s', tr('tui.hint.sessions')],
     ['t', tr('tui.hint.tasks')],
     ['/', tr('tui.hint.commands')],
     ['?', tr('tui.hint.help')],
+    ...(renderer === 'fullscreen'
+      ? ([
+          ['PgUp/PgDn', tr('tui.hint.scroll')],
+          ['Ctrl+O', tr('tui.hint.dump')],
+        ] as const)
+      : []),
     ['Ctrl+C', tr('tui.hint.quit')],
   ] as const

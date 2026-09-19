@@ -23,7 +23,14 @@ import {
   type RefLink,
   type SessionStore,
 } from '@domi/client-core'
-import { ConfigParseError, loadConfig, loadConfigOrThrow, MissingCredentialError } from '@domi/config'
+import {
+  ConfigParseError,
+  configPath,
+  domiHome,
+  loadConfig,
+  loadConfigOrThrow,
+  MissingCredentialError,
+} from '@domi/config'
 import { resolveClientToken } from '@domi/daemon'
 import { envLocaleHints, type LocaleSetting, resolveLocale, setLocale, tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
@@ -33,9 +40,21 @@ import { App } from './App.tsx'
 import { completeSlash, parseSlash } from './commands.ts'
 import { editAction, Prompt } from './components/Prompt.tsx'
 import { SlashHints } from './components/SlashHints.tsx'
+import { transcriptLines } from './components/Transcript.tsx'
 import { connectChat, connectDaemon } from './connect.ts'
 import { moveOf, routeKey } from './keys.ts'
 import { type OverlayState, Overlays } from './overlays/Overlays.tsx'
+import { clearFallback, fallbackMarked, fallbackPath, markFallback } from './render/fallback.ts'
+import {
+  chooseRenderer,
+  createScrollBus,
+  isMouseReport,
+  MOUSE_OFF,
+  MOUSE_ON,
+  parseWheel,
+  type Renderer,
+  scrollKey,
+} from './render/viewport.ts'
 import { detectMode, makeTheme, ThemeContext, type TuiTheme } from './theme.ts'
 
 const EXIT_CONFIG_ERROR = 2
@@ -72,6 +91,24 @@ export function formatSessionLine(
 const DAEMON_ROLE_ENV = 'DOMI_INTERNAL_ROLE'
 
 /** 顶栏要的：会话标题与所属项目名（从列表里查；老 daemon 没有项目接口就只显示标题） */
+/**
+ * Ctrl+O 之后等用户按任意键回来。Ink 在 suspendTerminal 期间已经放开了输入，这里自己开 raw 模式读一个字节。
+ * 不是 TTY（理论上 fullscreen 不会走到这）就直接返回
+ */
+function waitAnyKey(): Promise<void> {
+  const stdin = process.stdin
+  if (!stdin.isTTY) return Promise.resolve()
+  return new Promise((resolve) => {
+    const wasRaw = stdin.isRaw
+    stdin.setRawMode(true)
+    stdin.resume()
+    stdin.once('data', () => {
+      stdin.setRawMode(wasRaw)
+      resolve()
+    })
+  })
+}
+
 async function contextOf(client: DomiClient, sessionId: string): Promise<{ project: string | null; title: string }> {
   const { sessions } = await client.listSessions()
   const row = sessions.find((s) => s.id === sessionId)
@@ -88,13 +125,22 @@ export function Root({
   client,
   sessionId: initialSessionId,
   theme: initialTheme,
+  renderer = 'classic',
+  scrollBus,
+  mouse = false,
 }: {
   store: SessionStore
   client: DomiClient
   sessionId: string
   theme: TuiTheme
+  /** PRD-M9-005：fullscreen / classic */
+  renderer?: Renderer
+  /** fullscreen 的滚动命令（滚轮在 startChat 里接好，按键在这里接） */
+  scrollBus?: ReturnType<typeof createScrollBus>
+  /** 开着鼠标上报：倒进回滚区时要先关掉，回来再开 */
+  mouse?: boolean
 }): React.ReactElement {
-  const { exit } = useApp()
+  const { exit, suspendTerminal } = useApp()
   // 分支后切到新会话：换一个 store 重新订阅，旧会话在 daemon 里不受影响
   const [{ sessionId, store }, setActive] = useState({ sessionId: initialSessionId, store: initialStore })
   const [notice, setNotice] = useState<string | null>(null)
@@ -180,10 +226,37 @@ export function Root({
     exit()
   }, [client, exit])
 
+  /**
+   * Ctrl+O（PRD-M9-005 AC-4）：把完整对话按 classic 的样子写进终端原生回滚区——离开备用屏、写、等任意键、回来。
+   * 这时终端自带的搜索与选择复制都能用；Ink 的 suspendTerminal 负责离开 / 回到备用屏并整屏重画
+   */
+  const dump = useCallback(() => {
+    const lines = transcriptLines(store.$items.get(), process.stdout.columns ?? 80, theme)
+    void suspendTerminal(async () => {
+      if (mouse) process.stdout.write(MOUSE_OFF)
+      process.stdout.write(`${lines.join('\n')}\n\n${tr('tui.scroll.dumpHint')}\n`)
+      await waitAnyKey()
+      if (mouse) process.stdout.write(MOUSE_ON)
+    })
+  }, [store, theme, suspendTerminal, mouse])
+
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
       quit()
       return
+    }
+    // 鼠标上报（滚轮在 startChat 里处理）不能当文字打进输入框
+    if (isMouseReport(input)) return
+    if (renderer === 'fullscreen') {
+      const cmd = scrollKey(key)
+      if (cmd !== null) {
+        scrollBus?.emit(cmd)
+        return
+      }
+      if (key.ctrl && input === 'o') {
+        dump()
+        return
+      }
     }
 
     // 焦点在确认框时，按键只喂给确认框——别让用户以为自己在打字
@@ -434,9 +507,17 @@ export function Root({
 
   return (
     <ThemeContext.Provider value={theme}>
-      <App store={store} context={context} connection={connection} overlay={overlayView}>
+      <App
+        store={store}
+        context={context}
+        connection={connection}
+        overlay={overlayView}
+        renderer={renderer}
+        scrollBus={scrollBus}
+      >
         {notice !== null && <Text dimColor>{notice}</Text>}
-        <Box borderStyle="single" borderLeft={false} borderRight={false} borderBottom={false} borderDimColor>
+        {/* 上下两条横线，不闭合（PRD-M9-005 AC-6） */}
+        <Box borderStyle="single" borderLeft={false} borderRight={false} borderDimColor>
           <Prompt value={draft} disabled={busy} />
         </Box>
         <SlashHints
@@ -593,10 +674,76 @@ async function startChat(
       accent: config.ui.accent,
       env: process.env,
     })
-    // kitty 键盘协议：终端支持时 Shift+Enter 能和 Enter 区分开（PRD-M8-014 AC-5）；不支持的终端上什么都不做
-    render(<Root store={conn.store} client={conn.client} sessionId={conn.sessionId} theme={theme} />, {
-      kittyKeyboard: { mode: 'auto' },
+    // PRD-M9-005 AC-1/5：选渲染器。非 TTY / dumb / 读屏强制 classic；fullscreen 上次首帧前挂过就退回 classic
+    const marker = fallbackPath(domiHome({ home }))
+    const screenReader = process.env.INK_SCREEN_READER === 'true'
+    const picked = chooseRenderer({
+      setting: config.tui.renderer,
+      env: process.env,
+      isTTY: Boolean(process.stdout.isTTY && process.stdin.isTTY),
+      screenReader,
+      fallbackMarked: fallbackMarked(marker, configPath()),
     })
+    if (picked.reason === 'fallback') process.stderr.write(`${tr('tui.renderer.fellBack')}\n`)
+    let live: { unmount(): void; restore(): void } | undefined
+    const start = (renderer: Renderer) => {
+      const fullscreen = renderer === 'fullscreen'
+      const mouse = fullscreen && config.tui.mouse
+      const scrollBus = createScrollBus()
+      const onData = (data: Buffer | string) => {
+        for (const dir of parseWheel(data.toString())) scrollBus.emit(dir === 'up' ? 'wheelUp' : 'wheelDown')
+      }
+      if (fullscreen) markFallback(marker)
+      let restored = false
+      const restore = () => {
+        if (!mouse || restored) return
+        restored = true
+        process.stdin.off('data', onData)
+        process.stdout.write(MOUSE_OFF)
+      }
+      // 退出（包括异常退出）一定把鼠标上报关掉，不然用户的终端之后点一下就冒一串转义码
+      if (mouse) {
+        process.stdout.write(MOUSE_ON)
+        process.stdin.on('data', onData)
+        process.once('exit', restore)
+      }
+      live = { unmount: () => {}, restore }
+      const app = render(
+        <Root
+          store={conn.store}
+          client={conn.client}
+          sessionId={conn.sessionId}
+          theme={theme}
+          renderer={renderer}
+          scrollBus={scrollBus}
+          mouse={mouse}
+        />,
+        // kitty 键盘协议：终端支持时 Shift+Enter 能和 Enter 区分开（PRD-M8-014 AC-5）；不支持的终端上什么都不做
+        { kittyKeyboard: { mode: 'auto' }, alternateScreen: fullscreen, isScreenReaderEnabled: screenReader },
+      )
+      live = { unmount: () => app.unmount(), restore }
+      void app.waitUntilExit().finally(restore)
+      return app
+    }
+    if (picked.renderer === 'fullscreen') {
+      try {
+        const app = start('fullscreen')
+        await app.waitUntilRenderFlush()
+        clearFallback(marker)
+      } catch {
+        // 首帧前挂了：标记留着（下次直接 classic），这次也换 classic 接着用
+        live?.restore()
+        try {
+          live?.unmount()
+        } catch {
+          // 已经坏了的实例，卸不干净也要继续
+        }
+        process.stderr.write(`${tr('tui.renderer.fellBack')}\n`)
+        start('classic')
+      }
+    } else {
+      start('classic')
+    }
   } catch (e) {
     process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`)
     process.exit(EXIT_DAEMON_ERROR)

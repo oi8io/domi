@@ -49,6 +49,8 @@ export const WRITABLE_KEYS: readonly string[] = [
   'ui.accent',
   'ui.locale',
   'tui.theme',
+  'tui.renderer',
+  'tui.mouse',
 ]
 
 /** 每个 provider 能改的字段（PRD-M9-002 AC-8）。能力覆盖是模型特性，不是权限，放开 */
@@ -270,6 +272,8 @@ export function readSettings(opts: LoadOptions = {}): SettingsView {
     'ui.accent': cfg.ui.accent,
     'ui.locale': cfg.ui.locale,
     'tui.theme': cfg.tui.theme,
+    'tui.renderer': cfg.tui.renderer,
+    'tui.mouse': cfg.tui.mouse,
   }
   const ctx = { env, file, secrets, defaultProvider: cfg.model.provider }
   const secretView: SettingsView['secrets'] = {}

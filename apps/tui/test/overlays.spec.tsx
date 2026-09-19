@@ -295,7 +295,8 @@ describe('PRD-M8-015 AC-5 · `/` 命令补全', () => {
     await h.flush()
     await h.press('h', 'p')
     await h.flush()
-    expect(h.lastFrame()).toContain('› hp')
+    // PRD-M9-005 AC-6：输入区不再有 › 前缀
+    expect(h.lastFrame()).toContain('hp')
     expect(h.lastFrame()).not.toContain('项目选择')
     h.unmount()
   })

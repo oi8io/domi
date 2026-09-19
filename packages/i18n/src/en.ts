@@ -1260,4 +1260,13 @@ server:
   'daemon.notify.failed': 'Task failed: {name}',
   'daemon.notify.allDone': 'All {count, plural, one {# node} other {# nodes}} done',
   'daemon.notify.failedNodes': 'Failed nodes: {nodes}',
+  'tui.scroll.newItems': '{n, plural, one {# new message} other {# new messages}} · Ctrl+End to jump back',
+  'tui.scroll.dumpHint':
+    "— The full conversation is above (written to your terminal's scrollback; use its own search and copy). Press any key to return to domi —",
+  'tui.renderer.fellBack':
+    'The fullscreen renderer failed to start last time, so the classic renderer is used (set tui.renderer: fullscreen or DOMI_TUI_RENDERER=fullscreen to try again)',
+  'tui.hint.scroll': 'scroll',
+  'tui.hint.dump': 'scrollback',
+  'tui.hint.send': 'send',
+  'tui.hint.newline': 'newline',
 }

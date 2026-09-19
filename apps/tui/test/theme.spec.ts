@@ -86,10 +86,24 @@ describe('PRD-M8-014 AC-5 · 输入行的按键与提示一致', () => {
   })
 
   test('按键提示就是原型那一排，并且都是真能用的键', async () => {
-    expect(DEFAULT_HINTS().map(([k]) => k)).toEqual(['p', 's', 't', '/', '?', 'Ctrl+C'])
+    // PRD-M9-005 AC-6：输入区的按键提示并进这一排（Enter / Ctrl+J 在前）；fullscreen 多出滚动与倒回滚区
+    expect(DEFAULT_HINTS().map(([k]) => k)).toEqual(['Enter', 'Ctrl+J', 'p', 's', 't', '/', '?', 'Ctrl+C'])
+    expect(DEFAULT_HINTS('fullscreen').map(([k]) => k)).toEqual([
+      'Enter',
+      'Ctrl+J',
+      'p',
+      's',
+      't',
+      '/',
+      '?',
+      'PgUp/PgDn',
+      'Ctrl+O',
+      'Ctrl+C',
+    ])
     const { routeKey } = await import('../src/keys.ts')
     for (const [key] of DEFAULT_HINTS()) {
-      if (key === '/' || key === 'Ctrl+C') continue
+      // Enter / Ctrl+J 归输入框（editAction），/ 归补全，Ctrl+C 在最外层
+      if (['Enter', 'Ctrl+J', '/', 'Ctrl+C'].includes(key)) continue
       expect(routeKey(key, {}, { inputEmpty: true, overlay: null })).not.toBeNull()
     }
   })

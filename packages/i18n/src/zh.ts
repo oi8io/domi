@@ -1201,4 +1201,12 @@ server:
   'daemon.notify.failed': '任务失败：{name}',
   'daemon.notify.allDone': '{count} 个节点全部完成',
   'daemon.notify.failedNodes': '失败的节点：{nodes}',
+  'tui.scroll.newItems': '{n} 条新消息 · Ctrl+End 回到底部',
+  'tui.scroll.dumpHint': '—— 以上是完整对话（已写进终端回滚区，可以用终端自己的搜索与复制）。按任意键回到 domi ——',
+  'tui.renderer.fellBack':
+    '全屏渲染上次没能启动，这次用经典渲染（tui.renderer: fullscreen 或 DOMI_TUI_RENDERER=fullscreen 可以再试）',
+  'tui.hint.scroll': '翻页',
+  'tui.hint.dump': '回滚区',
+  'tui.hint.send': '发送',
+  'tui.hint.newline': '换行',
 }
