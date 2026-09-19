@@ -25,7 +25,7 @@ export interface ProjectRow {
 export interface ProjectSummary extends ProjectRow {
   taskCount: number
   lastActivity: number | null
-  recentTasks: Array<{ id: string; title: string; updatedAt: number }>
+  recentTasks: Array<{ id: string; title: string; updatedAt: number; firstInput?: string }>
 }
 
 interface Raw {
@@ -114,8 +114,14 @@ export class ProjectRepo {
       )
       .all()
     const recent = opts.recent ?? 5
-    const recentQ = this.db.query<{ id: string; title: string; updated_at: number }, [string, number]>(
-      `SELECT id, title, updated_at FROM sessions
+    const recentQ = this.db.query<
+      { id: string; title: string; updated_at: number; first_input: string | null },
+      [string, number]
+    >(
+      `SELECT id, title, updated_at,
+              (SELECT substr(json_extract(e.payload, '$.text'), 1, 40) FROM events e
+               WHERE e.session_id = s.id AND e.type = 'user.input' ORDER BY e.seq LIMIT 1) AS first_input
+       FROM sessions s
        WHERE project_id = ? AND deleted_at IS NULL AND spawned_by IS NULL
        ORDER BY updated_at DESC, created_at DESC LIMIT ?`,
     )
@@ -127,7 +133,12 @@ export class ProjectRepo {
         recentTasks:
           recent === 0
             ? []
-            : recentQ.all(r.id, recent).map((t) => ({ id: t.id, title: t.title, updatedAt: t.updated_at })),
+            : recentQ.all(r.id, recent).map((t) => ({
+                id: t.id,
+                title: t.title,
+                updatedAt: t.updated_at,
+                ...(t.first_input ? { firstInput: t.first_input } : {}),
+              })),
       }))
       .sort((a, b) => (b.lastActivity ?? b.createdAt) - (a.lastActivity ?? a.createdAt))
   }

@@ -218,7 +218,12 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       taskCount: s.taskCount,
       lastActivity: s.lastActivity,
       settings: s.settings,
-      recentTasks: s.recentTasks.map((t) => ({ ...t, busy: false })),
+      recentTasks: s.recentTasks.map((t) => ({
+        ...t,
+        busy: false,
+        // 空标题回退首条输入前 40 字（PRD-M10-001 AC-2）——项目展开列表与 session.list 同一口径
+        title: t.title.trim() !== '' ? t.title : (t.firstInput ?? ''),
+      })),
     }
   }
 
@@ -787,7 +792,12 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           taskCount: p.taskCount,
           lastActivity: p.lastActivity,
           settings: p.settings,
-          recentTasks: p.recentTasks.map((t) => ({ ...t, busy: false })),
+          recentTasks: p.recentTasks.map((t) => ({
+            ...t,
+            busy: false,
+            // 空标题回退首条输入前 40 字（PRD-M10-001 AC-2）——项目展开列表与 session.list 同一口径
+            title: t.title.trim() !== '' ? t.title : (t.firstInput ?? ''),
+          })),
         }))
       },
       async create(path, name) {

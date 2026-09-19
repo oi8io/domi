@@ -9,7 +9,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
-import { StubProvider } from '@domi/model'
+import { StubProvider, type StubTurn } from '@domi/model'
 import { PROTOCOL_VERSION, type RpcNotification, type RpcRequest, type RpcResponse } from '@domi/protocol'
 import { type ClientConn, createRuntimeHost, Daemon, type RuntimeHost } from '../src/index.ts'
 
@@ -53,11 +53,12 @@ function repo(dirty = false): string {
 }
 
 let n = 0
-function setup(script?: Array<Array<Record<string, unknown>>>) {
+function setup(script?: Array<Array<Record<string, unknown>>>, titleScript?: StubTurn[]) {
   const home = tmp('domi-home-')
   let k = 0
   const provider = new StubProvider((script ?? [[{ type: 'delta', text: '好的' }]]) as never, {
     onExhausted: 'repeat-last',
+    ...(titleScript === undefined ? {} : { titleScript }),
   })
   const host = createRuntimeHost({
     config: ConfigSchema.parse({ model: { provider: 'stub', name: 'stub-1', apiKey: 'k' } }),
@@ -255,4 +256,29 @@ describe('PRD-M8-009 AC-1 / AC-2 · 未读与 sessions.changed', () => {
     expect(conn.notifications('sessions.changed').length).toBeGreaterThan(0)
     expect(other.got.some((m) => 'method' in m && m.method === 'sessions.changed')).toBe(true)
   })
+})
+
+describe('PRD-M10-001 AC-2 · 项目展开列表（recentTasks）空标题 fallback first_input', () => {
+  const LONG = '帮我把这个项目里所有用到旧版配置格式的地方都找出来并且逐个迁移到新格式上去，注意保持向后兼容'
+
+  test('空标题任务在 project.list 的 recentTasks 里回退首条输入前 40 字', async () => {
+    const { call } = setup(undefined, []) // titleScript=[]：标题生成不产出，标题保持空
+    await call('handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    const dir = repo()
+    const created = (await call('session.create', { cwd: dir })) as { sessionId: string }
+    const sessionId = created.sessionId
+    await call('session.submit', { sessionId, text: LONG })
+
+    // user.input 落库后 first_input 即可派生；标题生成 fire-and-forget 且不产出，title 由 daemon 回退为首条输入前 40 字
+    let seen: { title: string; firstInput?: string } | undefined
+    for (let i = 0; i < 200 && seen === undefined; i++) {
+      await Bun.sleep(10)
+      const listed = (await call('project.list')) as {
+        projects: Array<{ recentTasks: Array<{ title: string; firstInput?: string }> }>
+      }
+      seen = listed.projects[0]?.recentTasks[0]
+    }
+    expect(seen?.title).toBe(LONG.slice(0, 40))
+    expect(seen?.firstInput).toBe(LONG.slice(0, 40))
+  }, 15_000)
 })
