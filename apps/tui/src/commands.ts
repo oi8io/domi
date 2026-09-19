@@ -29,6 +29,7 @@ export type SlashCommand =
   | { kind: 'discard'; path: string }
   | { kind: 'undo'; trash: string }
   | { kind: 'apply'; mode: 'squash' | 'merge' | 'branch' }
+  | { kind: 'settings' } // PRD-M10-004 AC-1：TUI 设置入口（本轮只做语言切换）
   | { kind: 'invalid'; message: string }
 
 /** 命令表：`/` 补全与帮助弹层用（PRD-M8-015 AC-5）。和 parseSlash 的分支一一对应 */
@@ -52,6 +53,7 @@ export const COMMANDS = (): ReadonlyArray<{ name: string; args?: string; desc: s
   { name: '/soul', args: '[accept|reject <id>]', desc: tr('tui.cmd.soul') },
   { name: '/memory', args: tr('tui.cmd.argQuery'), desc: tr('tui.cmd.memory') },
   { name: '/extract', desc: tr('tui.cmd.extract') },
+  { name: '/settings', desc: tr('tui.cmd.settings') },
 ]
 
 /** 输入框里还在打命令名（`/` 开头、没有空格）时，给出候选 */
@@ -120,6 +122,8 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       return { kind: 'memory', query: rest.join(' ') }
     case '/extract':
       return { kind: 'extract' }
+    case '/settings':
+      return { kind: 'settings' } // PRD-M10-004 AC-1
     case '/plan':
       return { kind: 'mode', mode: 'plan' } // PRD-M7-005
     case '/act':

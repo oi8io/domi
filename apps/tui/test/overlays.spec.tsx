@@ -76,6 +76,10 @@ function fakeClient(calls: unknown[][] = []) {
   return {
     $state: atom('open'),
     getSettings: async () => ({ values: {} }),
+    setSettings: async (patch: unknown) => {
+      calls.push(['setSettings', patch])
+      return {}
+    },
     listProjects: async () => projects,
     listSessions: async () => ({ sessions }),
     listSchedules: async () => schedules,
@@ -217,6 +221,30 @@ describe('PRD-M8-015 AC-2 / AC-3 / AC-4 · 三个弹层的内容', () => {
     h.unmount()
   })
 
+  test('PRD-M10-004 AC-2 / AC-3 · 设置层：三项语言，回车选择写 ui.locale，提示重启生效', async () => {
+    const calls: unknown[][] = []
+    const h = renderAt(
+      80,
+      <Overlays
+        client={fakeClient(calls) as never}
+        state={{ id: 'settings' }}
+        sessionId="s2"
+        onChange={() => undefined}
+        onOpenSession={() => undefined}
+      />,
+    )
+    await h.waitFor((f) => f.includes('设置 · 语言'), 2000)
+    const frame = h.lastFrame()
+    expect(frame).toContain('跟随系统')
+    expect(frame).toContain('简体中文')
+    expect(frame).toContain('English')
+    await h.press(KEYS.enter) // 默认选中第一项（跟随系统）
+    await h.flush()
+    await h.waitFor((f) => f.includes('重启后生效'), 2000)
+    expect(calls).toEqual([['setSettings', { 'ui.locale': 'auto' }]])
+    h.unmount()
+  })
+
   test('任务弹层：p 暂停 / 恢复定时任务，n 进新建表单，cron 非法当场提示', async () => {
     const calls: unknown[][] = []
     let state: OverlayState | null = { id: 'tasks' }
@@ -261,7 +289,7 @@ describe('PRD-M8-015 AC-2 / AC-3 / AC-4 · 三个弹层的内容', () => {
 
 describe('PRD-M8-015 AC-5 · `/` 命令补全', () => {
   test('按前缀给候选；命令表与 parseSlash 对得上', () => {
-    expect(completeSlash('/s').map((c) => c.name)).toEqual(['/sessions', '/soul'])
+    expect(completeSlash('/s').map((c) => c.name)).toEqual(['/sessions', '/soul', '/settings'])
     expect(completeSlash('/soul x')).toEqual([])
     expect(completeSlash('你好')).toEqual([])
     expect(COMMANDS().length).toBeGreaterThan(10)

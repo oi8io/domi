@@ -4,7 +4,7 @@
  */
 
 import type { DomiClient } from '@domi/client-core'
-import { tr } from '@domi/i18n'
+import { getLocale, tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { useCallback, useEffect, useState } from 'react'
 import { COMMANDS } from '../commands.ts'
@@ -133,6 +133,53 @@ export function modelItems(list: ModelList, current: { provider: string; name: s
     dot: m.provider === current.provider && m.name === current.name ? 'accent' : 'off',
     search: m.providerName,
   }))
+}
+
+/** 设置 · 语言（PRD-M10-004 AC-1）：选项与 Web 设置页一致，当前值点亮 */
+export function languageItems(current: string): OverlayItem[] {
+  return (
+    [
+      ['auto', tr('common.followSystem')],
+      ['zh', tr('web.settings.langZh')],
+      ['en', tr('web.settings.langEn')],
+    ] as const
+  ).map(([value, label]) => ({
+    key: value,
+    label,
+    dot: current === value ? 'accent' : 'off',
+  }))
+}
+
+function SettingsOverlay({
+  client,
+  current,
+  onClose,
+}: {
+  client: DomiClient
+  current: string
+  onClose(): void
+}) {
+  const [notice, setNotice] = useState<string | null>(null)
+  return (
+    <Overlay
+      title={tr('tui.settings.title')}
+      searchable={false}
+      items={languageItems(current)}
+      empty={tr('common.none')}
+      hints={[
+        ['enter', tr('tui.key.select')],
+        ['esc', tr('tui.key.close')],
+      ]}
+      notice={notice}
+      onSelect={(it) => {
+        client.setSettings({ 'ui.locale': it.key }).then(
+          () => setNotice(tr('tui.settings.appliesOnRestart')),
+          (e: unknown) => setNotice(e instanceof Error ? e.message : String(e)),
+        )
+      }}
+      onClose={onClose}
+    />
+  )
 }
 
 function ModelsOverlay({
@@ -278,6 +325,10 @@ export function Overlays({
 
   const now = Date.now()
   const currentProject = sessions?.find((s) => s.id === sessionId)?.projectId
+
+  if (state.id === 'settings') {
+    return <SettingsOverlay client={client} current={getLocale()} onClose={close} />
+  }
 
   if (state.id === 'help') return <HelpOverlay onClose={close} />
   if (state.id === 'models') {

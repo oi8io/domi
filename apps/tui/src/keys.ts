@@ -5,7 +5,7 @@
  * 单键（p / s / t / ?）只在输入框为空、没有弹层时生效——否则它们就是在打字；
  * Ctrl+P / Ctrl+R / Ctrl+T 任何时候都行（弹层里 Ctrl+P 让给「上移」）。不占 Ctrl+S（终端的流控键）。
  */
-export type OverlayId = 'projects' | 'sessions' | 'tasks' | 'help' | 'models'
+export type OverlayId = 'projects' | 'sessions' | 'tasks' | 'help' | 'models' | 'settings'
 
 export type KeyAction = { kind: 'open'; overlay: OverlayId } | { kind: 'close' } | null
 

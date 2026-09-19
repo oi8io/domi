@@ -330,6 +330,9 @@ export function Root({
           case 'model-picker':
             setOverlay({ id: 'models' })
             return
+          case 'settings':
+            setOverlay({ id: 'settings' }) // PRD-M10-004 AC-1
+            return
           case 'model':
             // 好几家都有这个名字：打开模型列表让人选（错误信息里列着候选）
             return client.switchModel(sessionId, cmd.model).catch((e: unknown) => {

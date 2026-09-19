@@ -12,6 +12,7 @@ import { createSessionStore } from '@domi/client-core'
 import { setLocale } from '@domi/i18n'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
 import { App } from '../src/App.tsx'
+import { Overlays } from '../src/overlays/Overlays.tsx'
 import { renderAt } from './render.tsx'
 
 const DIR = 'apps/tui/test/__snapshots__'
@@ -90,6 +91,47 @@ describe('PRD-M0-005 AC-4 · 四宽度 golden 快照', () => {
  * PRD-M9-004 AC-6 · English 界面的一组金样（80 列）。中文四个宽度照旧（上面那组，默认 zh）。
  * 顺带断言：界面文案一个中文字都不剩——剩下的中文只能来自用户内容（场景里的用户输入与模型输出）
  */
+/** PRD-M10-004 · 设置层（语言）的 en 金样：选项与当前值点亮的渲染不漂移 */
+describe('PRD-M10-004 · 设置层金样', () => {
+  test('宽度 80（en）', async () => {
+    const fake = {
+      setSettings: async () => ({}),
+      listProjects: async () => [],
+      listSessions: async () => ({ sessions: [] }),
+      listSchedules: async () => [],
+    }
+    setLocale('en')
+    try {
+      const h = renderAt(
+        80,
+        <Overlays
+          client={fake as never}
+          state={{ id: 'settings' }}
+          sessionId="s"
+          onChange={() => undefined}
+          onOpenSession={() => undefined}
+        />,
+      )
+      await h.flush()
+      const frame = h.lastFrame()
+      h.unmount()
+      const file = join(DIR, 'scene-settings.en.txt')
+      if (process.env.UPDATE_GOLDEN === '1' || !existsSync(file)) {
+        mkdirSync(DIR, { recursive: true })
+        writeFileSync(file, `${frame}\n`, 'utf8')
+      }
+      expect(frame).toBe(readFileSync(file, 'utf8').replace(/\n$/, ''))
+      expect(frame).toContain('Settings · Language')
+      expect(frame).toContain('Follow system')
+      // 语言名保持母语显示（en 界面也是「简体中文」，PRD-M9-004 既有行为）
+      expect(frame).toContain('简体中文')
+      expect(frame).toContain('English')
+    } finally {
+      setLocale('zh')
+    }
+  }, 15_000)
+})
+
 describe('PRD-M9-004 AC-6 · English 金样', () => {
   test('宽度 80（en）', async () => {
     setLocale('en')

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { parseSlash } from '../src/commands.ts'
-import { modelItems } from '../src/overlays/Overlays.tsx'
+import { COMMANDS, completeSlash, parseSlash } from '../src/commands.ts'
+import { languageItems, modelItems } from '../src/overlays/Overlays.tsx'
 
 describe('斜杠命令', () => {
   test('普通文字照常提交；/compact 不变', () => {
@@ -25,6 +25,19 @@ describe('斜杠命令', () => {
     expect(parseSlash('/ref s-abc 7', 3)).toEqual({ kind: 'ref', ref: { sessionId: 's-abc', fromSeq: 7, toSeq: 7 } })
     expect(parseSlash('/ref', 3)).toMatchObject({ kind: 'invalid' })
     expect(parseSlash('/ref s 9-4', 3)).toMatchObject({ kind: 'invalid' })
+  })
+
+  test('PRD-M10-004 AC-1 / AC-3 · /settings 打开设置层；命令补全可见', () => {
+    expect(parseSlash('/settings', 3)).toEqual({ kind: 'settings' })
+    expect(COMMANDS().some((c) => c.name === '/settings')).toBe(true)
+    expect(completeSlash('/set').map((c) => c.name)).toContain('/settings')
+  })
+
+  test('PRD-M10-004 AC-1 · 语言选项与 Web 一致，当前值点亮', () => {
+    const items = languageItems('zh')
+    expect(items.map((i) => i.label)).toEqual(['跟随系统', '简体中文', 'English'])
+    expect(items.find((i) => i.key === 'zh')?.dot).toBe('accent')
+    expect(items.find((i) => i.key === 'auto')?.dot).toBe('off')
   })
 
   test('/branch 不带数字从最后一条分，带数字从那一条分（parity 第 7 项）', () => {
