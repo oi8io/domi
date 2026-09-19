@@ -1,18 +1,18 @@
 # domi 交接
 
-> 2026-09-18 · 接手的人从这份开始读，读完再去 `CONTRIBUTING.md`。
+> 2026-09-19 · 接手的人从这份开始读，读完再去 `CONTRIBUTING.md`。
 > 这份只讲**现在在哪、下一步做什么、哪些地方会踩坑**；规矩与背景在别的文档里，本文只给指路。
 
 ---
 
 ## 1. 一句话现状
 
-M0–M8 九个里程碑的**功能全部落地**：内核 / 守卫 / 三端（CLI、TUI、Web）/ 插件 / 编码能力 / 工作台都通了；
-`pnpm typecheck`、`pnpm guard`（27 个门禁）、`pnpm test`（122 个文件 1134 条）当前全绿。
-剩下的是**验证补齐**（M4 / M5 / M6 各有一条「最后做」的任务没做）与**用户侧走查**（各里程碑 DoD）。
+M0–M9 十个里程碑的**功能全部落地**：内核 / 守卫 / 三端（CLI、TUI、Web）/ 插件 / 编码能力 / 工作台 / 模型配置与双语都通了；
+`pnpm typecheck`、`pnpm guard`（lint + 22 道守卫）、`pnpm test`（133 个文件 1242 条）当前全绿。
+剩下的是**验证补齐**（M4 / M5 / M6 / M9 各有一条「最后做」的任务没做）与**用户侧走查**（各里程碑 DoD）。
 
 代码在本地 `master`，**没有配置任何 git remote**——接手第一件事是推到你们的远端，
-否则这 137 个提交只活在一台机器上。
+否则这 150 多个提交只活在一台机器上。
 
 ---
 
@@ -62,6 +62,7 @@ pnpm check            # = typecheck + guard + test + eval(L1)；必须全绿才�
 | M6 生态 | done | **todo** | TASK-M6-008；BUG-M6-001（`eval l2 --rounds`）review |
 | M7 会写代码 | done | done | TASK-M7-011 已补齐（修了 BUG-M7-001…003）；只剩用户侧 DoD |
 | M8 工作台 | done | done | 只剩用户侧 DoD 与逐屏截图走查 |
+| M9 模型配置与体验 | done | **todo** | TASK-M9-012；TUI 双渲染器要真终端手测（见 §7） |
 
 `check-ac-coverage` 目前对 **M0 / M1 / M7 / M8** 强制（190 条 AC 全部有测试点名）。
 中间几个里程碑的 AC 有测试但没在测试里写编号——**补完哪个里程碑的验证，就把它加进 `scripts/check-ac-coverage.ts` 的 `ACTIVE` 正则**，这是唯一防回退的机制。
@@ -79,7 +80,7 @@ Web 首页与 Composer 引导去「设置 › 模型供应商」。细节在 `do
 补的时候找到三处与 AC 不符（dump 看不到规矩层、commit-msg 钩子漏掉单独一段 `-m` 的署名、超长失败输出把失败测试名截掉），
 按缺陷修了，登记为 BUG-M7-001…003。
 
-### 5.3 M4 / M5 / M6 的验证补齐（下一步）
+### 5.3 M9 / M4 / M5 / M6 的验证补齐（下一步）
 各自一条「验证补齐（最后做）」任务。照 M7 / M8 那两轮的做法：先用 `bun scripts/check-ac-coverage.ts --report` 看缺口，
 逐条读 AC 写能证伪它的测试（不是给旧测试贴编号），发现与 AC 不符的按 BUG 先写复现再修，最后把里程碑加进 `ACTIVE`。
 
@@ -94,14 +95,18 @@ Web 首页与 Composer 引导去「设置 › 模型供应商」。细节在 `do
 1. **commit message 里不要出现任何 AI 作者 / 协作信息**（不要 `Co-Authored-By:`、session 链接之类的行）。
 2. **凭据不进仓库**。`guard:secrets` 扫 `fixtures` 与 `docs`；`demos/m0-loop.md` 历史上出现过真 key，
    改它之前先 `git diff` 看一眼再决定提不提交（当前工作区里有一处无害的本机模型名改动，没提交）。
-3. **事件只增不改**（INV-01）。新事件类型要升 `SCHEMA_VERSION`（现在 11），迁移只能加列 / 加表 / 加索引，
+3. **事件只增不改**（INV-01）。新事件类型或事件加字段要升 `SCHEMA_VERSION`（现在 12），旧事件流 fixture 放 `fixtures/events/legacy-v*.jsonl`，迁移只能加列 / 加表 / 加索引，
    `guard:migrations` 会查（现有 14 条迁移）。
 4. **端上没有业务逻辑**（INV-02）。`apps/*` 只经 `client-core` + Domi Protocol 跟 daemon 说话；
    投影逻辑放 `packages/client-core`，不要放在组件里。
 5. **权限 fail-closed**（INV-03）。Web 的 `config.set` 白名单**必须**排除 permissions / hooks / MCP / 插件安装——
    界面永远不能给自己提权。
 6. **分层**：`@domi/daemon` 不能直接 import `@domi/kernel`，要走 `@domi/runtime` 再导出；
-   provider 名只允许出现在 `packages/model/src/factory.ts`（`guard:providers`）；kernel 必须纯（`guard:purity`）。
+   SDK 包名只允许出现在 `packages/model/src/factory.ts`，厂商 / 协议知识只在 `packages/config/src/vendors.ts`（`guard:providers` 扫全仓）；
+   kernel 必须纯（`guard:purity`）。
+11. **界面文案走 `@domi/i18n`**（PRD-M9-004）：中英两份 `packages/i18n/src/{zh,en}.ts` 的 key 必须一致，
+    `apps/*` 里不许出现写死的中文（`guard:i18n`）。UI 里用 `tr()`（TUI 里 `t` 是主题对象）；
+    daemon 的错误带 `data.messageKey / params`，端上翻译。**模块顶层不要调 `tr()`**——那时语言还没定，写成函数或 getter。
 7. **改 PRD 的 AC 要走回写门**：在 `docs/PRD.md` 顶部记一条回写，写清触发与理由，原文划掉留痕。
 8. **CI 里不调真实模型**（INV-08）。要模型的测试用 `StubProvider` 或假网关。
 9. **工作节奏**（用户定的）：先推进功能，测试验证类统一归到里程碑最后一条「验证补齐」任务。
@@ -112,6 +117,11 @@ Web 首页与 Composer 引导去「设置 › 模型供应商」。细节在 `do
 
 ## 7. 已知限制与坑
 
+- **TUI 的 fullscreen 渲染器在无 TTY 环境里只验得了一半**：切片、滚动状态机、滚轮解析、整屏布局都有测试（`apps/tui/test/viewport.spec.tsx`），
+  但备用屏进出、真滚轮、Ctrl+O 往返只能在真终端里看。坏了就 `DOMI_TUI_RENDERER=classic` 或 `tui.renderer: classic`；
+  首帧前挂过会写 `~/.domi/state/tui-fallback`，之后自动用 classic，改一下配置文件（或设环境变量）即视为再试。
+- **不要在 React 组件里调 Ink 的 `renderToString`**：reconciler 是单例，嵌套调用在渲染里返回空串、在 effect 里把 yoga 弄崩。
+  TUI 拿显示行一律走 `useTranscriptLines`（在 setImmediate 里算）。
 - **Playwright 一直没引入**（ADR-001 的回退项）。`docs/parity-checklist.md` 的两列 e2e 保持 ⬜，
   TUI 侧靠 golden 快照（四个宽度）+ 假 stdin（`apps/tui/test/render.tsx` 的 `press()` / `KEYS`）。
 - **定时任务**：夏令时被跳过的那一刻（例如美东 3 月第二个周日 02:30）当天不触发。`packages/daemon/src/cron.ts`。
@@ -130,4 +140,5 @@ Web 首页与 Composer 引导去「设置 › 模型供应商」。细节在 `do
 
 - 挂载目录里默认**不能删文件**，`git` 的 `.git/index.lock` 残留会让所有 git 命令失败——先 `rm -f .git/index.lock`。
 - 工具链（biome / guard）在挂载盘上跑容易被权限和符号链接绊住，做法是 `rsync` 一份到本地盘再跑，回写只回写源码。
+- 挂载盘上 `git checkout -- <file>` 也会因为删不了文件而失败，恢复单个文件用 `git show HEAD:<path> > <path>`。
 - 临时脚本**不要**放进仓库树，`biome` 与 `guard` 会把它算成源码直接红。
