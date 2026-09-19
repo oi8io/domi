@@ -60,10 +60,10 @@ INV-xx ──→ PRD-M{n}-xxx ──→ SPEC-M{n}-xxx ──→ TASK-M{n}-xxx �
 |---|---|---|
 | 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.12**（82 条，M0–M9 全部 `COMMITTED`）· 各里程碑再批准材料在 `docs/prd/` |
 | 架构师 | ✅ 完成 | `docs/spec/M0 / M1 / M2 / M6 / M7 / M8 / M9.md`，均带"触发重新决策的条件"· 27 份 ADR |
-| 工程师 | ✅ 功能完成 | M0–M9 共 10 个任务文件；typecheck + lint + 22 道守卫 + **1242 个测试** 全绿 |
-| 测试工程师 | 🔵 进行中 | M0 / M1 / M7 / M8 已纳入 `check-ac-coverage` 强制范围；M4 / M5 / M6 / M9 的「验证补齐」待做 |
+| 工程师 | ✅ 功能完成 | M0–M9 共 10 个任务文件；typecheck + lint + 22 道守卫 + **1257 个测试** + L1 回放全绿 |
+| 测试工程师 | 🔵 进行中 | M0 / M1 / M7 / M8 / M9 已纳入 `check-ac-coverage` 强制范围（224 条 AC）；M4 / M5 / M6 的「验证补齐」待做 |
 
-**下一步**：TASK-M9-012，然后 M4 / M5 / M6 验证补齐。
+**下一步**：M4 / M5 / M6 验证补齐。
 只有用户能做的：各里程碑 DoD、M8 逐屏截图走查、TUI fullscreen 真终端手测、桌面端与 macOS 沙箱的真机验证。详见 `NEXT.md`。
 
 **2026-09-14 方向变更**：见 `docs/adr/003-revert-to-self-built-runtime.md`。

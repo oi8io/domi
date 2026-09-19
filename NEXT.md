@@ -1,5 +1,5 @@
-在做: **M9「模型配置与体验」功能已落地**（2026-09-19）。TASK-M9-000…011 done，只剩 TASK-M9-012（验证补齐，最后做）。
-      当前 `pnpm typecheck` + `pnpm guard`（lint + 22 道守卫，新增 `guard:i18n`）+ `pnpm test`（133 个文件 1242 条）全绿。
+在做: **M9「模型配置与体验」功能已落地**（2026-09-19）。TASK-M9-000…012 全部 done，验证已补齐（M9 进了 `check-ac-coverage` 强制范围）。
+      干净副本 `pnpm check` 全绿：typecheck + lint + 22 道守卫（新增 `guard:i18n`）+ 135 个文件 1257 条测试 + L1 回放。
 
       M9 带来的（按需求）：
       - **Provider 配置（PRD-M9-002）**：每个 provider 有 `name / vendor / protocol / base_url / api_key / enabled / capabilities`，
@@ -16,7 +16,7 @@
       ⚠️ 更新代码后：`pnpm install`（去掉了 `@ai-sdk/google`），并停掉已在跑的 domid（旧进程跑的是旧代码，OPT-M3-002）
 
 下一步: 用户规矩不变：**先推进功能，测试验证类最后统一查漏补缺**。
-        1. **TASK-M9-012** —— M9 逐条 AC 写能证伪它的测试，M9 进 `check-ac-coverage` 的 `ACTIVE`，干净副本跑一遍 `pnpm check`
+        1. ~~TASK-M9-012~~ —— 已做：补了 daemon 层与 TUI 的测试，顺带修了 BUG-M9-003（见 `docs/tasks/M9.md`）
         2. **TASK-M4-009 / M5-008 / M6-008** —— 各自里程碑的「验证补齐（最后做）」
         3. TASK-M3-008（parity e2e，要先决定引不引 Playwright）、TASK-M3-009（推送延迟基准）
 

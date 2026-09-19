@@ -8,8 +8,8 @@
 ## 1. 一句话现状
 
 M0–M9 十个里程碑的**功能全部落地**：内核 / 守卫 / 三端（CLI、TUI、Web）/ 插件 / 编码能力 / 工作台 / 模型配置与双语都通了；
-`pnpm typecheck`、`pnpm guard`（lint + 22 道守卫）、`pnpm test`（133 个文件 1242 条）当前全绿。
-剩下的是**验证补齐**（M4 / M5 / M6 / M9 各有一条「最后做」的任务没做）与**用户侧走查**（各里程碑 DoD）。
+`pnpm typecheck`、`pnpm guard`（lint + 22 道守卫）、`pnpm test`（135 个文件 1257 条）当前全绿。
+剩下的是**验证补齐**（M4 / M5 / M6 各有一条「最后做」的任务没做）与**用户侧走查**（各里程碑 DoD）。
 
 代码在本地 `master`，**没有配置任何 git remote**——接手第一件事是推到你们的远端，
 否则这 150 多个提交只活在一台机器上。
@@ -62,9 +62,9 @@ pnpm check            # = typecheck + guard + test + eval(L1)；必须全绿才�
 | M6 生态 | done | **todo** | TASK-M6-008；BUG-M6-001（`eval l2 --rounds`）review |
 | M7 会写代码 | done | done | TASK-M7-011 已补齐（修了 BUG-M7-001…003）；只剩用户侧 DoD |
 | M8 工作台 | done | done | 只剩用户侧 DoD 与逐屏截图走查 |
-| M9 模型配置与体验 | done | **todo** | TASK-M9-012；TUI 双渲染器要真终端手测（见 §7） |
+| M9 模型配置与体验 | done | done | TASK-M9-012 已补齐（修了 BUG-M9-003）；TUI 双渲染器要真终端手测（见 §7） |
 
-`check-ac-coverage` 目前对 **M0 / M1 / M7 / M8** 强制（190 条 AC 全部有测试点名）。
+`check-ac-coverage` 目前对 **M0 / M1 / M7 / M8 / M9** 强制（224 条 AC 全部有测试点名）。
 中间几个里程碑的 AC 有测试但没在测试里写编号——**补完哪个里程碑的验证，就把它加进 `scripts/check-ac-coverage.ts` 的 `ACTIVE` 正则**，这是唯一防回退的机制。
 
 ---
@@ -80,7 +80,7 @@ Web 首页与 Composer 引导去「设置 › 模型供应商」。细节在 `do
 补的时候找到三处与 AC 不符（dump 看不到规矩层、commit-msg 钩子漏掉单独一段 `-m` 的署名、超长失败输出把失败测试名截掉），
 按缺陷修了，登记为 BUG-M7-001…003。
 
-### 5.3 M9 / M4 / M5 / M6 的验证补齐（下一步）
+### 5.3 M4 / M5 / M6 的验证补齐（下一步；M9 已在 2026-09-19 补齐）
 各自一条「验证补齐（最后做）」任务。照 M7 / M8 那两轮的做法：先用 `bun scripts/check-ac-coverage.ts --report` 看缺口，
 逐条读 AC 写能证伪它的测试（不是给旧测试贴编号），发现与 AC 不符的按 BUG 先写复现再修，最后把里程碑加进 `ACTIVE`。
 

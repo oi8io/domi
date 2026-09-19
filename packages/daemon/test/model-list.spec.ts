@@ -71,6 +71,7 @@ function setup(withConfigFile = false) {
 }
 
 class Conn implements ClientConn {
+  readonly id = 'c'
   readonly got: Array<RpcNotification | RpcResponse> = []
   send(m: RpcNotification | RpcResponse): void {
     this.got.push(m)
