@@ -150,15 +150,7 @@ export function languageItems(current: string): OverlayItem[] {
   }))
 }
 
-function SettingsOverlay({
-  client,
-  current,
-  onClose,
-}: {
-  client: DomiClient
-  current: string
-  onClose(): void
-}) {
+function SettingsOverlay({ client, current, onClose }: { client: DomiClient; current: string; onClose(): void }) {
   const [notice, setNotice] = useState<string | null>(null)
   return (
     <Overlay

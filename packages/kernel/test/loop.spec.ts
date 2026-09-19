@@ -14,9 +14,9 @@ import { StubProvider } from '@domi/model'
 import type { ToolSchema } from '@domi/protocol'
 import { SqliteEventLog } from '@domi/store'
 import {
-  DEFAULT_LIMITS,
   type Clock,
   type ContextPolicy,
+  DEFAULT_LIMITS,
   type LoopDeps,
   runTurn,
   type ToolOutcome,

@@ -8,7 +8,7 @@ import { tr } from '@domi/i18n'
 import { useState } from 'react'
 import { Button } from '../../components/ui/button.tsx'
 import { Field, Saved } from './fields.tsx'
-import { str, useSettings } from './useSettings.ts'
+import { str, type useSettings } from './useSettings.ts'
 
 const LOOP_FIELDS: Array<{ key: string; label: string; hint: string }> = [
   { key: 'loop.maxToolCalls', label: tr('web.settings.maxToolCalls'), hint: tr('web.settings.maxToolCallsHint') },

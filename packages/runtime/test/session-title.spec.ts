@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
-import { StubProvider, type ModelEvent } from '@domi/model'
+import { type ModelEvent, StubProvider } from '@domi/model'
 import { DomiSession } from '../src/index.ts'
 
 const dirs: string[] = []
@@ -43,11 +43,7 @@ function session(titleTurns: string[]) {
 }
 
 /** 标题写库是异步的（maybeAutoTitle 不阻塞 submit），轮询等到它出现 */
-async function waitTitle(
-  s: DomiSession,
-  pred: (t: string) => boolean,
-  timeoutMs = 3_000,
-): Promise<string> {
+async function waitTitle(s: DomiSession, pred: (t: string) => boolean, timeoutMs = 3_000): Promise<string> {
   const log = (s as unknown as { log: { sessions: { get(id: string): { title: string } | null } } }).log
   const deadline = Date.now() + timeoutMs
   for (;;) {
@@ -89,11 +85,13 @@ describe('PRD-M10-001 AC-1 · 第一轮结束后自动生成标题', () => {
     await waitTitle(s, (t) => t === '唯一标题')
     await s.submit('第二轮')
     await Bun.sleep(100) // 给 fire-and-forget 一点时间：若重复触发会再调一次 generateTitle
-    const title = (s as unknown as { log: { sessions: { get(id: string): { title: string } | null } } }).log.sessions
-      .get('s1')?.title
+    const title = (
+      s as unknown as { log: { sessions: { get(id: string): { title: string } | null } } }
+    ).log.sessions.get('s1')?.title
     expect(title).toBe('唯一标题')
-    calls = stub.calls.filter((c) => c.messages.some((m) => String(m.content).includes('起一个不超过 20 字的标题')))
-      .length
+    calls = stub.calls.filter((c) =>
+      c.messages.some((m) => String(m.content).includes('起一个不超过 20 字的标题')),
+    ).length
     expect(calls).toBe(1)
     await s.flushAndClose()
   }, 15_000)

@@ -147,7 +147,12 @@ export class SessionRepo {
     const rows = this.db
       .query<RawRow & { event_count: number; message_count: number }, never[]>(sql)
       .all(...(params as never[]))
-    return rows.map((r) => ({ ...toRow(r), eventCount: r.event_count, messageCount: r.message_count, ...(r.first_input ? { firstInput: r.first_input } : {}) }))
+    return rows.map((r) => ({
+      ...toRow(r),
+      eventCount: r.event_count,
+      messageCount: r.message_count,
+      ...(r.first_input ? { firstInput: r.first_input } : {}),
+    }))
   }
 
   /** 归类（M8-004）：新建时就定；老会话由宿主启动时回填 */

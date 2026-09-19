@@ -207,8 +207,7 @@ export function SettingsView({ client, tab, online }: { client: DomiClient; tab:
           {tab === 'memory' && (online ? <MemoryTab s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
           {tab === 'usage' &&
             (online ? <UsageTab client={client} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
-          {tab === 'runtime' &&
-            (online ? <RuntimeTab s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
+          {tab === 'runtime' && (online ? <RuntimeTab s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
           {(tab === 'soul' || tab === 'plugins') &&
             (online ? (
               tab === 'soul' ? (

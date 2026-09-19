@@ -8,9 +8,9 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { z } from 'zod'
 import { ConfigSchema } from '@domi/config'
 import { StubProvider } from '@domi/model'
+import { z } from 'zod'
 import { DomiSession } from '../src/index.ts'
 
 const dirs: string[] = []

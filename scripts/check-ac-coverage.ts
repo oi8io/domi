@@ -124,6 +124,6 @@ if (active.length > 0) {
   process.exit(1)
 }
 console.log(
-  `[check-ac-coverage] OK —— M0 / M1 / M7 / M8 / M9 的 ${covered.filter((c) => ACTIVE.test(c.id)).length} 条 AC 全部有测试提到；` +
+  `[check-ac-coverage] OK —— M0 / M1 / M7 / M8 / M9 / M10 的 ${covered.filter((c) => ACTIVE.test(c.id)).length} 条 AC 全部有测试提到；` +
     `其余里程碑还有 ${gaps.length - active.length} 条没在测试里点名`,
 )

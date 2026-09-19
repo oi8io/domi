@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
-import { StubProvider, type ModelEvent } from '@domi/model'
+import { type ModelEvent, StubProvider } from '@domi/model'
 import { DomiSession } from '../src/index.ts'
 
 const dirs: string[] = []

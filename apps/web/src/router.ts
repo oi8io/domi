@@ -6,7 +6,16 @@
  */
 import { atom } from 'nanostores'
 
-export const SETTINGS_TABS = ['general', 'models', 'messaging', 'memory', 'soul', 'plugins', 'usage', 'runtime'] as const
+export const SETTINGS_TABS = [
+  'general',
+  'models',
+  'messaging',
+  'memory',
+  'soul',
+  'plugins',
+  'usage',
+  'runtime',
+] as const
 export type SettingsTab = (typeof SETTINGS_TABS)[number]
 
 export type Route =

@@ -180,7 +180,10 @@ describe('PRD-M10-001 AC-2 · 列表空标题 fallback（first_input 派生列�
 
   test('空标题会话返回首条 user.input 前 40 字', async () => {
     const l = log()
-    await l.append('a', [{ t: 'user.input', text: LONG }, { t: 'model.delta', text: 'ok' }])
+    await l.append('a', [
+      { t: 'user.input', text: LONG },
+      { t: 'model.delta', text: 'ok' },
+    ])
     const row = l.sessions.list().find((x) => x.id === 'a')!
     expect(row.firstInput).toBe(LONG.slice(0, 40))
     expect(row.title).toBe('')
@@ -189,7 +192,10 @@ describe('PRD-M10-001 AC-2 · 列表空标题 fallback（first_input 派生列�
 
   test('有标题时 title 原样，firstInput 不受影响', async () => {
     const l = log()
-    await l.append('a', [{ t: 'user.input', text: '输入' }, { t: 'model.delta', text: 'ok' }])
+    await l.append('a', [
+      { t: 'user.input', text: '输入' },
+      { t: 'model.delta', text: 'ok' },
+    ])
     l.sessions.setTitle('a', '手动标题')
     const row = l.sessions.list().find((x) => x.id === 'a')!
     expect(row.title).toBe('手动标题')

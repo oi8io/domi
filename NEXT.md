@@ -1,8 +1,7 @@
-在做: **M10「会话体验与运行控制」**（2026-09-19）：M10 PRD 已 COMMITTED（用户拍板），SPEC 与任务拆分已就绪。
-      `docs/prd/M10.md` · `docs/qa/M10-prd-review.md` · `docs/spec/M10.md` · `docs/tasks/M10.md` · `docs/PRD.md` v1.13。
-      五个需求：标题接入运行时（M10-001）、默认模型互斥回归（M10-002）、运行时护栏可配置（M10-003）、
-      TUI 语言切换设置（M10-004）、思考过程默认折叠（M10-005）。
-      实现顺序：TASK-M10-000（loop 默认值 100 正式化）→ 001 → 002 → 003 → 004 → 005 → 006 收口 → 007 最后。
+在做: **M10「会话体验与运行控制」**：000–006 全部 done（2026-09-19）。
+      TASK-M10-006 收口完成：M10 进了 `check-ac-coverage` ACTIVE（224 条 AC 全点名）、协议/API 快照检查 OK
+      （`config.get` 的 loop.* 是运行值，schema 未变）、`pnpm check` 最终全绿（首轮 lint 抓出 12 个 biome 格式错，已修复）。
+      剩 **TASK-M10-007（DoD 验证，只有用户能做）**。
 
       进 M10 前的腐蚀已清：`guard:deps` 把 `apps/web/dist` 构建产物扫进架构分析导致 no-circular 红——
       `.dependency-cruiser.cjs` 的 `options.exclude` 加了 `(^|/)dist($|/)`（Vite 产物 chunk 互引是打包器正常行为，不该被拦）。
@@ -14,7 +13,7 @@
       ⚠️ 更新代码后：`pnpm install`（去掉了 `@ai-sdk/google`），并停掉已在跑的 domid（旧进程跑的是旧代码，OPT-M3-002）
 
 下一步: 用户规矩不变：**先推进功能，测试验证类最后统一查漏补缺**。
-        1. TASK-M10-000 → 001 → 002 → 003 → 004 → 005 → 006 → 007（M10 任务链，见 `docs/tasks/M10.md`）
+        1. TASK-M10-007（DoD 验证）—— M10 收尾的最后一项，只有你能做
         2. ~~TASK-M4-009 / M5-008 / M6-008~~（验证补齐）—— M10 之后
         3. TASK-M3-008（parity e2e，要先决定引不引 Playwright）、TASK-M3-009（推送延迟基准）
 

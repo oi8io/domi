@@ -119,9 +119,7 @@ function ItemBody({ item }: { item: TranscriptItem }) {
             <span className="group-open/thought:hidden">
               ▸ {tr('web.transcript.thinking')} · {summarizeReason(item.text)}
             </span>
-            <span className="hidden group-open/thought:inline">
-              ▾ {tr('web.transcript.thinking')}
-            </span>
+            <span className="hidden group-open/thought:inline">▾ {tr('web.transcript.thinking')}</span>
             {item.ms !== undefined && item.ms > 0 && (
               <span className="ml-1.5 font-mono text-[11px] text-mut2">{formatElapsed(item.ms)}</span>
             )}
