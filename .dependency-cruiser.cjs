@@ -70,6 +70,9 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
+    // 构建产物不进架构分析：Vite/tsc 生成的 chunk 互相引用是打包器的正常行为，
+    // 不该被 no-circular 当成源码循环（M10 进入前发现：apps/web/dist 首次构建后 guard:deps 红）
+    exclude: { path: '(^|/)dist($|/)' },
     tsConfig: { fileName: 'tsconfig.json' },
     tsPreCompilationDeps: true,
   },
