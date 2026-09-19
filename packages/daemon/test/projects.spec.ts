@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, test } from 'bun:test'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
@@ -38,7 +38,8 @@ class Conn implements ClientConn {
 }
 
 function tmp(prefix = 'domi-pj-'): string {
-  const d = mkdtempSync(join(tmpdir(), prefix))
+  // realpath：macOS 上 /var 是 /private/var 的符号链接，而生产代码会规范化路径，测试得用同一口径
+  const d = realpathSync(mkdtempSync(join(tmpdir(), prefix)))
   dirs.push(d)
   return d
 }

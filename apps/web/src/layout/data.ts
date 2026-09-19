@@ -49,7 +49,8 @@ export function dotOf(
 }
 
 export function titleOf(row: { id: string; title: string }): string {
-  return row.title.trim() === '' ? row.id : row.title
+  // PRD-M10-001 AC-2：daemon 已把空标题回退为首条输入前 40 字，侧栏不再显示会话 id
+  return row.title
 }
 
 /** 侧栏展开 / 折叠状态的持久化（localStorage，读写失败就只在本次生效） */

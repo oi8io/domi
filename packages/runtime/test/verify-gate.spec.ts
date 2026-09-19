@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SHELL_MAX_OUTPUT_BYTES } from '@domi/capability'
 import { ConfigSchema } from '@domi/config'
-import { StubProvider, type StubTurn } from '@domi/model'
+import { isTitleRequest, StubProvider, type StubTurn } from '@domi/model'
 import { DomiSession } from '../src/index.ts'
 
 /** onMetrics 推出来的快照里这里只关心 verify */
@@ -117,8 +117,9 @@ describe('PRD-M7-004 AC-2 · 改了没验就想结束 → 追加提示，有上�
       [2, true],
     ])
     expect(r.verify).toBe('unverified')
-    // 第一次请求 + 两次追加 = 3 次模型结束尝试（外加写文件那一步）
-    expect(stub.calls.length).toBe(4)
+    // 第一次请求 + 两次追加 = 3 次模型结束尝试（外加写文件那一步）。
+    // 过滤标题生成调用：M10-001 起第一轮结束会自动多一次标题请求（记进 calls，但不占对话轮次）
+    expect(stub.calls.filter((c) => !isTitleRequest(c)).length).toBe(4)
     await s.flushAndClose()
   })
 

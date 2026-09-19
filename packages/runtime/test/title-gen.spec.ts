@@ -32,13 +32,11 @@ function session(titleTurns: string[]) {
     cwd: tmp(),
     dbPath: join(tmp(), 'e.db'),
     clock,
-    provider: new StubProvider(
-      [
-        [{ type: 'delta', text: '好的' }], // 第一轮对话
-        ...titleTurns.map((t) => [{ type: 'delta' as const, text: t }]),
-      ],
-      { onExhausted: 'repeat-last' },
-    ),
+    provider: new StubProvider([[{ type: 'delta', text: '好的' }]], {
+      onExhausted: 'repeat-last',
+      // 标题生成是独立剧本，不占对话轮次（M10-001 起自动标题插队会打乱 turn 序列）
+      titleScript: titleTurns.map((t) => [{ type: 'delta' as const, text: t }]),
+    }),
   })
 }
 

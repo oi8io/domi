@@ -266,6 +266,7 @@ export class DomiSession {
   private modeLoaded = false
   /** 当前的计划模式是新建任务时系统开的（M8-005），不是用户切的 */
   private autoPlanned = false
+  private titleTried = false
   private planTool!: ReturnType<typeof makePlanSubmitTool>
   private currentModel: string
   private currentProvider: string
@@ -582,6 +583,29 @@ export class DomiSession {
       if (!(e instanceof StructuredOutputError)) throw e
       this.log.sessions.upsert({ id: this.opts.sessionId, cwd: this.opts.cwd, title: fallback })
       return fallback
+    }
+  }
+
+  /**
+   * 第一轮对话结束后自动生成标题 —— PRD-M10-001 AC-1。
+   *
+   * fire-and-forget：标题生成要调一次真实 LLM，不该拖住 submit 的返回。
+   * 判据（SPEC-M10 取舍-1）：本生命周期内没试过 && sessions 里还没有标题 &&
+   * 事件流里已有 assistant 事件（第一轮已产出）。
+   * 任何错误都不往外抛：标题只是标题；失败下一轮自然再试（daemon 重启后 titleTried 清零）。
+   */
+  private async maybeAutoTitle(): Promise<void> {
+    if (this.titleTried) return
+    this.titleTried = true // 先标记：并发多轮也不会重复触发
+    try {
+      const row = this.log.sessions.get(this.opts.sessionId)
+      if (row && row.title.trim() !== '') return // 已有标题（含手动重命名，AC-3）
+      const events = await this.view()
+      // 事件流里没有 assistant 类型：模型回复由 model.request + model.delta 构成，第一轮已产出 = 已有 model.delta
+      if (!events.some((e) => e.ev.t === 'model.delta')) return
+      await this.generateTitle()
+    } catch {
+      // 标题只是标题
     }
   }
 
@@ -1114,6 +1138,8 @@ export class DomiSession {
       this.busy = false
       await this.pump()
       this.listeners.onBusy?.(false)
+      // 第一轮结束后自动生成标题。不等它：LLM 调用不该拖住这一轮的结束（PRD-M10-001 AC-1）
+      void this.maybeAutoTitle()
       // 攒够轮数就抽取记忆、更新 Soul。不等它：抽取要调一次模型，不该拖住这一轮的结束
       void this.opts.memory?.afterTurn(this.opts.sessionId)
     }

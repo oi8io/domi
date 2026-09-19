@@ -255,6 +255,29 @@ describe('RuntimeHost', () => {
     const inB = () => c.events().filter((e) => e.sessionId === 'B' && e.ev.t !== 'session.kind')
     for (let i = 0; i < 100 && inB().filter((e) => e.ev.t === 'model.delta').length === 0; i++) await Bun.sleep(10)
     expect(inB()[0]?.ev).toMatchObject({ t: 'ctx.ref', sessionId: 'A', fromSeq: 1 })
-    expect(JSON.stringify(provider.calls.at(-1)?.messages)).toContain('A 的结论')
+    // M10-001 起第一轮结束后会多一次标题生成调用（LLM 替身），所以不能断言「最后一次调用」：
+    // 断言「存在一次调用把 refs 内容送进了上下文」即可
+    expect(provider.calls.some((c) => JSON.stringify(c.messages).includes('A 的结论'))).toBe(true)
   })
+})
+
+describe('PRD-M10-001 · 会话标题接入运行时（daemon 侧）', () => {
+  test('提交第一轮后 session.list 的标题自动生成（非空、不再是会话 id）', async () => {
+    const { daemon } = setup()
+    const c = new Conn('c')
+    await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    await call(daemon, c, 'session.create')
+    const r = await call(daemon, c, 'session.submit', { sessionId: 'sess-1', text: '你好' })
+    expect(r.result).toEqual({ accepted: true })
+
+    // 标题生成是 fire-and-forget（LLM 调用不阻塞 submit 返回），轮询等它落库
+    let title = ''
+    for (let i = 0; i < 200 && title === ''; i++) {
+      await Bun.sleep(10)
+      const listed = await call(daemon, c, 'session.list')
+      title = (listed.result as { sessions: Array<{ title: string }> }).sessions[0]?.title ?? ''
+    }
+    expect(title).not.toBe('')
+    expect(title).not.toBe('sess-1') // AC-2：侧栏不再显示会话 id
+  }, 15_000)
 })

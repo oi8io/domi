@@ -174,3 +174,34 @@ describe('AC-5 · 时间展示', () => {
     expect(formatRelative(now - 40 * 86_400_000, now)).toMatch(/\d{4}-\d{2}-\d{2}/)
   })
 })
+
+describe('PRD-M10-001 AC-2 · 列表空标题 fallback（first_input 派生列）', () => {
+  const LONG = '帮我把这个项目里所有用到旧版配置格式的地方都找出来并且逐个迁移到新格式上去，注意保持向后兼容'
+
+  test('空标题会话返回首条 user.input 前 40 字', async () => {
+    const l = log()
+    await l.append('a', [{ t: 'user.input', text: LONG }, { t: 'model.delta', text: 'ok' }])
+    const row = l.sessions.list().find((x) => x.id === 'a')!
+    expect(row.firstInput).toBe(LONG.slice(0, 40))
+    expect(row.title).toBe('')
+    l.close()
+  })
+
+  test('有标题时 title 原样，firstInput 不受影响', async () => {
+    const l = log()
+    await l.append('a', [{ t: 'user.input', text: '输入' }, { t: 'model.delta', text: 'ok' }])
+    l.sessions.setTitle('a', '手动标题')
+    const row = l.sessions.list().find((x) => x.id === 'a')!
+    expect(row.title).toBe('手动标题')
+    expect(row.firstInput).toBe('输入')
+    l.close()
+  })
+
+  test('没有 user.input 的会话不产生 firstInput', async () => {
+    const l = log()
+    l.sessions.upsert({ id: 'b', cwd: '/tmp/b' })
+    const row = l.sessions.list().find((x) => x.id === 'b')!
+    expect(row.firstInput).toBeUndefined()
+    l.close()
+  })
+})

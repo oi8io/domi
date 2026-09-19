@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SkillRegistry } from '@domi/capability'
 import { ConfigSchema } from '@domi/config'
-import { StubProvider } from '@domi/model'
+import { isTitleRequest, StubProvider } from '@domi/model'
 import { DomiSession, RULES_MAX_CHARS, rulesFiles, rulesText, TrustStore } from '../src/index.ts'
 
 const dirs: string[] = []
@@ -127,7 +127,8 @@ describe('PRD-M7-002 AC-3 · 未信任的工作区不加载', () => {
     expect(trust?.ev).toMatchObject({ trusted: false, source: 'default' })
     // 没人答过，不落盘：下次有人时还会问
     expect(new TrustStore(join(home, 'trust.json')).get(r)).toBeUndefined()
-    expect(stub.calls.length).toBe(1)
+    // 过滤标题生成调用（M10-001）：非交互场景不该有别的出站，标题请求除外
+    expect(stub.calls.filter((c) => !isTitleRequest(c)).length).toBe(1)
     await s.flushAndClose()
   })
 

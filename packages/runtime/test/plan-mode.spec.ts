@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
-import { StubProvider, type StubTurn } from '@domi/model'
+import { isTitleRequest, StubProvider, type StubTurn } from '@domi/model'
 import { validateSpec } from '@domi/orchestrator'
 import { z } from 'zod'
 import { DomiSession, type PendingAsk } from '../src/index.ts'
@@ -123,7 +123,8 @@ describe('PRD-M7-005 AC-1 · 计划模式下写能力一律拒绝，来源是 mo
     expect(stub.calls[0]?.tools?.some((t) => t.name === 'plan.submit')).toBe(false)
     await s.setMode('plan')
     await s.submit('二')
-    expect(stub.calls.at(-1)?.tools?.some((t) => t.name === 'plan.submit')).toBe(true)
+    const lastDialogue = stub.calls.filter((c) => !isTitleRequest(c)).at(-1)
+    expect(lastDialogue?.tools?.some((t) => t.name === 'plan.submit')).toBe(true)
     await s.flushAndClose()
   })
 })
@@ -149,8 +150,10 @@ describe('PRD-M7-005 AC-2 · plan.proposed / plan.decided，批准后切回执�
     expect(all.filter((e) => e.t === 'mode.switch').at(-1)).toMatchObject({ to: 'act' })
     expect(s.getMode()).toBe('act')
     expect(await Bun.file(join(cwd, 'a.txt')).text()).toBe('新')
-    expect(JSON.stringify(stub.calls.at(-1)?.messages)).toContain(PLAN)
-    expect(JSON.stringify(stub.calls.at(-1)?.messages)).toContain('顺手加个换行')
+    // 标题生成调用会记进 calls 且时序不定：断言最后一次**对话**调用
+    const last = stub.calls.filter((c) => !isTitleRequest(c)).at(-1)
+    expect(JSON.stringify(last?.messages)).toContain(PLAN)
+    expect(JSON.stringify(last?.messages)).toContain('顺手加个换行')
     await s.flushAndClose()
   })
 
@@ -167,7 +170,7 @@ describe('PRD-M7-005 AC-2 · plan.proposed / plan.decided，批准后切回执�
       comment: '不要动 lockfile',
     })
     expect(s.getMode()).toBe('plan')
-    expect(JSON.stringify(stub.calls.at(-1)?.messages)).toContain('不要动 lockfile')
+    expect(JSON.stringify(stub.calls.filter((c) => !isTitleRequest(c)).at(-1)?.messages)).toContain('不要动 lockfile')
     await s.flushAndClose()
   })
 

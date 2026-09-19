@@ -35,6 +35,8 @@ export type SessionKind = 'chat' | 'task'
 export interface SessionSummary extends SessionRow {
   messageCount: number
   eventCount: number
+  /** 本会话首条 user.input 前 40 字（列表空标题 fallback，SPEC-M10 取舍-2）。事件流是真相，这是读时算的派生值 */
+  firstInput?: string
 }
 
 interface RawRow {
@@ -50,6 +52,7 @@ interface RawRow {
   spawned_by: string | null
   kind?: string | null
   project_id?: string | null
+  first_input?: string | null
 }
 
 function toRow(r: RawRow): SessionRow {
@@ -128,7 +131,9 @@ export class SessionRepo {
     const sql = `
       SELECT s.*,
              (SELECT COUNT(*) FROM events e WHERE e.session_id = s.id) AS event_count,
-             (SELECT COUNT(*) FROM events e WHERE e.session_id = s.id AND e.type = 'user.input') AS message_count
+             (SELECT COUNT(*) FROM events e WHERE e.session_id = s.id AND e.type = 'user.input') AS message_count,
+             (SELECT substr(json_extract(e.payload, '$.text'), 1, 40) FROM events e
+              WHERE e.session_id = s.id AND e.type = 'user.input' ORDER BY e.seq LIMIT 1) AS first_input
       FROM sessions s
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY s.updated_at DESC, s.created_at DESC
@@ -142,7 +147,7 @@ export class SessionRepo {
     const rows = this.db
       .query<RawRow & { event_count: number; message_count: number }, never[]>(sql)
       .all(...(params as never[]))
-    return rows.map((r) => ({ ...toRow(r), eventCount: r.event_count, messageCount: r.message_count }))
+    return rows.map((r) => ({ ...toRow(r), eventCount: r.event_count, messageCount: r.message_count, ...(r.first_input ? { firstInput: r.first_input } : {}) }))
   }
 
   /** 归类（M8-004）：新建时就定；老会话由宿主启动时回填 */

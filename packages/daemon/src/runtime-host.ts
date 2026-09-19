@@ -598,7 +598,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       const read = index.readMarks.states(rows.map((r) => r.id))
       return rows.map((r) => ({
         id: r.id,
-        title: r.title,
+        // 空标题回退首条输入前 40 字（PRD-M10-001 AC-2，SPEC-M10 取舍-2）——别再让侧栏显示会话 id
+        title: r.title.trim() !== '' ? r.title : (r.firstInput ?? ''),
         model: r.model,
         updatedAt: r.updatedAt,
         eventCount: r.eventCount,
