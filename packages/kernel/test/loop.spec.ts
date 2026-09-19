@@ -14,6 +14,7 @@ import { StubProvider } from '@domi/model'
 import type { ToolSchema } from '@domi/protocol'
 import { SqliteEventLog } from '@domi/store'
 import {
+  DEFAULT_LIMITS,
   type Clock,
   type ContextPolicy,
   type LoopDeps,
@@ -100,12 +101,13 @@ describe('PRD-M0-002 · 基本闭环', () => {
   })
 })
 
-describe('PRD-M0-002 AC-2 · 20 次工具循环后强制停止', () => {
+describe('PRD-M0-002 AC-2 · 单轮达到 maxToolCalls 时强制停止', () => {
   test('第 20 次后停，产出 error{recoverable:true} 且带三个计数器', async () => {
     const provider = new StubProvider([[{ type: 'tool-call', id: 'c', name: 'fs.read', args: {} }]], {
       onExhausted: 'repeat-last',
     })
-    const d = deps({ provider, tools: runner(() => ({ ok: true, payload: 1 })) })
+    // fixture 注入 20，不依赖 DEFAULT_LIMITS（M10-003 起默认值 100，见 TASK-M10-000）
+    const d = deps({ provider, tools: runner(() => ({ ok: true, payload: 1 })), limits: { maxToolCalls: 20 } })
     const r = await runTurn(d, 's1', 'loop')
 
     expect(r.stopReason).toBe('max_tool_calls')
@@ -119,6 +121,12 @@ describe('PRD-M0-002 AC-2 · 20 次工具循环后强制停止', () => {
       argParseRetries: 0,
       elapsedMs: expect.any(Number),
     })
+  })
+
+  test('DEFAULT_LIMITS 默认 maxToolCalls = 100（M10-003 AC-1，TASK-M10-000 把工作区改动坐实）', () => {
+    expect(DEFAULT_LIMITS.maxToolCalls).toBe(100)
+    expect(DEFAULT_LIMITS.maxArgParseRetries).toBe(3)
+    expect(DEFAULT_LIMITS.maxWallClockMs).toBe(10 * 60_000)
   })
 
   test('BUG-M3-014 · 停下时没来得及跑的调用也配上结果，下一轮的上下文仍然一致', async () => {

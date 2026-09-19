@@ -28,7 +28,7 @@ export interface LoopLimits {
 }
 
 export const DEFAULT_LIMITS: LoopLimits = {
-  maxToolCalls: 20,
+  maxToolCalls: 100,
   maxArgParseRetries: 3,
   maxWallClockMs: 10 * 60_000,
 }
