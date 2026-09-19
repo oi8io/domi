@@ -40,6 +40,8 @@ export interface DoctorInput {
   ripgrep?: string | null | undefined
   /** 配置里没写 vendor、按键名推断出来的 provider（PRD-M9-002 AC-7）。只提示，不算问题 */
   inferredProviders?: Array<{ id: string; vendor: string; protocol: string }> | undefined
+  /** 运行时护栏（PRD-M10-003）：config.loop 的 limits。没给就不查 */
+  loop?: { maxToolCalls: number; maxArgParseRetries: number; maxWallClockMs: number } | undefined
 }
 
 export interface PingResult {
@@ -94,6 +96,15 @@ export function diagnose(input: DoctorInput): Finding[] {
           fix: `$ mkdir -p ${dirname(input.configPath)} && domi init > ${input.configPath}`,
         },
   )
+
+  if (input.loop) {
+    out.push({
+      ok: true,
+      title: tr('cli.doctor.loop'),
+      detail: tr('cli.doctor.loopDetail', input.loop),
+      fix: null,
+    })
+  }
 
   if (input.legacyConfig) {
     const { path, ignored } = input.legacyConfig

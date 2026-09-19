@@ -61,6 +61,21 @@ describe('PRD-M8-011 AC-2 / AC-4 · 白名单之外一律拒绝，注释与写�
     expect(loadConfig(opts).context.compactAt).toBe(75)
   })
 
+  test('PRD-M10-003：loop.* 三键在白名单里，写得了也读得回；非法值整体拒绝且文件不动', () => {
+    const { cfg, opts } = home()
+    writeConfigPatch({ 'loop.maxToolCalls': 5, 'loop.maxArgParseRetries': 2, 'loop.maxWallClockMs': 30_000 }, opts)
+    expect(loadConfig(opts).loop).toEqual({ maxToolCalls: 5, maxArgParseRetries: 2, maxWallClockMs: 30_000 })
+    const read = readSettings(opts)
+    expect(read.values['loop.maxToolCalls']).toBe(5)
+    expect(read.values['loop.maxArgParseRetries']).toBe(2)
+    expect(read.values['loop.maxWallClockMs']).toBe(30_000)
+    for (const bad of [{ 'loop.maxToolCalls': -1 }, { 'loop.maxToolCalls': 1001 }, { 'loop.maxWallClockMs': 500 }]) {
+      expect(() => writeConfigPatch(bad as never, opts)).toThrow(ConfigWriteError)
+    }
+    expect(readFileSync(cfg, 'utf8')).toContain('maxToolCalls: 5')
+    expect(readFileSync(cfg, 'utf8')).not.toContain('maxToolCalls: -1')
+  })
+
   test('值不合法时也整体拒绝（先在副本上校验过才写真文件）', () => {
     const { cfg, opts } = home()
     expect(() => writeConfigPatch({ 'ui.accent': 'red' } as never, opts)).toThrow()

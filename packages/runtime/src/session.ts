@@ -1112,6 +1112,12 @@ export class DomiSession {
           clock: this.opts.clock ?? { now: () => Date.now() },
           policy,
           model: this.currentModel,
+          // 运行时护栏（PRD-M10-003 AC-3）：kernel 不读配置，只收 LoopLimits；缺省与 DEFAULT_LIMITS 一致
+          limits: {
+            maxToolCalls: this.opts.config.loop.maxToolCalls,
+            maxArgParseRetries: this.opts.config.loop.maxArgParseRetries,
+            maxWallClockMs: this.opts.config.loop.maxWallClockMs,
+          },
           refs: { resolve: (ref) => this.readRef(ref) },
           inputs: {
             upload: async (ref) =>

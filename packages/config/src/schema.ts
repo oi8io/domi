@@ -258,6 +258,18 @@ export const ConfigSchema = z.object({
       compactAt: z.number().int().min(30).max(95).default(70),
     })
     .default({ maxTokens: 150_000, includeReasoning: false, strategy: 'full', keepTurns: 2, compactAt: 70 }),
+  /**
+   * 运行时护栏（PRD-M10-003 AC-1）：一轮的中断条件。
+   * 缺省值与 kernel 的 DEFAULT_LIMITS 一致；runtime 从配置读并传进 runTurn 的 deps.limits，
+   * kernel 不读配置（INV-02 不回退），只收 LoopLimits
+   */
+  loop: z
+    .object({
+      maxToolCalls: z.number().int().min(1).max(1000).default(100),
+      maxArgParseRetries: z.number().int().min(1).max(100).default(3),
+      maxWallClockMs: z.number().int().min(1_000).max(86_400_000).default(600_000),
+    })
+    .default({ maxToolCalls: 100, maxArgParseRetries: 3, maxWallClockMs: 600_000 }),
   /** 上传附件（PRD-M8-010 AC-3）：单个上限，MB */
   attachments: z.object({ maxMB: z.number().positive().max(200).default(20) }).default({ maxMB: 20 }),
 })

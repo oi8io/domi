@@ -26,6 +26,7 @@ import { Notice, Page } from './Page.tsx'
 import { Field, Saved, ToggleRow } from './settings/fields.tsx'
 import { PluginsTab } from './settings/PluginsTab.tsx'
 import { ProvidersTab } from './settings/ProvidersTab.tsx'
+import { RuntimeTab } from './settings/RuntimeTab.tsx'
 import { SoulTab } from './settings/SoulTab.tsx'
 import { UsageTab } from './settings/UsageTab.tsx'
 import { str, useSettings } from './settings/useSettings.ts'
@@ -38,6 +39,7 @@ const TABS = (): Array<[SettingsTab, string]> => [
   ['soul', tr('web.settings.soul')],
   ['plugins', tr('web.settings.plugins')],
   ['usage', tr('web.settings.usage')],
+  ['runtime', tr('web.settings.runtime')],
 ]
 
 type TabProps = { s: ReturnType<typeof useSettings> }
@@ -205,6 +207,8 @@ export function SettingsView({ client, tab, online }: { client: DomiClient; tab:
           {tab === 'memory' && (online ? <MemoryTab s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
           {tab === 'usage' &&
             (online ? <UsageTab client={client} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
+          {tab === 'runtime' &&
+            (online ? <RuntimeTab s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
           {(tab === 'soul' || tab === 'plugins') &&
             (online ? (
               tab === 'soul' ? (

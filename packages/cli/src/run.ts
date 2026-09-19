@@ -201,6 +201,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         model: cfg.model.name,
         plugins: await pluginDoctor(cfg.plugins.allowUnsandboxed),
         ripgrep: Bun.which('rg'),
+        loop: cfg.loop,
         inferredProviders: listProviders(cfg)
           .filter((p) => p.inferred && cfg.providers[p.id] !== undefined)
           .map((p) => ({ id: p.id, vendor: p.vendor, protocol: p.protocol })),

@@ -56,6 +56,18 @@ describe('AC-4 · doctor 的每条问题都带可执行命令', () => {
     }
   })
 
+  test('PRD-M10-003：传了 loop 就显示生效的限制；没传不查', () => {
+    const f = diagnose({
+      ...BASE,
+      loop: { maxToolCalls: 200, maxArgParseRetries: 5, maxWallClockMs: 1_200_000 },
+    }).find((x) => x.ok && x.title.includes('运行时护栏'))
+    expect(f).toBeDefined()
+    expect(f!.detail).toContain('maxToolCalls=200')
+    expect(f!.detail).toContain('maxArgParseRetries=5')
+    expect(f!.detail).toContain('maxWallClockMs=1200000')
+    expect(diagnose(BASE).find((x) => x.title.includes('运行时护栏'))).toBeUndefined()
+  })
+
   test('渲染后的输出里，每个问题下面都能匹配到 ^\\$ .+', () => {
     const out = formatFindings(diagnose(BASE))
     const cmdLines = out.split('\n').filter((l) => /^\s*\$ .+/.test(l))

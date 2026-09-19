@@ -221,10 +221,10 @@ describe('PRD-M8-006 AC-2 · 改动条：N 个文件改动 · 查看 · 带回',
   })
 })
 
-describe('PRD-M8-012 AC-1 / AC-3 · 设置页 7 个 tab，通讯工具是「即将支持」', () => {
-  test('左侧 7 个 tab，地址里带 tab', () => {
+describe('PRD-M8-012 AC-1 / AC-3 · 设置页 8 个 tab（M10-003 加运行时），通讯工具是「即将支持」', () => {
+  test('左侧 8 个 tab，地址里带 tab', () => {
     const html = renderToStaticMarkup(<SettingsView client={client} tab="general" online={false} />)
-    for (const label of ['通用', '模型供应商', '通讯工具', '记忆管理', 'Soul 与人格', '插件', '用量统计']) {
+    for (const label of ['通用', '模型供应商', '通讯工具', '记忆管理', 'Soul 与人格', '插件', '用量统计', '运行时']) {
       expect(html).toContain(label)
     }
     expect(html).toContain('href="#/settings/plugins"')

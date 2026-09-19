@@ -205,6 +205,13 @@ export const en: Record<keyof typeof zh, string> = {
   'web.settings.soul': 'Soul & persona',
   'web.settings.plugins': 'Plugins',
   'web.settings.usage': 'Usage',
+  'web.settings.runtime': 'Runtime',
+  'web.settings.maxToolCalls': 'Max tool calls per turn',
+  'web.settings.maxToolCallsHint': 'How many tool calls one turn may make (1-1000, default 100)',
+  'web.settings.maxArgParseRetries': 'Max arg-parse retries',
+  'web.settings.maxArgParseRetriesHint': 'Retries when tool-arg parsing fails (1-100, default 3)',
+  'web.settings.maxWallClockMs': 'Max wall-clock per turn (ms)',
+  'web.settings.maxWallClockMsHint': 'Wall-clock budget for one turn (1000-86400000, default 600000)',
   'web.settings.language': 'Interface language',
   'web.settings.languageHint':
     "Language domi's interface is shown in; shared by Web and TUI. The page reloads after switching",
@@ -732,6 +739,9 @@ export const en: Record<keyof typeof zh, string> = {
   'cli.doctor.connectivity': 'Connectivity',
   'cli.doctor.pingDetail': '{detail} ({ms}ms)',
   'cli.doctor.unreachable': "Can't reach the model endpoint",
+  'cli.doctor.loop': 'Runtime guards',
+  'cli.doctor.loopDetail':
+    'Per turn: maxToolCalls={maxToolCalls} · maxArgParseRetries={maxArgParseRetries} · maxWallClockMs={maxWallClockMs}',
   'cli.doctor.dataOk': 'Data directory is writable',
   'cli.doctor.dataBad': 'Data directory is not writable',
   'cli.doctor.dataBadDetail': "Can't write to {dataDir}, so sessions can't be saved.",

@@ -51,6 +51,9 @@ export const WRITABLE_KEYS: readonly string[] = [
   'tui.theme',
   'tui.renderer',
   'tui.mouse',
+  'loop.maxToolCalls',
+  'loop.maxArgParseRetries',
+  'loop.maxWallClockMs',
 ]
 
 /** 每个 provider 能改的字段（PRD-M9-002 AC-8）。能力覆盖是模型特性，不是权限，放开 */
@@ -274,6 +277,9 @@ export function readSettings(opts: LoadOptions = {}): SettingsView {
     'tui.theme': cfg.tui.theme,
     'tui.renderer': cfg.tui.renderer,
     'tui.mouse': cfg.tui.mouse,
+    'loop.maxToolCalls': cfg.loop.maxToolCalls,
+    'loop.maxArgParseRetries': cfg.loop.maxArgParseRetries,
+    'loop.maxWallClockMs': cfg.loop.maxWallClockMs,
   }
   const ctx = { env, file, secrets, defaultProvider: cfg.model.provider }
   const secretView: SettingsView['secrets'] = {}
