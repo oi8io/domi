@@ -9,6 +9,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
+import { tr } from '@domi/i18n'
 import { StubProvider, type StubTurn } from '@domi/model'
 import { PROTOCOL_VERSION, type RpcNotification, type RpcRequest, type RpcResponse } from '@domi/protocol'
 import { type ClientConn, createRuntimeHost, Daemon, type RuntimeHost } from '../src/index.ts'
@@ -260,6 +261,21 @@ describe('PRD-M8-009 AC-1 / AC-2 · 未读与 sessions.changed', () => {
 
 describe('PRD-M10-001 AC-2 · 项目展开列表（recentTasks）空标题 fallback first_input', () => {
   const LONG = '帮我把这个项目里所有用到旧版配置格式的地方都找出来并且逐个迁移到新格式上去，注意保持向后兼容'
+
+  test('新会话（还没有任何输入）标题回退到默认「新会话」，不空着', async () => {
+    const { call } = setup(undefined, [])
+    await call('handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
+    const dir = repo()
+    const created = (await call('session.create', { cwd: dir })) as { sessionId: string }
+
+    // 不 submit：没有 user.input，first_input 派生列为 NULL
+    const listed = (await call('session.list')) as { sessions: Array<{ id: string; title: string }> }
+    expect(listed.sessions.find((x) => x.id === created.sessionId)?.title).toBe(tr('daemon.sessions.untitled'))
+    const plist = (await call('project.list')) as {
+      projects: Array<{ recentTasks: Array<{ id: string; title: string }> }>
+    }
+    expect(plist.projects[0]?.recentTasks[0]?.title).toBe(tr('daemon.sessions.untitled'))
+  })
 
   test('空标题任务在 project.list 的 recentTasks 里回退首条输入前 40 字', async () => {
     const { call } = setup(undefined, []) // titleScript=[]：标题生成不产出，标题保持空

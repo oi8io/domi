@@ -222,7 +222,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...t,
         busy: false,
         // 空标题回退首条输入前 40 字（PRD-M10-001 AC-2）——项目展开列表与 session.list 同一口径
-        title: t.title.trim() !== '' ? t.title : (t.firstInput ?? ''),
+        title: t.title.trim() !== '' ? t.title : (t.firstInput ?? tr('daemon.sessions.untitled')),
       })),
     }
   }
@@ -604,7 +604,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       return rows.map((r) => ({
         id: r.id,
         // 空标题回退首条输入前 40 字（PRD-M10-001 AC-2，SPEC-M10 取舍-2）——别再让侧栏显示会话 id
-        title: r.title.trim() !== '' ? r.title : (r.firstInput ?? ''),
+        title: r.title.trim() !== '' ? r.title : (r.firstInput ?? tr('daemon.sessions.untitled')),
         model: r.model,
         updatedAt: r.updatedAt,
         eventCount: r.eventCount,
@@ -796,7 +796,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
             ...t,
             busy: false,
             // 空标题回退首条输入前 40 字（PRD-M10-001 AC-2）——项目展开列表与 session.list 同一口径
-            title: t.title.trim() !== '' ? t.title : (t.firstInput ?? ''),
+            title: t.title.trim() !== '' ? t.title : (t.firstInput ?? tr('daemon.sessions.untitled')),
           })),
         }))
       },

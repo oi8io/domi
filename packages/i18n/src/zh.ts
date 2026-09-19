@@ -1210,6 +1210,7 @@ server:
   'error.worktree.op.readBranch': '读分支',
   'error.worktree.op.readChangeList': '读改动清单',
   'error.worktree.op.remove': '清理隔离工作区',
+  'daemon.sessions.untitled': '新会话',
   'daemon.notify.done': '任务完成：{name}',
   'daemon.notify.failed': '任务失败：{name}',
   'daemon.notify.allDone': '{count} 个节点全部完成',

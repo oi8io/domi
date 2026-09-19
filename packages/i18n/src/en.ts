@@ -1269,6 +1269,7 @@ server:
   'error.worktree.op.readBranch': 'Reading the branch',
   'error.worktree.op.readChangeList': 'Reading the change list',
   'error.worktree.op.remove': 'Removing the isolated workspace',
+  'daemon.sessions.untitled': 'New chat',
   'daemon.notify.done': 'Task done: {name}',
   'daemon.notify.failed': 'Task failed: {name}',
   'daemon.notify.allDone': 'All {count, plural, one {# node} other {# nodes}} done',

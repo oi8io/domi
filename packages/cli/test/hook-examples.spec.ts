@@ -24,7 +24,7 @@ function repo(): string {
   return d
 }
 // 拼出来的假凭据：源码里不出现完整的样子，免得被别的扫描器当真
-const FAKE_KEY = ['sk', 'ant', 'x'.repeat(8) + 'FAKEFAKEFAKEFAKE1234'].join('-')
+const FAKE_KEY = ['sk', 'ant', `${'x'.repeat(8)}FAKEFAKEFAKEFAKE1234`].join('-')
 
 describe('PRD-M7-003 AC-6 · 模板里有两个示例钩子', () => {
   test('init 模板的 hooks 段引用 domi hook commit-msg 与 domi hook secrets', () => {
