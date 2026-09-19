@@ -28,6 +28,7 @@ export interface LoopLimits {
 }
 
 export const DEFAULT_LIMITS: LoopLimits = {
+  // M10-003 AC-1：loop 默认上限 100（config.loop 缺省与之一致；TASK-M10-000 坐实，勿回退 20）
   maxToolCalls: 100,
   maxArgParseRetries: 3,
   maxWallClockMs: 10 * 60_000,
