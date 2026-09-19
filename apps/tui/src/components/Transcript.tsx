@@ -190,6 +190,14 @@ export function transcriptLines(items: readonly TranscriptItem[], width: number,
 }
 
 /**
+ * Ctrl+O 写进终端原生回滚区的内容（PRD-M9-005 AC-4）：**完整**对话，按 classic 的样子（同一个 <Line>），末尾一行回去的提示。
+ * 在按键回调里调（不在 React 渲染里），见 itemLines 的警告
+ */
+export function dumpText(items: readonly TranscriptItem[], width: number, theme: TuiTheme): string {
+  return `${transcriptLines(items, width, theme).join('\n')}\n\n${tr('tui.scroll.dumpHint')}\n`
+}
+
+/**
  * 组件里拿显示行的唯一入口：条目 / 宽度 / 主题变了之后，在 setImmediate 里（React 的工作循环之外）重算。
  * 代价是新内容晚一个事件循环出现，换来的是不和 Ink 的 reconciler 抢
  */

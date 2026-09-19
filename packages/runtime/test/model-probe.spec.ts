@@ -78,7 +78,7 @@ describe('PRD-M9-001 AC-1 · 两种协议的请求', () => {
 })
 
 describe('PRD-M9-001 AC-2 · 探测失败降级，一家失败不影响别家', () => {
-  test('401 / 非 2xx / 网络错误 / 形状不对 → 这一家降级为手填 + 默认模型，原因里没有 key', async () => {
+  test('401 / 非 2xx / 网络错误 / 形状不对 → 这一家降级为手填 + 默认模型、条目都标 fallback，原因里没有 key', async () => {
     for (const bad of [
       () => json({ error: 'nope' }, 401),
       () => json({}, 503),
@@ -105,7 +105,8 @@ describe('PRD-M9-001 AC-2 · 探测失败降级，一家失败不影响别家', 
       expect(gw?.error).toBeDefined()
       expect(JSON.stringify(r)).not.toContain('sk-gw-secret')
       expect(r.models.filter((m) => m.provider === 'gw').map((m) => [m.name, m.source])).toEqual([
-        ['qwen3', 'manual'],
+        // AC-2：降级来的本地清单整份标 fallback（BUG-M9-003 之前手填的那条标成了 manual）
+        ['qwen3', 'fallback'],
         ['glm-4.6', 'fallback'],
       ])
       expect(r.models.filter((m) => m.provider === 'deepseek').map((m) => m.name)).toEqual(['deepseek-chat'])

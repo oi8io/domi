@@ -40,7 +40,7 @@ import { App } from './App.tsx'
 import { completeSlash, parseSlash } from './commands.ts'
 import { editAction, Prompt } from './components/Prompt.tsx'
 import { SlashHints } from './components/SlashHints.tsx'
-import { transcriptLines } from './components/Transcript.tsx'
+import { dumpText } from './components/Transcript.tsx'
 import { connectChat, connectDaemon } from './connect.ts'
 import { moveOf, routeKey } from './keys.ts'
 import { type OverlayState, Overlays } from './overlays/Overlays.tsx'
@@ -231,10 +231,10 @@ export function Root({
    * 这时终端自带的搜索与选择复制都能用；Ink 的 suspendTerminal 负责离开 / 回到备用屏并整屏重画
    */
   const dump = useCallback(() => {
-    const lines = transcriptLines(store.$items.get(), process.stdout.columns ?? 80, theme)
+    const text = dumpText(store.$items.get(), process.stdout.columns ?? 80, theme)
     void suspendTerminal(async () => {
       if (mouse) process.stdout.write(MOUSE_OFF)
-      process.stdout.write(`${lines.join('\n')}\n\n${tr('tui.scroll.dumpHint')}\n`)
+      process.stdout.write(text)
       await waitAnyKey()
       if (mouse) process.stdout.write(MOUSE_ON)
     })

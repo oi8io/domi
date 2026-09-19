@@ -301,3 +301,45 @@ describe('PRD-M8-015 AC-5 · `/` 命令补全', () => {
     h.unmount()
   })
 })
+
+describe('PRD-M9-005 AC-7 / AC-6 · fullscreen 下输入区照旧：Enter 发送、Ctrl+J 换行；滚动键与鼠标上报不进输入框', () => {
+  const fullscreen = (calls: unknown[][]) => (
+    <Root
+      store={createSessionStore({ provider: 'x', model: 'y' })}
+      client={fakeClient(calls)}
+      sessionId="s1"
+      theme={makeTheme()}
+      renderer="fullscreen"
+    />
+  )
+
+  test('Ctrl+J 换行、Enter 把两行一起发出去（fullscreen 的滚动拦截没吃掉它们）', async () => {
+    const calls: unknown[][] = []
+    const h = renderAt(80, fullscreen(calls))
+    await h.flush()
+    await h.press('h', 'i', KEYS.ctrl('j'), 'x', KEYS.enter)
+    await h.flush()
+    const submit = calls.find((c) => c[0] === 'submit')
+    expect(submit?.[1]).toBe('s1')
+    expect(submit?.[2]).toBe('hi\nx')
+    h.unmount()
+  })
+
+  test('PgUp / PgDn、滚轮上报都不会变成输入框里的字；空输入框没有 › 与占位，上下两条横边框', async () => {
+    const h = renderAt(80, fullscreen([]))
+    await h.flush()
+    await h.press('\u001b[5~', '\u001b[6~', '\u001b[<64;10;5M', '\u001b[<65;10;5M')
+    await h.flush()
+    const frame = h.lastFrame()
+    expect(frame).not.toContain('<64')
+    expect(frame).not.toContain('[5~')
+    // 输入区：上下各一条横线（不闭合：没有竖边），中间那行除了光标什么都没有（顶栏的 › 是面包屑，不算）
+    const lines = frame.split('\n')
+    const rules = lines.flatMap((l, i) => (/^─{20,}$/.test(l.trim()) ? [i] : []))
+    expect(rules).toHaveLength(2)
+    const [top = 0, bottom = 0] = rules
+    expect(bottom - top).toBe(2)
+    expect(lines[top + 1]?.trim()).toBe('')
+    h.unmount()
+  })
+})

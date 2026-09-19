@@ -14,7 +14,7 @@ import { tr } from '@domi/i18n'
 import type { DomiEvent } from '@domi/protocol'
 import { renderToString } from 'ink'
 import { App } from '../src/App.tsx'
-import { settledCount, transcriptLines, Viewport } from '../src/components/Transcript.tsx'
+import { dumpText, settledCount, Transcript, transcriptLines, Viewport } from '../src/components/Transcript.tsx'
 import { clearFallback, fallbackMarked, markFallback } from '../src/render/fallback.ts'
 import {
   applyScroll,
@@ -33,6 +33,10 @@ import {
 } from '../src/render/viewport.ts'
 import { makeTheme, ThemeContext } from '../src/theme.ts'
 import { renderAt } from './render.tsx'
+
+/** ANSI 颜色：量宽度、比内容之前先去掉 */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI 转义本来就以 ESC 开头
+const ANSI = /\u001b\[[0-9;]*m/g
 
 function longSession(n: number) {
   const store = createSessionStore({ model: 'stub-1', provider: 'stub' })
@@ -103,8 +107,7 @@ describe('PRD-M9-005 AC-2 · 只渲染可见的行，右侧滚动条按比例', 
     const wide = transcriptLines(items, 80, theme)
     expect(narrow.length).toBeGreaterThan(wide.length)
     const width = (s: string) =>
-      // biome-ignore lint/suspicious/noControlCharactersInRegex: 去掉 ANSI 颜色再量宽度
-      [...s.replace(/\u001b\[[0-9;]*m/g, '')].reduce((n, c) => n + ((c.codePointAt(0) ?? 0) > 0x2e80 ? 2 : 1), 0)
+      [...s.replace(ANSI, '')].reduce((n, c) => n + ((c.codePointAt(0) ?? 0) > 0x2e80 ? 2 : 1), 0)
     for (const l of narrow) expect(width(l)).toBeLessThanOrEqual(20)
   })
 })
@@ -208,5 +211,30 @@ describe('PRD-M9-005 AC-5 · classic：已完成的条目进 Static，只输出�
     expect(settledCount([item(1, 'user'), item(2, 'assistant')])).toBe(1)
     expect(settledCount([item(1, 'user'), item(2, 'tool-call'), item(3, 'reason'), item(4, 'assistant')])).toBe(1)
     expect(settledCount([item(1, 'user'), item(2, 'tool-call'), item(3, 'tool-result'), item(4, 'assistant')])).toBe(3)
+  })
+})
+
+describe('PRD-M9-005 AC-4 · Ctrl+O 写进回滚区的是完整对话、classic 的样子', () => {
+  test('滚到哪都一样：100 条全在，和 classic 直接渲染逐行一致，末尾告诉用户按任意键回去', () => {
+    const store = longSession(100)
+    const items = store.$items.get()
+    const theme = makeTheme()
+    const text = dumpText(items, 80, theme)
+    expect(text).toContain('msg-0\n')
+    expect(text).toContain('msg-99')
+    const classic = renderToString(
+      <ThemeContext.Provider value={theme}>
+        <Transcript items={items} />
+      </ThemeContext.Provider>,
+      { columns: 80 },
+    )
+    const plain = (s: string) =>
+      s
+        .replace(ANSI, '')
+        .split('\n')
+        .map((l) => l.trimEnd())
+        .filter((l) => l !== '')
+    expect(plain(text).slice(0, -1)).toEqual(plain(classic))
+    expect(text.trimEnd().endsWith(tr('tui.scroll.dumpHint'))).toBe(true)
   })
 })

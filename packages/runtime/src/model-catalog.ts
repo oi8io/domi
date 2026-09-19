@@ -97,7 +97,9 @@ export class ModelCatalog {
       })
       const names = new Map<string, ModelSource>()
       for (const id of r.ids ?? []) if (isChatModel(id)) names.set(id, 'probe')
-      for (const m of p.models) if (!names.has(m)) names.set(m, 'manual')
+      // 探测成功时，手填的是「补充」（manual）；探测失败时整份本地清单都是降级来的（AC-2：source = fallback，BUG-M9-003）
+      const local: ModelSource = r.ids === undefined ? 'fallback' : 'manual'
+      for (const m of p.models) if (!names.has(m)) names.set(m, local)
       if (p.id === current.provider && !names.has(current.name)) names.set(current.name, 'fallback')
       for (const [name, source] of names) {
         const caps = capabilitiesFor(providerConfigOf(p, name))

@@ -75,6 +75,18 @@ describe('事件流投影', () => {
     ])
   })
 
+  test('PRD-M9-003 AC-7 · 带 provider 的切换（schema 12）：条目里标出 provider，失去的能力照列', () => {
+    seq = 0
+    const s = createSessionStore()
+    s.applyEvents([
+      env({ t: 'model.switch', from: 'claude-sonnet', to: 'qwen', provider: 'local', lostCapabilities: ['toolCall'] }),
+    ])
+    const [item] = s.$items.get()
+    expect(item?.text).toContain('qwen')
+    expect(item?.text).toContain('local')
+    expect(item?.summary).toContain('toolCall')
+  })
+
   test('工具调用之后的 delta 另起一条，不会拼到前一段上', () => {
     seq = 0
     const s = createSessionStore()
