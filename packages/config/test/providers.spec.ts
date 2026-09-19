@@ -155,6 +155,32 @@ describe('PRD-M9-002 · provider 的增删改（config.set 白名单）', () => 
     expect(providerConnection(loadConfig(h.opts), 'anthropic').enabled).toBe(false)
   })
 
+  test('PRD-M10-002 AC-1（回归）：设新默认后旧默认的保护解除，新默认接管', () => {
+    const h = home(`${BASE}providers:\n  anthropic:\n    base_url: https://a.example\n  deepseek: {}\n`)
+    // 当前 anthropic 是默认：删它被拒
+    try {
+      writeConfigPatch({ 'providers.anthropic': null }, h.opts)
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect((e as ConfigWriteError).reason).toBe('DEFAULT_PROVIDER')
+    }
+    // 「设为默认」= 写 model.provider + model.name（Web 补丁的等价物）
+    writeConfigPatch({ 'model.provider': 'deepseek', 'model.name': 'deepseek-chat' }, h.opts)
+    const cfg = loadConfig(h.opts)
+    expect(cfg.model.provider).toBe('deepseek')
+    expect(cfg.model.name).toBe('deepseek-chat')
+    // 新默认接管保护：deepseek 不能停/删
+    try {
+      writeConfigPatch({ 'providers.deepseek': null }, h.opts)
+      throw new Error('should have thrown')
+    } catch (e) {
+      expect((e as ConfigWriteError).reason).toBe('DEFAULT_PROVIDER')
+    }
+    // 旧默认保护解除：anthropic 现在可以停用
+    writeConfigPatch({ 'providers.anthropic.enabled': false }, h.opts)
+    expect(providerConnection(loadConfig(h.opts), 'anthropic').enabled).toBe(false)
+  })
+
   test('AC-7：旧配置照读，按键名推断 vendor；设置页标出 inferred', () => {
     const h = home(`${BASE}providers:\n  openai-compatible:\n    base_url: http://localhost:4000/v1\n  google: {}\n`)
     const cfg = loadConfig(h.opts)
