@@ -144,7 +144,7 @@ describe('切换之后，发出去的请求真的换了模型（2026-09-15 发�
       await s.submit('第二轮')
       // 过滤标题生成请求（M10-001）：它会多发一个请求到网关，model 是当前模型，与切换断言无关
       expect(
-        bodies.filter((b) => !JSON.stringify(b.messages).includes('起一个不超过 20 字的标题')).map((b) => b.model),
+        bodies.filter((b) => !JSON.stringify(b).includes('起一个不超过 20 字的标题')).map((b) => b.model),
       ).toEqual(['model-a', 'model-b'])
       expect(s.modelInfo()).toEqual({ provider: 'local-gw', model: 'model-b' })
       await s.flushAndClose()

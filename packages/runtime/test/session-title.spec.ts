@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
-import { StubProvider } from '@domi/model'
+import { StubProvider, type ModelEvent } from '@domi/model'
 import { DomiSession } from '../src/index.ts'
 
 const dirs: string[] = []
@@ -37,7 +37,7 @@ function session(titleTurns: string[]) {
     clock,
     provider: new StubProvider([[{ type: 'delta', text: '好的' }]], {
       onExhausted: 'repeat-last',
-      titleScript: titleTurns.map((t) => [{ type: 'delta' as const, text: t }]),
+      titleScript: titleTurns.map((t): ModelEvent[] => [{ type: 'delta', text: t }]),
     }),
   })
 }
@@ -74,7 +74,7 @@ describe('PRD-M10-001 AC-1 · 第一轮结束后自动生成标题', () => {
     const cwd = tmp()
     const stub = new StubProvider([[{ type: 'delta', text: '好的' }]], {
       onExhausted: 'repeat-last',
-      titleScript: [[{ type: 'delta', text: '{"title":"唯一标题"}' }]],
+      titleScript: [[{ type: 'delta' as const, text: '{"title":"唯一标题"}' }]],
     })
     // 包一层计数：StubProvider 的 calls 含对话轮，用 generate 次数区分太脆，直接数「标题轮」出现次数
     const s = new DomiSession({

@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
-import { StubProvider } from '@domi/model'
+import { StubProvider, type ModelEvent } from '@domi/model'
 import { DomiSession } from '../src/index.ts'
 
 const dirs: string[] = []
@@ -35,7 +35,7 @@ function session(titleTurns: string[]) {
     provider: new StubProvider([[{ type: 'delta', text: '好的' }]], {
       onExhausted: 'repeat-last',
       // 标题生成是独立剧本，不占对话轮次（M10-001 起自动标题插队会打乱 turn 序列）
-      titleScript: titleTurns.map((t) => [{ type: 'delta' as const, text: t }]),
+      titleScript: titleTurns.map((t): ModelEvent[] => [{ type: 'delta', text: t }]),
     }),
   })
 }

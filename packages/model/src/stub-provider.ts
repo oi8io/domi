@@ -19,11 +19,12 @@ export interface StubProviderOptions {
   onExhausted?: 'repeat-last' | 'throw'
   /**
    * 标题生成请求（PRD-M10-001）的独立剧本，**不占对话轮次**。
+   * 语义与 script 相同：数组按标题请求轮次消费（越界回退到最后一轮），元素是单轮剧本（事件数组或函数）。
    * 自动标题是运行时附属行为：不给剧本时替身返回固定 JSON 标题，
    * 免得它插队打乱多轮测试的 turn 序列（verify-gate / plan-mode 曾因此错位）。
    * 要断言标题内容 / 降级时显式传剧本（如 title-gen.spec.ts）。
    */
-  titleScript?: StubTurn
+  titleScript?: StubTurn[]
 }
 
 const ALL_CAPABLE: ModelCapabilities = {
@@ -42,7 +43,7 @@ export class StubProvider implements ModelProvider {
   private turn = 0
   private titleTurn = 0
   private readonly onExhausted: 'repeat-last' | 'throw'
-  private readonly titleScript: StubTurn | undefined
+  private readonly titleScript: StubTurn[] | undefined
 
   constructor(
     private readonly script: StubTurn[],
@@ -80,10 +81,9 @@ export class StubProvider implements ModelProvider {
     const t = this.titleTurn++
     let turn: ModelEvent[]
     if (this.titleScript !== undefined) {
-      const raw = typeof this.titleScript === 'function' ? this.titleScript(req, t) : this.titleScript[t]
-      turn = raw ?? (typeof this.titleScript === 'function'
-        ? this.titleScript(req, Math.max(0, t - 1))
-        : (this.titleScript[this.titleScript.length - 1] ?? []))
+      // 数组按轮取，越界回退到最后一轮；单轮剧本可以是事件数组或函数
+      const raw = this.titleScript[t] ?? this.titleScript[this.titleScript.length - 1] ?? []
+      turn = typeof raw === 'function' ? raw(req, t) : raw
     } else {
       turn = [{ type: 'delta', text: '{"title":"自动标题"}' }]
     }
