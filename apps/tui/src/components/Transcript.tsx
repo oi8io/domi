@@ -1,4 +1,4 @@
-import type { TranscriptItem } from '@domi/client-core'
+import { summarizeReason, type TranscriptItem } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import { Box, renderToString, Static, Text } from 'ink'
 import { useEffect, useState } from 'react'
@@ -28,14 +28,28 @@ export function toolMeta(result: TranscriptItem | undefined): string {
   return result.ms === undefined ? state : `${state} · ${result.ms}ms`
 }
 
-export function Line({ item, next }: { item: TranscriptItem; next: TranscriptItem | undefined }): React.ReactElement {
+export function Line({
+  item,
+  next,
+  collapsed = false,
+}: {
+  item: TranscriptItem
+  next: TranscriptItem | undefined
+  /** PRD-M10-005 AC-2：reason 行折叠时只显示「思考 · 摘要」；其余条目忽略它 */
+  collapsed?: boolean
+}): React.ReactElement {
   const t = useTheme()
   const prefix = PREFIX[item.kind]
   switch (item.kind) {
     case 'user':
       return <Text {...t.fg('ok')}>{`${prefix} ${item.text}`}</Text>
     case 'reason':
-      return (
+      // 折叠态：单行「· 思考 · 前 N 字…」，截断口径 = summarizeReason（与 summarizeArgs 同一 80 字符原则）
+      return collapsed ? (
+        <Text {...t.fg('mut')} dimColor={!t.truecolor}>
+          {`${prefix} ${tr('web.transcript.thinking')} · ${summarizeReason(item.text)}`}
+        </Text>
+      ) : (
         <Text>
           <Text {...t.fg('info')}>{`${prefix} `}</Text>
           <Text {...t.fg('mut')} dimColor={!t.truecolor}>
@@ -109,13 +123,25 @@ export function resultAfter(items: readonly TranscriptItem[], i: number): Transc
   return undefined
 }
 
-export function Transcript({ items }: { items: TranscriptItem[] }): React.ReactElement {
+export function Transcript({
+  items,
+  reasonsExpanded = false,
+}: {
+  items: TranscriptItem[]
+  /** PRD-M10-005：false = reason 默认折叠；true = 全部展开（e 键切换，纯展示层，不持久化） */
+  reasonsExpanded?: boolean
+}): React.ReactElement {
   return (
     <Box flexDirection="column">
       {/* key 用 seq 而不是数组下标：delta 合并时保留的是首条的 seq，仍然唯一，
           而下标会在前面插入条目时让 React 复用错行 */}
       {items.map((item, i) => (
-        <Line key={item.seq} item={item} next={item.kind === 'tool-call' ? resultAfter(items, i) : undefined} />
+        <Line
+          key={item.seq}
+          item={item}
+          next={item.kind === 'tool-call' ? resultAfter(items, i) : undefined}
+          collapsed={item.kind === 'reason' && !reasonsExpanded}
+        />
       ))}
     </Box>
   )
@@ -133,19 +159,35 @@ export function settledCount(items: readonly TranscriptItem[]): number {
   return items.length
 }
 
-export function ClassicTranscript({ items }: { items: TranscriptItem[] }): React.ReactElement {
+export function ClassicTranscript({
+  items,
+  reasonsExpanded = false,
+}: {
+  items: TranscriptItem[]
+  reasonsExpanded?: boolean
+}): React.ReactElement {
   const n = settledCount(items)
   const settled = items.slice(0, n)
   return (
     <>
       <Static items={settled}>
         {(item, i) => (
-          <Line key={item.seq} item={item} next={item.kind === 'tool-call' ? resultAfter(items, i) : undefined} />
+          <Line
+            key={item.seq}
+            item={item}
+            next={item.kind === 'tool-call' ? resultAfter(items, i) : undefined}
+            collapsed={item.kind === 'reason' && !reasonsExpanded}
+          />
         )}
       </Static>
       <Box flexDirection="column">
         {items.slice(n).map((item, j) => (
-          <Line key={item.seq} item={item} next={item.kind === 'tool-call' ? resultAfter(items, n + j) : undefined} />
+          <Line
+            key={item.seq}
+            item={item}
+            next={item.kind === 'tool-call' ? resultAfter(items, n + j) : undefined}
+            collapsed={item.kind === 'reason' && !reasonsExpanded}
+          />
         ))}
       </Box>
     </>
@@ -161,7 +203,7 @@ export function ClassicTranscript({ items }: { items: TranscriptItem[] }): React
  */
 const lineCache = new WeakMap<
   TranscriptItem,
-  { width: number; next: TranscriptItem | undefined; theme: TuiTheme; lines: string[] }
+  { width: number; next: TranscriptItem | undefined; theme: TuiTheme; collapsed: boolean; lines: string[] }
 >()
 
 export function itemLines(
@@ -169,23 +211,37 @@ export function itemLines(
   next: TranscriptItem | undefined,
   width: number,
   theme: TuiTheme,
+  collapsed = false,
 ): string[] {
   const hit = lineCache.get(item)
-  if (hit && hit.width === width && hit.next === next && hit.theme === theme) return hit.lines
+  if (hit && hit.width === width && hit.next === next && hit.theme === theme && hit.collapsed === collapsed) {
+    return hit.lines
+  }
   const out = renderToString(
     <ThemeContext.Provider value={theme}>
-      <Line item={item} next={next} />
+      <Line item={item} next={next} collapsed={collapsed} />
     </ThemeContext.Provider>,
     { columns: Math.max(10, width) },
   )
   const lines = out === '' ? [''] : out.split('\n')
-  lineCache.set(item, { width, next, theme, lines })
+  lineCache.set(item, { width, next, theme, collapsed, lines })
   return lines
 }
 
-export function transcriptLines(items: readonly TranscriptItem[], width: number, theme: TuiTheme): string[] {
+export function transcriptLines(
+  items: readonly TranscriptItem[],
+  width: number,
+  theme: TuiTheme,
+  reasonsExpanded = false,
+): string[] {
   return items.flatMap((item, i) =>
-    itemLines(item, item.kind === 'tool-call' ? resultAfter(items, i) : undefined, width, theme),
+    itemLines(
+      item,
+      item.kind === 'tool-call' ? resultAfter(items, i) : undefined,
+      width,
+      theme,
+      item.kind === 'reason' && !reasonsExpanded,
+    ),
   )
 }
 
@@ -201,12 +257,17 @@ export function dumpText(items: readonly TranscriptItem[], width: number, theme:
  * 组件里拿显示行的唯一入口：条目 / 宽度 / 主题变了之后，在 setImmediate 里（React 的工作循环之外）重算。
  * 代价是新内容晚一个事件循环出现，换来的是不和 Ink 的 reconciler 抢
  */
-export function useTranscriptLines(items: readonly TranscriptItem[], width: number, theme: TuiTheme): string[] {
+export function useTranscriptLines(
+  items: readonly TranscriptItem[],
+  width: number,
+  theme: TuiTheme,
+  reasonsExpanded = false,
+): string[] {
   const [lines, setLines] = useState<string[]>([])
   useEffect(() => {
-    const h = setImmediate(() => setLines(transcriptLines(items, width, theme)))
+    const h = setImmediate(() => setLines(transcriptLines(items, width, theme, reasonsExpanded)))
     return () => clearImmediate(h)
-  }, [items, width, theme])
+  }, [items, width, theme, reasonsExpanded])
   return lines
 }
 

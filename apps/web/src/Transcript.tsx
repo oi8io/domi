@@ -6,7 +6,7 @@
  * 折叠是展示状态，不是业务状态，不值得进 store。
  */
 
-import { formatElapsed, type TranscriptItem } from '@domi/client-core'
+import { formatElapsed, summarizeReason, type TranscriptItem } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import type { ReactNode } from 'react'
 import { IconBranch, IconQuote } from './icons.tsx'
@@ -111,12 +111,17 @@ function ItemBody({ item }: { item: TranscriptItem }) {
         </div>
       )
     case 'reason':
+      // PRD-M10-005 AC-1：默认折叠为单行「思考 · 前 N 字…」，点击展开/收起全文。
+      // 折叠是展示状态，用原生 <details>；摘要截断口径 = summarizeReason（client-core 定死，渲染层不二次截断）
       return (
-        <details open className="group/thought my-0.5 ml-2 border-l-2 border-border px-3.5 py-1.5">
+        <details className="group/thought my-0.5 ml-2 border-l-2 border-border px-3.5 py-1.5">
           <summary className="cursor-pointer list-none text-xs text-mut2 select-none [&::-webkit-details-marker]:hidden">
-            <span className="group-open/thought:hidden">▸ </span>
-            <span className="hidden group-open/thought:inline">▾ </span>
-            {tr('web.transcript.thinking')}
+            <span className="group-open/thought:hidden">
+              ▸ {tr('web.transcript.thinking')} · {summarizeReason(item.text)}
+            </span>
+            <span className="hidden group-open/thought:inline">
+              ▾ {tr('web.transcript.thinking')}
+            </span>
             {item.ms !== undefined && item.ms > 0 && (
               <span className="ml-1.5 font-mono text-[11px] text-mut2">{formatElapsed(item.ms)}</span>
             )}

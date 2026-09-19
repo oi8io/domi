@@ -15,6 +15,7 @@ import type { DomiEvent } from '@domi/protocol'
 import { renderToString } from 'ink'
 import { App } from '../src/App.tsx'
 import { dumpText, settledCount, Transcript, transcriptLines, Viewport } from '../src/components/Transcript.tsx'
+import { isReasonToggle } from '../src/keys.ts'
 import { clearFallback, fallbackMarked, markFallback } from '../src/render/fallback.ts'
 import {
   applyScroll,
@@ -109,6 +110,43 @@ describe('PRD-M9-005 AC-2 · 只渲染可见的行，右侧滚动条按比例', 
     const width = (s: string) =>
       [...s.replace(ANSI, '')].reduce((n, c) => n + ((c.codePointAt(0) ?? 0) > 0x2e80 ? 2 : 1), 0)
     for (const l of narrow) expect(width(l)).toBeLessThanOrEqual(20)
+  })
+})
+
+describe('PRD-M10-005 AC-2/AC-4 · 思考默认折叠，e 展开（不占滚动键）', () => {
+  const theme = makeTheme()
+
+  test('默认折叠：reason 行只显示「思考 · 摘要（80 字截断）」，展开后是全文', () => {
+    const long = '先看文件内容'.repeat(30) // 150 字，必超 80
+    const items: TranscriptItem[] = [
+      { seq: 1, kind: 'user', text: '帮我看看' },
+      { seq: 2, kind: 'reason', text: long, ts: 1 },
+      { seq: 3, kind: 'assistant', text: '好' },
+    ]
+    // 折叠行 = 前缀(≈10 双宽) + 80 双宽 + …，需要 > 170 宽才不折行；展开行是 180 双宽，用 400 宽验全文
+    const folded = transcriptLines(items, 200, theme)
+    expect(folded[1]).toContain(tr('web.transcript.thinking'))
+    expect(folded[1]).toContain('…')
+    expect(folded[1]).not.toContain(long)
+    const expanded = transcriptLines(items, 400, theme, true)
+    expect(expanded[1]).toContain(long)
+    expect(expanded[1]).not.toContain('…')
+  })
+
+  test('短思考折叠时原样显示（不截断，无省略号）', () => {
+    const items: TranscriptItem[] = [{ seq: 1, kind: 'reason', text: '短思考', ts: 1 }]
+    const folded = transcriptLines(items, 80, theme)
+    expect(folded[0]).toContain('思考 · 短思考')
+  })
+
+  test('e 键切换：输入框空 + 无修饰键才生效；输入中 / Ctrl / Meta / 其他字母不触发', () => {
+    expect(isReasonToggle('e', {}, true)).toBe(true)
+    expect(isReasonToggle('e', {}, false)).toBe(false)
+    expect(isReasonToggle('e', { ctrl: true }, true)).toBe(false)
+    expect(isReasonToggle('e', { meta: true }, true)).toBe(false)
+    expect(isReasonToggle('E', {}, true)).toBe(false)
+    expect(isReasonToggle('x', {}, true)).toBe(false)
+    // e 不是滚动键：PgUp/PgDn/Ctrl+Home/End 的判定不受影响（见下方 PRD-M9-005 AC-3 的 scrollKey 测试）
   })
 })
 

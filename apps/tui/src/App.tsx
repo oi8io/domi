@@ -30,6 +30,7 @@ export function App({
   overlay,
   renderer,
   scrollBus,
+  reasonsExpanded = false,
 }: {
   store: SessionStore
   /** 顶栏；不给就不画（测试、嵌入） */
@@ -46,6 +47,8 @@ export function App({
   renderer?: Renderer | undefined
   /** fullscreen 的滚动命令从这里来（Root 收按键与滚轮） */
   scrollBus?: ReturnType<typeof createScrollBus> | undefined
+  /** PRD-M10-005：true = reason 行展开（e 键切换，纯展示层，不持久化） */
+  reasonsExpanded?: boolean
 }): React.ReactElement {
   const items = useStore(store.$items)
   const status = useStore(store.$status)
@@ -53,7 +56,14 @@ export function App({
 
   if (renderer === 'fullscreen') {
     return (
-      <FullscreenLayout store={store} context={context} connection={connection} overlay={overlay} scrollBus={scrollBus}>
+      <FullscreenLayout
+        store={store}
+        context={context}
+        connection={connection}
+        overlay={overlay}
+        scrollBus={scrollBus}
+        reasonsExpanded={reasonsExpanded}
+      >
         {children}
       </FullscreenLayout>
     )
@@ -68,7 +78,11 @@ export function App({
         overlay
       ) : (
         <>
-          {renderer === 'classic' ? <ClassicTranscript items={items} /> : <Transcript items={items} />}
+          {renderer === 'classic' ? (
+            <ClassicTranscript items={items} reasonsExpanded={reasonsExpanded} />
+          ) : (
+            <Transcript items={items} reasonsExpanded={reasonsExpanded} />
+          )}
           {status.busy && ask === null ? <Spinner /> : null}
           {ask ? <ConfirmDialog ask={ask} /> : null}
           {children}
@@ -91,6 +105,7 @@ function FullscreenLayout({
   overlay,
   scrollBus,
   children,
+  reasonsExpanded,
 }: {
   store: SessionStore
   context?: { project: string | null; title: string } | undefined
@@ -98,6 +113,7 @@ function FullscreenLayout({
   overlay?: ReactNode
   scrollBus?: ReturnType<typeof createScrollBus> | undefined
   children?: ReactNode
+  reasonsExpanded: boolean
 }): React.ReactElement {
   const items = useStore(store.$items)
   const status = useStore(store.$status)
@@ -108,7 +124,7 @@ function FullscreenLayout({
   const box = useBoxMetrics(ref as never)
   const height = box.hasMeasured ? box.height : 0
   // 右边留一列给滚动条
-  const lines = useTranscriptLines(items, Math.max(10, columns - 1), theme)
+  const lines = useTranscriptLines(items, Math.max(10, columns - 1), theme, reasonsExpanded)
   const [scroll, setScroll] = useState<ScrollState>(INITIAL_SCROLL)
 
   // 内容变了：往上翻着的时候保持看到的那一屏不动，并数新来了几条

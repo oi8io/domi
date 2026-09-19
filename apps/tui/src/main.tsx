@@ -42,7 +42,7 @@ import { editAction, Prompt } from './components/Prompt.tsx'
 import { SlashHints } from './components/SlashHints.tsx'
 import { dumpText } from './components/Transcript.tsx'
 import { connectChat, connectDaemon } from './connect.ts'
-import { moveOf, routeKey } from './keys.ts'
+import { isReasonToggle, moveOf, routeKey } from './keys.ts'
 import { type OverlayState, Overlays } from './overlays/Overlays.tsx'
 import { clearFallback, fallbackMarked, fallbackPath, markFallback } from './render/fallback.ts'
 import {
@@ -156,6 +156,8 @@ export function Root({
   const [context, setContext] = useState<{ project: string | null; title: string }>({ project: null, title: '' })
   // 弹层（PRD-M8-015）与 `/` 补全的选中项
   const [overlay, setOverlay] = useState<OverlayState | null>(null)
+  // PRD-M10-005 AC-2/AC-3：思考折叠是纯展示态，会话内可反复切换、不持久化
+  const [reasonsExpanded, setReasonsExpanded] = useState(false)
   const [slashSel, setSlashSel] = useState(0)
   // `@` 文件补全：候选从 daemon 的 fs.list 来；选过的路径提交时作为 files 带上（PRD-M8-010 AC-2）
   const atQuery = draft.match(/(^|\s)@([^\s@]*)$/)?.[2]
@@ -284,6 +286,12 @@ export function Root({
       return
     }
     if (overlay !== null) return
+
+    // PRD-M10-005 AC-2：e 在输入框空时切换思考折叠（不占滚动键；滚动键是 PgUp/PgDn/Ctrl+Home/End）
+    if (isReasonToggle(input, key, draft === '')) {
+      setReasonsExpanded((x) => !x)
+      return
+    }
 
     // `/` 补全：Tab 补上选中的命令，↑↓ 换候选
     if (slash.length > 0) {
@@ -517,6 +525,7 @@ export function Root({
         overlay={overlayView}
         renderer={renderer}
         scrollBus={scrollBus}
+        reasonsExpanded={reasonsExpanded}
       >
         {notice !== null && <Text dimColor>{notice}</Text>}
         {/* 上下两条横线，不闭合（PRD-M9-005 AC-6） */}

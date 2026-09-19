@@ -38,6 +38,14 @@ export function routeKey(
   return null
 }
 
+/**
+ * PRD-M10-005 AC-2：e 在输入框空时切换思考折叠。纯函数，main.tsx 的 useInput 直接问它；
+ * 与滚动键（PgUp/PgDn/Ctrl+Home/End，render/viewport.ts 的 scrollKey）不冲突
+ */
+export function isReasonToggle(input: string, key: KeyLike, inputEmpty: boolean): boolean {
+  return input === 'e' && !key.ctrl && !key.meta && inputEmpty
+}
+
 /** 列表里的上下移动：↑↓，或 Ctrl+P / Ctrl+N */
 export function moveOf(input: string, key: { upArrow?: boolean; downArrow?: boolean; ctrl?: boolean }): -1 | 1 | 0 {
   if (key.upArrow || (key.ctrl && input === 'p')) return -1

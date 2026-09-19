@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { ARG_SUMMARY_LIMIT, createSessionStore, summarizeArgs } from '../src/index.ts'
+import { ARG_SUMMARY_LIMIT, createSessionStore, summarizeArgs, summarizeReason } from '../src/index.ts'
 
 let seq = 0
 function env(ev: DomiEvent): EventEnvelope {
@@ -131,6 +131,19 @@ describe('事件流投影', () => {
       env({ t: 'permission', capabilityId: 'fs.write', decision: 'deny', source: 'default', matchedRule: null }),
     ])
     expect(s.$items.get()[0]).toMatchObject({ kind: 'permission', text: 'fs.write → deny', ok: false })
+  })
+})
+
+describe('PRD-M10-005 AC-4 · 思考折叠摘要（与 summarizeArgs 同一 80 字符截断口径）', () => {
+  test('短思考原样显示', () => {
+    expect(summarizeReason('先看看')).toBe('先看看')
+  })
+
+  test('超过 80 字符截断并加省略号', () => {
+    const r = summarizeReason('x'.repeat(200))
+    expect(r).toHaveLength(ARG_SUMMARY_LIMIT + 1)
+    expect(r.endsWith('…')).toBe(true)
+    expect(r.startsWith('x'.repeat(80))).toBe(true)
   })
 })
 

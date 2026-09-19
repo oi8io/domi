@@ -61,6 +61,13 @@ describe('PRD-M8-008 AC-1 · Chat 流按原型渲染', () => {
     expect(html).toContain('重试一次就好')
   })
 
+  test('思考默认折叠：summary 带「思考 · 摘要」，details 不带 open，全文仍在（PRD-M10-005 AC-1）', () => {
+    // 折叠态：无 open 属性，summary 显示「思考 · 前 N 字…」；正文全文还在 body 里（details 语义，点击展开）
+    expect(html).toContain('思考 · 先读测试文件')
+    expect(html).not.toContain('<details open')
+    expect(html).toContain('先读测试文件')
+  })
+
   test('工具卡可展开看参数与结果', () => {
     expect(html).toContain('<details')
     expect(html).toContain('{&quot;path&quot;:&quot;a.ts&quot;}')

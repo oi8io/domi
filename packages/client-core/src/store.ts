@@ -114,6 +114,11 @@ export function formatTokens(t: { input: number; output: number; cacheRead: numb
 
 export const ARG_SUMMARY_LIMIT = 80
 
+/** 思考折叠的单行摘要（PRD-M10-005 AC-4）：与 summarizeArgs 同一 80 字符截断口径，渲染层不二次截断 */
+export function summarizeReason(text: string): string {
+  return text.length <= ARG_SUMMARY_LIMIT ? text : `${text.slice(0, ARG_SUMMARY_LIMIT)}…`
+}
+
 export function summarizeArgs(args: unknown): string {
   const json = (() => {
     try {

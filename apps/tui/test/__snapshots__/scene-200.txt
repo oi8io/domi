@@ -1,5 +1,5 @@
 › 把 sum.js 的减号改成加号，然后跑测试
-· 先看看文件内容
+· 思考 · 先看看文件内容
 ✓ domi: 我先读一下 sum.js。
 ⚙ fs.read {"path":"sum.js"}  done · 4ms
 🔑 fs.read → allow
