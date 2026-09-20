@@ -211,3 +211,28 @@ describe('PRD-M2-002 / M2-003 · 上下文事件也在对话里看得见', () =>
     expect(item?.summary).toBe('把 sum.js 的减号改成加号')
   })
 })
+
+describe('PRD-M11-002 · 工具调用展开时带完整原文（detail 投影，纯展示层）', () => {
+  test('tool.call：summary 截断，detail 是完整 args 的 JSON（展开看全文）', () => {
+    seq = 0
+    const s = createSessionStore()
+    const long = 'y'.repeat(200)
+    s.applyEvents([env({ t: 'tool.call', id: 'c1', name: 'fs.write', args: { path: 'f.txt', content: long } })])
+    const item = s.$items.get()[0]
+    expect(item?.kind).toBe('tool-call')
+    expect(item?.summary?.endsWith('…')).toBe(true)
+    expect(item?.detail).toBe(JSON.stringify({ path: 'f.txt', content: long }))
+    expect(item?.detail).not.toContain('…')
+  })
+
+  test('tool.result：detail 是完整 payload 的 JSON，不被 summary 截断', () => {
+    seq = 0
+    const s = createSessionStore()
+    const big = 'z'.repeat(200)
+    s.applyEvents([env({ t: 'tool.result', id: 'c1', ok: true, payload: { output: big }, ms: 5 })])
+    const item = s.$items.get()[0]
+    expect(item?.kind).toBe('tool-result')
+    expect(item?.summary?.endsWith('…')).toBe(true)
+    expect(item?.detail).toBe(JSON.stringify({ output: big }))
+  })
+})

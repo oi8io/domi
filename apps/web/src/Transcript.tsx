@@ -202,11 +202,11 @@ export function Transcript({
                 )}
               </summary>
               <pre className="max-h-[260px] overflow-y-auto border-t border-border2 bg-code px-3 py-2 text-xs break-all whitespace-pre-wrap">
-                {row.call.summary}
+                {row.call.detail ?? row.call.summary}
               </pre>
               {row.result !== null && (
                 <pre className="max-h-[260px] overflow-y-auto border-t border-border2 bg-code px-3 py-2 text-xs break-all whitespace-pre-wrap text-ink2">
-                  {row.result.summary ?? row.result.text}
+                  {row.result.detail ?? row.result.summary ?? row.result.text}
                 </pre>
               )}
             </details>

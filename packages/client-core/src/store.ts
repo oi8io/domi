@@ -19,6 +19,11 @@ export interface TranscriptItem {
   /** 工具调用的参数摘要：JSON 序列化后前 80 字符 + …（PRD-M0-005 AC-1 写死的规则） */
   summary?: string
   /**
+   * 展开后的完整原文（PRD-M11-002）：tool.call=JSON(完整 args)，tool.result=JSON(完整 payload)。
+   * 纯投影——事件流里本来就有，回放现算，不是新事件（INV-01/INV-13）
+   */
+  detail?: string
+  /**
    * 耗时（毫秒）：工具结果来自 `tool.result` 事件；思考段是这一段流式增量的跨度（M8-008 AC-1）
    */
   ms?: number
@@ -119,6 +124,15 @@ export function summarizeReason(text: string): string {
   return text.length <= ARG_SUMMARY_LIMIT ? text : `${text.slice(0, ARG_SUMMARY_LIMIT)}…`
 }
 
+/** 完整 JSON（PRD-M11-002 展开原文）：与 summarizeArgs 同口径的容错，但不截断 */
+export function fullJson(args: unknown): string {
+  try {
+    return JSON.stringify(args) ?? String(args)
+  } catch {
+    return String(args)
+  }
+}
+
 export function summarizeArgs(args: unknown): string {
   const json = (() => {
     try {
@@ -185,7 +199,13 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         appendText('assistant', env.seq, ev.text)
         break
       case 'tool.call':
-        push({ seq: env.seq, kind: 'tool-call', text: ev.name, summary: summarizeArgs(ev.args) })
+        push({
+          seq: env.seq,
+          kind: 'tool-call',
+          text: ev.name,
+          summary: summarizeArgs(ev.args),
+          detail: fullJson(ev.args),
+        })
         $status.set({ ...$status.get(), toolCalls: $status.get().toolCalls + 1 })
         break
       case 'tool.result':
@@ -195,6 +215,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           text: ev.reason ?? (ev.ok ? 'ok' : 'failed'),
           ok: ev.ok,
           summary: summarizeArgs(ev.payload),
+          detail: fullJson(ev.payload),
           ms: ev.ms,
         })
         break
