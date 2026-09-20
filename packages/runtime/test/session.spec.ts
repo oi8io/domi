@@ -145,7 +145,7 @@ describe('外部工具（MCP）接进会话 —— PRD-M2-001 · ADR-015', () =>
       extraTools: opts.tools as never,
       ...(opts.notices ? { notices: opts.notices } : {}),
       // PRD-M11-005：危险能力（mcp.*/fs.write/shell.exec）规则 allow 后仍要问；测试环境默认自动批准
-      ...(opts.autoAsk === false ? {} : { listeners: { onAsk: (a) => a?.answer(true) } }),
+      ...(opts.autoAsk === false ? {} : { listeners: { onAsk: (a: { answer: (v: boolean) => void }) => a?.answer(true) } }),
       provider: new StubProvider([
         [{ type: 'tool-call', id: 'c1', name: 'mcp.demo.echo', args: { text: 'hi' } }],
         [{ type: 'delta', text: '好了' }],
