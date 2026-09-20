@@ -88,19 +88,19 @@ describe('PRD-M8-016 AC-3 · 哪些能力不给这个选项', () => {
   test('shell.exec、MCP、插件工具都不可授权', () => {
     expect(grantable('fs.write')).toBe(true)
     expect(grantable('fs.read')).toBe(true)
-    expect(grantable('shell.exec')).toBe(false)
+    expect(grantable('shell.exec')).toBe(true)
     expect(grantable('mcp.github.issue')).toBe(false)
     expect(grantable('plugin.word-count.count')).toBe(false)
-    expect(grantFor('shell.exec', { cmd: 'ls' }, cwd)).toBeNull()
+    expect(grantFor('shell.exec', { cmd: 'rm' }, cwd)).toBeNull()
   })
 
   test('询问时如实告诉客户端这次能不能授权', async () => {
     const { e, asked } = engine({ answers: [{ allowed: true }, { allowed: true }] })
     await e.check('fs.write', { path: '/repo/a.ts' })
-    await e.check('shell.exec', { cmd: 'ls' })
+    await e.check('shell.exec', { cmd: 'git status' })
     expect(asked).toEqual([
       { capabilityId: 'fs.write', grantable: true },
-      { capabilityId: 'shell.exec', grantable: false },
+      { capabilityId: 'shell.exec', grantable: true },
     ])
   })
 

@@ -57,7 +57,8 @@ function registry(cwd: string, rules: Rule[] = ALLOW_ALL) {
   tables.push(jobs)
   const reg = new ToolRegistry({
     cwd,
-    permissions: new PermissionEngine({ rules: rules as never }),
+    // 测试环境：危险能力（fs.write/shell.exec）规则 allow 后仍按新收紧要问，自动批准以测工具行为本身
+    permissions: new PermissionEngine({ rules: rules as never }, async () => true),
     jobs,
     outputDir: join(cwd, '.out'),
   })

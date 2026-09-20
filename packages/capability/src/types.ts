@@ -22,10 +22,12 @@ export interface Decision {
   grant?: SessionGrant
 }
 
-/** 会话级授权。scope 是路径类能力的目录（绝对路径），没有 scope 的管这个能力的全部调用 */
+/** 会话级授权。scope 是路径类能力的目录（绝对路径）；fingerprint 是 shell.exec 的命令指纹（PRD-M11-005 5.2） */
 export interface SessionGrant {
   capability: string
   scope?: string
+  /** shell.exec：命令指纹 argv[0] + ' ' + argv[1]。有它就只覆盖同指纹调用 */
+  fingerprint?: string
 }
 
 /** 工具向用户要输入（MCP elicitation 等）。一次问答，不是权限决定 */

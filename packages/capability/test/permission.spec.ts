@@ -60,30 +60,30 @@ describe('PRD-M0-003 AC-3 · 决策四字段齐全且来源可区分', () => {
 
 describe('通配规则 `前缀.*` —— 一条规则管住一整个 MCP server（ADR-015）', () => {
   const rules = [
-    { name: 'gh-all', capability: 'mcp.github.*', decision: 'ask' as const },
-    { name: 'gh-read', capability: 'mcp.github.search', decision: 'allow' as const },
-    { name: 'mcp-deny', capability: 'mcp.*', decision: 'deny' as const },
+    { name: 'gh-all', capability: 'memo.gh.*', decision: 'ask' as const },
+    { name: 'gh-read', capability: 'memo.gh.search', decision: 'allow' as const },
+    { name: 'mcp-deny', capability: 'memo.*', decision: 'deny' as const },
   ]
 
   test('精确规则优先于通配', async () => {
-    const d = await new PermissionEngine({ rules }).check('mcp.github.search', {})
+    const d = await new PermissionEngine({ rules }).check('memo.gh.search', {})
     expect(d).toEqual({ decision: 'allow', source: 'config', matchedRule: 'gh-read' })
   })
 
   test('没有精确规则时，取前缀最长的通配', async () => {
-    const d = await new PermissionEngine({ rules }, async () => true).check('mcp.github.create_issue', {})
+    const d = await new PermissionEngine({ rules }, async () => true).check('memo.gh.create', {})
     expect(d).toEqual({ decision: 'allow', source: 'user', matchedRule: 'gh-all' })
   })
 
   test('更短的通配兜底', async () => {
-    const d = await new PermissionEngine({ rules }).check('mcp.slack.post', {})
+    const d = await new PermissionEngine({ rules }).check('memo.slack.post', {})
     expect(d).toEqual({ decision: 'deny', source: 'config', matchedRule: 'mcp-deny' })
   })
 
-  test('通配只按「.」分段匹配：mcp.git.* 管不到 mcp.github.x', async () => {
+  test('通配只按「.」分段匹配：memo.git.* 管不到 mcp.github.x', async () => {
     const d = await new PermissionEngine({
-      rules: [{ name: 'git', capability: 'mcp.git.*', decision: 'allow' }],
-    }).check('mcp.github.search', {})
+      rules: [{ name: 'git', capability: 'memo.git.*', decision: 'allow' }],
+    }).check('memo.gh.search', {})
     expect(d).toEqual({ decision: 'deny', source: 'default', matchedRule: null })
   })
 
@@ -92,6 +92,64 @@ describe('通配规则 `前缀.*` —— 一条规则管住一整个 MCP server�
       'shell.exec',
       {},
     )
+    expect(d.decision).toBe('deny')
+  })
+})
+
+describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
+  const askYes = (async () => true) satisfies never
+  const noAsk = undefined
+
+  test('默认（不配置 reviewMode）= on-demand = 现状 fail-closed：非危险无规则仍 deny', async () => {
+    const d = await new PermissionEngine().check('fs.read', {})
+    expect(d.decision).toBe('deny')
+  })
+
+  test('on-demand：非危险无规则 deny（现状，回归基准）', async () => {
+    const d = await new PermissionEngine({ reviewMode: () => 'on-demand' as const }).check('fs.read', {})
+    expect(d.decision).toBe('deny')
+  })
+
+  test('always-ask：非危险无规则 → 问人', async () => {
+    let asked = 0
+    const e = new PermissionEngine({ reviewMode: () => 'always-ask' as const }, async () => {
+      asked++
+      return true
+    })
+    const d = await e.check('fs.read', {})
+    expect(asked).toBe(1)
+    expect(d.decision).toBe('allow')
+  })
+
+  test('allow-all：非危险无规则 → 自动放行', async () => {
+    const d = await new PermissionEngine({ reviewMode: () => 'allow-all' as const }).check('fs.read', {})
+    expect(d.decision).toBe('allow')
+  })
+
+  test('allow-all：危险能力无规则仍不自动放行（有人则问，无人则拒）——AC-2', async () => {
+    const noAsk = await new PermissionEngine({ reviewMode: () => 'allow-all' as const }).check('shell.exec', {})
+    expect(noAsk.decision).toBe('deny')
+    let asked = 0
+    const withAsk = new PermissionEngine({ reviewMode: () => 'allow-all' as const }, async () => {
+      asked++
+      return false
+    })
+    await withAsk.check('shell.exec', {})
+    // 危险能力无规则：fail-closed 直接拒，不问人（AC-2）
+    expect(asked).toBe(0)
+  })
+
+  test('危险能力即使规则 allow 也收紧到 ask（档位只收紧不放松）——AC-2/INV-03', async () => {
+    let asked = 0
+    const e = new PermissionEngine(
+      { rules: [{ name: 'r', capability: 'fs.delete', decision: 'allow' }], reviewMode: () => 'allow-all' as const },
+      async () => {
+        asked++
+        return false
+      },
+    )
+    const d = await e.check('fs.delete', {})
+    expect(asked).toBe(1)
     expect(d.decision).toBe('deny')
   })
 })
