@@ -67,27 +67,31 @@ describe('PRD-M0-008 AC-1 · 环境变量优先于配置文件', () => {
     expect(cfg.permissions.rules).toHaveLength(1)
   })
 
-  test('环境变量覆盖文件里的同名项', () => {
+  test('环境变量覆盖文件里的同名项（base_url 例外：只认配置文件，DOMI_BASE_URL 已废弃）', () => {
     const cfg = loadConfig({
       home: home(YAML),
-      env: { DOMI_MODEL: 'claude-from-env', DOMI_BASE_URL: 'https://env.example/v1' },
+      env: { DOMI_MODEL: 'claude-from-env' },
     })
     expect(cfg.model.name).toBe('claude-from-env')
-    expect(cfg.model.baseUrl).toBe('https://env.example/v1')
+    // base_url 不再有环境变量覆盖入口：文件里的值保持生效
+    expect(cfg.model.baseUrl).toBe('https://gateway.example/v1')
   })
 
   test('凭据也是环境变量优先，且认 provider 惯用的变量名', () => {
     const h = home(YAML)
-    expect(loadConfig({ home: h, env: { DOMI_API_KEY: 'sk-from-domi-env' } }).model.apiKey).toBe('sk-from-domi-env')
     expect(loadConfig({ home: h, env: { ANTHROPIC_API_KEY: 'sk-ant-env' } }).model.apiKey).toBe('sk-ant-env')
-    // DOMI_API_KEY 是统一入口，优先于 provider 专用变量
+    expect(loadConfig({ home: h, env: { DOMI_ANTHROPIC_API_KEY: 'sk-domispecific' } }).model.apiKey).toBe(
+      'sk-domispecific',
+    )
+    // 厂商惯用名优先于 DOMI_<ID>_API_KEY（废弃 DOMI_API_KEY 后按 providerEnvNames 的顺序）
     expect(
-      loadConfig({ home: h, env: { DOMI_API_KEY: 'sk-unified', ANTHROPIC_API_KEY: 'sk-specific' } }).model.apiKey,
-    ).toBe('sk-unified')
+      loadConfig({ home: h, env: { ANTHROPIC_API_KEY: 'sk-specific', DOMI_ANTHROPIC_API_KEY: 'sk-domispecific' } })
+        .model.apiKey,
+    ).toBe('sk-specific')
   })
 
   test('完全没有配置文件时也能跑，用内置默认', () => {
-    const cfg = loadConfig({ home: home(), env: { DOMI_API_KEY: 'k' } })
+    const cfg = loadConfig({ home: home(), env: { ANTHROPIC_API_KEY: 'k' } })
     expect(cfg.model.provider).toBe('anthropic')
     expect(cfg.context.maxTokens).toBeGreaterThan(0)
     expect(cfg.permissions.rules).toEqual([])
@@ -99,7 +103,7 @@ describe('PRD-M0-008 AC-1 · 环境变量优先于配置文件', () => {
     const p = join(d, 'other.yaml')
     writeFileSync(p, 'model:\n  name: from-explicit-path\n', 'utf8')
     expect(configPath({ env: { DOMI_CONFIG: p } })).toBe(p)
-    expect(loadConfig({ env: { DOMI_CONFIG: p, DOMI_API_KEY: 'k' } }).model.name).toBe('from-explicit-path')
+    expect(loadConfig({ env: { DOMI_CONFIG: p, ANTHROPIC_API_KEY: 'k' } }).model.name).toBe('from-explicit-path')
   })
 })
 
@@ -117,7 +121,7 @@ describe('配置文件坏掉时给人话，不是堆栈', () => {
 
   test('字段类型不对也是 ConfigParseError，不是 zod 的原始报错', () => {
     const h = home('context:\n  maxTokens: 很多\n')
-    expect(() => loadConfig({ home: h, env: { DOMI_API_KEY: 'k' } })).toThrow(ConfigParseError)
+    expect(() => loadConfig({ home: h, env: { ANTHROPIC_API_KEY: 'k' } })).toThrow(ConfigParseError)
   })
 })
 
@@ -130,7 +134,7 @@ describe('PRD-M0-008 AC-3 · 缺凭据的退出路径', () => {
       expect(e).toBeInstanceOf(MissingCredentialError)
       const err = e as MissingCredentialError
       expect(err.messageKey).toBe('error.missing_credential')
-      expect(err.envNames).toEqual(['DOMI_API_KEY', 'ANTHROPIC_API_KEY', 'DOMI_ANTHROPIC_API_KEY'])
+      expect(err.envNames).toEqual(['ANTHROPIC_API_KEY', 'DOMI_ANTHROPIC_API_KEY'])
     }
   })
 
@@ -148,7 +152,10 @@ describe('PRD-M0-008 AC-3 · 缺凭据的退出路径', () => {
   test('有凭据时 preflight 不吭声、不退出', () => {
     const lines: string[] = []
     const codes: number[] = []
-    preflight({ err: (l) => lines.push(l), exit: (c) => codes.push(c) }, { home: home(), env: { DOMI_API_KEY: 'k' } })
+    preflight(
+      { err: (l) => lines.push(l), exit: (c) => codes.push(c) },
+      { home: home(), env: { ANTHROPIC_API_KEY: 'k' } },
+    )
     expect(codes).toEqual([])
     expect(lines).toEqual([])
   })
@@ -192,7 +199,7 @@ model:
   capabilities:
     toolCall: true
 `),
-      env: { DOMI_API_KEY: 'k' },
+      env: { DOMI_MY_GATEWAY_API_KEY: 'k' },
     })
     expect(cfg.model.capabilities).toEqual({ toolCall: true })
   })

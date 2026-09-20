@@ -141,7 +141,7 @@ export function diagnose(input: DoctorInput): Finding[] {
             provider: input.provider,
             join: input.credentialEnvNames.join(tr('common.or')),
           }),
-          fix: tr('cli.doctor.exportKey', { v: input.credentialEnvNames[0] ?? 'DOMI_API_KEY' }),
+          fix: tr('cli.doctor.exportKey', { v: input.credentialEnvNames[0] ?? 'DOMI_<ID>_API_KEY' }),
         },
   )
 
@@ -193,7 +193,7 @@ export function diagnose(input: DoctorInput): Finding[] {
             detail: input.ping.detail,
             // 不给「检查一下网络」这种废话：给一条能立刻看到真实响应的命令
             fix: input.baseUrl
-              ? `$ curl -sS -o /dev/null -w '%{http_code}\\n' ${input.baseUrl}/messages -H 'x-api-key: '"$DOMI_API_KEY"`
+              ? `$ curl -sS -o /dev/null -w '%{http_code}\\n' ${input.baseUrl}/messages -H 'x-api-key: '"$DOMI_${input.provider.toUpperCase().replace(/-/g, '_')}_API_KEY"`
               : "$ curl -sS -o /dev/null -w '%{http_code}\\n' https://api.anthropic.com/v1/messages -H 'x-api-key: '\"$ANTHROPIC_API_KEY\"",
           },
     )

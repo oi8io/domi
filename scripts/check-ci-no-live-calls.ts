@@ -22,14 +22,7 @@ const WORKFLOWS = join('.github', 'workflows')
 const MARKER = 'INV-08-LIVE'
 
 /** 注入其中任何一个，CI 就具备了真实调用的能力 */
-const CREDENTIAL_ENVS = [
-  'DOMI_API_KEY',
-  'ANTHROPIC_API_KEY',
-  'OPENAI_API_KEY',
-  'GOOGLE_API_KEY',
-  'GEMINI_API_KEY',
-  'DOMI_BASE_URL',
-]
+const CREDENTIAL_ENVS = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY']
 
 const live = readdirSync(SCRIPTS)
   .filter((f) => f.endsWith('.ts') || f.endsWith('.sh'))

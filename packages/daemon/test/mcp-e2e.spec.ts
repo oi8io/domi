@@ -87,6 +87,9 @@ describe('MCP 全链路', () => {
       `model:
   capabilities:
     toolCall: true
+providers:
+  fake-llm:
+    base_url: ${llm.url}
 permissions:
   rules:
     - name: local-mcp
@@ -109,8 +112,7 @@ mcp:
         DOMI_PORT: '0',
         DOMI_MODEL_PROVIDER: 'fake-llm',
         DOMI_MODEL: 'fake',
-        DOMI_BASE_URL: llm.url,
-        DOMI_API_KEY: 'not-a-real-key',
+        DOMI_FAKE_LLM_API_KEY: 'not-a-real-key',
       },
     })
     const client = new DomiClient({

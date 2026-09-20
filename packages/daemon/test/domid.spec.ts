@@ -30,7 +30,7 @@ function env(home: string, withKey = true): Record<string, string> {
   return {
     PATH: process.env.PATH ?? '',
     HOME: home,
-    ...(withKey ? { DOMI_API_KEY: 'test-not-a-real-key' } : {}),
+    ...(withKey ? { ANTHROPIC_API_KEY: 'test-not-a-real-key' } : {}),
     DOMI_PORT: '0',
   }
 }

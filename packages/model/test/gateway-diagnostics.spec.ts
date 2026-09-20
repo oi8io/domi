@@ -2,7 +2,7 @@
  * PRD-M1-001 AC-1 的续篇 · 兼容网关「请求发出去了，但什么都没回来」
  *
  * 真实现场（2026-09-15，M3 骨架轮后第一次用 Web 端）：
- *   DOMI_BASE_URL=https://api.z.ai/api/anthropic   ← Claude Code 的写法，不带 /v1
+ *   base_url: https://api.z.ai/api/anthropic   ← Claude Code 的写法，不带 /v1（base_url 只写配置文件）
  *   Web 输入 "Hi" → 事件流里只有一句
  *   「模型流中断：No output generated. The model stream ended without a finish chunk.」
  *

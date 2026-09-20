@@ -204,7 +204,7 @@ describe('ADR-014 · init --from-toml', () => {
 
     const yamlPath = join(home, 'converted.yaml')
     writeFileSync(yamlPath, r.out, 'utf8')
-    const env = { DOMI_API_KEY: 'k' }
+    const env = { ANTHROPIC_API_KEY: 'k' }
     expect(loadConfig({ path: yamlPath, env })).toEqual(loadConfig({ path: tomlPath, env }))
   })
 

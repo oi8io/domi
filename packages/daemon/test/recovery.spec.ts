@@ -94,6 +94,9 @@ describe('kill -9 后恢复', () => {
       `model:
   capabilities:
     toolCall: true
+providers:
+  fake-llm:
+    base_url: ${llm.url}
 permissions:
   rules:
     - name: allow-shell
@@ -111,8 +114,7 @@ permissions:
           DOMI_PORT: '0',
           DOMI_MODEL_PROVIDER: 'fake-llm',
           DOMI_MODEL: 'fake',
-          DOMI_BASE_URL: llm.url,
-          DOMI_API_KEY: 'not-a-real-key',
+          DOMI_FAKE_LLM_API_KEY: 'not-a-real-key',
         },
       })
     const connect = async (url: string) => {

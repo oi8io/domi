@@ -36,7 +36,7 @@ function newHome(): string {
 
 const env = (extra: Record<string, string> = {}) => ({
   PATH: process.env.PATH ?? '',
-  DOMI_API_KEY: 'test-not-a-real-key',
+  ANTHROPIC_API_KEY: 'test-not-a-real-key',
   DOMI_PORT: '0',
   ...extra,
 })

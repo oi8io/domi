@@ -53,18 +53,18 @@ describe('providerConnection', () => {
   })
 })
 
-describe('DOMI_API_KEY 只给默认模型所在的那一家（PRD-M9-002 AC-6）', () => {
+describe('凭据环境变量名（PRD-M9-002 AC-6，DOMI_API_KEY 已于 2026-09-20 废弃）', () => {
   test('环境变量名', () => {
-    expect(credentialEnvNames('anthropic')).toEqual(['DOMI_API_KEY', 'ANTHROPIC_API_KEY', 'DOMI_ANTHROPIC_API_KEY'])
-    expect(credentialEnvNames('openai', false)).toEqual(['OPENAI_API_KEY', 'DOMI_OPENAI_API_KEY'])
+    expect(credentialEnvNames('anthropic')).toEqual(['ANTHROPIC_API_KEY', 'DOMI_ANTHROPIC_API_KEY'])
+    expect(credentialEnvNames('openai')).toEqual(['OPENAI_API_KEY', 'DOMI_OPENAI_API_KEY'])
     // 自定义 id：DOMI_<ID>_API_KEY（- 转 _）
-    expect(credentialEnvNames('my-gw', false)).toEqual(['DOMI_MY_GW_API_KEY'])
+    expect(credentialEnvNames('my-gw')).toEqual(['DOMI_MY_GW_API_KEY'])
   })
 
-  test('装载：DOMI_API_KEY 不会变成别家的 key', () => {
+  test('装载：别家的 key 不会串到默认 provider 之外', () => {
     const cfg = loadConfig({
       path: '/nonexistent/config.yaml',
-      env: { DOMI_API_KEY: 'k-uni', DOMI_MODEL_PROVIDER: 'anthropic' },
+      env: { ANTHROPIC_API_KEY: 'k-uni', DOMI_MODEL_PROVIDER: 'anthropic' },
     })
     expect(providerConnection(cfg, 'anthropic').apiKey).toBe('k-uni')
     expect(providerConnection(cfg, 'openai').apiKey).toBeUndefined()

@@ -390,8 +390,7 @@ export class DomiSession {
   checkCredential(): void {
     if (this.injectedProvider) return
     if (providerConnection(this.opts.config, this.currentProvider).apiKey) return
-    const isDefault = this.currentProvider === this.opts.config.model.provider
-    throw new MissingCredentialError(credentialEnvNames(this.currentProvider, isDefault), this.currentProvider)
+    throw new MissingCredentialError(credentialEnvNames(this.currentProvider), this.currentProvider)
   }
 
   /** 当前在用的 provider 与模型（会话中途可能被 switchModel 换掉） */

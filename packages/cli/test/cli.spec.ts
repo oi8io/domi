@@ -38,7 +38,7 @@ function tmp(): string {
 const BASE = {
   configPath: '/nonexistent/config.yaml',
   hasCredential: false,
-  credentialEnvNames: ['DOMI_API_KEY', 'ANTHROPIC_API_KEY'],
+  credentialEnvNames: ['ANTHROPIC_API_KEY', 'DOMI_ANTHROPIC_API_KEY'],
   dataDir: '/tmp',
   gitAvailable: false,
   provider: 'anthropic',

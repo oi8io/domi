@@ -92,7 +92,7 @@ describe('doctor 把 ping 结果并进体检报告', () => {
   const input = {
     configPath: '/nonexistent/config.yaml',
     hasCredential: true,
-    credentialEnvNames: ['DOMI_API_KEY'],
+    credentialEnvNames: ['ANTHROPIC_API_KEY'],
     dataDir: '/tmp',
     gitAvailable: true,
     provider: 'anthropic',

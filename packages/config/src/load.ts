@@ -3,8 +3,10 @@
  *
  * 优先级：环境变量 > ~/.domi/config.yaml > 内置默认。
  * 格式是 YAML（docs/adr/014）；旧的 config.toml 过渡期内仍可读，到 M4 再批准门删掉。
- * 这个顺序不是随便定的：出问题时人要能用一条 `DOMI_API_KEY=... domi` 临时绕开配置文件，
+ * 这个顺序不是随便定的：出问题时人要能用一条 `DEEPSEEK_API_KEY=... domi` 临时绕开配置文件，
  * 反过来（文件覆盖环境变量）会让"我明明设了环境变量为什么没生效"变成常见困惑。
+ * base_url 不走环境变量（`DOMI_BASE_URL` 已于 2026-09-20 废弃）：它随终端环境漂，
+ * 两次把 deepseek 的请求打到 `/anthropic/chat/completions` 的 404 上，只认配置文件。
  */
 
 import { existsSync, readFileSync } from 'node:fs'
@@ -106,12 +108,12 @@ export function readConfigFile(src: ConfigSource): Record<string, unknown> {
 }
 
 /**
- * 按 provider 找它惯用的环境变量名。`DOMI_API_KEY` 这个统一入口**只给默认模型所在的那一家**（PRD-M9-002 AC-6）：
- * 否则设了它，切到任何没配 key 的别家都会把这把 key 发过去（BUG-M9-002 的同一类问题）
+ * 按 provider 找它惯用的环境变量名：`DOMI_<ID>_API_KEY` + 厂商模板的惯用名（如 `DEEPSEEK_API_KEY`）。
+ * 不存在无后缀的统一入口（`DOMI_API_KEY` 已于 2026-09-20 废弃）：它的值随终端环境漂，
+ * 出现过把一把旧 key 发给别家 / 请求打到 `/anthropic/chat/completions` 404 的两起事故。
  */
-export function credentialEnvNames(provider: string, isDefault = true, vendor?: VendorId): string[] {
-  const names = providerEnvNames(provider, vendor)
-  return isDefault ? ['DOMI_API_KEY', ...names] : names
+export function credentialEnvNames(provider: string, vendor?: VendorId): string[] {
+  return providerEnvNames(provider, vendor)
 }
 
 type FileProviders = Record<
@@ -155,7 +157,7 @@ export function resolveCredential(
     defaultProvider: string
   },
 ): ResolvedCredential | null {
-  const fromEnv = credentialEnvNames(provider, provider === ctx.defaultProvider, vendorOf(ctx.file, provider))
+  const fromEnv = credentialEnvNames(provider, vendorOf(ctx.file, provider))
     .map((n) => ctx.env[n])
     .find((v) => v !== undefined && v !== '')
   if (fromEnv !== undefined) return { value: fromEnv, source: 'env' }
@@ -213,8 +215,8 @@ export function loadConfig(opts: LoadOptions = {}): DomiConfig {
     model: {
       provider,
       name: env.DOMI_MODEL ?? (fileModel.name as string | undefined) ?? DEFAULT_MODEL.name,
-      ...((env.DOMI_BASE_URL ?? fileModel.base_url ?? providerBase)
-        ? { baseUrl: env.DOMI_BASE_URL ?? (fileModel.base_url as string | undefined) ?? providerBase }
+      ...((fileModel.base_url ?? providerBase)
+        ? { baseUrl: (fileModel.base_url as string | undefined) ?? providerBase }
         : {}),
       ...(apiKey ? { apiKey } : {}),
       ...(fileModel.capabilities === undefined ? {} : { capabilities: fileModel.capabilities }),

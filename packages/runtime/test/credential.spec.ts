@@ -72,7 +72,7 @@ describe('OPT-M8-001 · 提交时查凭据', () => {
       return null
     })()
     expect(err?.provider).toBe('openai')
-    // DOMI_API_KEY 只属于默认那一家（PRD-M9-002 AC-6），别家的提示里不该出现它
+    // 别家 provider 的提示里不该出现默认那一家才有的统一入口（DOMI_API_KEY 已于 2026-09-20 废弃）
     expect(err?.envNames).toEqual(['OPENAI_API_KEY', 'DOMI_OPENAI_API_KEY'])
     await none.flushAndClose()
   })

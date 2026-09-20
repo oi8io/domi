@@ -117,7 +117,7 @@ describe('token 的形状', () => {
 describe('AC-2 · 监听地址与 token 从哪来', () => {
   test('默认配置：127.0.0.1，没有 token', () => {
     const home = tmp()
-    const config = loadConfig({ env: { DOMI_API_KEY: 'x' }, home })
+    const config = loadConfig({ env: { ANTHROPIC_API_KEY: 'x' }, home })
     expect(config.server.host).toBe('127.0.0.1')
     const s = resolveServerSettings({ config, env: {}, home })
     expect(s).toMatchObject({ hostname: '127.0.0.1', port: 7437, token: null })
@@ -125,7 +125,7 @@ describe('AC-2 · 监听地址与 token 从哪来', () => {
 
   test('监听非本地地址又没配 token：生成一个存进 ~/.domi/daemon.token（0600），下次复用', () => {
     const home = tmp()
-    const config = loadConfig({ env: { DOMI_API_KEY: 'x' }, home })
+    const config = loadConfig({ env: { ANTHROPIC_API_KEY: 'x' }, home })
     const a = resolveServerSettings({ config, env: { DOMI_HOST: '0.0.0.0' }, home })
     expect(a.hostname).toBe('0.0.0.0')
     expect(a.token).toMatch(/^[A-Za-z0-9_-]{32,}$/)
@@ -141,7 +141,7 @@ describe('AC-2 · 监听地址与 token 从哪来', () => {
     const home = tmp()
     mkdirSync(join(home, '.domi'), { recursive: true })
     writeFileSync(join(home, '.domi', 'config.yaml'), `server:\n  host: 0.0.0.0\n  port: 9000\n  token: ${TOKEN}\n`)
-    const config = loadConfig({ env: { DOMI_API_KEY: 'x' }, home })
+    const config = loadConfig({ env: { ANTHROPIC_API_KEY: 'x' }, home })
     const s = resolveServerSettings({ config, env: {}, home })
     expect(s).toMatchObject({ hostname: '0.0.0.0', port: 9000, token: TOKEN })
     expect(existsSync(join(home, '.domi', 'daemon.token'))).toBe(false)
@@ -205,7 +205,7 @@ describe('AC-3 · 被拒的连接落成事件', () => {
   test('RuntimeHost 把拒绝写进审计会话；会话列表里看不到它', async () => {
     const d = tmp()
     const h = createRuntimeHost({
-      config: loadConfig({ env: { DOMI_API_KEY: 'x' }, home: d }),
+      config: loadConfig({ env: { ANTHROPIC_API_KEY: 'x' }, home: d }),
       dbPath: join(d, 'events.db'),
       defaultCwd: d,
       newId: () => 'real',
@@ -230,7 +230,7 @@ describe('AC-3 · 被拒的连接落成事件', () => {
     const env = {
       PATH: process.env.PATH ?? '',
       HOME: home,
-      DOMI_API_KEY: 'test-not-a-real-key',
+      ANTHROPIC_API_KEY: 'test-not-a-real-key',
       DOMI_PORT: '0',
       DOMI_HOST: '0.0.0.0',
     }

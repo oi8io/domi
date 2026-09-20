@@ -85,14 +85,23 @@ describe('M3 DoD', () => {
     const h = home()
     // openai-compatible 默认不声明工具调用（fail-closed）；这个假网关「支持」，显式打开
     mkdirSync(join(h, '.domi'), { recursive: true })
-    writeFileSync(join(h, '.domi', 'config.yaml'), 'model:\n  capabilities:\n    toolCall: true\n', 'utf8')
+    writeFileSync(
+      join(h, '.domi', 'config.yaml'),
+      `model:
+  capabilities:
+    toolCall: true
+providers:
+  fake-llm:
+    base_url: ${llm.url}
+`,
+      'utf8',
+    )
     const env = {
       PATH: process.env.PATH ?? '',
       DOMI_PORT: '0',
       DOMI_MODEL_PROVIDER: 'fake-llm', // 未知 provider 走 openai-compatible
       DOMI_MODEL: 'fake',
-      DOMI_BASE_URL: llm.url,
-      DOMI_API_KEY: 'not-a-real-key',
+      DOMI_FAKE_LLM_API_KEY: 'not-a-real-key',
     }
 
     // —— TUI：自动拉起 domid，建会话，提交，马上退出
