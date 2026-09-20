@@ -428,6 +428,7 @@ export const en: Record<keyof typeof zh, string> = {
   'core.client.notConnected': "Not connected to the daemon; can't call {method}",
   'core.client.closed': 'Connection closed',
   'core.client.unreachable': "Can't reach the daemon",
+  'core.client.startDaemonHint': 'Run `pnpm domid` in a terminal to start the daemon',
   'core.client.dropped': 'Connection lost',
   'core.ev.cleanup': 'Context cleanup {tokensBefore} → {tokensAfter} tokens',
   'core.ev.cleanupDetail':

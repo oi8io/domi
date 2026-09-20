@@ -412,6 +412,7 @@ export const zh = {
   'core.client.notConnected': '未连接到 daemon，无法调用 {method}',
   'core.client.closed': '连接已关闭',
   'core.client.unreachable': '连不上 daemon',
+  'core.client.startDaemonHint': '在终端跑 `pnpm domid` 启动后台进程',
   'core.client.dropped': '连接已断开',
   'core.ev.cleanup': '上下文清理 {tokensBefore} → {tokensAfter} tokens',
   'core.ev.cleanupDetail': '去重 {dedupe} · 截断 {verbose} · 已解决错误 {resolvedError} · 堆栈 {stack}',

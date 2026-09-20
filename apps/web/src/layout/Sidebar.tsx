@@ -229,7 +229,12 @@ export function Sidebar(props: SidebarProps) {
           {STATE_LABEL()[state]}
         </p>
       )}
-      {lastError !== null && <p className="mx-3 mb-2 text-xs text-bad">{lastError}</p>}
+      {lastError !== null && (
+        <div className="mx-3 mb-2">
+          <p className="text-xs text-bad">{lastError}</p>
+          <p className="text-[11px] text-mut">{tr('core.client.startDaemonHint')}</p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-[5px] px-2.5 pb-2">
         <Button

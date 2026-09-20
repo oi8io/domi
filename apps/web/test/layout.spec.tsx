@@ -180,3 +180,10 @@ describe('PRD-M8-002 AC-6 · 项目是一棵树', () => {
     expect(expanded).toContain('data-state="running"')
   })
 })
+
+describe('PRD-M11-006 · 连不上 daemon 时侧栏给出启动指引', () => {
+  test('lastError 出现时，附一行启动 daemon 的命令（Web 无 Node，只能指引用户自己起）', () => {
+    const html = sidebar({ view: 'home' }, { lastError: '连不上 daemon' })
+    expect(html).toContain('pnpm domid')
+  })
+})
