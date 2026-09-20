@@ -20,8 +20,7 @@ CI 里的端到端测试用的是真 SQLite、真权限引擎、真文件系统�
 
 ```bash
 # 走自建网关 / 兼容端点
-export DOMI_API_KEY=你的兼容key
-export DOMI_BASE_URL=https://你的网关/v1
+export DEEPSEEK_API_KEY=你的兼容key
 
 mkdir -p /tmp/domi-demo && cd /tmp/domi-demo
 cat > sum.js <<'JS'
@@ -35,8 +34,8 @@ SH
 mkdir -p ~/.domi && cat > ~/.domi/config.yaml <<'YAML'
 model:
   provider: anthropic                     # 说的是协议，不是域名
-  name: claude-sonnet-4-5                # 网关上的模型名，按你的网关填
-  # base_url: https://你的网关            # 也可以用 DOMI_BASE_URL；带不带 /v1 都行
+  name: GLM-4.7-Flash                # 网关上的模型名，按你的网关填
+  # base_url: https://你的网关            # base_url 只写配置文件；带不带 /v1 都行
 
 permissions:
   rules:

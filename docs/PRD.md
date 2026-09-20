@@ -1122,7 +1122,7 @@ TUI 应用内鼠标拖选复制 · 翻译用户内容 / 事件流 / 轨迹 / sou
   - AC-3：适配器由厂商决定：`openai` → OpenAI 官方适配器；`anthropic`，以及 `custom` + anthropic 协议 → Anthropic 适配器；其余 openai 协议 → OpenAI 兼容适配器（Chat Completions）。去掉 Google 专用适配器，Gemini 的对话与 embedding 都走兼容端点
   - AC-4：设置页「模型供应商」可新增 / 编辑 / 删除 / 启停 provider；编辑项 = 名称、厂商模板、协议、Base URL、API Key、启用、能力开关、手填模型；id 新建时由名称生成、可改，建好后不可改；选厂商模板时自动带出协议、地址与能力
   - AC-5：默认模型所在的 provider 不能停用、不能删除：`config.set` 返回 `INVALID_PARAMS`（`data.reason = DEFAULT_PROVIDER`），界面提示先换默认模型
-  - AC-6：凭据优先级不变（环境变量 > secrets.yaml > config.yaml）；环境变量名 = `DOMI_<ID>_API_KEY`（id 转大写、`-` 转 `_`），模板再认惯用名（如 `ANTHROPIC_API_KEY`）；`DOMI_API_KEY` 只作用于默认模型所在的 provider
+  - AC-6：凭据优先级不变（环境变量 > secrets.yaml > config.yaml）；环境变量名 = `DOMI_<ID>_API_KEY`（id 转大写、`-` 转 `_`），模板再认惯用名（如 `ANTHROPIC_API_KEY`、`DEEPSEEK_API_KEY`）；不存在无后缀的统一入口（`DOMI_API_KEY` 已废弃——它的值随终端环境漂，出现过「环境里挂着旧 key / 旧 base_url 把请求打飞」两起事故）；`base_url` 只写配置文件（`model.base_url` / `providers.<id>.base_url`），不设环境变量覆盖入口（`DOMI_BASE_URL` 已废弃，同因）
   - AC-7：旧配置照常读：`model.apiKey / baseUrl / capabilities` 加载时并入 `providers[model.provider]`（运行期只有 `providers` 一个来源）；缺 `vendor / protocol` 的旧条目按键名推断（键名是模板名 → 该模板；`openai-compatible` → `custom`；`google` → `gemini`；其它 → `custom` + openai）；`domi doctor` 列出被推断的条目（只提示，不强制迁移）
   - AC-8：`config.set` 白名单改为 `providers.<id>.{name, vendor, protocol, base_url, api_key, enabled, models, capabilities}` 与删除整条 provider；`permissions`、`hooks`、`mcp`、插件安装仍整体拒绝（PRD-M8-011 AC-2 不回退）
 - **验收方式**：`bun test config/providers.spec.ts` + `bun test config/write.spec.ts` + `bun test model/vendors.spec.ts` + `apps/web/test/settings-providers.spec.tsx`

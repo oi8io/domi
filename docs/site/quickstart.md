@@ -9,11 +9,11 @@ domi 是一个本地优先的 agent 运行时：对话、工具调用、权限�
 git clone <仓库地址> domi && cd domi
 pnpm install && pnpm build     # 产物是 dist/domi 单二进制；开发时也可以 bun apps/tui/src/main.tsx
 domi init > ~/.domi/config.yaml
-export DOMI_API_KEY=sk-...     # 或者在 config.yaml 里写 model.api_key
+export DEEPSEEK_API_KEY=sk-...     # 或者把 key 写进 ~/.domi/secrets.yaml
 domi doctor                    # 每条问题都带一条能直接粘贴的修复命令
 ```
 
-`DOMI_API_KEY` 只给默认那一家 provider 用；别家的 key 写进 `~/.domi/secrets.yaml`，或者用它们各自的环境变量
+key 写进 `~/.domi/secrets.yaml`（`providers.<id>.api_key`），或者用各家自己的环境变量
 （每家都认 `DOMI_<ID>_API_KEY`，厂商模板再加惯用名，例如 `ANTHROPIC_API_KEY`、`DEEPSEEK_API_KEY`）。
 
 多家供应商、本地模型或网关（LiteLLM、OpenRouter、Ollama）写在 `providers` 下，每家一段：
