@@ -1,7 +1,14 @@
-在做: **M10「会话体验与运行控制」**：000–006 全部 done（2026-09-19）。
+在做: **M11 PRD 已 COMMITTED**（2026-09-21 用户拍板六疑点）：会话体验深化七条，**一册不拆**，简单先做、逐个击破、测试先行。
+      拍板：默认档位「按需确认」/ Markdown 先只做 Web / 「始终允许」指纹=可执行文件+参数首词/前缀够用 / 三端（desktop+TUI+Web）都接自启 /
+      危险清单先内置固定。任务顺序建议：006→001→004→002→003→007（等终止方案）→005。文档：`docs/prd/M11.md`。
+      终止方案（S1–S4：墙钟语义 / ask 超时 / 终止消息 / 断点续跑）**仍挂起待用户拍板**，007 的语义与其绑定。
+
+      **M10「会话体验与运行控制」**：000–006 全部 done（2026-09-19）。
       TASK-M10-006 收口完成：M10 进了 `check-ac-coverage` ACTIVE（224 条 AC 全点名）、协议/API 快照检查 OK
       （`config.get` 的 loop.* 是运行值，schema 未变）、`pnpm check` 最终全绿（首轮 lint 抓出 12 个 biome 格式错，已修复）。
       剩 **TASK-M10-007（DoD 验证，只有用户能做）**。
+      实测反馈已修（1a5ed41e）：侧栏项目展开列表（recentTasks）空标题回退首条输入——M10-001 只改了 session.list 一条 SQL，projects.list 漏了同口径。
+      另补提交 loop.ts 默认 100（81ad5dda，M10-000 欠账）。
 
       进 M10 前的腐蚀已清：`guard:deps` 把 `apps/web/dist` 构建产物扫进架构分析导致 no-circular 红——
       `.dependency-cruiser.cjs` 的 `options.exclude` 加了 `(^|/)dist($|/)`（Vite 产物 chunk 互引是打包器正常行为，不该被拦）。
@@ -28,6 +35,6 @@
 卡在: **仓库还没有 git remote**——150 多个提交只在这一台机器上，交接前先推到远端。
       本机残留要你在 Mac 上清一次（挂载盘这边删不了）：`.git/index.lock`、`.git/HEAD.lock`、`_tmp_git_locks/`、`.*.bun-build`、`_tmp_smoke1.ts`。
       工作区里有几处**不是这边改的**本机改动没提交：`package.json`（pnpm 12.4.2、devDependencies 排序）、`pnpm-lock.yaml`、
-      `packages/kernel/src/loop.ts`（`maxToolCalls` 20 → 100——M10-003 默认值就是 100，TASK-M10-000 会把它正式提交）、
       `packages/daemon/src/main.ts`（只是可执行位）、`demos/m0-loop.md`（**别提交**，历史上出现过真 key）。要不要留由你定。
+      （`packages/kernel/src/loop.ts` 的 maxToolCalls 100 已随 TASK-M10-000 欠账补提交，不在遗留清单了。）
       体验类问题按你定的规矩只记录不排期，登记在各任务文件末尾（M9 新增 OPT-M9-001）。
