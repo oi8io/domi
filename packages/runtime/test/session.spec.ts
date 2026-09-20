@@ -145,7 +145,9 @@ describe('外部工具（MCP）接进会话 —— PRD-M2-001 · ADR-015', () =>
       extraTools: opts.tools as never,
       ...(opts.notices ? { notices: opts.notices } : {}),
       // PRD-M11-005：危险能力（mcp.*/fs.write/shell.exec）规则 allow 后仍要问；测试环境默认自动批准
-      ...(opts.autoAsk === false ? {} : { listeners: { onAsk: (a: { answer: (v: boolean) => void }) => a?.answer(true) } }),
+      ...(opts.autoAsk === false
+        ? {}
+        : { listeners: { onAsk: (a: { answer: (v: boolean) => void }) => a?.answer(true) } }),
       provider: new StubProvider([
         [{ type: 'tool-call', id: 'c1', name: 'mcp.demo.echo', args: { text: 'hi' } }],
         [{ type: 'delta', text: '好了' }],
@@ -259,7 +261,7 @@ describe('TASK-M3-016 · 工具向用户要输入（elicitation）走询问通�
   test('拒绝 → decline；没人能回答 → decline（不替人填）', async () => {
     const s = session()
     // PRD-M11-005：权限问先放行，只在表单询问上拒绝
-    s.on('onAsk', (a) => a?.answer(a?.capabilityId === 'mcp.demo.input' ? false : true, {}))
+    s.on('onAsk', (a) => a?.answer(a?.capabilityId !== 'mcp.demo.input', {}))
     await s.submit('部署')
     expect(JSON.stringify((await s.pumpAll()).find((e) => e.ev.t === 'tool.result')?.ev)).toContain(
       '"action":"decline"',

@@ -1,6 +1,6 @@
 /** 危险清单 + 命令指纹 —— PRD-M11-005（SPEC-M11-005/006） */
 import { describe, expect, test } from 'bun:test'
-import { commandFingerprint, DANGEROUS_EXACT, DANGEROUS_PREFIX, isDangerous, type ReviewMode } from '../src/dangerous.ts'
+import { commandFingerprint, DANGEROUS_EXACT, DANGEROUS_PREFIX, isDangerous } from '../src/dangerous.ts'
 
 describe('isDangerous —— 任何档位都不能自动放行（AC-2）', () => {
   test('删除/覆盖/写/外发/shell 是危险能力', () => {

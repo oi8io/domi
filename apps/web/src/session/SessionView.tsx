@@ -12,13 +12,13 @@ import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
 import { NEAR_BOTTOM_PX, shouldStickToBottom } from '../lib/scroll.ts'
-import { JumpBar } from './JumpBar.tsx'
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
 import { ChangesBar } from './ChangesBar.tsx'
 import { Composer, ModelSwitch, ModeToggle, type PendingRef } from './Composer.tsx'
 import { CredentialNotice } from './CredentialNotice.tsx'
+import { JumpBar } from './JumpBar.tsx'
 import { ReviewFindings } from './ReviewFindings.tsx'
 import { Trajectory } from './Trajectory.tsx'
 
@@ -70,6 +70,7 @@ export function SessionView({
 
   // PRD-M11-001：进入/切换会话先强制贴底一次；之后新内容只在「贴着底部」时跟随（用户上翻不打扰）
   const pendingStick = useRef(true)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 切会话时以当前条数为基准重置，items.length 变化不该再触发重置
   useEffect(() => {
     pendingStick.current = true
     awayFromBottom.current = false
@@ -203,27 +204,27 @@ export function SessionView({
         <ChangesBar client={client} sessionId={sessionId} busy={status.busy} items={items} />
       )}
       <div className="relative min-h-0 flex-1">
-      <div ref={scroller} className="h-full overflow-y-auto" onScroll={reportRead}>
-        {tab === 'trajectory' ? (
-          <Trajectory items={items} />
-        ) : (
-          <div className="mx-auto max-w-[860px] px-6 py-5">
-            <Transcript
-              items={items}
-              {...(onBranched === undefined ? {} : { onBranch: branch })}
-              {...(onRefsChange === undefined
-                ? {}
-                : {
-                    onQuote: (q) =>
-                      onRefsChange([...refs, { sessionId, fromSeq: q.fromSeq, toSeq: q.toSeq, label: q.label }]),
-                  })}
-            />
-            {review !== null && <ReviewFindings findings={review} />}
-            {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
-          </div>
-        )}
-      </div>
-      <JumpBar count={newCount} onClick={jumpToBottom} />
+        <div ref={scroller} className="h-full overflow-y-auto" onScroll={reportRead}>
+          {tab === 'trajectory' ? (
+            <Trajectory items={items} />
+          ) : (
+            <div className="mx-auto max-w-[860px] px-6 py-5">
+              <Transcript
+                items={items}
+                {...(onBranched === undefined ? {} : { onBranch: branch })}
+                {...(onRefsChange === undefined
+                  ? {}
+                  : {
+                      onQuote: (q) =>
+                        onRefsChange([...refs, { sessionId, fromSeq: q.fromSeq, toSeq: q.toSeq, label: q.label }]),
+                    })}
+              />
+              {review !== null && <ReviewFindings findings={review} />}
+              {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
+            </div>
+          )}
+        </div>
+        <JumpBar count={newCount} onClick={jumpToBottom} />
       </div>
       {tab === 'trajectory' && ask !== null && (
         <div className="shrink-0 px-5">

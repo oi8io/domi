@@ -97,7 +97,6 @@ describe('通配规则 `前缀.*` —— 一条规则管住一整个 MCP server�
 })
 
 describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
-
   test('默认（不配置 reviewMode）= on-demand = 现状 fail-closed：非危险无规则仍 deny', async () => {
     const d = await new PermissionEngine().check('fs.read', {})
     expect(d.decision).toBe('deny')

@@ -189,9 +189,7 @@ function SettingsOverlay({ client, current, onClose }: { client: DomiClient; cur
       ]}
       notice={notice}
       onSelect={(it) => {
-        const patch = it.key.startsWith('r:')
-          ? { 'permissions.review': it.key.slice(2) }
-          : { 'ui.locale': it.key }
+        const patch = it.key.startsWith('r:') ? { 'permissions.review': it.key.slice(2) } : { 'ui.locale': it.key }
         client.setSettings(patch).then(
           () => setNotice(tr('tui.settings.appliesOnRestart')),
           (e: unknown) => setNotice(e instanceof Error ? e.message : String(e)),

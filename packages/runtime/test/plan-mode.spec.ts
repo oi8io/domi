@@ -72,7 +72,15 @@ function session(turns: StubTurn[], o: { startTask?: (spec: unknown) => Promise<
     // PRD-M11-005：危险能力权限问自动过；业务问（plan 审批等）不答 = 没人批（与无 listener 同义）
     if (!a) return
     const c = a.capabilityId
-    const dangerous = c === 'fs.write' || c === 'fs.delete' || c === 'fs.move' || c === 'fs.append' || c === 'shell.exec' || c === 'web.fetch' || c.startsWith('mcp.') || c.startsWith('plugin.')
+    const dangerous =
+      c === 'fs.write' ||
+      c === 'fs.delete' ||
+      c === 'fs.move' ||
+      c === 'fs.append' ||
+      c === 'shell.exec' ||
+      c === 'web.fetch' ||
+      c.startsWith('mcp.') ||
+      c.startsWith('plugin.')
     a.answer(dangerous)
   })
   const evs = async () => (await s.pumpAll()).map((e) => e.ev)
