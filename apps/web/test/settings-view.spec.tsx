@@ -7,6 +7,7 @@
 import { describe, expect, test } from 'bun:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { GeneralTab, MemoryTab } from '../src/views/SettingsView.tsx'
+import { RuntimeTab } from '../src/views/settings/RuntimeTab.tsx'
 import { PluginList } from '../src/views/settings/PluginsTab.tsx'
 import { SoulView } from '../src/views/settings/SoulTab.tsx'
 import { fmtCost, fmtTokens, ModelBars, rangeOf, UsageView } from '../src/views/settings/UsageTab.tsx'
@@ -31,6 +32,7 @@ const settings: Settings = {
     'budget.tokens': null,
     'budget.costUsd': null,
     'budget.toolCalls': null,
+    'permissions.review': 'on-demand',
     'ui.accent': 'blue',
     'tui.theme': 'auto',
   },
@@ -269,5 +271,15 @@ describe('PRD-M8-013 AC-2 · 用量：6 张数字卡 + 按模型柱状图', () =
     expect(new Date(prev.from).getMonth()).toBe(7)
     expect(prev.to).toBe(month.from)
     expect(rangeOf('all', now).from).toBe(0)
+  })
+})
+
+
+describe('PRD-M11-005 AC-1 · 审核档位', () => {
+  test('RuntimeTab 渲染三档下拉（on-demand/always-ask/allow-all），当前值选中', () => {
+    const html = renderToStaticMarkup(<RuntimeTab s={s} />)
+    expect(html).toContain('on-demand')
+    expect(html).toContain('always-ask')
+    expect(html).toContain('allow-all')
   })
 })

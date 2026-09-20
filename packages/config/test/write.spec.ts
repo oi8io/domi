@@ -76,6 +76,14 @@ describe('PRD-M8-011 AC-2 / AC-4 · 白名单之外一律拒绝，注释与写�
     expect(readFileSync(cfg, 'utf8')).not.toContain('maxToolCalls: -1')
   })
 
+  test('PRD-M11-005：permissions.review 三档在白名单，写得进读得回；非法值整体拒绝', () => {
+    const { opts } = home()
+    writeConfigPatch({ 'permissions.review': 'always-ask' }, opts)
+    expect(loadConfig(opts).permissions.review).toBe('always-ask')
+    expect(readSettings(opts).values['permissions.review']).toBe('always-ask')
+    expect(() => writeConfigPatch({ 'permissions.review': 'bogus' } as never, opts)).toThrow(ConfigWriteError)
+  })
+
   test('值不合法时也整体拒绝（先在副本上校验过才写真文件）', () => {
     const { cfg, opts } = home()
     expect(() => writeConfigPatch({ 'ui.accent': 'red' } as never, opts)).toThrow()

@@ -213,6 +213,11 @@ export const en: Record<keyof typeof zh, string> = {
   'web.settings.maxArgParseRetriesHint': 'Retries when tool-arg parsing fails (1-100, default 3)',
   'web.settings.maxWallClockMs': 'Max wall-clock per turn (ms)',
   'web.settings.maxWallClockMsHint': 'Wall-clock budget for one turn (1000-86400000, default 600000)',
+  'web.settings.review': 'Dangerous-capability review mode',
+  'web.settings.reviewHint': 'When to ask before risky actions (write files, run commands, call services); never silent',
+  'web.settings.reviewOnDemand': 'On demand (recommended): follow rules, ask only when unclear',
+  'web.settings.reviewAlways': 'Always ask: confirm every risky action regardless of rules',
+  'web.settings.reviewAllowAll': 'Allow all: skip non-risky asks; risky actions still ask (never off)',
   'web.settings.language': 'Interface language',
   'web.settings.languageHint':
     "Language domi's interface is shown in; shared by Web and TUI. The page reloads after switching",
