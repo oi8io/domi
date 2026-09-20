@@ -11,7 +11,8 @@ import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
-import { shouldStickToBottom } from '../lib/scroll.ts'
+import { NEAR_BOTTOM_PX, shouldStickToBottom } from '../lib/scroll.ts'
+import { JumpBar } from './JumpBar.tsx'
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
@@ -62,11 +63,18 @@ export function SessionView({
   const review = useStore(store.$review)
   const [notice, setNotice] = useState<ReactNode>(null)
   const scroller = useRef<HTMLDivElement>(null)
+  // PRD-M11-002：用户上翻离开底部后，新内容累计成「N 条新消息」浮条
+  const [newCount, setNewCount] = useState(0)
+  const awayFromBottom = useRef(false)
+  const lastLen = useRef(items.length)
 
   // PRD-M11-001：进入/切换会话先强制贴底一次；之后新内容只在「贴着底部」时跟随（用户上翻不打扰）
   const pendingStick = useRef(true)
   useEffect(() => {
     pendingStick.current = true
+    awayFromBottom.current = false
+    setNewCount(0)
+    lastLen.current = items.length
   }, [sessionId])
   // biome-ignore lint/correctness/useExhaustiveDependencies: 条数与询问变化是滚动的触发条件
   useEffect(() => {
@@ -78,6 +86,11 @@ export function SessionView({
     } else if (shouldStickToBottom(el.scrollHeight - el.scrollTop - el.clientHeight)) {
       el.scrollTop = el.scrollHeight
     }
+    // 上翻期间来了新内容（首次贴底那次不算）→ 累计浮条计数
+    if (!pendingStick.current && awayFromBottom.current && items.length > lastLen.current) {
+      setNewCount((n) => n + (items.length - lastLen.current))
+    }
+    lastLen.current = items.length
     reportRead()
   }, [items.length, ask])
 
@@ -86,7 +99,15 @@ export function SessionView({
   const reportRead = (): void => {
     const el = scroller.current
     if (!el || document.visibilityState !== 'visible') return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight > 80) return
+    // PRD-M11-002：距底远近决定浮条；回到底部就清计数
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (dist <= NEAR_BOTTOM_PX) {
+      awayFromBottom.current = false
+      setNewCount(0)
+    } else {
+      awayFromBottom.current = true
+    }
+    if (dist > 80) return
     const r = lastReport.current
     if (r.timer !== 0) return
     const send = (): void => {
@@ -111,6 +132,13 @@ export function SessionView({
     }
   }, [sessionId])
 
+  const jumpToBottom = (): void => {
+    const el = scroller.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    awayFromBottom.current = false
+    setNewCount(0)
+  }
   const answer = (allowed: boolean, content?: Record<string, unknown>, grant?: boolean): void => {
     if (!ask?.askId) return
     client.answer(ask.askId, allowed, content, undefined, grant).then(
@@ -174,7 +202,8 @@ export function SessionView({
       {status.worktree !== undefined && (
         <ChangesBar client={client} sessionId={sessionId} busy={status.busy} items={items} />
       )}
-      <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto" onScroll={reportRead}>
+      <div className="relative min-h-0 flex-1">
+      <div ref={scroller} className="h-full overflow-y-auto" onScroll={reportRead}>
         {tab === 'trajectory' ? (
           <Trajectory items={items} />
         ) : (
@@ -193,6 +222,8 @@ export function SessionView({
             {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
           </div>
         )}
+      </div>
+      <JumpBar count={newCount} onClick={jumpToBottom} />
       </div>
       {tab === 'trajectory' && ask !== null && (
         <div className="shrink-0 px-5">

@@ -4,6 +4,7 @@
  */
 export const zh = {
   'common.save': '保存',
+  'web.chat.newItems': '↓ {count} 条新消息',
   'web.confirm.empty': '（不填）',
   'web.confirm.awaitingApproval': '等你审批',
   'web.confirm.needsInput': '需要你提供信息',

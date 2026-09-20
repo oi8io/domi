@@ -3,6 +3,7 @@ import type { zh } from './zh.ts'
 
 export const en: Record<keyof typeof zh, string> = {
   'common.save': 'Save',
+  'web.chat.newItems': '↓ {count} new messages',
   'web.confirm.empty': '(empty)',
   'web.confirm.awaitingApproval': 'Awaiting your approval',
   'web.confirm.needsInput': 'Needs your input',
