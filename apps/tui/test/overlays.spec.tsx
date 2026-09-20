@@ -245,6 +245,24 @@ describe('PRD-M8-015 AC-2 / AC-3 / AC-4 · 三个弹层的内容', () => {
     h.unmount()
   })
 
+  test('PRD-M11-005：设置层含审核三档，选档位写 permissions.review', async () => {
+    const calls: unknown[][] = []
+    const h = renderAt(
+      80,
+      <Overlays
+        client={fakeClient(calls) as never}
+        state={{ id: 'settings' }}
+        sessionId="s2"
+        onChange={() => undefined}
+        onOpenSession={() => undefined}
+      />,
+    )
+    await h.waitFor((f) => f.includes('每次都问'), 2000)
+    expect(h.lastFrame()).toContain('按需')
+    expect(h.lastFrame()).toContain('全部放行')
+    h.unmount()
+  })
+
   test('任务弹层：p 暂停 / 恢复定时任务，n 进新建表单，cron 非法当场提示', async () => {
     const calls: unknown[][] = []
     let state: OverlayState | null = { id: 'tasks' }
