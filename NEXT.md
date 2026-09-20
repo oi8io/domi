@@ -1,7 +1,11 @@
-在做: **M11 PRD 已 COMMITTED**（2026-09-21 用户拍板六疑点）：会话体验深化七条，**一册不拆**，简单先做、逐个击破、测试先行。
-      拍板：默认档位「按需确认」/ Markdown 先只做 Web / 「始终允许」指纹=可执行文件+参数首词/前缀够用 / 三端（desktop+TUI+Web）都接自启 /
-      危险清单先内置固定。任务顺序建议：006→001→004→002→003→007（等终止方案）→005。文档：`docs/prd/M11.md`。
-      终止方案（S1–S4：墙钟语义 / ask 超时 / 终止消息 / 断点续跑）**仍挂起待用户拍板**，007 的语义与其绑定。
+在做: **M11「会话体验深化」**：000–006 全部 done（2026-09-21 夜间自主 TDD）。
+      000 自启指引 / 001 默认贴底 / 004 展开全文 / 002 浮条新消息 / 003 Web Markdown / 005 审核三档 / 006 命令指纹。
+      引擎：capability/dangerous.ts + permission.check() 三档语义 + fail-closed；runtime session.ts 接 reviewMode；
+      config 白名单 permissions.review；Web RuntimeTab 三档下拉 + TUI SettingsOverlay 三档。
+      验证：typecheck 绿、biome/i18n/lint-tasks 绿；runtime 141/141、capability 118/118、各 Web/TUI spec 绿。
+      剩 **TASK-M11-007 收口**：全量 `pnpm test` 有 ~45 个环境类 flaky（git worktree/MCP 全链路/守卫扫描，单跑全绿、全量并行才红，与 M11 无关）；
+      M11 DoD（贴底/浮条/Markdown/三档确认/指纹）只有用户手测。
+      阻塞同前：desktop 壳自启（ADR-021 + 无 Rust）；PRD-M11-007 TUI 中断等终止方案 S1–S4 拍板。
 
       **M10「会话体验与运行控制」**：000–006 全部 done（2026-09-19）。
       TASK-M10-006 收口完成：M10 进了 `check-ac-coverage` ACTIVE（224 条 AC 全点名）、协议/API 快照检查 OK
