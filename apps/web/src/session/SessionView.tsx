@@ -11,6 +11,7 @@ import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
+import { shouldStickToBottom } from '../lib/scroll.ts'
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
@@ -62,12 +63,21 @@ export function SessionView({
   const [notice, setNotice] = useState<ReactNode>(null)
   const scroller = useRef<HTMLDivElement>(null)
 
-  // 新内容进来时贴底（用户往上翻了就不打扰）
+  // PRD-M11-001：进入/切换会话先强制贴底一次；之后新内容只在「贴着底部」时跟随（用户上翻不打扰）
+  const pendingStick = useRef(true)
+  useEffect(() => {
+    pendingStick.current = true
+  }, [sessionId])
   // biome-ignore lint/correctness/useExhaustiveDependencies: 条数与询问变化是滚动的触发条件
   useEffect(() => {
     const el = scroller.current
     if (!el) return
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight
+    if (pendingStick.current) {
+      el.scrollTop = el.scrollHeight
+      pendingStick.current = false
+    } else if (shouldStickToBottom(el.scrollHeight - el.scrollTop - el.clientHeight)) {
+      el.scrollTop = el.scrollHeight
+    }
     reportRead()
   }, [items.length, ask])
 
