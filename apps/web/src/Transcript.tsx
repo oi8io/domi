@@ -11,6 +11,7 @@ import { tr } from '@domi/i18n'
 import type { ReactNode } from 'react'
 import { IconBranch, IconQuote } from './icons.tsx'
 import { cn } from './lib/cn.ts'
+import { MarkdownView } from './session/MarkdownView.tsx'
 
 type Row =
   | { kind: 'item'; item: TranscriptItem }
@@ -104,10 +105,11 @@ function ItemBody({ item }: { item: TranscriptItem }) {
         </div>
       )
     case 'assistant':
+      // PRD-M11-003：assistant 文本走 Markdown（reason/user/error 保持纯文本）
       return (
         <div className="px-3.5 py-2.5">
           <div className={cn(ROLE, 'text-ok')}>domi</div>
-          <div className={TEXT}>{item.text}</div>
+          <MarkdownView>{item.text}</MarkdownView>
         </div>
       )
     case 'reason':
