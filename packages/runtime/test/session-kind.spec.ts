@@ -47,7 +47,9 @@ function open(opts: { cwd: string; dbDir: string; chat: boolean; provider: StubP
     ...(opts.chat ? { projectContext: false, askAlways: ['shell.exec'] } : {}),
   })
   s.on('onAsk', (ask) => {
-    if (ask) asks.push(ask)
+    if (!ask) return
+    asks.push(ask)
+    ask.answer(true) // PRD-M11-005：危险能力必问，测试环境自动批准
   })
   return { session: s, asks, events: () => s.pumpAll() }
 }
@@ -109,7 +111,7 @@ describe('PRD-M8-004 AC-7 · 自由会话：沙盒外的文件访问被拒，she
     )
     const r = open({ cwd: repo, dbDir: home, chat: false, provider })
     await r.session.submit('跑一下')
-    expect(r.asks).toHaveLength(0)
+    expect(r.asks.map((a) => a.capabilityId)).toEqual(['shell.exec']) // PRD-M11-005：任务里首次 shell.exec 也要问（指纹 grant 后才不问）
     expect(existsSync(join(repo, 'out.txt'))).toBe(true)
     await r.session.flushAndClose()
   })

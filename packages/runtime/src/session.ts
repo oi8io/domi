@@ -286,6 +286,7 @@ export class DomiSession {
           ? { askAlways: (c: string) => (opts.askAlways as readonly string[]).includes(c) }
           : {}),
         cwd: opts.cwd,
+        reviewMode: () => opts.config.permissions.review,
       },
       (capabilityId, args, o) => this.askUser(capabilityId, args, o?.grantable === true),
     )

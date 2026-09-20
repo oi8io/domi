@@ -56,14 +56,14 @@ function session(o: {
     provider: new StubProvider(o.turns ?? [loop()], { onExhausted: 'repeat-last' }),
   })
   const asks: PendingAsk[] = []
-  if (o.answer) {
-    const answer = o.answer
-    s.on('onAsk', (a) => {
-      if (!a) return
-      asks.push(a)
-      answer(a)
-    })
-  }
+  s.on('onAsk', (a) => {
+    if (!a) return
+    // PRD-M11-005：shell.exec 危险能力规则 allow 后仍问；测试自动过权限问
+    if (a.capabilityId === 'shell.exec') return a.answer(true)
+    asks.push(a)
+    if (o.answer) o.answer(a)
+    else a.answer(false) // 测试没指定回答人 = 停止/拒绝（与无 listener 同义）
+  })
   const calls = (): number =>
     existsSync(join(cwd, 'calls.log')) ? readFileSync(join(cwd, 'calls.log'), 'utf8').trim().split('\n').length : 0
   const evs = async () => (await s.pumpAll()).map((e) => e.ev as Record<string, unknown> & { t: string })

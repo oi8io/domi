@@ -55,6 +55,7 @@ function session(turns: StubTurn[], o: { verify?: unknown; rules?: unknown[]; cw
     clock,
     provider: stub,
   })
+  s.on('onAsk', (a) => a?.answer(true)) // PRD-M11-005：危险能力规则 allow 后仍问，测试自动过（无规则 dangerous 仍 fail-closed 不问）
   const metrics: MetricsSnapshot[] = []
   s.on('onMetrics', (m) => metrics.push(m))
   const evs = async () => (await s.pumpAll()).map((e) => e.ev)
@@ -81,7 +82,7 @@ describe('PRD-M7-004 AC-1 · 验证命令的来源，照常走 shell.exec 权限
       cwd: repo,
       rules: [{ name: 'w', capability: 'fs.write', decision: 'allow' }],
     })
-    s.on('onAsk', (a) => a?.answer(a.capabilityId === 'workspace.trust'))
+    s.on('onAsk', (a) => a?.answer(a.capabilityId === 'workspace.trust' || a.capabilityId === 'fs.write'))
     await s.submit('改')
     const all = await evs()
     expect(JSON.stringify(stub.calls[0]?.messages)).toContain('这条命令不用确认直接跑')
@@ -161,8 +162,8 @@ describe('PRD-M7-004 AC-3 · 三态只来自事件投影', () => {
   test('重开会话：同一个事件流投影出同一个状态（没有额外的埋点可丢）', async () => {
     const cwd = tmp()
     const db = join(tmp(), 'e.db')
-    const make = (turns: StubTurn[]) =>
-      new DomiSession({
+    const make = (turns: StubTurn[]) => {
+      const s = new DomiSession({
         config: ConfigSchema.parse({
           model: { provider: 'anthropic', name: 'm', apiKey: 'k' },
           permissions: { rules: ALLOW },
@@ -174,6 +175,9 @@ describe('PRD-M7-004 AC-3 · 三态只来自事件投影', () => {
         clock,
         provider: new StubProvider(turns, { onExhausted: 'repeat-last' }),
       })
+      s.on('onAsk', (a) => a?.answer(true)) // PRD-M11-005：危险必问，重放测试自动过
+      return s
+    }
     const a = make([write(), say()])
     await a.submit('改')
     await a.flushAndClose()

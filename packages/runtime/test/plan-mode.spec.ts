@@ -68,6 +68,13 @@ function session(turns: StubTurn[], o: { startTask?: (spec: unknown) => Promise<
     extraTools: () => [fakeTool('mcp.demo.deploy'), fakeTool('plugin.demo.run')],
     ...(o.startTask ? { startTask: (spec: unknown) => (o.startTask as (s: unknown) => Promise<string>)(spec) } : {}),
   })
+  s.on('onAsk', (a) => {
+    // PRD-M11-005：危险能力权限问自动过；业务问（plan 审批等）不答 = 没人批（与无 listener 同义）
+    if (!a) return
+    const c = a.capabilityId
+    const dangerous = c === 'fs.write' || c === 'fs.delete' || c === 'fs.move' || c === 'fs.append' || c === 'shell.exec' || c === 'web.fetch' || c.startsWith('mcp.') || c.startsWith('plugin.')
+    a.answer(dangerous)
+  })
   const evs = async () => (await s.pumpAll()).map((e) => e.ev)
   return { s, stub, cwd, evs }
 }
@@ -140,7 +147,7 @@ describe('PRD-M7-005 AC-2 · plan.proposed / plan.decided，批准后切回执�
     await s.setMode('plan')
     await s.submit('先出个计划')
     const all = await evs()
-    expect(asks.map((a) => a.capabilityId)).toEqual(['plan.input'])
+    expect(asks.map((a) => a.capabilityId)).toEqual(['plan.input', 'fs.write']) // PRD-M11-005：fs.write 危险要问
     expect(all.find((e) => e.t === 'plan.proposed')).toMatchObject({ plan: PLAN })
     expect(all.find((e) => e.t === 'plan.decided')).toMatchObject({
       approved: true,

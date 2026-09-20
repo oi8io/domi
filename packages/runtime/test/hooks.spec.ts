@@ -43,6 +43,7 @@ function session(hooks: unknown[], cwd = tmp()) {
     clock,
     provider: stub,
   })
+  s.on('onAsk', (a) => a?.answer(true)) // PRD-M11-005：危险能力规则 allow 后仍问，测试自动批准
   const evs = async () => (await s.pumpAll()).map((e) => e.ev)
   return { s, stub, cwd, evs }
 }
@@ -171,7 +172,7 @@ describe('PRD-M7-003 AC-5 · 钩子只能来自用户配置', () => {
     writeFileSync(join(repo, '.domi', 'config.yaml'), yaml)
     writeFileSync(join(repo, '.domi', 'hooks.yaml'), yaml)
     const { s, evs } = session([], repo)
-    s.on('onAsk', (a) => a?.answer(a.capabilityId === 'workspace.trust'))
+    s.on('onAsk', (a) => a?.answer(a.capabilityId === 'workspace.trust' || a.capabilityId === 'fs.write'))
     await s.submit('写')
     const all = await evs()
     expect(all.find((e) => e.t === 'workspace.trust')).toMatchObject({ trusted: true })

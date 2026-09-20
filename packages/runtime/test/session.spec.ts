@@ -131,8 +131,9 @@ describe('外部工具（MCP）接进会话 —— PRD-M2-001 · ADR-015', () =>
     rules: Array<{ name: string; capability: string; decision: 'allow' | 'deny' | 'ask' }>
     tools: () => unknown[]
     notices?: () => string[]
+    autoAsk?: boolean
   }) {
-    return new DomiSession({
+    const ret = new DomiSession({
       config: ConfigSchema.parse({
         model: { provider: 'stub', name: 'stub-1', apiKey: 'k' },
         permissions: { rules: opts.rules },
@@ -143,11 +144,15 @@ describe('外部工具（MCP）接进会话 —— PRD-M2-001 · ADR-015', () =>
       clock,
       extraTools: opts.tools as never,
       ...(opts.notices ? { notices: opts.notices } : {}),
+      // PRD-M11-005：危险能力（mcp.*/fs.write/shell.exec）规则 allow 后仍要问；测试环境默认自动批准
+      ...(opts.autoAsk === false ? {} : { listeners: { onAsk: (a) => a?.answer(true) } }),
       provider: new StubProvider([
         [{ type: 'tool-call', id: 'c1', name: 'mcp.demo.echo', args: { text: 'hi' } }],
         [{ type: 'delta', text: '好了' }],
       ]),
     })
+    if (opts.autoAsk !== false) ret.on('onAsk', (a) => a?.answer(true))
+    return ret
   }
 
   test('外部工具走同一条权限路径：通配规则放行后才执行', async () => {
@@ -236,7 +241,8 @@ describe('TASK-M3-016 · 工具向用户要输入（elicitation）走询问通�
     const asks: PendingAsk[] = []
     s.on('onAsk', (a) => {
       if (!a) return
-      asks.push(a)
+      // PRD-M11-005：mcp.* 危险先过权限问；只记录真正的表单询问
+      if (a.capabilityId === 'mcp.demo.input') asks.push(a)
       a.answer(true, { env: 'prod' })
     })
     await s.submit('部署')
@@ -252,17 +258,19 @@ describe('TASK-M3-016 · 工具向用户要输入（elicitation）走询问通�
 
   test('拒绝 → decline；没人能回答 → decline（不替人填）', async () => {
     const s = session()
-    s.on('onAsk', (a) => a?.answer(false))
+    // PRD-M11-005：权限问先放行，只在表单询问上拒绝
+    s.on('onAsk', (a) => a?.answer(a?.capabilityId === 'mcp.demo.input' ? false : true, {}))
     await s.submit('部署')
     expect(JSON.stringify((await s.pumpAll()).find((e) => e.ev.t === 'tool.result')?.ev)).toContain(
       '"action":"decline"',
     )
     await s.flushAndClose()
 
+    // PRD-M11-005：危险能力（mcp.*）无人在场 = fail-closed 直接拒，不给执行机会
     const lonely = session()
     await lonely.submit('部署')
     expect(JSON.stringify((await lonely.pumpAll()).find((e) => e.ev.t === 'tool.result')?.ev)).toContain(
-      '"action":"decline"',
+      '"reason":"user_denied"',
     )
     await lonely.flushAndClose()
   })

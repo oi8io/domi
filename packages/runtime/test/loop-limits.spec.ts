@@ -52,6 +52,7 @@ describe('PRD-M10-003 AC-3 · runTurn limits 来自配置', () => {
         onExhausted: 'repeat-last',
       }),
     })
+    s.on('onAsk', (a) => a?.answer(true)) // PRD-M11-005：mcp.* 危险要问，测试自动过
     await s.submit('跑')
     const events = await s.pumpAll()
     const calls = events.filter((e) => e.ev.t === 'tool.call')
