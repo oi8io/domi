@@ -96,6 +96,7 @@ describe('PRD-M10-004 · 设置层金样', () => {
   test('宽度 80（en）', async () => {
     const fake = {
       setSettings: async () => ({}),
+      getSettings: async () => ({ values: {} }),
       listProjects: async () => [],
       listSessions: async () => ({ sessions: [] }),
       listSchedules: async () => [],
