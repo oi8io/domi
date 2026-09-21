@@ -2,6 +2,7 @@ import { summarizeReason, type TranscriptItem } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import { Box, renderToString, Static, Text } from 'ink'
 import { useEffect, useState } from 'react'
+import { type Block, hasMarkdownStructure, type Inline, parseMarkdownBlocks } from '../render/markdown.ts'
 import { scrollbarColumn, visibleRange } from '../render/viewport.ts'
 import { ThemeContext, type TuiTheme, useTheme } from '../theme.ts'
 
@@ -101,16 +102,164 @@ export function Line({
       )
     case 'error':
       return <Text {...t.fg('bad')}>{`${prefix} ${item.text}`}</Text>
-    case 'assistant':
+    case 'assistant': {
+      // PRD-M11-003 AC-6/AC-7：有 Markdown 结构才走渲染，纯文本保持现状逐字一致（不破坏 golden 快照）
+      const blocks = parseMarkdownBlocks(item.text)
+      if (hasMarkdownStructure(blocks)) return <MarkdownBlocks blocks={blocks} />
       return (
         <Text>
           <Text {...t.fg('accent')}>{`${prefix} domi: `}</Text>
           <Text {...t.fg('ink')}>{item.text}</Text>
         </Text>
       )
+    }
     default:
       return <Text>{item.text}</Text>
   }
+}
+
+/** 单个行内段 → Ink 文本。终端无斜体/字号，样式映射为：粗体→bold、行内代码→info 色、链接→accent+下划线、删除线→strikethrough */
+function StyledInline({ s }: { s: Inline }): React.ReactElement {
+  const t = useTheme()
+  switch (s.style) {
+    case 'bold':
+      return (
+        <Text bold {...t.fg('ink')}>
+          {s.text}
+        </Text>
+      )
+    case 'code':
+      return (
+        <Text {...t.fg('info')} dimColor={!t.truecolor}>
+          {s.text}
+        </Text>
+      )
+    case 'link':
+      return (
+        <Text underline {...t.fg('accent')}>
+          {s.text}
+        </Text>
+      )
+    case 'del':
+      return (
+        <Text strikethrough {...t.fg('mut')}>
+          {s.text}
+        </Text>
+      )
+    default:
+      return <Text {...t.fg('ink')}>{s.text}</Text>
+  }
+}
+
+/** 行内段序列 → Ink 文本 */
+function InlineText({ inlines }: { inlines: readonly Inline[] }): React.ReactElement {
+  return (
+    <Text>
+      {inlines.map((s, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本流，顺序不可变，index 即稳定身份
+        <StyledInline key={i} s={s} />
+      ))}
+    </Text>
+  )
+}
+
+function plainText(inlines: readonly Inline[]): string {
+  return inlines.map((s) => s.text).join('')
+}
+
+/** GFM 表格 → 等宽对齐的文本行。单元格内样式简化为纯文本（终端表格的已知上限） */
+function tableText(t: Extract<Block, { kind: 'table' }>): string[] {
+  const cols = t.headers.length
+  const widths = new Array<number>(cols).fill(0)
+  for (const row of [t.headers, ...t.rows]) {
+    for (let i = 0; i < cols; i++) {
+      const w = plainText(row[i] ?? []).length
+      if (w > (widths[i] ?? 0)) widths[i] = w
+    }
+  }
+  const pad = (s: string, w: number, align: string): string => {
+    if (align === 'right') return s.padStart(w)
+    if (align === 'center') return `${' '.repeat(Math.floor((w - s.length) / 2))}${s}`.padEnd(w)
+    return s.padEnd(w)
+  }
+  const line = (row: Inline[][]): string =>
+    `| ${row.map((c, i) => pad(plainText(c ?? []), widths[i] ?? 0, t.align[i] ?? 'left')).join(' | ')} |`
+  const out = [line(t.headers), `|${widths.map((w) => '-'.repeat(w + 2)).join('|')}|`]
+  for (const r of t.rows) out.push(line(r))
+  return out
+}
+
+function BlockLine({ block }: { block: Block }): React.ReactElement {
+  const t = useTheme()
+  switch (block.kind) {
+    case 'para':
+      return <InlineText inlines={block.children} />
+    case 'heading': {
+      const tone = block.level <= 2 ? 'accent' : block.level <= 4 ? 'info' : 'ink2'
+      return (
+        <Text bold {...t.fg(tone)}>
+          {`${'#'.repeat(block.level)} ${plainText(block.children)}`}
+        </Text>
+      )
+    }
+    case 'code':
+      return (
+        <Box flexDirection="column">
+          {block.code.split('\n').map((l, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本行，顺序不可变
+            <Text key={i} {...t.fg('info')} dimColor={!t.truecolor}>
+              {l}
+            </Text>
+          ))}
+        </Box>
+      )
+    case 'list':
+      return (
+        <Box flexDirection="column">
+          {block.items.map((item, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本行，顺序不可变
+            <Text key={i}>
+              <Text {...t.fg('accent')}>{block.ordered ? `${i + 1}. ` : '• '}</Text>
+              <InlineText inlines={item} />
+            </Text>
+          ))}
+        </Box>
+      )
+    case 'quote':
+      return (
+        <Text {...t.fg('mut')}>
+          <Text {...t.fg('mut2')}>│ </Text>
+          <InlineText inlines={block.children} />
+        </Text>
+      )
+    case 'table':
+      return (
+        <Box flexDirection="column">
+          {tableText(block).map((r, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本行，顺序不可变
+            <Text key={i} {...t.fg(i === 0 ? 'ink2' : 'ink')}>
+              {r}
+            </Text>
+          ))}
+        </Box>
+      )
+    case 'hr':
+      return <Text {...t.fg('mut2')}>────</Text>
+  }
+}
+
+/** assistant 的 Markdown 正文：第一行「✓ domi:」标签，下面逐块渲染 */
+function MarkdownBlocks({ blocks }: { blocks: readonly Block[] }): React.ReactElement {
+  const t = useTheme()
+  return (
+    <Box flexDirection="column">
+      <Text {...t.fg('accent')}>✓ domi:</Text>
+      {blocks.map((b, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本块，顺序不可变
+        <BlockLine key={i} block={b} />
+      ))}
+    </Box>
+  )
 }
 
 /** 调用之后的结果：中间隔着的权限决定跳过，碰到下一个调用或别的内容就算还没结果 */

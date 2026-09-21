@@ -17,9 +17,13 @@
     "@nanostores/react": "^1.0.0",
     "ink": "^7.1.1",
     "nanostores": "^1.5.3",
-    "react": "^19.3.0"
+    "react": "^19.3.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.0"
   },
   "devDependencies": {
+    "@types/mdast": "^4.0.0",
     "@types/react": "^19.0.0",
     "@domi/protocol": "workspace:*"
   }
