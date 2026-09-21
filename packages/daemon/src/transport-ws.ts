@@ -31,12 +31,17 @@ export class NonLocalListenError extends Error {
 }
 
 /** 浏览器来源是否可信。null = 非浏览器客户端（没有 Origin 头） */
-export function isAllowedOrigin(origin: string | null): boolean {
+export function isAllowedOrigin(origin: string | null, extra: readonly string[] = []): boolean {
   if (origin === null) return true
   try {
-    const host = new URL(origin).hostname
+    const u = new URL(origin)
+    const host = u.hostname
     // 桌面端（Tauri）在 Windows 上的页面来源是 http://tauri.localhost（ADR-021）
-    return isLoopback(host) || host === 'tauri.localhost'
+    if (isLoopback(host) || host === 'tauri.localhost') return true
+    // 显式白名单（本地开发域名经 nginx 反代）
+    return extra.some((o) => {
+      try { return new URL(o).origin === u.origin } catch { return false }
+    })
   } catch {
     return false
   }
@@ -48,6 +53,8 @@ export interface WsServerOptions {
   port?: number
   /** 要求客户端带的 token。null / 不给 = 不校验，只允许回环地址 */
   token?: string | null
+  /** 额外允许的浏览器 Origin（本地开发域名经反代） */
+  allowedOrigins?: readonly string[]
   /** 一次连接因为认证被拒 */
   onRejected?: (r: RejectedConnection) => void
 }
@@ -85,7 +92,7 @@ export function serveWs(daemon: Daemon, opts: WsServerOptions = {}): WsServer {
           })
           return new Response('domid：需要 token（DOMI_TOKEN）', { status: 401 })
         }
-      } else if (!isAllowedOrigin(origin)) {
+      } else if (!isAllowedOrigin(origin, opts.allowedOrigins ?? [])) {
         return new Response('forbidden origin', { status: 403 })
       }
       // 客户端提供了子协议，就必须回一个它提供过的——只回 domi，token 不回显

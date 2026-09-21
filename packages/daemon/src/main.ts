@@ -91,6 +91,7 @@ export async function main(env: Record<string, string | undefined> = process.env
     hostname: server.hostname,
     port: requestedPort,
     token: server.token,
+    allowedOrigins: server.allowedOrigins,
     onRejected: (r) => void recordRejection(r),
   })
   if (ws.port !== requestedPort) {

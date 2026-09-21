@@ -47,6 +47,8 @@ export interface ServerSettings {
   token: string | null
   /** token 是自动生成、存在文件里的，这里是那个文件 */
   tokenFile?: string
+  /** 额外允许的浏览器 Origin（本地开发域名经反代） */
+  allowedOrigins: readonly string[]
 }
 
 interface Sources {
@@ -74,18 +76,19 @@ function readTokenFile(path: string): string | null {
 export function resolveServerSettings({ config, env, home }: Sources): ServerSettings {
   const hostname = env.DOMI_HOST || config.server.host
   const port = env.DOMI_PORT === undefined || env.DOMI_PORT === '' ? config.server.port : Number(env.DOMI_PORT)
-  if (env.DOMI_TOKEN) return { hostname, port, token: checked(env.DOMI_TOKEN, 'DOMI_TOKEN') }
-  if (config.server.token) return { hostname, port, token: checked(config.server.token, 'config.yaml 的 server.token') }
-  if (isLoopback(hostname)) return { hostname, port, token: null }
+  const allowedOrigins = config.server.allowedOrigins ?? []
+  if (env.DOMI_TOKEN) return { hostname, port, token: checked(env.DOMI_TOKEN, 'DOMI_TOKEN'), allowedOrigins }
+  if (config.server.token) return { hostname, port, token: checked(config.server.token, 'config.yaml 的 server.token'), allowedOrigins }
+  if (isLoopback(hostname)) return { hostname, port, token: null, allowedOrigins }
 
   const tokenFile = tokenFilePath(home)
   const existing = readTokenFile(tokenFile)
-  if (existing) return { hostname, port, token: existing, tokenFile }
+  if (existing) return { hostname, port, token: existing, tokenFile, allowedOrigins }
   const token = randomBytes(32).toString('base64url')
   mkdirSync(join(home, '.domi'), { recursive: true })
   writeFileSync(tokenFile, `${token}\n`, { mode: 0o600 })
   chmodSync(tokenFile, 0o600) // umask 可能吃掉 mode；再明确设一次
-  return { hostname, port, token, tokenFile }
+  return { hostname, port, token, tokenFile, allowedOrigins }
 }
 
 /** 本机客户端连 domid 时带的 token：环境变量 → 配置 → domid 生成的文件。都没有就不带 */
