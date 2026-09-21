@@ -1,11 +1,16 @@
-在做: **M11「会话体验深化」**：000–006 全部 done（2026-09-21 夜间自主 TDD）。
-      000 自启指引 / 001 默认贴底 / 004 展开全文 / 002 浮条新消息 / 003 Web Markdown / 005 审核三档 / 006 命令指纹。
+在做: **M11「会话体验深化」**：000–008 全部 done（2026-09-21 夜间自主 TDD + 用户复核扩围）。
+      000 自启指引 / 001 默认贴底 / 004 展开全文 / 002 浮条新消息 / 003 Web Markdown / 005 审核三档 / 006 命令指纹 / 008 TUI Markdown。
       引擎：capability/dangerous.ts + permission.check() 三档语义 + fail-closed；runtime session.ts 接 reviewMode；
       config 白名单 permissions.review；Web RuntimeTab 三档下拉 + TUI SettingsOverlay 三档。
-      验证：typecheck 绿、biome/i18n/lint-tasks 绿；runtime 141/141、capability 118/118、各 Web/TUI spec 绿。
+      008（TUI Markdown，用户拍板从「只做 Web」扩为两端）：复用 remark-parse/remark-gfm（与 Web 同一 parser），
+      自写 mdast→ANSI 渲染层 apps/tui/src/render/markdown.ts；纯文本消息逐字不变（AC-7，golden 快照全过）。
+      顺手修了 M11-005 的 golden 欠账（fake client 缺 getSettings + settings snapshot 缺审核三档，commit 7cdbd27）。
+      验证：typecheck 绿、biome 绿；TUI 110/110、runtime 141/141、capability 118/118、Web spec 绿。
       剩 **TASK-M11-007 收口**：全量 `pnpm test` 有 ~45 个环境类 flaky（git worktree/MCP 全链路/守卫扫描，单跑全绿、全量并行才红，与 M11 无关）；
-      M11 DoD（贴底/浮条/Markdown/三档确认/指纹）只有用户手测。
+      M11 DoD（贴底/浮条/Markdown/三档确认/指纹 + TUI Markdown 视觉）只有用户手测。
       阻塞同前：desktop 壳自启（ADR-021 + 无 Rust）；PRD-M11-007 TUI 中断等终止方案 S1–S4 拍板。
+      ⚠️ 工作区残留一个已停 agent 的半成品：apps/web 的 scroll 贴底修复（lib/scroll.ts、SessionView.tsx、scroll.spec.ts）+ tasks/M11.md 的
+      TASK-M11-001「点进会话没跳到底」笔记——未提交，等用户决定留/丢。
 
       **M10「会话体验与运行控制」**：000–006 全部 done（2026-09-19）。
       TASK-M10-006 收口完成：M10 进了 `check-ac-coverage` ACTIVE（224 条 AC 全点名）、协议/API 快照检查 OK
@@ -24,16 +29,15 @@
       ⚠️ 更新代码后：`pnpm install`（去掉了 `@ai-sdk/google`），并停掉已在跑的 domid（旧进程跑的是旧代码，OPT-M3-002）
 
 下一步: 用户规矩不变：**先推进功能，测试验证类最后统一查漏补缺**。
-        1. TASK-M10-007（DoD 验证）—— M10 收尾的最后一项，只有你能做
-        2. ~~TASK-M4-009 / M5-008 / M6-008~~（验证补齐）—— M10 之后
+        1. TASK-M11-007（收口）—— M11 收尾，`pnpm check` 全绿 + 进 check-ac-coverage
+        2. 决定工作区里 agent 半成品（apps/web scroll 修复）留还是丢
         3. TASK-M3-008（parity e2e，要先决定引不引 Playwright）、TASK-M3-009（推送延迟基准）
 
         只有你能做的：
-        - M10 DoD：新建会话跑完第一轮看侧栏标题；设置页改 loop 上限下一轮生效；TUI 切一次语言重启看界面；长思考链两端默认折叠可展开
-        - **TUI 真终端手测（M9 新增）**：fullscreen 下滚轮、PgUp/PgDn、Ctrl+Home/End、Ctrl+O 往返、窗口缩放；
-          `DOMI_TUI_RENDERER=classic` 与 `tui.renderer: classic` 各进一次；iTerm2 / Terminal.app / tmux 里各看一眼
-        - 切成 English 走一遍（Web 设置 › 通用 › 语言；TUI 跟 `ui.locale` 或 `LANG`）
-        - M9 DoD、M8 DoD 与逐屏截图走查、M7 DoD、M0 真终端走查（TASK-M0-021）、`pnpm bench:cache --yes`、独立 QA、M6 DoD、
+        - **TUI Markdown 手测（M11-008 新增）**：发一条带标题/列表/代码块/表格的回复，看终端里的 ANSI 视觉区分
+          （标题加粗+颜色、列表 •/数字、代码块 info 色、表格对齐）；纯文本回复应和以前一模一样
+        - M11 DoD：贴底/浮条/Markdown（Web+TUI）/三档确认/指纹
+        - M10 DoD、**TUI 真终端手测（M9）**、切成 English 走一遍、M9/M8/M7/M6/M0 DoD、`pnpm bench:cache --yes`、独立 QA、
           在 GitHub 上开那 5 个 good first issue（草稿在 `docs/good-first-issues.md`）
 
 卡在: **仓库还没有 git remote**——150 多个提交只在这一台机器上，交接前先推到远端。
