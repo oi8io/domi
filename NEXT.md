@@ -1,4 +1,7 @@
 在做: **M11「会话体验深化」**：000–008 全部 done（2026-09-21 夜间自主 TDD + 用户复核扩围）。
+      顺手修 bug（commit 721e95b）：状态栏 token/context 一直不显示——根因是 readEvents 走 pumpAll=view() 不调 pump()，
+      而 onMetrics emit 只在 pump() 里，打开旧会话 daemon 从不推 session.metrics。runtime 抽 emitMetricsNow()，
+      readEvents 末尾补推一次。裸 WS 探针实测 metrics=0 → metrics=2，runtime 141/141 绿。
       000 自启指引 / 001 默认贴底 / 004 展开全文 / 002 浮条新消息 / 003 Web Markdown / 005 审核三档 / 006 命令指纹 / 008 TUI Markdown。
       引擎：capability/dangerous.ts + permission.check() 三档语义 + fail-closed；runtime session.ts 接 reviewMode；
       config 白名单 permissions.review；Web RuntimeTab 三档下拉 + TUI SettingsOverlay 三档。
