@@ -477,30 +477,36 @@ export class DomiSession {
             parentSeq: (e.parentSeq ?? 0) + this.offset,
           }))
     this.listeners.onEvents?.(fresh)
+    await this.emitMetricsNow()
+  }
 
-    if (this.listeners.onMetrics) {
-      const all = await this.view()
-      const m = aggregate(all, {
-        pricing: this.opts.pricing ?? {},
-        maxContextTokens: this.opts.config.context.maxTokens,
-        // 这一轮还在跑：耗时算到现在；跑完了就算到这一轮最后一条事件
-        ...(this.busy ? { now: this.now() } : {}),
-      })
-      this.listeners.onMetrics({
-        tokens: m.tokens,
-        cost: formatCost(m),
-        turnMs: m.turnMs,
-        contextPercent: m.contextPercent,
-        contextLevel: contextLevel(m.contextPercent),
-        unpricedModels: m.unpricedModels,
-        verify: verifyState(all, { command: this.opts.config.verify?.command }),
-        mode: this.mode,
-        turns: m.turns,
-        steps: m.steps,
-        tokPerSec: m.tokPerSec,
-        cacheHitPercent: m.cacheHitPercent,
-      })
-    }
+  /**
+   * 重新聚合全量事件流并推一次 metrics。
+   * pump() 只在「有新事件」时调；readEvents（打开已有会话补历史）走 pumpAll=view() 不调 pump，
+   * 必须单独推一次，否则打开旧会话时状态栏一直空（PRD-M1-007 / bug：token 与 context 百分比不显示）。
+   */
+  async emitMetricsNow(): Promise<void> {
+    if (!this.listeners.onMetrics) return
+    const all = await this.view()
+    const m = aggregate(all, {
+      pricing: this.opts.pricing ?? {},
+      maxContextTokens: this.opts.config.context.maxTokens,
+      ...(this.busy ? { now: this.now() } : {}),
+    })
+    this.listeners.onMetrics({
+      tokens: m.tokens,
+      cost: formatCost(m),
+      turnMs: m.turnMs,
+      contextPercent: m.contextPercent,
+      contextLevel: contextLevel(m.contextPercent),
+      unpricedModels: m.unpricedModels,
+      verify: verifyState(all, { command: this.opts.config.verify?.command }),
+      mode: this.mode,
+      turns: m.turns,
+      steps: m.steps,
+      tokPerSec: m.tokPerSec,
+      cacheHitPercent: m.cacheHitPercent,
+    })
   }
 
   /**

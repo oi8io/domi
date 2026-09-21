@@ -557,6 +557,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         async readEvents(fromSeq) {
           const all = await s.pumpAll()
           head = all[all.length - 1]?.seq ?? head
+          // 打开已有会话时补历史：pumpAll 不推 metrics（它只读不 pump），这里补一次，否则状态栏一直空
+          await s.emitMetricsNow()
           return all.filter((e) => e.seq > fromSeq)
         },
         async head() {
