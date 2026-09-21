@@ -56,11 +56,16 @@ export interface AggregateOptions {
   now?: number
 }
 
-/** provider 的 usage 字段名各家不同，这里只做**读取**的归一，事件流里存的仍是原文（ADR-004） */
+/** provider 的 usage 字段名各家不同，这里只做**读取**的归一，事件流里存的仍是原文（ADR-004）。
+ *
+ * AI SDK 的 ai-sdk-provider 把 usage 包在 raw.usage 下（{ usage: {inputTokens,outputTokens}, providerMetadata, response }），
+ * 旧形状是平铺在 raw 顶层。两种都认：先看 raw.usage，再回退顶层。 */
 export function readUsage(raw: Record<string, unknown>): TokenTotals {
+  // ai-sdk-provider 的 finish-step：raw = { usage: {...}, providerMetadata, response }
+  const inner = (raw.usage && typeof raw.usage === 'object' ? raw.usage : raw) as Record<string, unknown>
   const pick = (...keys: string[]): number => {
     for (const k of keys) {
-      const v = raw[k]
+      const v = inner[k]
       if (typeof v === 'number' && Number.isFinite(v)) return v
     }
     return 0
