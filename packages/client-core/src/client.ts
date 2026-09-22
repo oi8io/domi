@@ -476,7 +476,38 @@ export class DomiClient {
     const w = this.watches.get(sessionId) ?? { store, lastSeq: 0 }
     w.store = store
     this.watches.set(sessionId, w)
-    return this.request('session.subscribe', { sessionId, fromSeq: w.lastSeq })
+    // 必须在 await 之前把 fromSeq 记到局部变量：daemon 端先推 session.events 通知（带 backlog），
+    // 再回 RPC response。client 收到通知时 deliver() 会把 w.lastSeq 更新成 backlog 尾部 seq，
+    // 等 await resolve 时 w.lastSeq 早就不是 0 了——之前用 w.lastSeq===0 判定首连永远不成立，
+    // setWindowMeta 不执行，hasOlder 永远 false，翻页入口根本不触发。
+    const fromSeq = w.lastSeq
+    const res = await this.request('session.subscribe', { sessionId, fromSeq })
+    // PRD-M11-009：首连（fromSeq=0）服务端回尾部窗口，把窗口边界写进 store
+    if (fromSeq === 0 && res.oldestSeq !== undefined && res.hasOlder !== undefined) {
+      store.setWindowMeta({ oldestSeq: res.oldestSeq, hasOlder: res.hasOlder })
+    }
+    return res
+  }
+
+  /**
+   * PRD-M11-009：向上翻一页——取 view seq < beforeSeq 的更早窗口，prepend 进 store。
+   * 返回 hasOlder（true 表示还能继续往上翻）。
+   */
+  async loadOlder(sessionId: string): Promise<boolean> {
+    const w = this.watches.get(sessionId)
+    if (!w) return false
+    const oldestSeq = w.store.$oldestSeq.get()
+    const hasOlder = w.store.$hasOlder.get()
+    if (oldestSeq === null || !hasOlder) return false
+    w.store.setLoadingOlder(true)
+    try {
+      const page = await this.request('session.history', { sessionId, beforeSeq: oldestSeq })
+      w.store.prependEvents(page.events)
+      w.store.setWindowMeta({ oldestSeq: page.fromSeq, hasOlder: page.hasOlder })
+      return page.hasOlder
+    } finally {
+      w.store.setLoadingOlder(false)
+    }
   }
 
   unwatch(sessionId: string): void {
