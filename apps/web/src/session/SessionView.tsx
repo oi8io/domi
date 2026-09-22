@@ -11,7 +11,7 @@ import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
-import { NEAR_BOTTOM_PX, shouldStickToBottom } from '../lib/scroll.ts'
+import { NEAR_BOTTOM_PX, nextScrollAction } from '../lib/scroll.ts'
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
@@ -61,6 +61,9 @@ export function SessionView({
   const status = useStore(store.$status)
   const ask = useStore(store.$ask)
   const review = useStore(store.$review)
+  // PRD-M11-009：窗口化加载——是否还有更早历史、正在向上翻页
+  const hasOlder = useStore(store.$hasOlder)
+  const loadingOlder = useStore(store.$loadingOlder)
   const [notice, setNotice] = useState<ReactNode>(null)
   const scroller = useRef<HTMLDivElement>(null)
   // PRD-M11-002：用户上翻离开底部后，新内容累计成「N 条新消息」浮条
@@ -68,32 +71,27 @@ export function SessionView({
   const awayFromBottom = useRef(false)
   const lastLen = useRef(items.length)
 
-  // PRD-M11-001：进入/切换会话先强制贴底一次；之后新内容只在「贴着底部」时跟随（用户上翻不打扰）
-  const pendingStick = useRef(true)
+  // 进入/切换会话：重置跟随态（在底部），历史事件灌进来时贴底
   // biome-ignore lint/correctness/useExhaustiveDependencies: 切会话时以当前条数为基准重置，items.length 变化不该再触发重置
   useEffect(() => {
-    pendingStick.current = true
     awayFromBottom.current = false
     setNewCount(0)
     lastLen.current = items.length
   }, [sessionId])
-  // biome-ignore lint/correctness/useExhaustiveDependencies: 条数与询问变化是滚动的触发条件
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 内容/条数与询问变化是滚动的触发条件（流式逐 token 也在 items 上）
   useEffect(() => {
     const el = scroller.current
     if (!el) return
-    if (pendingStick.current) {
-      el.scrollTop = el.scrollHeight
-      pendingStick.current = false
-    } else if (shouldStickToBottom(el.scrollHeight - el.scrollTop - el.clientHeight)) {
-      el.scrollTop = el.scrollHeight
-    }
-    // 上翻期间来了新内容（首次贴底那次不算）→ 累计浮条计数
-    if (!pendingStick.current && awayFromBottom.current && items.length > lastLen.current) {
-      setNewCount((n) => n + (items.length - lastLen.current))
-    }
+    const action = nextScrollAction({
+      awayFromBottom: awayFromBottom.current,
+      prevLen: lastLen.current,
+      nextLen: items.length,
+    })
+    if (action.stick) el.scrollTop = el.scrollHeight
+    if (action.newCount > 0) setNewCount((n) => n + action.newCount)
     lastLen.current = items.length
     reportRead()
-  }, [items.length, ask])
+  }, [items, ask])
 
   // 已读（PRD-M8-009 AC-2）：页面在前台、看到了底，就告诉 daemon 读到了哪；1 秒最多一次
   const lastReport = useRef({ at: 0, seq: 0, timer: 0 as ReturnType<typeof setTimeout> | 0 })
@@ -107,6 +105,23 @@ export function SessionView({
       setNewCount(0)
     } else {
       awayFromBottom.current = true
+    }
+    // PRD-M11-009 AC-2：向上滚到顶（scrollTop < 80px）且还有更早 → 加载一页
+    if (el.scrollTop < 80 && hasOlder && !loadingOlder) {
+      const prevHeight = el.scrollHeight
+      // loadOlder 是 async（网络往返 + prepend）。必须等它 resolve（新事件已落进 $items、
+      // React 重渲染、DOM 变高）之后再补 scrollTop——之前在 rAF 里立刻跑，那时 prepend
+      // 还没发生，scrollHeight 没变，差值算成 0，scrollTop 被钉死在 0，prepend 完成后
+      // 用户看到的是新内容顶部而不是原位置，感觉翻页没效果。
+      client
+        .loadOlder(sessionId)
+        .then(() => {
+          requestAnimationFrame(() => {
+            const el2 = scroller.current
+            if (el2) el2.scrollTop = el2.scrollHeight - prevHeight
+          })
+        })
+        .catch(() => undefined)
     }
     if (dist > 80) return
     const r = lastReport.current
@@ -209,6 +224,11 @@ export function SessionView({
             <Trajectory items={items} />
           ) : (
             <div className="mx-auto max-w-[860px] px-6 py-5">
+              {hasOlder && (
+                <div className="mb-3 text-center text-xs text-zinc-500">
+                  {loadingOlder ? tr('web.session.loadingOlder') : tr('web.session.scrollToTopForMore')}
+                </div>
+              )}
               <Transcript
                 items={items}
                 {...(onBranched === undefined ? {} : { onBranch: branch })}
