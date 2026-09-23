@@ -302,3 +302,59 @@ describe('PRD-M12-004 AC-5 · 批准并转成长任务', () => {
     await h.s.flushAndClose()
   })
 })
+
+describe('PRD-M12-004 AC-10 · 续跑要的计划进度', () => {
+  const env = (seq: number, ev: Record<string, unknown>) =>
+    ({ seq, sessionId: 's', parentSeq: seq - 1 || null, ts: seq, schemaVersion: 14, ev }) as EventEnvelope
+
+  test('没有计划 → null；有计划 → 总数与剩余（done / skipped 不算剩余）', async () => {
+    const { planProgress } = await import('../src/index.ts')
+    expect(planProgress([env(1, { t: 'user.input', text: 'x' })])).toBeNull()
+    expect(planProgress([env(1, { t: 'plan.update', steps: STEPS })])).toEqual({
+      total: 3,
+      remaining: 2,
+      interrupted: false,
+    })
+  })
+
+  test('计划之后出了错 / 工具被中断 → interrupted；用户再说一句就不算了', async () => {
+    const { planProgress } = await import('../src/index.ts')
+    const base = [env(1, { t: 'plan.update', steps: STEPS })]
+    expect(
+      planProgress([...base, env(2, { t: 'error', scope: 'recovery', message: 'x', recoverable: true })])?.interrupted,
+    ).toBe(true)
+    expect(
+      planProgress([
+        ...base,
+        env(2, { t: 'tool.result', id: 'a', ok: false, payload: {}, ms: 0, reason: 'interrupted' }),
+      ])?.interrupted,
+    ).toBe(true)
+    expect(
+      planProgress([...base, env(2, { t: 'tool.result', id: 'a', ok: false, payload: {}, ms: 0, reason: 'not_run' })])
+        ?.interrupted,
+    ).toBe(true)
+    expect(
+      planProgress([
+        ...base,
+        env(2, { t: 'error', scope: 'recovery', message: 'x', recoverable: true }),
+        env(3, { t: 'user.input', text: '继续' }),
+      ])?.interrupted,
+    ).toBe(false)
+    // 被计划闸门拦下不算中断（那是正常流程）
+    expect(
+      planProgress([
+        ...base,
+        env(2, { t: 'tool.result', id: 'a', ok: false, payload: {}, ms: 0, reason: 'plan_required' }),
+      ])?.interrupted,
+    ).toBe(false)
+  })
+
+  test('状态栏指标带着计划进度推给端', async () => {
+    const h = open({ planRequired: true, script: [[plan('p1')], [done]] })
+    const seen: Array<{ plan?: unknown }> = []
+    h.s.on('onMetrics', (m) => seen.push(m))
+    await run(h, '开始')
+    expect(seen.at(-1)?.plan).toEqual({ total: 3, remaining: 2, interrupted: false })
+    await h.s.flushAndClose()
+  })
+})

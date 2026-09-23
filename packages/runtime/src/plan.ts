@@ -344,3 +344,35 @@ export function makePlanUpdateTool(host: PlanToolHost): Tool<PlanUpdateArgs, Rec
     },
   }
 }
+
+/** 计划进度（PRD-M12-004 AC-10）：端上的「计划还剩 N 步 · 继续」用它 */
+export interface PlanProgress {
+  total: number
+  remaining: number
+  /** 计划写出之后这一轮没有正常收场（进程挂了补的一致点、工具被中断 / 没跑、出错），且用户还没再说话 */
+  interrupted: boolean
+}
+
+/** 这些 tool.result 的 reason 说明这一轮是被打断的；计划闸门拦下（plan_*）是正常流程，不算 */
+const BROKEN_REASONS: ReadonlySet<string> = new Set(['interrupted', 'not_run', 'budget_stop'])
+
+/** 从事件流算计划进度（纯函数，指标与测试共用）。没有计划 → null */
+export function planProgress(events: readonly EventEnvelope[]): PlanProgress | null {
+  let steps: Array<{ status?: unknown }> | null = null
+  let interrupted = false
+  for (const e of events) {
+    const ev = e.ev as { t: string; steps?: unknown; reason?: unknown }
+    if (ev.t === 'plan.update' && Array.isArray(ev.steps)) {
+      steps = ev.steps as Array<{ status?: unknown }>
+      interrupted = false
+    } else if (steps !== null) {
+      if (ev.t === 'user.input') interrupted = false
+      else if (ev.t === 'error') interrupted = true
+      else if (ev.t === 'tool.result' && typeof ev.reason === 'string' && BROKEN_REASONS.has(ev.reason))
+        interrupted = true
+    }
+  }
+  if (steps === null) return null
+  const remaining = steps.filter((s) => s.status !== 'done' && s.status !== 'skipped').length
+  return { total: steps.length, remaining, interrupted }
+}

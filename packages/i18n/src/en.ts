@@ -470,6 +470,13 @@ export const en: Record<keyof typeof zh, string> = {
   'core.plan.change': 'Needs changes',
   'core.plan.changeHint': 'write what to change under "Other"; you will see it again',
   'core.ev.planUpdate': 'Plan · {done}/{total} steps done',
+  'core.plan.continuePrompt':
+    'Continue with the unfinished steps of the plan. Check the current state first (the last run may have stopped midway), then pick up from the first unfinished step.',
+  'core.plan.resume': '{remaining}/{total} plan steps left',
+  'core.plan.resumeInterrupted': 'Interrupted last time · {remaining}/{total} plan steps left',
+  'web.plan.continue': 'Continue',
+  'tui.plan.resumeHint': '/continue to pick it up',
+  'tui.cmd.continue': 'pick the plan back up from the first unfinished step',
   'core.ask.other': 'Other (write your own)',
   'core.ev.planProposed': 'Submitted a plan for your approval',
   'core.ev.planApproved': 'Plan approved{v}',

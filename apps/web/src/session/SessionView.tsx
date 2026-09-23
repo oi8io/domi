@@ -3,7 +3,13 @@
  * **只渲染**：状态全在 client-core 的 atom 里（INV-04）。
  */
 
-import { type ConnectionState, type DomiClient, missingCredentialOf, type SessionStore } from '@domi/client-core'
+import {
+  type ConnectionState,
+  continuePrompt,
+  type DomiClient,
+  missingCredentialOf,
+  type SessionStore,
+} from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
@@ -19,6 +25,7 @@ import { ChangesBar } from './ChangesBar.tsx'
 import { Composer, ModelSwitch, type PendingRef, PermissionsModeSwitch } from './Composer.tsx'
 import { CredentialNotice } from './CredentialNotice.tsx'
 import { JumpBar } from './JumpBar.tsx'
+import { ResumeBar } from './ResumeBar.tsx'
 import { ReviewFindings } from './ReviewFindings.tsx'
 import { Trajectory } from './Trajectory.tsx'
 
@@ -251,6 +258,18 @@ export function SessionView({
           <ConfirmDialog ask={ask} onAnswer={answer} />
         </div>
       )}
+      <div className="shrink-0 px-5 pb-1.5 empty:hidden">
+        <ResumeBar
+          status={status}
+          ask={ask}
+          onContinue={() =>
+            void client.submit(sessionId, continuePrompt(), [], {}).then(
+              () => setNotice(null),
+              (err: Error) => setNotice(err.message),
+            )
+          }
+        />
+      </div>
       <Composer
         busy={status.busy}
         notice={notice}

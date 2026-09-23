@@ -204,6 +204,14 @@ const MetricsSchema = z.object({
   verify: z.enum(['clean', 'unverified', 'verified', 'failed']).optional(),
   /** PRD-M12-002：会话确认模式（always-ask/on-demand/allow-all） */
   permissionsMode: z.enum(['always-ask', 'on-demand', 'allow-all']).optional(),
+  /** PRD-M12-004 AC-10：计划进度（老 daemon 不推）。interrupted = 计划写出后这一轮没有正常收场、用户还没再说话 */
+  plan: z
+    .object({
+      total: z.number().int().nonnegative(),
+      remaining: z.number().int().nonnegative(),
+      interrupted: z.boolean(),
+    })
+    .optional(),
   /** PRD-M8-008 AC-2：轮数、模型请求次数、最近一轮输出速度、缓存命中率（老 daemon 不推） */
   turns: z.number().int().nonnegative().optional(),
   steps: z.number().int().nonnegative().optional(),

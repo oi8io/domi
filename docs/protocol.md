@@ -8338,6 +8338,29 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
             "allow-all"
           ]
         },
+        "plan": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "remaining": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "interrupted": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "total",
+            "remaining",
+            "interrupted"
+          ]
+        },
         "turns": {
           "type": "integer",
           "minimum": 0,

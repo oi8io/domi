@@ -75,7 +75,9 @@ import {
   makePlanUpdateTool,
   PLAN_CAPABILITY,
   type PlanPolicy,
+  type PlanProgress,
   PlanTracker,
+  planProgress,
   planPromptText,
 } from './plan.ts'
 
@@ -137,6 +139,11 @@ export const INTRINSIC_RULES: ReadonlyArray<{ name: string; capability: string; 
   { name: 'builtin.plan', capability: PLAN_CAPABILITY, decision: 'allow' },
 ]
 
+function planField(events: readonly EventEnvelope[]): { plan?: PlanProgress } {
+  const p = planProgress(events)
+  return p === null ? {} : { plan: p }
+}
+
 /** 计划闸门先于预算闸门：没计划 / 没批准的调用直接拦下（不结束这一轮），不去算用量 */
 function withPlanGate(
   plan: ReturnType<typeof makePlanGate>,
@@ -173,6 +180,8 @@ export interface MetricsSnapshot {
   verify: VerifyState
   /** PRD-M12-002：会话确认模式 */
   permissionsMode?: 'always-ask' | 'on-demand' | 'allow-all'
+  /** PRD-M12-004 AC-10：计划进度（端上「计划还剩 N 步 · 继续」）。没有计划就不带 */
+  plan?: PlanProgress
   turns?: number
   steps?: number
   tokPerSec?: number | null
@@ -547,6 +556,7 @@ export class DomiSession {
       unpricedModels: m.unpricedModels,
       verify: verifyState(all, { command: this.opts.config.verify?.command }),
       permissionsMode: this.permissionsMode,
+      ...planField(all),
       turns: m.turns,
       steps: m.steps,
       tokPerSec: m.tokPerSec,

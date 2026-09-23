@@ -4,6 +4,7 @@ import { Box, useBoxMetrics, useWindowSize } from 'ink'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from './components/ConfirmDialog.tsx'
 import { ContextBar, DEFAULT_HINTS, KeyHints } from './components/ContextBar.tsx'
+import { ResumeHint } from './components/ResumeHint.tsx'
 import { Spinner } from './components/Spinner.tsx'
 import { StatusBar } from './components/StatusBar.tsx'
 import { ClassicTranscript, Transcript, useTranscriptLines, Viewport } from './components/Transcript.tsx'
@@ -85,6 +86,7 @@ export function App({
           )}
           {status.busy && ask === null ? <Spinner /> : null}
           {ask ? <ConfirmDialog ask={ask} /> : null}
+          <ResumeHint status={status} ask={ask} />
           {children}
         </>
       )}
@@ -161,6 +163,7 @@ function FullscreenLayout({
           </Box>
           {status.busy && ask === null ? <Spinner /> : null}
           {ask ? <ConfirmDialog ask={ask} /> : null}
+          <ResumeHint status={status} ask={ask} />
           {children}
         </>
       )}

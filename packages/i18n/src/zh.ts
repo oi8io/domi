@@ -455,6 +455,13 @@ export const zh = {
   'core.plan.change': '要修改',
   'core.plan.changeHint': '在「其他」里写要改什么，改好再给你看',
   'core.ev.planUpdate': '计划 · {done}/{total} 步完成',
+  'core.plan.continuePrompt':
+    '继续执行计划里没做完的步骤。先看一眼当前状态（上次可能是中途断的），再从没做完的那一步接着做。',
+  'core.plan.resume': '计划还剩 {remaining}/{total} 步',
+  'core.plan.resumeInterrupted': '上次被打断了 · 计划还剩 {remaining}/{total} 步',
+  'web.plan.continue': '继续',
+  'tui.plan.resumeHint': '/continue 接着做',
+  'tui.cmd.continue': '计划还有没做完的步骤时，接着做',
   'core.ask.other': '其他（自己写）',
   'core.ev.planProposed': '提交了计划，等你审批',
   'core.ev.planApproved': '计划已批准{v}',

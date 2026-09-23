@@ -61,6 +61,8 @@ export interface MetricsSnapshot {
   verify?: 'clean' | 'unverified' | 'verified' | 'failed' | undefined
   /** PRD-M12-002：会话确认模式（always-ask/on-demand/allow-all） */
   permissionsMode?: 'always-ask' | 'on-demand' | 'allow-all' | undefined
+  /** PRD-M12-004 AC-10：计划进度。老 daemon 不推 */
+  plan?: { total: number; remaining: number; interrupted: boolean } | undefined
   /** M8-008：轮数、模型请求次数、最近一轮输出速度、缓存命中率。老 daemon 不推 */
   turns?: number | undefined
   steps?: number | undefined
@@ -201,6 +203,24 @@ export type PermissionsModeName = keyof typeof PERMISSIONS_MODE_LABEL
  * 状态栏上的确认模式（PRD-M12-002 AC-9）：两端同一个名字、同一个口径。
  * danger = 「全部放行」——这个会话什么都不问，状态栏要一眼看得出来
  */
+/**
+ * 「计划还剩 N 步 · 继续」（PRD-M12-004 AC-10）：计划有没做完的步骤、会话空闲、没有待回答的询问时才显示。
+ * interrupted = 上一轮是被打断的（端上用警示色突出）
+ */
+export function resumeHint(
+  status: StatusSnapshot,
+  ask: AskSnapshot | null,
+): { remaining: number; total: number; interrupted: boolean } | null {
+  const p = status.metrics?.plan
+  if (!p || p.remaining === 0 || status.busy || ask !== null) return null
+  return { remaining: p.remaining, total: p.total, interrupted: p.interrupted }
+}
+
+/** 续跑时替用户说的那一句：计划本身已经在上下文里了，这句只是「接着做」 */
+export function continuePrompt(): string {
+  return tr('core.plan.continuePrompt')
+}
+
 export function permissionsModeBadge(mode: PermissionsModeName): { label: string; danger: boolean } {
   return { label: tr(PERMISSIONS_MODE_LABEL[mode]), danger: mode === 'allow-all' }
 }

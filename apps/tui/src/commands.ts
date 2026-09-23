@@ -4,7 +4,7 @@
  * 单独成文件是为了能测：Ink 的按键在无 TTY 环境里验不了（docs/adr/001）
  */
 
-import type { RefLink } from '@domi/client-core'
+import { continuePrompt, type RefLink } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 
 export type SlashCommand =
@@ -42,6 +42,7 @@ export const COMMANDS = (): ReadonlyArray<{ name: string; args?: string; desc: s
   { name: '/branch', args: '[seq]', desc: tr('tui.cmd.branch') },
   { name: '/ref', args: tr('tui.cmd.argRef'), desc: tr('tui.cmd.ref') },
   { name: '/model', args: tr('tui.cmd.argModel'), desc: tr('tui.cmd.model') },
+  { name: '/continue', args: '', desc: tr('tui.cmd.continue') },
   { name: '/mode', args: '[on-demand|always-ask|allow-all]', desc: tr('tui.cmd.permissionsMode') },
   { name: '/compact', desc: tr('tui.cmd.compact') },
   { name: '/budget', args: tr('tui.cmd.argBudget'), desc: tr('tui.cmd.budget') },
@@ -121,6 +122,9 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       return { kind: 'extract' }
     case '/settings':
       return { kind: 'settings' } // PRD-M10-004 AC-1
+    // PRD-M12-004 AC-10：续跑 = 替用户说一句「接着做」，计划本身已经在上下文里
+    case '/continue':
+      return { kind: 'submit', text: continuePrompt() }
     case '/mode': {
       // PRD-M12-002：会话确认模式三档
       if (!rest[0]) return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }

@@ -87,3 +87,30 @@ describe('PRD-M12-004 AC-7 · 问题框画面', () => {
     $questions.set(null)
   })
 })
+
+describe('PRD-M12-004 AC-10 · 终端续跑', () => {
+  test('/continue = 替用户说一句「接着做」（计划已经在上下文里）', async () => {
+    const { parseSlash } = await import('../src/commands.ts')
+    const { continuePrompt } = await import('@domi/client-core')
+    expect(parseSlash('/continue', 3)).toEqual({ kind: 'submit', text: continuePrompt() })
+  })
+
+  test('提示行：还剩几步 + /continue；被打断时明说', async () => {
+    const { ResumeHint } = await import('../src/components/ResumeHint.tsx')
+    const { createSessionStore } = await import('@domi/client-core')
+    const s = createSessionStore({ provider: 'p', model: 'm' })
+    s.setMetrics({
+      tokens: { input: 1, output: 1, cacheRead: 0 },
+      cost: '—',
+      contextPercent: 1,
+      contextLevel: 'ok',
+      unpricedModels: [],
+      plan: { total: 4, remaining: 3, interrupted: true },
+    })
+    const h = renderAt(100, <ResumeHint status={s.$status.get()} ask={null} />)
+    await h.flush()
+    expect(h.lastFrame()).toContain('上次被打断了 · 计划还剩 3/4 步')
+    expect(h.lastFrame()).toContain('/continue')
+    h.unmount()
+  })
+})
