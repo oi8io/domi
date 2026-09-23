@@ -6,10 +6,11 @@
  * 文本、数字、布尔、枚举四种，够 MCP 规范里 elicitation 允许的那几种原始类型。
  */
 
-import type { AskSnapshot } from '@domi/client-core'
+import { type AskSnapshot, questionsOf } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import type { FormEvent, ReactElement } from 'react'
 import { Button } from './components/ui/button.tsx'
+import { QuestionsDialog } from './QuestionsDialog.tsx'
 
 interface FieldSchema {
   type?: string
@@ -123,6 +124,9 @@ export function ConfirmDialog({
   onAnswer: (allowed: boolean, content?: Record<string, unknown>, grant?: boolean) => void
 }) {
   const form = ask.form
+  // 问题框（PRD-M12-004 AC-7）：form 带扩展键就画多 tab；key 用 askId，换一次提问就重置状态
+  const questions = form ? questionsOf(form.schema) : null
+  if (questions) return <QuestionsDialog key={ask.askId ?? ask.detail} questions={questions} onAnswer={onAnswer} />
   if (form) {
     const required = new Set((form.schema as { required?: string[] } | undefined)?.required ?? [])
     // 审批类表单（字段都可选，例如计划审批）：驳回时也把填的意见带上

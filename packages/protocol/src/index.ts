@@ -1,5 +1,6 @@
 export * from './auth.ts'
 export * from './event.ts'
 export * from './message.ts'
+export * from './questions.ts'
 export * from './rpc.ts'
 export * from './tool.ts'

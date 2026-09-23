@@ -1,7 +1,10 @@
-import type { AskSnapshot } from '@domi/client-core'
+import { type AskSnapshot, initQuestions, questionsOf } from '@domi/client-core'
 import { tr } from '@domi/i18n'
+import { useStore } from '@nanostores/react'
 import { Box, Text } from 'ink'
+import { $questions } from '../questions-state.ts'
 import { useTheme } from '../theme.ts'
+import { QuestionsDialog } from './QuestionsDialog.tsx'
 
 /**
  * 回滚确认框的副作用提示 —— PRD-M1-011 AC-6。
@@ -25,6 +28,13 @@ export const CONFIRM_FOCUS_ID = 'domi-confirm'
  */
 export function ConfirmDialog({ ask }: { ask: AskSnapshot }): React.ReactElement {
   const t = useTheme()
+  // 问题框（PRD-M12-004 AC-7）：状态在 $questions 里，按键由 main.tsx 改
+  const qs = useStore($questions)
+  const questions = ask.form ? questionsOf(ask.form.schema) : null
+  if (questions) {
+    const state = qs && qs.askId === (ask.askId ?? '') ? qs.state : initQuestions(questions)
+    return <QuestionsDialog questions={questions} state={state} />
+  }
   const needsWeb = ask.form !== undefined && formNeedsWeb(ask.form.schema)
   const approval = (ask.form?.schema as Record<string, unknown> | undefined)?.[TUI_ACCEPT_EMPTY] === true
   const title = ask.form

@@ -20,7 +20,10 @@ import {
   type DomiClient,
   DomiRpcError,
   focusIdOf,
+  questionsContent,
+  questionsOf,
   type RefLink,
+  reduceQuestions,
   type SessionStore,
 } from '@domi/client-core'
 import {
@@ -42,8 +45,9 @@ import { editAction, Prompt } from './components/Prompt.tsx'
 import { SlashHints } from './components/SlashHints.tsx'
 import { dumpText } from './components/Transcript.tsx'
 import { connectChat, connectDaemon } from './connect.ts'
-import { isReasonToggle, moveOf, routeKey } from './keys.ts'
+import { isReasonToggle, moveOf, questionKey, routeKey } from './keys.ts'
 import { type OverlayState, Overlays } from './overlays/Overlays.tsx'
+import { $questions, questionsStateFor } from './questions-state.ts'
 import { clearFallback, fallbackMarked, fallbackPath, markFallback } from './render/fallback.ts'
 import {
   chooseRenderer,
@@ -264,6 +268,19 @@ export function Root({
     // 焦点在确认框时，按键只喂给确认框——别让用户以为自己在打字
     const ask = store.$ask.get()
     if (focusIdOf(ask) === 'domi-confirm') {
+      // 问题框（PRD-M12-004 AC-7）：按键交给问题框的状态机，别当成 y / n
+      const qs = ask?.form ? questionsOf(ask.form.schema) : null
+      if (qs && ask?.askId) {
+        const cur = questionsStateFor(ask.askId, qs)
+        const k = questionKey(input, key, { editing: cur.editing, onReview: cur.tab >= qs.length })
+        if (k?.kind === 'decline') void client.answer(ask.askId, false).catch(() => undefined)
+        else if (k?.kind === 'submit')
+          void client
+            .answer(ask.askId, true, questionsContent(qs, cur) as unknown as Record<string, unknown>)
+            .catch(() => undefined)
+        else if (k?.kind === 'act') $questions.set({ askId: ask.askId, state: reduceQuestions(qs, cur, k.action) })
+        return
+      }
       // a = 本会话始终允许（PRD-M8-016）：只在这次询问可以授权时生效
       if (input.toLowerCase() === 'a' && !key.ctrl && ask?.grantable === true && ask.askId) {
         void client.answer(ask.askId, true, undefined, undefined, true).catch(() => undefined)

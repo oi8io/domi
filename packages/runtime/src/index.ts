@@ -1,5 +1,6 @@
 // 用量汇总是 kernel 的纯投影（PRD-M8-013）；daemon 不直接依赖 kernel，从这里转出去
 export { monthOf, summarizeUsage, type UsageSummary, type UsageTotals } from '@domi/kernel'
+export * from './ask-user.ts'
 export * from './attachments.ts'
 export * from './budget.ts'
 export * from './builtin-plugins.ts'

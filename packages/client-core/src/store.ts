@@ -133,6 +133,29 @@ export function fullJson(args: unknown): string {
   }
 }
 
+/** 与 summarizeArgs 同一 80 字符口径 */
+const clip = (s: string): string => (s.length > 80 ? `${s.slice(0, 79)}…` : s)
+
+/** 工具调用行的摘要。问用户（PRD-M12-004 AC-7）读成问题本身，而不是一坨 JSON */
+export function toolCallSummary(name: string, args: unknown): string {
+  if (name === 'ask.user') {
+    const qs = (args as { questions?: Array<{ question?: unknown }> } | null)?.questions
+    if (Array.isArray(qs)) return clip(qs.map((q) => String(q.question ?? '')).join(' / '))
+  }
+  return summarizeArgs(args)
+}
+
+/** 工具结果行的摘要。问用户的回答读成「标签：答案」 */
+export function toolResultSummary(name: string | undefined, payload: unknown): string {
+  if (name === 'ask.user') {
+    const p = payload as { answered?: boolean; answers?: Array<{ header?: unknown; answer?: unknown }> } | null
+    if (p?.answered === false) return tr('core.ask.unanswered')
+    if (Array.isArray(p?.answers))
+      return clip(p.answers.map((a) => `${String(a.header ?? '')}：${String(a.answer ?? '')}`).join('；'))
+  }
+  return summarizeArgs(payload)
+}
+
 export function summarizeArgs(args: unknown): string {
   const json = (() => {
     try {
@@ -163,6 +186,8 @@ export function permissionsModeBadge(mode: PermissionsModeName): { label: string
 
 export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
   const $items = atom<TranscriptItem[]>([])
+  /** tool.result 只带 id：记下每次调用的工具名，结果行才知道怎么摘要 */
+  const callNames = new Map<string, string>()
   const $status = atom<StatusSnapshot>({
     model: initial.model ?? '',
     provider: initial.provider ?? '',
@@ -221,11 +246,12 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
         appendText('assistant', env.seq, ev.text)
         break
       case 'tool.call':
+        callNames.set(ev.id, ev.name)
         push({
           seq: env.seq,
           kind: 'tool-call',
           text: ev.name,
-          summary: summarizeArgs(ev.args),
+          summary: toolCallSummary(ev.name, ev.args),
           detail: fullJson(ev.args),
         })
         $status.set({ ...$status.get(), toolCalls: $status.get().toolCalls + 1 })
@@ -236,7 +262,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           kind: 'tool-result',
           text: ev.reason ?? (ev.ok ? 'ok' : 'failed'),
           ok: ev.ok,
-          summary: summarizeArgs(ev.payload),
+          summary: toolResultSummary(callNames.get(ev.id), ev.payload),
           detail: fullJson(ev.payload),
           ms: ev.ms,
         })

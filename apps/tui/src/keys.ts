@@ -52,3 +52,49 @@ export function moveOf(input: string, key: { upArrow?: boolean; downArrow?: bool
   if (key.downArrow || (key.ctrl && input === 'n')) return 1
   return 0
 }
+
+/**
+ * 问题框的按键（PRD-M12-004 AC-7）：纯函数，main.tsx 的 useInput 问它。
+ * 在「其他」里打字时按键进输入框；否则 ←→ / Tab 切题、↑↓ 移动、回车 / 空格选、a–d 直选、n / Esc 不回答，
+ * 核对页上回车 = 提交。
+ */
+export type QuestionKey =
+  | { kind: 'act'; action: import('@domi/client-core').QuestionsAction }
+  | { kind: 'submit' }
+  | { kind: 'decline' }
+  | null
+
+export function questionKey(
+  input: string,
+  key: {
+    ctrl?: boolean
+    meta?: boolean
+    return?: boolean
+    escape?: boolean
+    tab?: boolean
+    shift?: boolean
+    leftArrow?: boolean
+    rightArrow?: boolean
+    upArrow?: boolean
+    downArrow?: boolean
+    backspace?: boolean
+    delete?: boolean
+  },
+  state: { editing: boolean; onReview: boolean },
+): QuestionKey {
+  if (state.editing) {
+    if (key.return || key.escape) return { kind: 'act', action: { t: 'edit', on: false } }
+    if (key.backspace || key.delete) return { kind: 'act', action: { t: 'backspace' } }
+    if (!key.ctrl && !key.meta && input !== '') return { kind: 'act', action: { t: 'type', text: input } }
+    return null
+  }
+  if (key.escape || (input === 'n' && !key.ctrl)) return { kind: 'decline' }
+  if (key.leftArrow || (key.tab && key.shift)) return { kind: 'act', action: { t: 'prev' } }
+  if (key.rightArrow || key.tab) return { kind: 'act', action: { t: 'next' } }
+  if (state.onReview) return key.return ? { kind: 'submit' } : null
+  if (key.upArrow) return { kind: 'act', action: { t: 'move', delta: -1 } }
+  if (key.downArrow) return { kind: 'act', action: { t: 'move', delta: 1 } }
+  if (key.return || input === ' ') return { kind: 'act', action: { t: 'choose' } }
+  if (!key.ctrl && /^[a-d]$/.test(input)) return { kind: 'act', action: { t: 'letter', ch: input } }
+  return null
+}

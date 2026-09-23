@@ -68,6 +68,7 @@ import {
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
 import type { DomiEvent, EventEnvelope, RefLink, UploadRef } from '@domi/protocol'
 import { z } from 'zod'
+import { ASK_USER_CAPABILITY, makeAskUserTool } from './ask-user.ts'
 import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
 
 /**
@@ -118,6 +119,14 @@ export class RefError extends KeyedError {
     this.name = 'RefError'
   }
 }
+
+/**
+ * 内置放行（SPEC-M12-004 第二轮 取舍-2）：和用户说话的工具不碰外部世界，不该靠用户在配置里写 allow
+ * （按需档下没规则的能力会被拒）。排在用户规则**后面**：用户对同一个能力写的精确规则（比如 deny）先匹配到
+ */
+export const INTRINSIC_RULES: ReadonlyArray<{ name: string; capability: string; decision: 'allow' }> = [
+  { name: 'builtin.ask-user', capability: ASK_USER_CAPABILITY, decision: 'allow' },
+]
 
 export interface PendingAsk {
   capabilityId: string
@@ -276,7 +285,7 @@ export class DomiSession {
 
     const permissions = new PermissionEngine(
       {
-        rules: [...(opts.extraRules ?? []), ...opts.config.permissions.rules],
+        rules: [...(opts.extraRules ?? []), ...opts.config.permissions.rules, ...INTRINSIC_RULES],
         ...(opts.scope ? { scope: opts.scope } : {}),
         ...(opts.askAlways && opts.askAlways.length > 0
           ? { askAlways: (c: string) => (opts.askAlways as readonly string[]).includes(c) }
@@ -329,6 +338,8 @@ export class DomiSession {
       // M7-007 代码结构理解：只读，TypeScript 第一次用到才加载
       .register(makeOutlineTool())
       .register(makeDiagnosticsTool(this.diagnostics))
+      // PRD-M12-004 AC-7：问用户（和用户说话，内置放行）
+      .register(makeAskUserTool())
     // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用。以插件形态注册（PRD-M6-001 AC-3）
     for (const t of memorySearchPlugin.tools?.({ search: this.log.search }) ?? []) this.tools.register(t)
     if (opts.memory) this.tools.register(makeMemoryRecallTool(opts.memory))
@@ -423,9 +434,11 @@ export class DomiSession {
     req: { message: string; requestedSchema?: unknown },
     detail?: Record<string, unknown>,
   ): Promise<{ action: 'accept' | 'decline'; content?: Record<string, unknown> }> {
-    // 运行时自己问的（预算到顶）用原名；工具要输入时显示为「同组.input」
+    // 运行时自己问的（预算到顶）与问题框（ask.user）用原名；工具要输入时显示为「同组.input」
     const capabilityId =
-      detail !== undefined ? capability : `${capability.split('.').slice(0, -1).join('.') || capability}.input`
+      detail !== undefined || capability === ASK_USER_CAPABILITY
+        ? capability
+        : `${capability.split('.').slice(0, -1).join('.') || capability}.input`
     return new Promise((resolve) => {
       if (!this.listeners.onAsk) {
         resolve({ action: 'decline' })
