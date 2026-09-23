@@ -9,7 +9,16 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { contrast, DEFAULT_PALETTE, PALETTES, paletteOf, type ThemeMode, TOKENS } from '../src/index.ts'
+import {
+  contrast,
+  DEFAULT_PALETTE,
+  PALETTES,
+  paletteOf,
+  SYNTAX,
+  SYNTAX_KINDS,
+  type ThemeMode,
+  TOKENS,
+} from '../src/index.ts'
 
 const root = join(import.meta.dir, '..', '..', '..')
 const handoff = readFileSync(join(root, 'docs/ui-redesign/HANDOFF.md'), 'utf8')
@@ -112,6 +121,15 @@ describe('PRD-M8-001 AC-6 · Web 的 CSS 变量与 TUI 的配色同源', () => {
   ]
   const dark = cssVars(':root,\n:root[data-theme="dark"]')
   const light = cssVars(':root[data-theme="light"]')
+
+  test('PRD-M11-003 AC-9 · 代码语法色：globals.css 的 --syn-* 就是 tokens.ts 的 SYNTAX；在代码底色上对比度 ≥ 4.5:1', () => {
+    for (const k of SYNTAX_KINDS) {
+      expect(norm(dark[`syn-${k}`] ?? '')).toBe(norm(SYNTAX.dark[k]))
+      expect(norm(light[`syn-${k}`] ?? '')).toBe(norm(SYNTAX.light[k]))
+      expect(contrast(SYNTAX.dark[k], TOKENS.dark.codeBg)).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(SYNTAX.light[k], TOKENS.light.codeBg)).toBeGreaterThanOrEqual(4.5)
+    }
+  })
 
   test('两套选择器都解析到了变量', () => {
     expect(Object.keys(dark).length).toBeGreaterThan(10)

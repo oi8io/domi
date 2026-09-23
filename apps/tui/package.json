@@ -20,11 +20,12 @@
     "react": "^19.3.0",
     "remark-gfm": "^4.0.1",
     "remark-parse": "^11.0.0",
+    "string-width": "^8.2.2",
     "unified": "^11.0.0"
   },
   "devDependencies": {
+    "@domi/protocol": "workspace:*",
     "@types/mdast": "^4.0.0",
-    "@types/react": "^19.0.0",
-    "@domi/protocol": "workspace:*"
+    "@types/react": "^19.0.0"
   }
 }

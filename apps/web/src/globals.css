@@ -30,6 +30,17 @@
   --info: #a371f7;
   --tool: #f0883e;
   --code-bg: #0d1117;
+  /* 代码语法色（PRD-M11-003 AC-9 · ADR-028）：Primer 语法色，与 client-core tokens.ts 的 SYNTAX 同源（测试断言） */
+  --syn-keyword: #ff7b72;
+  --syn-string: #a5d6ff;
+  --syn-constant: #79c0ff;
+  --syn-comment: #8b949e;
+  --syn-title: #d2a8ff;
+  --syn-type: #ffa657;
+  --syn-variable: #ffa657;
+  --syn-meta: #8b949e;
+  --syn-added: #3fb950;
+  --syn-removed: #f85149;
   --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   --tint: 12%;
   --tint-b: 35%;
@@ -55,6 +66,16 @@
   --info: #8250df;
   --tool: #bc4c00;
   --code-bg: #f6f8fa;
+  --syn-keyword: #cf222e;
+  --syn-string: #0a3069;
+  --syn-constant: #0550ae;
+  --syn-comment: #59636e;
+  --syn-title: #8250df;
+  --syn-type: #953800;
+  --syn-variable: #953800;
+  --syn-meta: #59636e;
+  --syn-added: #1a7f37;
+  --syn-removed: #d1242f;
   --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   --tint: 8%;
   --tint-b: 30%;
@@ -232,5 +253,6 @@
    这里只留父子覆盖：首尾边距归零、代码块里的 code 透明、loose 列表的 p 不额外撑高 */
 .md-body > *:first-child { margin-top: 0; }
 .md-body > *:last-child { margin-bottom: 0; }
-.md-body pre code { background: transparent; padding: 0; font-size: 0.85em; }
 .md-body li > p { margin: 0; }
+/* 任务列表（GFM）：勾选框自带位置，不要圆点 */
+.md-body li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.3em; }

@@ -1,7 +1,9 @@
 import { summarizeReason, type TranscriptItem } from '@domi/client-core'
+import { highlightLines } from '@domi/client-core/highlight'
 import { tr } from '@domi/i18n'
 import { Box, renderToString, Static, Text } from 'ink'
 import { useEffect, useState } from 'react'
+import stringWidth from 'string-width'
 import { type Block, hasMarkdownStructure, type Inline, parseMarkdownBlocks } from '../render/markdown.ts'
 import { scrollbarColumn, visibleRange } from '../render/viewport.ts'
 import { ThemeContext, type TuiTheme, useTheme } from '../theme.ts'
@@ -189,26 +191,56 @@ function plainText(inlines: readonly Inline[]): string {
   return inlines.map((s) => s.text).join('')
 }
 
-/** GFM 表格 → 等宽对齐的文本行。单元格内样式简化为纯文本（终端表格的已知上限） */
-function tableText(t: Extract<Block, { kind: 'table' }>): string[] {
+/**
+ * GFM 表格 → 对齐的文本行（PRD-M11-003 AC-6，与 Web 同一个原则：只留横线）。
+ * 宽度按显示宽度算（一个汉字占两格）；单元格内样式简化为纯文本（终端表格的已知上限）
+ */
+export function tableLines(t: Extract<Block, { kind: 'table' }>): { header: string; rule: string; rows: string[] } {
   const cols = t.headers.length
   const widths = new Array<number>(cols).fill(0)
   for (const row of [t.headers, ...t.rows]) {
     for (let i = 0; i < cols; i++) {
-      const w = plainText(row[i] ?? []).length
+      const w = stringWidth(plainText(row[i] ?? []))
       if (w > (widths[i] ?? 0)) widths[i] = w
     }
   }
   const pad = (s: string, w: number, align: string): string => {
-    if (align === 'right') return s.padStart(w)
-    if (align === 'center') return `${' '.repeat(Math.floor((w - s.length) / 2))}${s}`.padEnd(w)
-    return s.padEnd(w)
+    const gap = Math.max(0, w - stringWidth(s))
+    if (align === 'right') return `${' '.repeat(gap)}${s}`
+    if (align === 'center') return `${' '.repeat(Math.floor(gap / 2))}${s}${' '.repeat(gap - Math.floor(gap / 2))}`
+    return `${s}${' '.repeat(gap)}`
   }
   const line = (row: Inline[][]): string =>
-    `| ${row.map((c, i) => pad(plainText(c ?? []), widths[i] ?? 0, t.align[i] ?? 'left')).join(' | ')} |`
-  const out = [line(t.headers), `|${widths.map((w) => '-'.repeat(w + 2)).join('|')}|`]
-  for (const r of t.rows) out.push(line(r))
-  return out
+    row
+      .map((c, i) => pad(plainText(c ?? []), widths[i] ?? 0, t.align[i] ?? 'left'))
+      .join('  ')
+      .replace(/\s+$/, '')
+  const total = widths.reduce((a, w) => a + w, 0) + 2 * Math.max(0, cols - 1)
+  return { header: line(t.headers), rule: '─'.repeat(total), rows: t.rows.map(line) }
+}
+
+/** 代码块（PRD-M11-003 AC-6 / AC-9）：语言头 + 左边线 + 语法色，和 Web 的代码卡片同一个意思 */
+function CodeLines({ block }: { block: Extract<Block, { kind: 'code' }> }): React.ReactElement {
+  const t = useTheme()
+  const lines = highlightLines(block.code.replace(/\n$/, ''), block.lang)
+  return (
+    <Box flexDirection="column">
+      <Text {...t.fg('mut2')}>{`╭─ ${block.lang === '' ? tr('web.md.code') : block.lang}`}</Text>
+      {lines.map((line, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本行，顺序不可变
+        <Text key={i}>
+          <Text {...t.fg('mut2')}>│ </Text>
+          {line.map((s, j) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: 同上
+            <Text key={j} {...t.syntax(s.kind)} italic={s.kind === 'comment'}>
+              {s.text}
+            </Text>
+          ))}
+        </Text>
+      ))}
+      <Text {...t.fg('mut2')}>╰─</Text>
+    </Box>
+  )
 }
 
 function BlockLine({ block }: { block: Block }): React.ReactElement {
@@ -217,31 +249,23 @@ function BlockLine({ block }: { block: Block }): React.ReactElement {
     case 'para':
       return <InlineText inlines={block.children} />
     case 'heading': {
-      const tone = block.level <= 2 ? 'accent' : block.level <= 4 ? 'info' : 'ink2'
+      // 不带 #：终端没有字号，层次靠粗细与明暗（与 Web 的「小阶梯」同一个原则）
+      const tone = block.level <= 2 ? 'ink' : block.level === 3 ? 'ink2' : 'mut'
       return (
         <Text bold {...t.fg(tone)}>
-          {`${'#'.repeat(block.level)} ${plainText(block.children)}`}
+          {plainText(block.children)}
         </Text>
       )
     }
     case 'code':
-      return (
-        <Box flexDirection="column">
-          {block.code.split('\n').map((l, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本行，顺序不可变
-            <Text key={i} {...t.fg('info')} dimColor={!t.truecolor}>
-              {l}
-            </Text>
-          ))}
-        </Box>
-      )
+      return <CodeLines block={block} />
     case 'list':
       return (
         <Box flexDirection="column">
           {block.items.map((item, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本行，顺序不可变
             <Text key={i}>
-              <Text {...t.fg('accent')}>{block.ordered ? `${i + 1}. ` : '• '}</Text>
+              <Text {...t.fg('mut')}>{block.ordered ? `${i + 1}. ` : '• '}</Text>
               <InlineText inlines={item} />
             </Text>
           ))}
@@ -254,31 +278,39 @@ function BlockLine({ block }: { block: Block }): React.ReactElement {
           <InlineText inlines={block.children} />
         </Text>
       )
-    case 'table':
+    case 'table': {
+      const tl = tableLines(block)
       return (
         <Box flexDirection="column">
-          {tableText(block).map((r, i) => (
+          <Text bold {...t.fg('ink2')}>
+            {tl.header}
+          </Text>
+          <Text {...t.fg('mut2')}>{tl.rule}</Text>
+          {tl.rows.map((r, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本行，顺序不可变
-            <Text key={i} {...t.fg(i === 0 ? 'ink2' : 'ink')}>
+            <Text key={i} {...t.fg('ink')}>
               {r}
             </Text>
           ))}
         </Box>
       )
+    }
     case 'hr':
-      return <Text {...t.fg('mut2')}>────</Text>
+      return <Text {...t.fg('mut2')}>{'─'.repeat(24)}</Text>
   }
 }
 
-/** assistant 的 Markdown 正文：第一行「✓ domi:」标签，下面逐块渲染 */
-function MarkdownBlocks({ blocks }: { blocks: readonly Block[] }): React.ReactElement {
+/** assistant 的 Markdown 正文：第一行「✓ domi:」标签，下面逐块渲染；块与块之间空一行（与 Web 的段距同一个意思） */
+export function MarkdownBlocks({ blocks }: { blocks: readonly Block[] }): React.ReactElement {
   const t = useTheme()
   return (
     <Box flexDirection="column">
       <Text {...t.fg('accent')}>✓ domi:</Text>
       {blocks.map((b, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: 纯展示文本块，顺序不可变
-        <BlockLine key={i} block={b} />
+        <Box key={i} marginTop={i === 0 ? 0 : 1}>
+          <BlockLine block={b} />
+        </Box>
       ))}
     </Box>
   )

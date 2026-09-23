@@ -4,7 +4,7 @@
  * 与 Web 共用同一个 parser（remark-parse + remark-gfm），只重写最后一层：
  * mdast → 块序列（Block[]），颜色/前缀由 Transcript 层按 theme 映射成 Ink 元素。
  *
- * 终端上限（诚实记录）：无斜体（多数终端不支持）、无代码语法高亮、无真实字号
+ * 终端上限（诚实记录）：无斜体（多数终端不支持）、无真实字号
  * （标题用颜色/前缀分）；HTML 节点直接跳过（remark 不把 HTML 解析成标签，INV-06）。
  */
 import type { BlockContent, DefinitionContent, List, ListItem, PhrasingContent, Root, RootContent, Table } from 'mdast'

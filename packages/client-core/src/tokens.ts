@@ -68,6 +68,53 @@ export const TOKENS: Record<ThemeMode, ThemeTokens> = {
 }
 
 /**
+ * 代码语法色（PRD-M11-003 AC-9 · ADR-028）：Primer 的 prettylights 语法色——主题底色本身就是 Primer，
+ * 同源才协调。几类够用：关键字、字符串、常量（数字 / 字面量 / 内置 / 属性名）、注释、标题（函数名等）、
+ * 类型、变量、元信息，以及 diff 的增删。
+ */
+export const SYNTAX_KINDS = [
+  'keyword',
+  'string',
+  'constant',
+  'comment',
+  'title',
+  'type',
+  'variable',
+  'meta',
+  'added',
+  'removed',
+] as const
+export type SyntaxKind = (typeof SYNTAX_KINDS)[number]
+
+export const SYNTAX: Record<ThemeMode, Record<SyntaxKind, string>> = {
+  dark: {
+    keyword: '#ff7b72',
+    string: '#a5d6ff',
+    constant: '#79c0ff',
+    comment: '#8b949e',
+    title: '#d2a8ff',
+    type: '#ffa657',
+    variable: '#ffa657',
+    meta: '#8b949e',
+    added: '#3fb950',
+    removed: '#f85149',
+  },
+  light: {
+    keyword: '#cf222e',
+    string: '#0a3069',
+    constant: '#0550ae',
+    // Primer 原值 #6e7781 在 codeBg 上只有 4.27:1，换成更深一档的 fg.muted，过 4.5:1
+    comment: '#59636e',
+    title: '#8250df',
+    type: '#953800',
+    variable: '#953800',
+    meta: '#59636e',
+    added: '#1a7f37',
+    removed: '#d1242f',
+  },
+}
+
+/**
  * accent 色板。`accent` 用于选中态、链接、tab 下划线；`emphasis` 是实心按钮底色，
  * 配白字对比度 ≥ 4.5:1（PRD-M8-001 AC-4）——深色主题下亮色 accent 配白字只有 ~2.5:1。
  */
