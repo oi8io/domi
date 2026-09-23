@@ -151,6 +151,16 @@ const PERMISSIONS_MODE_LABEL = {
   'allow-all': 'web.composer.modeAllowAll',
 } as const
 
+export type PermissionsModeName = keyof typeof PERMISSIONS_MODE_LABEL
+
+/**
+ * 状态栏上的确认模式（PRD-M12-002 AC-9）：两端同一个名字、同一个口径。
+ * danger = 「全部放行」——这个会话什么都不问，状态栏要一眼看得出来
+ */
+export function permissionsModeBadge(mode: PermissionsModeName): { label: string; danger: boolean } {
+  return { label: tr(PERMISSIONS_MODE_LABEL[mode]), danger: mode === 'allow-all' }
+}
+
 export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
   const $items = atom<TranscriptItem[]>([])
   const $status = atom<StatusSnapshot>({

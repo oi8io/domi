@@ -97,19 +97,19 @@ describe('通配规则 `前缀.*` —— 一条规则管住一整个 MCP server�
 })
 
 describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
-  test('默认（不配置 reviewMode）= on-demand = 现状 fail-closed：非危险无规则仍 deny', async () => {
+  test('默认（不配置 permissionsMode）= on-demand = 现状 fail-closed：非危险无规则仍 deny', async () => {
     const d = await new PermissionEngine().check('fs.read', {})
     expect(d.decision).toBe('deny')
   })
 
   test('on-demand：非危险无规则 deny（现状，回归基准）', async () => {
-    const d = await new PermissionEngine({ reviewMode: () => 'on-demand' as const }).check('fs.read', {})
+    const d = await new PermissionEngine({ permissionsMode: () => 'on-demand' as const }).check('fs.read', {})
     expect(d.decision).toBe('deny')
   })
 
   test('always-ask：非危险无规则 → 问人', async () => {
     let asked = 0
-    const e = new PermissionEngine({ reviewMode: () => 'always-ask' as const }, async () => {
+    const e = new PermissionEngine({ permissionsMode: () => 'always-ask' as const }, async () => {
       asked++
       return true
     })
@@ -119,7 +119,7 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
   })
 
   test('allow-all：非危险无规则 → 自动放行', async () => {
-    const d = await new PermissionEngine({ reviewMode: () => 'allow-all' as const }).check('fs.read', {})
+    const d = await new PermissionEngine({ permissionsMode: () => 'allow-all' as const }).check('fs.read', {})
     expect(d.decision).toBe('allow')
   })
 
@@ -127,7 +127,7 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
   // 只剩两道线：用户自己写的 deny 规则、子 agent 的父范围——那是「不许做」，不是「要不要问」。
   test('allow-all：危险能力无规则也直接放行，不问人（source: mode）', async () => {
     let asked = 0
-    const e = new PermissionEngine({ reviewMode: () => 'allow-all' as const }, async () => {
+    const e = new PermissionEngine({ permissionsMode: () => 'allow-all' as const }, async () => {
       asked++
       return false
     })
@@ -144,7 +144,7 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
       {
         rules: [{ name: 'ask-write', capability: 'fs.write', decision: 'ask' }],
         askAlways: (c) => c === 'shell.exec',
-        reviewMode: () => 'allow-all' as const,
+        permissionsMode: () => 'allow-all' as const,
       },
       async () => {
         asked++
@@ -163,7 +163,7 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
   test('allow-all：用户显式写的 deny 规则仍然拒', async () => {
     const e = new PermissionEngine({
       rules: [{ name: 'no-mcp', capability: 'mcp.github.*', decision: 'deny' }],
-      reviewMode: () => 'allow-all' as const,
+      permissionsMode: () => 'allow-all' as const,
     })
     expect(await e.check('mcp.github.push', {})).toMatchObject({
       decision: 'deny',
@@ -173,14 +173,17 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
   })
 
   test('allow-all：子 agent 的父范围仍然拦（AC-5 / INV-03）', async () => {
-    const e = new PermissionEngine({ scope: (c) => c === 'fs.read', reviewMode: () => 'allow-all' as const })
+    const e = new PermissionEngine({ scope: (c) => c === 'fs.read', permissionsMode: () => 'allow-all' as const })
     expect((await e.check('shell.exec', { cmd: 'ls' })).decision).toBe('deny')
   })
 
   test('always-ask：危险能力即使规则 allow 也收紧到 ask——AC-2/INV-03', async () => {
     let asked = 0
     const e = new PermissionEngine(
-      { rules: [{ name: 'r', capability: 'fs.delete', decision: 'allow' }], reviewMode: () => 'always-ask' as const },
+      {
+        rules: [{ name: 'r', capability: 'fs.delete', decision: 'allow' }],
+        permissionsMode: () => 'always-ask' as const,
+      },
       async () => {
         asked++
         return false
@@ -194,7 +197,10 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
   test('on-demand：用户显式写的 allow 规则算数，危险能力也直接放行（2026-09-23 回写）', async () => {
     let asked = 0
     const e = new PermissionEngine(
-      { rules: [{ name: 'w', capability: 'fs.write', decision: 'allow' }], reviewMode: () => 'on-demand' as const },
+      {
+        rules: [{ name: 'w', capability: 'fs.write', decision: 'allow' }],
+        permissionsMode: () => 'on-demand' as const,
+      },
       async () => {
         asked++
         return false
@@ -211,7 +217,10 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
   test('on-demand：危险能力没写规则仍拒（fail-closed），规则 ask 仍问', async () => {
     let asked = 0
     const e = new PermissionEngine(
-      { rules: [{ name: 'a', capability: 'shell.exec', decision: 'ask' }], reviewMode: () => 'on-demand' as const },
+      {
+        rules: [{ name: 'a', capability: 'shell.exec', decision: 'ask' }],
+        permissionsMode: () => 'on-demand' as const,
+      },
       async () => {
         asked++
         return true

@@ -157,6 +157,28 @@ describe('状态栏（parity 第 9 项）', () => {
     }
   })
 
+  test('PRD-M12-002 AC-9 · 确认模式常驻显示；全部放行用警示色', () => {
+    for (const [mode, label, danger] of [
+      ['on-demand', '按需', false],
+      ['always-ask', '每次都问', false],
+      ['allow-all', '全部放行', true],
+    ] as const) {
+      const store = createSessionStore({ provider: 'anthropic', model: 'glm' })
+      store.setMetrics({
+        tokens: { input: 1, output: 1, cacheRead: 0 },
+        cost: '—',
+        contextPercent: 1,
+        contextLevel: 'ok',
+        unpricedModels: [],
+        permissionsMode: mode,
+      })
+      const html = renderToStaticMarkup(<StatusBar status={store.$status.get()} />)
+      const pill = html.match(/<span[^>]*data-pill="permissions-mode"[^>]*>([^<]*)<\/span>/)
+      expect(pill?.[1]).toBe(label)
+      expect(pill?.[0].includes('text-bad')).toBe(danger)
+    }
+  })
+
   test('还没有指标时不瞎编数字', () => {
     const html = renderToStaticMarkup(<StatusBar status={createSessionStore().$status.get()} />)
     expect(html).toContain('— tok')

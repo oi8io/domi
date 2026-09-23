@@ -63,7 +63,6 @@ export const zh = {
   'web.status.toggleTheme': '切换主题',
   'web.status.toolCalls': '{toolCalls} 次工具',
   'web.status.turnElapsed': '本轮 {formatElapsed} ·',
-  'common.planMode': '计划模式',
   'common.severity.high': '高',
   'common.severity.medium': '中',
   'common.severity.low': '低',
@@ -100,16 +99,11 @@ export const zh = {
   'web.composer.input': '输入',
   'web.composer.fileHint': '引用工作目录里的文件，或上传附件（也可以输入 @）',
   'web.composer.skillHint': '这一轮指定一个技能（也可以输入 /）',
-  'web.composer.planHint': '计划模式下 domi 只读代码，想好方案后提交给你审批，批准后才动手',
-  'common.actMode': '执行模式',
   'web.composer.switchedLost': '已切换。新模型不支持：{join}',
-  'web.composer.modelName': '模型名',
   'web.composer.switchModel': '切换模型',
-  'web.composer.switchModelHint': '搜索或填模型名，回车',
   'common.cancel': '取消',
   'web.composer.model': '模型',
   'web.composer.noImages': ' · 不支持图片',
-  'web.composer.searchOrType': '搜索 / 手填…',
   'web.composer.noModels': '没有模型 — 去设置页添加 provider key',
   'web.changes.added': '新增',
   'web.changes.modified': '修改',
@@ -142,7 +136,6 @@ export const zh = {
   'web.session.chat': '会话',
   'web.session.title': '会话标题',
   'web.session.clickRename': '点击改名',
-  'common.untitled': '未命名',
   'web.session.reviewHint': '派一个只读的审阅者，对照需求审这个会话目录里的未提交改动（看不到对话历史）',
   'web.session.review': '审阅改动',
   'web.session.deleteHint': '删除会话（可在全部会话里恢复）',
@@ -504,8 +497,6 @@ export const zh = {
   'tui.changes.header': '{branch} 相对 {slice} 的改动（/changes <文件> 看 diff，/apply 带回）：',
   'tui.changes.discarded': '已丢弃 {path} 的改动（/undo {trash} 撤销）',
   'tui.changes.restored': '已恢复 {path} 的改动',
-  'tui.mode.alreadyPlan': '已经是计划模式了',
-  'tui.mode.alreadyAct': '已经是执行模式了',
   'tui.mode.alreadyPermissionsMode': '已是这个确认模式',
   'tui.mode.permissionsModeSet': '确认模式设为 {mode}',
   'tui.branch.switched': '已切到分支 {id}（从第 {atSeq} 条分出）',
@@ -526,8 +517,6 @@ export const zh = {
   'tui.cmd.branch': '从这里分支',
   'tui.cmd.argRef': '<会话 id> [起-止]',
   'tui.cmd.ref': '下一句话引用另一个会话',
-  'tui.cmd.plan': '切到计划模式',
-  'tui.cmd.act': '切回执行模式',
   'tui.cmd.argModel': '[模型]',
   'tui.cmd.model': '换模型（不带参数打开模型列表）',
   'tui.cmd.permissionsMode': '切确认模式（on-demand/always-ask/allow-all）',
@@ -548,7 +537,6 @@ export const zh = {
   'tui.cmd.settings': '设置（语言）',
   'tui.settings.title': '设置 · 语言',
   'tui.settings.appliesOnRestart': '语言已保存，重启后生效',
-  'tui.usage.model': '用法：/model [模型名]——只填模型名，供应商由设置决定',
   'tui.usage.modelNoArg': '/model 打开选择器——不要带模型名',
   'tui.usage.permissionsMode': '用法：/mode [on-demand|always-ask|allow-all]',
   'tui.usage.branchEmpty': '对话还是空的，没有可以分支的地方',
@@ -855,10 +843,11 @@ export const zh = {
 
 对话里：
   /compact                  手动压缩上下文
-  /model [名字]             会话中途切换模型（不带名字打开模型列表；供应商由设置决定）
+  /model                    会话中途切换模型（打开模型列表；供应商由设置决定）
   /branch [seq]             从某一条（默认最后一条）分出一个新会话并切过去
   /ref <会话 id> [起-止]    引用另一个会话的一段，下一句话带上（不给区间就是整个会话）
-  /plan  /act               计划模式（只读，想好方案提交审批）/ 回到执行模式
+  /mode <档位>              这个会话的确认模式：on-demand（默认）/ always-ask / allow-all（跳过所有确认）
+  /continue                 计划还有没做完的步骤时，接着做
   /budget tokens|cost|calls <数>  这个会话的用量上限（到 80% 提醒，到顶暂停问你）
   /changes [文件]           隔离会话的改动清单（给文件名就显示它的 diff）
   /discard <文件>           丢弃一个文件的改动（/undo <编号> 撤销）
@@ -1145,14 +1134,13 @@ server:
   'error.feature.rename': '改标题',
   'error.feature.createTask': '按目标建任务',
   'error.feature.config': '从这里改配置',
-  'error.feature.resolveModel': '按名字归属模型',
   'error.feature.usage': '用量统计',
   'error.feature.composer': '附件与文件引用',
   'error.feature.projects': '项目',
   'error.feature.review': '审阅',
   'error.feature.budget': '用量上限',
-  'error.feature.planMode': '计划模式',
   'error.feature.worktrees': '隔离工作区',
+  'error.feature.permissionsMode': '确认模式',
   'error.feature.schedules': '定时任务',
   'error.feature.refs': '跨会话引用',
   'error.session_not_found': '没有这个会话：{sessionId}',

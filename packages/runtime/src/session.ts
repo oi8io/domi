@@ -24,7 +24,7 @@ import {
   makeShellOutputTool,
   makeSkillLoadTool,
   PermissionEngine,
-  type ReviewMode,
+  type PermissionsMode,
   SkillOverlay,
   type SkillRegistry,
   scopeOf,
@@ -262,7 +262,7 @@ export class DomiSession {
   private busy = false
   /** 计划模式（M7-005）。从事件流里最后一条 mode.switch 恢复 */
   /** PRD-M12-002：会话级确认模式（always-ask/on-demand/allow-all），默认 on-demand */
-  private permissionsMode: ReviewMode = 'on-demand'
+  private permissionsMode: PermissionsMode = 'on-demand'
   private permissionsModeLoaded = false
   private titleTried = false
   private currentModel: string
@@ -282,7 +282,7 @@ export class DomiSession {
           ? { askAlways: (c: string) => (opts.askAlways as readonly string[]).includes(c) }
           : {}),
         cwd: opts.cwd,
-        reviewMode: () => this.permissionsMode,
+        permissionsMode: () => this.permissionsMode,
       },
       (capabilityId, args, o) => this.askUser(capabilityId, args, o?.grantable === true),
     )
@@ -774,7 +774,7 @@ export class DomiSession {
     this.permissionsModeLoaded = true
     const view = await this.view()
     for (let i = view.length - 1; i >= 0; i--) {
-      const ev = (view[i] as EventEnvelope).ev as { t: string; mode?: ReviewMode }
+      const ev = (view[i] as EventEnvelope).ev as { t: string; mode?: PermissionsMode }
       if (ev.t === 'permissions.mode.switch' && ev.mode) {
         this.permissionsMode = ev.mode
         break
@@ -783,7 +783,7 @@ export class DomiSession {
   }
 
   /** PRD-M12-002：切会话确认模式（写事件流，重开恢复） */
-  async setPermissionsMode(mode: ReviewMode): Promise<{ mode: ReviewMode; changed: boolean }> {
+  async setPermissionsMode(mode: PermissionsMode): Promise<{ mode: PermissionsMode; changed: boolean }> {
     await this.loadMode()
     if (this.permissionsMode === mode) return { mode, changed: false }
     this.permissionsMode = mode
@@ -792,7 +792,7 @@ export class DomiSession {
     return { mode, changed: true }
   }
 
-  getPermissionsMode(): ReviewMode {
+  getPermissionsMode(): PermissionsMode {
     return this.permissionsMode
   }
 

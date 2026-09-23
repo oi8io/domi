@@ -1,4 +1,11 @@
-import { type ConnectionState, formatElapsed, formatTokens, type StatusSnapshot, VERIFY_LABEL } from '@domi/client-core'
+import {
+  type ConnectionState,
+  formatElapsed,
+  formatTokens,
+  permissionsModeBadge,
+  type StatusSnapshot,
+  VERIFY_LABEL,
+} from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import { Box, Text } from 'ink'
 import { type Tone, useTheme } from '../theme.ts'
@@ -42,6 +49,8 @@ export function StatusBar({
   const tokens = m === null ? '— tok' : formatTokens(m.tokens)
   const cost = m === null ? '—' : m.cost
   const pct = m?.contextPercent ?? 0
+  // 确认模式（PRD-M12-002 AC-9）：常驻；「全部放行」用 bad 色加粗
+  const mode = m?.permissionsMode === undefined ? null : permissionsModeBadge(m.permissionsMode)
   const level = m?.contextLevel ?? 'ok'
   const val = t.fg('ink2')
   const sep = <Text {...t.fg('mut2')}>{'  '}</Text>
@@ -65,6 +74,14 @@ export function StatusBar({
         )}
         {`${status.provider}/${status.model}`}
         {sep}
+        {mode !== null && (
+          <>
+            <Text {...t.fg(mode.danger ? 'bad' : 'mut')} bold={mode.danger}>
+              {mode.label}
+            </Text>
+            {sep}
+          </>
+        )}
         {pace.length > 0 && (
           <>
             <Text {...val}>{pace.join(' · ')}</Text>

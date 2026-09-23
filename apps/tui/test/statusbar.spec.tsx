@@ -71,6 +71,18 @@ describe('AC-1 · 状态栏显示的内容', () => {
     h.unmount()
   })
 
+  test('PRD-M12-002 AC-9 · 确认模式常驻显示；全部放行用 bad 色', async () => {
+    const h = renderAt(120, <StatusBar status={status({ ...metrics(10), permissionsMode: 'allow-all' })} />)
+    await h.flush()
+    expect(h.lastFrame()).toContain('全部放行')
+    h.unmount()
+    const calm = renderAt(120, <StatusBar status={status({ ...metrics(10), permissionsMode: 'on-demand' })} />)
+    await calm.flush()
+    expect(calm.lastFrame()).toContain('按需')
+    expect(calm.lastFrame()).not.toContain('全部放行')
+    calm.unmount()
+  })
+
   test('还没有任何用量时不瞎编数字', async () => {
     const h = renderAt(120, <StatusBar status={status(null)} />)
     await h.flush()

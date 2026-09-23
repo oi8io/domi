@@ -6,7 +6,7 @@
  * 用户点第三次之后就不看内容了。fail-closed 的意思是：没显式声明过的，直接拒。
  */
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
-import { commandFingerprint, isDangerous, type ReviewMode, shellCommandFingerprint } from './dangerous.ts'
+import { commandFingerprint, isDangerous, type PermissionsMode, shellCommandFingerprint } from './dangerous.ts'
 import type { CapabilityId, Decision, SessionGrant } from './types.ts'
 
 export interface PermissionRule {
@@ -34,7 +34,7 @@ export interface PermissionConfig {
    * 会话级审核档位（SPEC-M11-004）：每次检查现取。
    * always-ask=无规则也问；on-demand=无规则拒（默认）；allow-all=跳过所有确认（只剩显式 deny 与父范围）
    */
-  reviewMode?: () => ReviewMode
+  permissionsMode?: () => PermissionsMode
 }
 
 /** 路径类能力不提供「本会话始终允许」的外部工具——参数能碰到什么没法静态限定。
@@ -119,7 +119,7 @@ export class PermissionEngine {
       return { decision: 'deny', source: 'default', matchedRule: PARENT_SCOPE_RULE }
     }
     const rule = findRule(this.config.rules ?? [], capabilityId)
-    const mode = this.config.reviewMode?.() ?? 'on-demand'
+    const mode = this.config.permissionsMode?.() ?? 'on-demand'
 
     // 全部放行 = 跳过所有确认（PRD-M12-002 回写 2026-09-23，同 Claude 的 skip all approvals）：
     // 危险清单、规则 ask、askAlways 收紧都不再问。剩下的线只有「不许做」——

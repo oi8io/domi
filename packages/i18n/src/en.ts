@@ -62,7 +62,6 @@ export const en: Record<keyof typeof zh, string> = {
   'web.status.toggleTheme': 'Toggle theme',
   'web.status.toolCalls': '{toolCalls, plural, one {# tool call} other {# tool calls}}',
   'web.status.turnElapsed': 'this turn {formatElapsed} ·',
-  'common.planMode': 'Plan mode',
   'common.severity.high': 'High',
   'common.severity.medium': 'Medium',
   'common.severity.low': 'Low',
@@ -99,17 +98,11 @@ export const en: Record<keyof typeof zh, string> = {
   'web.composer.input': 'Input',
   'web.composer.fileHint': 'Quote files from the working directory, or upload attachments (you can also type @)',
   'web.composer.skillHint': 'Pick a skill for this turn (you can also type /)',
-  'web.composer.planHint':
-    'In plan mode domi only reads code, drafts a plan for your approval, and acts only after you approve',
-  'common.actMode': 'Act mode',
   'web.composer.switchedLost': "Switched. The new model doesn't support: {join}",
-  'web.composer.modelName': 'Model name',
   'web.composer.switchModel': 'Switch model',
-  'web.composer.switchModelHint': 'Search or type a model name, then Enter',
   'common.cancel': 'Cancel',
   'web.composer.model': 'Model',
   'web.composer.noImages': ' · no images',
-  'web.composer.searchOrType': 'Search / type…',
   'web.composer.noModels': 'No models — add a provider key in Settings',
   'web.composer.mode': 'Confirm mode',
   'web.composer.modeOnDemand': 'On demand',
@@ -151,7 +144,6 @@ export const en: Record<keyof typeof zh, string> = {
   'web.session.chat': 'Chat',
   'web.session.title': 'Session title',
   'web.session.clickRename': 'Click to rename',
-  'common.untitled': 'Untitled',
   'web.session.reviewHint':
     "Send a read-only reviewer to check this session's uncommitted changes against the requirements (it can't see the chat history)",
   'web.session.review': 'Review changes',
@@ -522,8 +514,6 @@ export const en: Record<keyof typeof zh, string> = {
     'Changes on {branch} relative to {slice} (/changes <file> shows the diff, /apply brings them back):',
   'tui.changes.discarded': 'Discarded the changes to {path} (/undo {trash} to undo)',
   'tui.changes.restored': 'Restored the changes to {path}',
-  'tui.mode.alreadyPlan': 'Already in plan mode',
-  'tui.mode.alreadyAct': 'Already in act mode',
   'tui.mode.alreadyPermissionsMode': 'Already in this confirm mode',
   'tui.mode.permissionsModeSet': 'Confirm mode set to {mode}',
   'tui.branch.switched': 'Switched to branch {id} (branched at event {atSeq})',
@@ -546,8 +536,6 @@ export const en: Record<keyof typeof zh, string> = {
   'tui.cmd.branch': 'Branch from here',
   'tui.cmd.argRef': '<session id> [from-to]',
   'tui.cmd.ref': 'Quote another session in your next message',
-  'tui.cmd.plan': 'Switch to plan mode',
-  'tui.cmd.act': 'Switch back to act mode',
   'tui.cmd.argModel': '[model]',
   'tui.cmd.model': 'Switch model (no argument opens the model list)',
   'tui.cmd.permissionsMode': 'Switch confirm mode (on-demand/always-ask/allow-all)',
@@ -568,7 +556,6 @@ export const en: Record<keyof typeof zh, string> = {
   'tui.cmd.settings': 'Settings (language)',
   'tui.settings.title': 'Settings · Language',
   'tui.settings.appliesOnRestart': 'Language saved; takes effect after restart',
-  'tui.usage.model': 'Usage: /model [model name] — model name only; the provider comes from settings',
   'tui.usage.modelNoArg': '/model opens the picker — no name argument',
   'tui.usage.permissionsMode': 'Usage: /mode [on-demand|always-ask|allow-all]',
   'tui.usage.branchEmpty': "The conversation is empty; there's nowhere to branch from",
@@ -901,10 +888,11 @@ Usage:
 
 In a chat:
   /compact                  compact the context by hand
-  /model [name]             switch models mid-session (no name opens the model list; the provider comes from settings)
+  /model                    switch models mid-session (opens the model list; the provider comes from settings)
   /branch [seq]             branch a new session from an event (default: the last one) and switch to it
   /ref <session id> [from-to]  quote part of another session in your next message (no range = the whole session)
-  /plan  /act               plan mode (read-only; drafts a plan for your approval) / back to act mode
+  /mode <mode>              this session's confirm mode: on-demand (default) / always-ask / allow-all (skip every approval)
+  /continue                 pick the plan back up from the first unfinished step
   /budget tokens|cost|calls <n>  usage limit for this session (warns at 80%, pauses and asks when reached)
   /changes [file]           changes in an isolated session (with a file name, shows its diff)
   /discard <file>           discard one file's changes (/undo <number> to undo)
@@ -1195,14 +1183,13 @@ server:
   'error.feature.rename': 'renaming',
   'error.feature.createTask': 'creating tasks from a goal',
   'error.feature.config': 'changing settings from here',
-  'error.feature.resolveModel': 'resolving models by name',
   'error.feature.usage': 'usage statistics',
   'error.feature.composer': 'attachments and file references',
   'error.feature.projects': 'projects',
   'error.feature.review': 'reviews',
   'error.feature.budget': 'usage limits',
-  'error.feature.planMode': 'plan mode',
   'error.feature.worktrees': 'isolated workspaces',
+  'error.feature.permissionsMode': 'confirm mode',
   'error.feature.schedules': 'scheduled tasks',
   'error.feature.refs': 'cross-session references',
   'error.session_not_found': 'No such session: {sessionId}',

@@ -4,7 +4,14 @@
  * 一个数都不自己算：指标由 runtime 算好，经 session.metrics 推过来。
  */
 
-import { type ConnectionState, formatElapsed, formatTokens, type StatusSnapshot, VERIFY_LABEL } from '@domi/client-core'
+import {
+  type ConnectionState,
+  formatElapsed,
+  formatTokens,
+  permissionsModeBadge,
+  type StatusSnapshot,
+  VERIFY_LABEL,
+} from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
 import { IconClock, IconDatabase, IconMoon, IconSun } from './icons.tsx'
@@ -32,6 +39,21 @@ export function ThemeToggle() {
   )
 }
 
+/** 确认模式（PRD-M12-002 AC-9）：常驻；「全部放行」用警示色 */
+export function ModePill({ mode }: { mode: Parameters<typeof permissionsModeBadge>[0] }) {
+  const b = permissionsModeBadge(mode)
+  return (
+    <span
+      className={cn('pill', b.danger && 'border-bad text-bad')}
+      data-pill="permissions-mode"
+      data-permissions-mode={mode}
+      title={tr('web.composer.mode')}
+    >
+      {b.label}
+    </span>
+  )
+}
+
 export function StatusBar({ status, connection }: { status: StatusSnapshot; connection?: ConnectionState }) {
   const m = status.metrics
   const level = m?.contextLevel ?? 'ok'
@@ -48,6 +70,7 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
           </span>
         )}
         <span className="pill font-mono">{status.model === '' ? '—' : `${status.provider}/${status.model}`}</span>
+        {m?.permissionsMode !== undefined && <ModePill mode={m.permissionsMode} />}
         <span className="pill" data-pill="pace">
           <IconClock size={12} className="opacity-60" />
           {m?.turns !== undefined && (

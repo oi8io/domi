@@ -7,7 +7,7 @@
  */
 
 /** 会话级审核档位（SPEC-M11-004） */
-export type ReviewMode = 'always-ask' | 'on-demand' | 'allow-all'
+export type PermissionsMode = 'always-ask' | 'on-demand' | 'allow-all'
 
 /**
  * 任何档位都不能自动放行的精确能力 id。
