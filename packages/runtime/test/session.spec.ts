@@ -260,7 +260,7 @@ describe('TASK-M3-016 · 工具向用户要输入（elicitation）走询问通�
 
   test('拒绝 → decline；没人能回答 → decline（不替人填）', async () => {
     const s = session()
-    // PRD-M11-005：权限问先放行，只在表单询问上拒绝
+    // 只在表单询问上拒绝（权限如果问了就放行）
     s.on('onAsk', (a) => a?.answer(a?.capabilityId !== 'mcp.demo.input', {}))
     await s.submit('部署')
     expect(JSON.stringify((await s.pumpAll()).find((e) => e.ev.t === 'tool.result')?.ev)).toContain(
@@ -268,11 +268,12 @@ describe('TASK-M3-016 · 工具向用户要输入（elicitation）走询问通�
     )
     await s.flushAndClose()
 
-    // PRD-M11-005：危险能力（mcp.*）无人在场 = fail-closed 直接拒，不给执行机会
+    // 规则显式 allow 了 mcp.demo.*（按需档下用户写的 allow 算数，2026-09-23 回写）：工具照跑，
+    // 表单没人能填 → decline，不替人填
     const lonely = session()
     await lonely.submit('部署')
     expect(JSON.stringify((await lonely.pumpAll()).find((e) => e.ev.t === 'tool.result')?.ev)).toContain(
-      '"reason":"user_denied"',
+      '"action":"decline"',
     )
     await lonely.flushAndClose()
   })

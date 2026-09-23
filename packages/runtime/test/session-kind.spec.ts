@@ -111,7 +111,7 @@ describe('PRD-M8-004 AC-7 · 自由会话：沙盒外的文件访问被拒，she
     )
     const r = open({ cwd: repo, dbDir: home, chat: false, provider })
     await r.session.submit('跑一下')
-    expect(r.asks.map((a) => a.capabilityId)).toEqual(['shell.exec']) // PRD-M11-005：任务里首次 shell.exec 也要问（指纹 grant 后才不问）
+    expect(r.asks).toHaveLength(0) // 任务里用户写的 allow 规则算数，不问（M8 原意；2026-09-23 回写后恢复）
     expect(existsSync(join(repo, 'out.txt'))).toBe(true)
     await r.session.flushAndClose()
   })

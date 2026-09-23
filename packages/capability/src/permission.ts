@@ -6,7 +6,7 @@
  * 用户点第三次之后就不看内容了。fail-closed 的意思是：没显式声明过的，直接拒。
  */
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
-import { commandFingerprint, isDangerous, type ReviewMode } from './dangerous.ts'
+import { commandFingerprint, isDangerous, type ReviewMode, shellCommandFingerprint } from './dangerous.ts'
 import type { CapabilityId, Decision, SessionGrant } from './types.ts'
 
 export interface PermissionRule {
@@ -24,10 +24,6 @@ export interface PermissionConfig {
    */
   scope?: (capabilityId: CapabilityId) => boolean
   /**
-   * 计划模式（PRD-M7-005）：plan 时只有只读能力还按规则走，其余一律拒绝（source: mode）。
-   * 每次检查现取——模式在会话中途会变
-   */
-  /**
    * 收紧（PRD-M8-004）：这些能力即使规则说 allow 也要问人；规则说 deny 的照样拒。只会更严，不会更松。
    * 自由会话用它让 shell.exec 每次都问——命令能碰到哪些路径没法静态判断
    */
@@ -36,7 +32,7 @@ export interface PermissionConfig {
   cwd?: string
   /**
    * 会话级审核档位（SPEC-M11-004）：每次检查现取。
-   * always-ask=无规则也问；on-demand=无规则拒（现状默认）；allow-all=无规则放行（危险能力仍拦）
+   * always-ask=无规则也问；on-demand=无规则拒（默认）；allow-all=跳过所有确认（只剩显式 deny 与父范围）
    */
   reviewMode?: () => ReviewMode
 }
@@ -53,11 +49,12 @@ export function grantFor(capabilityId: string, args: unknown, cwd?: string): Ses
   if (capabilityId === 'shell.exec') {
     // PRD-M11-005 5.2：指纹 = argv[0] + ' ' + argv[1]；危险词/裸命令返回 null 不可授权
     const a = (args ?? {}) as { argv?: unknown; command?: unknown; cmd?: unknown }
-    let argv: readonly string[] = []
-    if (Array.isArray(a.argv)) argv = a.argv.filter((x): x is string => typeof x === 'string')
-    else if (typeof a.command === 'string') argv = a.command.split(/\s+/).filter(Boolean)
-    else if (typeof a.cmd === 'string') argv = a.cmd.split(/\s+/).filter(Boolean)
-    const fp = commandFingerprint(argv)
+    // 真正被执行的是 cmd（shell-exec.ts 用 `sh -c cmd`），所以 cmd 优先——
+    // 否则带一个无害的 argv 就能让指纹和实际执行的命令对不上
+    let fp: string | null = null
+    if (typeof a.cmd === 'string') fp = shellCommandFingerprint(a.cmd)
+    else if (typeof a.command === 'string') fp = shellCommandFingerprint(a.command)
+    else if (Array.isArray(a.argv)) fp = commandFingerprint(a.argv.filter((x): x is string => typeof x === 'string'))
     return fp === null ? null : { capability: capabilityId, fingerprint: fp }
   }
   if (!grantable(capabilityId)) return null
@@ -123,6 +120,15 @@ export class PermissionEngine {
     }
     const rule = findRule(this.config.rules ?? [], capabilityId)
     const mode = this.config.reviewMode?.() ?? 'on-demand'
+
+    // 全部放行 = 跳过所有确认（PRD-M12-002 回写 2026-09-23，同 Claude 的 skip all approvals）：
+    // 危险清单、规则 ask、askAlways 收紧都不再问。剩下的线只有「不许做」——
+    // 父范围（上面已拦）与用户显式写的 deny 规则。source: mode，审计能看出是档位放行的。
+    if (mode === 'allow-all') {
+      if (rule?.decision === 'deny') return { decision: 'deny', source: 'config', matchedRule: rule.name }
+      return { decision: 'allow', source: 'mode', matchedRule: rule?.name ?? null }
+    }
+
     const dangerous = isDangerous(capabilityId)
 
     // 结论三态：allow / deny / ask（ask 才走下面的会话授权 + 问人）
@@ -135,8 +141,6 @@ export class PermissionEngine {
         decision = 'deny'
       } else if (mode === 'always-ask') {
         decision = 'ask'
-      } else if (mode === 'allow-all') {
-        decision = 'allow'
       } else {
         // on-demand = 现状 fail-closed（AC-4 回归基准）
         decision = 'deny'
@@ -145,8 +149,10 @@ export class PermissionEngine {
       ruleName = rule.name
       if (rule.decision === 'deny') {
         decision = 'deny'
-      } else if (dangerous) {
-        // 危险能力即使规则 allow 也收紧到 ask（档位只收紧不放松，INV-03）
+      } else if (dangerous && (mode === 'always-ask' || rule.decision === 'ask')) {
+        // 每次都问：危险能力即使规则 allow 也收紧到 ask。
+        // 按需（默认）：用户亲手写的 allow 规则算数（2026-09-23 用户拍板，同 Claude 的显式 allow）——
+        // 「不让 AI 自动执行危险指令」拦的是 AI 自作主张，不是用户自己的配置；没写规则的危险能力仍拒
         decision = 'ask'
       } else if (rule.decision === 'ask' || this.config.askAlways?.(capabilityId) === true) {
         decision = 'ask'

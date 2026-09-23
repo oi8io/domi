@@ -1,13 +1,13 @@
 /**
  * Composer —— PRD-M8-010 AC-1（Enter 发送 / chip / 忙时不可点）· AC-2（@ 文件）· AC-3（附件）·
- * AC-4（/ 技能）· AC-5（模型下拉与模式按钮）
+ * AC-4（/ 技能）· AC-6（模型下拉与确认模式；AC-5 的模式按钮随计划模式取消，v1.14 划掉）
  *
  * SSR 渲染 + 纯函数断言；`@` / `/` 的触发判断是 `triggerAt`，这里逐例覆盖。
  */
 import { describe, expect, test } from 'bun:test'
 import { DomiClient, type WireSocket } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { Composer, ModelSwitch, PendingRefs, triggerAt } from '../src/session/Composer.tsx'
+import { Composer, ModelSwitch, PendingRefs, PermissionsModeSwitch, triggerAt } from '../src/session/Composer.tsx'
 
 const client = new DomiClient({
   clientName: 't',
@@ -106,7 +106,7 @@ describe('PRD-M8-010 AC-3 · 附件：可上传、可粘贴、可拖入', () => 
   })
 })
 
-describe('PRD-M8-010 AC-5 · 模型下拉与模式按钮', () => {
+describe('PRD-M8-010 AC-6 · 模型下拉与确认模式', () => {
   test('模型清单没到之前先显示当前模型，可以点开换', () => {
     const html = renderToStaticMarkup(
       <ModelSwitch
@@ -120,5 +120,29 @@ describe('PRD-M8-010 AC-5 · 模型下拉与模式按钮', () => {
     expect(html).toContain('claude-sonnet-4-5')
     expect(html).toContain('切换模型')
   })
+})
 
+describe('PRD-M8-010 AC-6 / PRD-M12-002 AC-2 · Composer 工具栏的确认模式三档', () => {
+  const render = (mode: 'always-ask' | 'on-demand' | 'allow-all', busy = false) =>
+    renderToStaticMarkup(
+      <PermissionsModeSwitch client={client} sessionId="s-1" busy={busy} mode={mode} onNotice={() => undefined} />,
+    )
+
+  test('三档都在，当前档位是选中的那一个', () => {
+    const html = render('allow-all')
+    expect(html).toContain('aria-label="确认模式"')
+    expect(html).toContain('data-permissions-mode="allow-all"')
+    for (const v of ['on-demand', 'always-ask', 'allow-all']) expect(html).toContain(`value="${v}"`)
+    expect(html).toMatch(/<option value="allow-all" selected="">/)
+  })
+
+  test('全部放行的说明写明「跳过所有确认」，不再说危险操作仍问', () => {
+    const html = render('allow-all')
+    expect(html).toContain('跳过所有确认')
+    expect(html).not.toContain('危险操作仍问')
+  })
+
+  test('忙时不能切', () => {
+    expect(render('on-demand', true)).toContain('disabled=""')
+  })
 })

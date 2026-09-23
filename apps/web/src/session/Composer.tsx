@@ -536,7 +536,6 @@ export function Composer({
   )
 }
 
-/** 计划模式开关（PRD-M7-005）：计划模式下 domi 只读代码，想好方案提交审批，批准后才动手 */
 /** PRD-M12-002：会话确认模式三档下拉（always-ask/on-demand/allow-all） */
 export function PermissionsModeSwitch({
   client,

@@ -123,23 +123,64 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
     expect(d.decision).toBe('allow')
   })
 
-  test('allow-all：危险能力无规则仍不自动放行（有人则问，无人则拒）——AC-2', async () => {
-    const noAsk = await new PermissionEngine({ reviewMode: () => 'allow-all' as const }).check('shell.exec', {})
-    expect(noAsk.decision).toBe('deny')
+  // PRD-M12-002 回写（2026-09-23 用户拍板）：全部放行 = 跳过所有确认，同 Claude 的 skip all approvals。
+  // 只剩两道线：用户自己写的 deny 规则、子 agent 的父范围——那是「不许做」，不是「要不要问」。
+  test('allow-all：危险能力无规则也直接放行，不问人（source: mode）', async () => {
     let asked = 0
-    const withAsk = new PermissionEngine({ reviewMode: () => 'allow-all' as const }, async () => {
+    const e = new PermissionEngine({ reviewMode: () => 'allow-all' as const }, async () => {
       asked++
       return false
     })
-    await withAsk.check('shell.exec', {})
-    // 危险能力无规则：fail-closed 直接拒，不问人（AC-2）
+    for (const id of ['shell.exec', 'fs.write', 'fs.delete', 'web.fetch', 'mcp.github.search']) {
+      const d = await e.check(id, { cmd: 'rm -rf build' })
+      expect(d).toMatchObject({ decision: 'allow', source: 'mode' })
+    }
     expect(asked).toBe(0)
   })
 
-  test('危险能力即使规则 allow 也收紧到 ask（档位只收紧不放松）——AC-2/INV-03', async () => {
+  test('allow-all：规则 ask 与 askAlways 收紧也不再问', async () => {
     let asked = 0
     const e = new PermissionEngine(
-      { rules: [{ name: 'r', capability: 'fs.delete', decision: 'allow' }], reviewMode: () => 'allow-all' as const },
+      {
+        rules: [{ name: 'ask-write', capability: 'fs.write', decision: 'ask' }],
+        askAlways: (c) => c === 'shell.exec',
+        reviewMode: () => 'allow-all' as const,
+      },
+      async () => {
+        asked++
+        return false
+      },
+    )
+    expect(await e.check('fs.write', { path: 'a' })).toMatchObject({
+      decision: 'allow',
+      source: 'mode',
+      matchedRule: 'ask-write',
+    })
+    expect(await e.check('shell.exec', { cmd: 'ls' })).toMatchObject({ decision: 'allow', source: 'mode' })
+    expect(asked).toBe(0)
+  })
+
+  test('allow-all：用户显式写的 deny 规则仍然拒', async () => {
+    const e = new PermissionEngine({
+      rules: [{ name: 'no-mcp', capability: 'mcp.github.*', decision: 'deny' }],
+      reviewMode: () => 'allow-all' as const,
+    })
+    expect(await e.check('mcp.github.push', {})).toMatchObject({
+      decision: 'deny',
+      source: 'config',
+      matchedRule: 'no-mcp',
+    })
+  })
+
+  test('allow-all：子 agent 的父范围仍然拦（AC-5 / INV-03）', async () => {
+    const e = new PermissionEngine({ scope: (c) => c === 'fs.read', reviewMode: () => 'allow-all' as const })
+    expect((await e.check('shell.exec', { cmd: 'ls' })).decision).toBe('deny')
+  })
+
+  test('always-ask：危险能力即使规则 allow 也收紧到 ask——AC-2/INV-03', async () => {
+    let asked = 0
+    const e = new PermissionEngine(
+      { rules: [{ name: 'r', capability: 'fs.delete', decision: 'allow' }], reviewMode: () => 'always-ask' as const },
       async () => {
         asked++
         return false
@@ -148,5 +189,36 @@ describe('PRD-M11-005 · 会话级审核档位（SPEC-M11-004）', () => {
     const d = await e.check('fs.delete', {})
     expect(asked).toBe(1)
     expect(d.decision).toBe('deny')
+  })
+
+  test('on-demand：用户显式写的 allow 规则算数，危险能力也直接放行（2026-09-23 回写）', async () => {
+    let asked = 0
+    const e = new PermissionEngine(
+      { rules: [{ name: 'w', capability: 'fs.write', decision: 'allow' }], reviewMode: () => 'on-demand' as const },
+      async () => {
+        asked++
+        return false
+      },
+    )
+    expect(await e.check('fs.write', { path: 'a' })).toMatchObject({
+      decision: 'allow',
+      source: 'config',
+      matchedRule: 'w',
+    })
+    expect(asked).toBe(0)
+  })
+
+  test('on-demand：危险能力没写规则仍拒（fail-closed），规则 ask 仍问', async () => {
+    let asked = 0
+    const e = new PermissionEngine(
+      { rules: [{ name: 'a', capability: 'shell.exec', decision: 'ask' }], reviewMode: () => 'on-demand' as const },
+      async () => {
+        asked++
+        return true
+      },
+    )
+    expect((await e.check('fs.delete', {})).decision).toBe('deny')
+    expect(await e.check('shell.exec', { cmd: 'ls' })).toMatchObject({ decision: 'allow', source: 'user' })
+    expect(asked).toBe(1)
   })
 })
