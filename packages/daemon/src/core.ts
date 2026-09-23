@@ -123,7 +123,16 @@ export interface SessionHandle {
   /** 用量上限（M7-009） */
   setBudget?(b: { tokens?: number; costUsd?: number; toolCalls?: number }): Promise<void>
   compactNow(trigger: 'manual' | 'threshold'): Promise<{ ok: boolean; detail: string }>
-  readEvents(fromSeq: number): Promise<EventEnvelope[]>
+  readEvents(fromSeq: number, opts?: { maxLines?: number }): Promise<EventEnvelope[]>
+  /** PRD-M11-009：向上翻页。beforeSeq 只取 view seq < beforeSeq 的事件。 */
+  history?(beforeSeq: number, maxLines?: number): Promise<{
+    events: EventEnvelope[]
+    fromSeq: number
+    toSeq: number
+    hasOlder: boolean
+  }>
+  /** PRD-M11-009：首连尾部窗口的元信息（oldestSeq/hasOlder），readEvents(fromSeq=0) 时写入 */
+  windowMeta?: { oldestSeq: number; hasOlder: boolean } | undefined
   head(): Promise<number>
   close(): Promise<void>
 }
@@ -946,7 +955,7 @@ export class Daemon {
       }
 
       case 'session.subscribe': {
-        const p = params as { sessionId: string; fromSeq: number }
+        const p = params as { sessionId: string; fromSeq: number; maxLines?: number }
         const session = await this.session(p.sessionId)
         if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
 
@@ -962,7 +971,7 @@ export class Daemon {
 
         let backlog: EventEnvelope[]
         try {
-          backlog = await session.readEvents(p.fromSeq)
+          backlog = await session.readEvents(p.fromSeq, p.maxLines !== undefined ? { maxLines: p.maxLines } : undefined)
         } catch (e) {
           // 读不出历史就不留这个订阅：留下来只会收到一条有空洞的事件流
           this.unsubscribe(p.sessionId, conn.id)
@@ -978,7 +987,21 @@ export class Daemon {
         for (const ask of this.asks.values()) {
           if (ask.sessionId === p.sessionId) conn.send(this.askNotice(p.sessionId, ask))
         }
-        return ok(req.id, { head: await session.head() })
+        const wm = p.fromSeq === 0 ? session.windowMeta : undefined
+        return ok(req.id, {
+          head: await session.head(),
+          oldestSeq: wm?.oldestSeq,
+          hasOlder: wm?.hasOlder,
+        })
+      }
+
+      case 'session.history': {
+        const hp = params as { sessionId: string; beforeSeq: number; maxLines?: number }
+        const session = await this.session(hp.sessionId)
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: hp.sessionId })
+        if (!session.history) return failKey(req.id, 'UNKNOWN_METHOD', 'error.not_implemented', { method: 'session.history' })
+        const page = await session.history(hp.beforeSeq, hp.maxLines)
+        return ok(req.id, page)
       }
 
       case 'session.read': {

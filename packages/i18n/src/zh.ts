@@ -147,6 +147,8 @@ export const zh = {
   'web.session.deleteHint': '删除会话（可在全部会话里恢复）',
   'common.confirmDelete': '确认删除',
   'web.session.delete': '删除会话',
+  'web.session.scrollToTopForMore': '向上滚动加载更早历史',
+  'web.session.loadingOlder': '正在加载更早历史…',
   'common.noProject': '无项目',
   'web.sessions.sub': '跨项目的所有会话和任务。按项目分组。',
   'web.sessions.filter': '筛选会话…',

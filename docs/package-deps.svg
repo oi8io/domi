@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1352" height="806" viewBox="0 0 1352 806" font-family="PingFang SC, Roboto, Helvetica, Arial, sans-serif">
+  <title>domi packages dependency (HEAD 163c880)</title>
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#90A4AE"/>
+    </marker>
+  </defs>
+  <text x="40" y="24" font-size="17" font-weight="600" fill="#1A1B1C">domi 包依赖关系（19 个包 · 基线 HEAD 163c880）</text>
+  <text x="40" y="44" font-size="11.5" fill="#6B7280">箭头指向被依赖方（自上而下分层）· 红框 = 零测试 · 统计 = src 行数 / 测试文件数</text>
+    <path d="M284.0,580.0 C284.0,610.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M1060.0,580.0 C1060.0,610.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 1060.0,500.0 1060.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 767.0,618.0 767.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 759.0,264.0 759.0,294.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 462.0,500.0 462.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 827.0,382.0 827.0,412.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 1242.0,500.0 1242.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 676.0,146.0 676.0,176.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,108.0 C759.0,138.0 493.0,382.0 493.0,412.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M644.0,580.0 C644.0,610.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M604.0,108.0 C604.0,138.0 284.0,500.0 284.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M604.0,108.0 C604.0,138.0 767.0,618.0 767.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M604.0,108.0 C604.0,138.0 644.0,382.0 644.0,412.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M604.0,108.0 C604.0,138.0 1021.0,382.0 1021.0,412.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M604.0,108.0 C604.0,138.0 854.0,500.0 854.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M604.0,108.0 C604.0,138.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M604.0,108.0 C604.0,138.0 676.0,146.0 676.0,176.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M604.0,108.0 C604.0,138.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,344.0 C759.0,374.0 331.0,382.0 331.0,412.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,344.0 C759.0,374.0 462.0,500.0 462.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,344.0 C759.0,374.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M759.0,344.0 C759.0,374.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M331.0,462.0 C331.0,492.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M331.0,462.0 C331.0,492.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M644.0,462.0 C644.0,492.0 284.0,500.0 284.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M644.0,462.0 C644.0,492.0 767.0,618.0 767.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M601.0,344.0 C601.0,374.0 284.0,500.0 284.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M601.0,344.0 C601.0,374.0 331.0,382.0 331.0,412.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M601.0,344.0 C601.0,374.0 462.0,500.0 462.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M601.0,344.0 C601.0,374.0 1242.0,500.0 1242.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M601.0,344.0 C601.0,374.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M601.0,344.0 C601.0,374.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M462.0,580.0 C462.0,610.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M1021.0,462.0 C1021.0,492.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M827.0,462.0 C827.0,492.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M854.0,580.0 C854.0,610.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M1242.0,580.0 C1242.0,610.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 284.0,500.0 284.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 767.0,618.0 767.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 331.0,382.0 331.0,412.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 601.0,264.0 601.0,294.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 462.0,500.0 462.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 854.0,500.0 854.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 1242.0,500.0 1242.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M676.0,226.0 C676.0,256.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M106.0,580.0 C106.0,610.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M493.0,462.0 C493.0,492.0 593.0,618.0 593.0,648.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <path d="M493.0,462.0 C493.0,492.0 106.0,500.0 106.0,530.0" fill="none" stroke="#90A4AE" stroke-width="1.2" opacity="0.55" marker-end="url(#arr)"/>
+    <rect x="198.0" y="530.0" width="172.0" height="50" rx="9" fill="#F7F7F4" stroke="#C9C7BC" stroke-width="1.2"/>
+    <text x="284.0" y="552.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">capability</text>
+    <text x="284.0" y="570.0" text-anchor="middle" font-size="10.5" fill="#6B7280">863 行 · 5 测试</text>
+    <rect x="974.0" y="530.0" width="172.0" height="50" rx="9" fill="#F7F7F4" stroke="#C9C7BC" stroke-width="1.2"/>
+    <text x="1060.0" y="552.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">checkpoint</text>
+    <text x="1060.0" y="570.0" text-anchor="middle" font-size="10.5" fill="#6B7280">316 行 · 2 测试</text>
+    <rect x="700.0" y="58.0" width="118.0" height="50" rx="9" fill="#F3EDF8" stroke="#9A6FC0" stroke-width="1.2"/>
+    <text x="759.0" y="80.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">cli</text>
+    <text x="759.0" y="98.0" text-anchor="middle" font-size="10.5" fill="#6B7280">1085 行 · 4 测试</text>
+    <rect x="554.0" y="530.0" width="180.0" height="50" rx="9" fill="#F7F7F4" stroke="#C9C7BC" stroke-width="1.2"/>
+    <text x="644.0" y="552.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">client-core</text>
+    <text x="644.0" y="570.0" text-anchor="middle" font-size="10.5" fill="#6B7280">681 行 · 6 测试</text>
+    <rect x="697.0" y="648.0" width="140.0" height="50" rx="9" fill="#F1F8E9" stroke="#7CB342" stroke-width="1.2"/>
+    <text x="767.0" y="670.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">config</text>
+    <text x="767.0" y="688.0" text-anchor="middle" font-size="10.5" fill="#6B7280">352 行 · 1 测试</text>
+    <rect x="534.0" y="58.0" width="140.0" height="50" rx="9" fill="#F3EDF8" stroke="#9A6FC0" stroke-width="1.2"/>
+    <text x="604.0" y="80.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">daemon</text>
+    <text x="604.0" y="98.0" text-anchor="middle" font-size="10.5" fill="#6B7280">1606 行 · 9 测试</text>
+    <rect x="697.0" y="294.0" width="124.0" height="50" rx="9" fill="#E8F2FA" stroke="#5BA8DB" stroke-width="1.2"/>
+    <text x="759.0" y="316.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">eval</text>
+    <text x="759.0" y="334.0" text-anchor="middle" font-size="10.5" fill="#6B7280">460 行 · 3 测试</text>
+    <rect x="261.0" y="412.0" width="140.0" height="50" rx="9" fill="#E8F2FA" stroke="#5BA8DB" stroke-width="1.2"/>
+    <text x="331.0" y="434.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">kernel</text>
+    <text x="331.0" y="452.0" text-anchor="middle" font-size="10.5" fill="#6B7280">810 行 · 10 测试</text>
+    <rect x="585.0" y="412.0" width="118.0" height="50" rx="9" fill="#E8F2FA" stroke="#5BA8DB" stroke-width="1.2"/>
+    <text x="644.0" y="434.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">mcp</text>
+    <text x="644.0" y="452.0" text-anchor="middle" font-size="10.5" fill="#6B7280">378 行 · 3 测试</text>
+    <rect x="531.0" y="294.0" width="140.0" height="50" rx="9" fill="#E8F2FA" stroke="#5BA8DB" stroke-width="1.2"/>
+    <text x="601.0" y="316.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">memory</text>
+    <text x="601.0" y="334.0" text-anchor="middle" font-size="10.5" fill="#6B7280">1238 行 · 5 测试</text>
+    <rect x="396.0" y="530.0" width="132.0" height="50" rx="9" fill="#F7F7F4" stroke="#C9C7BC" stroke-width="1.2"/>
+    <text x="462.0" y="552.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">model</text>
+    <text x="462.0" y="570.0" text-anchor="middle" font-size="10.5" fill="#6B7280">769 行 · 9 测试</text>
+    <rect x="951.0" y="412.0" width="140.0" height="50" rx="9" fill="#FDECEA" stroke="#EA6668" stroke-width="1.6"/>
+    <text x="1021.0" y="434.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">notify ⚠️</text>
+    <text x="1021.0" y="452.0" text-anchor="middle" font-size="10.5" fill="#6B7280">139 行 · 0 测试</text>
+    <rect x="729.0" y="412.0" width="196.0" height="50" rx="9" fill="#E8F2FA" stroke="#5BA8DB" stroke-width="1.2"/>
+    <text x="827.0" y="434.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">observability</text>
+    <text x="827.0" y="452.0" text-anchor="middle" font-size="10.5" fill="#6B7280">175 行 · 1 测试</text>
+    <rect x="760.0" y="530.0" width="188.0" height="50" rx="9" fill="#FDECEA" stroke="#EA6668" stroke-width="1.6"/>
+    <text x="854.0" y="552.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">orchestrator ⚠️</text>
+    <text x="854.0" y="570.0" text-anchor="middle" font-size="10.5" fill="#6B7280">380 行 · 0 测试</text>
+    <rect x="1172.0" y="530.0" width="140.0" height="50" rx="9" fill="#F7F7F4" stroke="#C9C7BC" stroke-width="1.2"/>
+    <text x="1242.0" y="552.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">prompt</text>
+    <text x="1242.0" y="570.0" text-anchor="middle" font-size="10.5" fill="#6B7280">266 行 · 1 测试</text>
+    <rect x="515.0" y="648.0" width="156.0" height="50" rx="9" fill="#F1F8E9" stroke="#7CB342" stroke-width="1.2"/>
+    <text x="593.0" y="670.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">protocol</text>
+    <text x="593.0" y="688.0" text-anchor="middle" font-size="10.5" fill="#6B7280">795 行 · 4 测试</text>
+    <rect x="602.0" y="176.0" width="148.0" height="50" rx="9" fill="#F3EDF8" stroke="#9A6FC0" stroke-width="1.2"/>
+    <text x="676.0" y="198.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">runtime</text>
+    <text x="676.0" y="216.0" text-anchor="middle" font-size="10.5" fill="#6B7280">1458 行 · 3 测试</text>
+    <rect x="40.0" y="530.0" width="132.0" height="50" rx="9" fill="#F7F7F4" stroke="#C9C7BC" stroke-width="1.2"/>
+    <text x="106.0" y="552.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">store</text>
+    <text x="106.0" y="570.0" text-anchor="middle" font-size="10.5" fill="#6B7280">1142 行 · 8 测试</text>
+    <rect x="427.0" y="412.0" width="132.0" height="50" rx="9" fill="#E8F2FA" stroke="#5BA8DB" stroke-width="1.2"/>
+    <text x="493.0" y="434.0" text-anchor="middle" font-size="13" font-weight="600" fill="#1A1B1C">trace</text>
+    <text x="493.0" y="452.0" text-anchor="middle" font-size="10.5" fill="#6B7280">578 行 · 2 测试</text>
+  <text x="40" y="796" font-size="10.5" fill="#9CA3AF">生成：独立 QA 会话 · 数据源 HEAD 163c880 干净导出 · 共 19 包 / 51 条依赖边</text>
+</svg>

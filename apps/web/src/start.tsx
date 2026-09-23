@@ -16,8 +16,7 @@ import './globals.css'
 
 // https 页面里明文 ws 会被浏览器当 mixed content 拦掉，所以走同源 wss（nginx 把 /ws 反代到 daemon）；
 // 非 https（本地 vite 直连）才用默认地址
-export const DEFAULT_DAEMON_URL =
-  location.protocol === 'https:' ? `wss://${location.host}/ws` : 'ws://127.0.0.1:7437'
+export const DEFAULT_DAEMON_URL = location.protocol === 'https:' ? `wss://${location.host}/ws` : 'ws://127.0.0.1:7437'
 
 const url = new URLSearchParams(location.search).get('daemon') ?? DEFAULT_DAEMON_URL
 

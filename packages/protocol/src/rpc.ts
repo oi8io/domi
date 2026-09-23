@@ -783,9 +783,40 @@ export const METHODS = {
   'session.subscribe': {
     summary:
       '订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏。' +
-      '分支会话的 seq 是**视图编号**：父链到分叉点的那一段排在前面、从 1 连续编下来，自己的事件接在后面',
-    params: z.object({ sessionId: z.string(), fromSeq: z.number().int().nonnegative().default(0) }),
-    result: z.object({ head: z.number().int().nonnegative() }),
+      '分支会话的 seq 是**视图编号**：父链到分叉点的那一段排在前面、从 1 连续编下来。' +
+      'PRD-M11-009：fromSeq=0（首连）时服务端只回尾部窗口（按轮 + 屏预算），' +
+      'result.oldestSeq 是本窗口最老事件 seq、hasOlder 表示前面还有更早历史——' +
+      '客户端向上滚到顶再调 session.history(beforeSeq=oldestSeq) 拉更早一页。',
+    params: z.object({
+      sessionId: z.string(),
+      fromSeq: z.number().int().nonnegative().default(0),
+      /** 首连尾部窗口的预算：估算渲染行数。缺省 120（≈2.5 屏） */
+      maxLines: z.number().int().positive().optional(),
+    }),
+    result: z.object({
+      head: z.number().int().nonnegative(),
+      /** 本窗口最老事件的 view seq（首连尾部窗口用；续订时等于 fromSeq） */
+      oldestSeq: z.number().int().nonnegative().optional(),
+      /** 本窗口前面还有没有更早历史（首连尾部窗口用） */
+      hasOlder: z.boolean().optional(),
+    }),
+  },
+  'session.history': {
+    summary:
+      'PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口（按轮 + 屏预算）。' +
+      '配合 session.subscribe 的 oldestSeq/hasOlder：beforeSeq = 当前窗口最老事件的 seq。',
+    params: z.object({
+      sessionId: z.string(),
+      beforeSeq: z.number().int().positive(),
+      /** 翻页预算：估算渲染行数。缺省 80（≈1.5 屏） */
+      maxLines: z.number().int().positive().optional(),
+    }),
+    result: z.object({
+      events: z.array(EventEnvelopeSchema),
+      fromSeq: z.number().int().nonnegative(),
+      toSeq: z.number().int().nonnegative(),
+      hasOlder: z.boolean(),
+    }),
   },
   'session.answer': {
     summary: '回答一次权限询问。askId 不存在（已被别的客户端答过）时返回 ok:false',

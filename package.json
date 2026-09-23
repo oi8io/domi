@@ -2,7 +2,7 @@
   "name": "domi",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.4.1",
+  "packageManager": "pnpm@12.4.2",
   "engines": {
     "node": ">=22"
   },
@@ -44,11 +44,11 @@
     "guard:i18n": "bun run scripts/check-i18n.ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.13",
+    "@domi/store": "workspace:*",
     "@types/bun": "^1.4.0",
     "dependency-cruiser": "^17.0.0",
     "typescript": "^5.9.0",
-    "zod": "^4.6.5",
-    "@biomejs/biome": "^2.5.13",
-    "@domi/store": "workspace:*"
+    "zod": "^4.6.5"
   }
 }

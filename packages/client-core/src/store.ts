@@ -157,6 +157,11 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
   const $ask = atom<AskSnapshot | null>(null)
   /** 最近一次提交的审阅发现；没有审阅过是 null */
   const $review = atom<ReviewFindingSnapshot[] | null>(null)
+  /** PRD-M11-009：窗口化加载——当前窗口最老事件的 seq、是否还有更早 */
+  const $oldestSeq = atom<number | null>(null)
+  const $hasOlder = atom<boolean>(false)
+  /** 正在向上翻页（防重复触发） */
+  const $loadingOlder = atom<boolean>(false)
 
   /** 最后一条 assistant 文本，流式增量往它上面拼 */
   const $streaming = computed($items, (items) => {
@@ -470,9 +475,33 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     $status,
     $ask,
     $review,
+    $oldestSeq,
+    $hasOlder,
+    $loadingOlder,
     $streaming,
     applyEvents(envelopes: EventEnvelope[]): void {
       for (const e of envelopes) applyEvent(e)
+    },
+    /** PRD-M11-009：向上翻页拿到的更早事件，插到列表前面。 */
+    prependEvents(envelopes: EventEnvelope[]): void {
+      // 复用 applyEvent 的投影逻辑，但往头部插而不是尾部 push。
+      // applyEvent 内部用 push/appendText——它们只往尾部拼。这里需要一个独立的头部投影。
+      // 简化：envelopes 已经按 seq 升序，逐条"反向投影"——先把现有 items 存下，
+      // 清空后先 applyEvent 新事件再 applyEvent 旧事件。开销 O(n)，翻页频次低可接受。
+      const oldItems = $items.get()
+      $items.set([])
+      at = envelopes[0]?.ts ?? 0
+      for (const e of envelopes) applyEvent(e)
+      // 旧事件重新 apply 会再次走 push——直接把旧 items 拼回去（它们已经是投影好的 TranscriptItem）
+      $items.set([...$items.get(), ...oldItems])
+    },
+    /** 首连 subscribe 回来后，服务端告诉我们窗口边界 */
+    setWindowMeta(meta: { oldestSeq: number; hasOlder: boolean } | null): void {
+      $oldestSeq.set(meta?.oldestSeq ?? null)
+      $hasOlder.set(meta?.hasOlder ?? false)
+    },
+    setLoadingOlder(b: boolean): void {
+      $loadingOlder.set(b)
     },
     setBusy(busy: boolean): void {
       $status.set({ ...$status.get(), busy })

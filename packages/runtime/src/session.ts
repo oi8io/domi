@@ -45,6 +45,7 @@ import {
   type ContextPolicy,
   contextLevel,
   formatCost,
+  paginateByTurns,
   type PricingTable,
   recoveryEvents,
   runTurn,
@@ -618,6 +619,21 @@ export class DomiSession {
   /** 测试与轨迹面板用：读出这个会话的全部事件（不走增量推送） */
   async pumpAll(): Promise<EventEnvelope[]> {
     return this.view()
+  }
+
+  /**
+   * PRD-M11-009：尾部窗口（首连用）。按轮 + 屏预算从尾部选一段事件。
+   * 返回 EventPage：events 升序 + fromSeq/toSeq/hasOlder。
+   */
+  async tailWindow(maxLines: number): Promise<import('@domi/kernel').EventPage> {
+    const all = await this.pumpAll()
+    return paginateByTurns(all, { budget: { maxLines } })
+  }
+
+  /** PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口。 */
+  async history(beforeSeq: number, maxLines: number): Promise<import('@domi/kernel').EventPage> {
+    const all = await this.pumpAll()
+    return paginateByTurns(all, { beforeSeq, budget: { maxLines } })
   }
 
   /**

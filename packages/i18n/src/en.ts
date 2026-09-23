@@ -149,6 +149,8 @@ export const en: Record<keyof typeof zh, string> = {
   'web.session.deleteHint': 'Delete session (recoverable from All chats)',
   'common.confirmDelete': 'Confirm delete',
   'web.session.delete': 'Delete session',
+  'web.session.scrollToTopForMore': 'Scroll up to load earlier history',
+  'web.session.loadingOlder': 'Loading earlier history…',
   'common.noProject': 'No project',
   'web.sessions.sub': 'Every chat and task across projects, grouped by project.',
   'web.sessions.filter': 'Filter chats…',

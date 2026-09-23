@@ -505,7 +505,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     async open(sessionId: string): Promise<SessionHandle> {
       const s = await live(sessionId)
       let head = 0
-      return {
+      
+      let hostWindowMeta: { oldestSeq: number; hasOlder: boolean } | undefined
+return {
         id: sessionId,
         submit: (text, refs, inputs) => s.submit(text, { ...(refs === undefined ? {} : { refs }), ...(inputs ?? {}) }),
         async checkReady() {
@@ -554,12 +556,26 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         setMode: (mode) => s.setMode(mode),
         setBudget: (b) => s.setBudget(b),
         compactNow: (trigger) => s.compactNow(trigger),
-        async readEvents(fromSeq) {
+        async readEvents(fromSeq, opts?: { maxLines?: number | undefined }) {
+          // PRD-M11-009：fromSeq=0（首连）只回尾部窗口（按轮 + 屏预算），不全量拉回。
+          // fromSeq>0（断点续订）仍是增量：seq > fromSeq 的全部事件。
+          if (fromSeq === 0) {
+            const page = await s.tailWindow(opts?.maxLines ?? 120)
+            head = page.toSeq
+            hostWindowMeta = { oldestSeq: page.fromSeq, hasOlder: page.hasOlder }
+            await s.emitMetricsNow()
+            return page.events
+          }
           const all = await s.pumpAll()
           head = all[all.length - 1]?.seq ?? head
-          // 打开已有会话时补历史：pumpAll 不推 metrics（它只读不 pump），这里补一次，否则状态栏一直空
           await s.emitMetricsNow()
           return all.filter((e) => e.seq > fromSeq)
+        },
+        async history(beforeSeq, maxLines = 80) {
+          return s.history(beforeSeq, maxLines)
+        },
+        get windowMeta() {
+          return hostWindowMeta
         },
         async head() {
           const all = await s.pumpAll()
