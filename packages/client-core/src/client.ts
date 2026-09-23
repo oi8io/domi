@@ -407,9 +407,6 @@ export class DomiClient {
   }
 
   /** 手填的模型名归属到哪一家（PRD-M9-003 AC-3） */
-  resolveModel(name: string): Promise<ResultOf<'model.resolve'>> {
-    return this.request('model.resolve', { name })
-  }
 
   /**
    * 回答一次权限询问。返回 false = 没生效（已经被别的客户端答过）。

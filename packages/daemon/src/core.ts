@@ -177,7 +177,6 @@ export interface HostComposer {
   skills(sessionId: string | undefined): Promise<ResultOf<'skill.list'>['skills']>
   models(refresh?: boolean): Promise<ResultOf<'model.list'>>
   /** 手填模型名归属到哪一家（PRD-M9-003 AC-3）。归属不了抛 InvalidInputError（MODEL_UNRESOLVED / AMBIGUOUS） */
-  resolveModel?(name: string): Promise<ResultOf<'model.resolve'>>
 }
 
 export interface SessionSummary {
@@ -722,12 +721,6 @@ export class Daemon {
         if (!h) return unsupported(req.id, 'config')
         if (method === 'config.get') return ok(req.id, await h.get())
         return ok(req.id, await h.set((params as { patch: Record<string, unknown> }).patch))
-      }
-
-      case 'model.resolve': {
-        const h = this.host.composer
-        if (!h?.resolveModel) return unsupported(req.id, 'resolveModel')
-        return ok(req.id, await h.resolveModel((params as { name: string }).name))
       }
 
       case 'provider.vendors':

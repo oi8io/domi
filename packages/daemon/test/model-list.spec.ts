@@ -152,26 +152,6 @@ describe('PRD-M9-003 AC-2 · model.list 经协议返回扁平条目，只含启�
   })
 })
 
-describe('PRD-M9-003 AC-3 · model.resolve：只给名字，由 daemon 归属', () => {
-  test('唯一命中 → 那一家；默认 provider 下有同名 → 默认那家', async () => {
-    const { daemon } = setup()
-    expect((await rpc(daemon, 'model.resolve', { name: 'deepseek-chat' })).result).toEqual({
-      provider: 'ds',
-      name: 'deepseek-chat',
-    })
-    expect((await rpc(daemon, 'model.resolve', { name: 'shared-model' })).result).toEqual({
-      provider: 'claude',
-      name: 'shared-model',
-    })
-  })
-
-  test('哪儿都没有 → INVALID_PARAMS / MODEL_UNRESOLVED', async () => {
-    const { daemon } = setup()
-    const r = await rpc(daemon, 'model.resolve', { name: 'no-such-model' })
-    expect(r.error).toMatchObject({ code: 'INVALID_PARAMS', data: { reason: 'MODEL_UNRESOLVED' } })
-  })
-})
-
 describe('PRD-M9-002 AC-2 · provider.vendors：厂商模板是唯一来源，经协议给端上用', () => {
   test('五个模板；custom 能力全关；每个模板都给协议与惯用环境变量名', async () => {
     const { daemon } = setup()

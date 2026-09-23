@@ -68,11 +68,9 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
   switch (cmd) {
     case '/compact':
       return { kind: 'compact' } // PRD-M2-003 AC-1
-    case '/model': // PRD-M1-002 · parity 第 10 项 · PRD-M9-003 AC-4
-      // 只接受模型名：归属哪一家由 daemon 定（provider 是配置概念，不在对话里切）
+    case '/model': // PRD-M12-001：只开选择器，不接受手填模型名
       if (!rest[0]) return { kind: 'model-picker' }
-      if (rest.length > 1) return { kind: 'invalid', message: tr('tui.usage.model') }
-      return { kind: 'model', model: rest[0] }
+      return { kind: 'invalid', message: tr('tui.usage.modelNoArg') }
     case '/branch': {
       // parity 第 7 项。常用的是不带数字；带数字时和 Web 端「分支」按钮是同一套视图编号
       const at = rest[0] === undefined ? lastSeq : Number(rest[0])

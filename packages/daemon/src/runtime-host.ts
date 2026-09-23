@@ -682,16 +682,6 @@ return {
       async models(refresh) {
         return catalog.list(opts.config, { refresh: refresh === true })
       },
-      async resolveModel(name) {
-        const list = await catalog.list(opts.config)
-        const r = resolveModel(list.models, name, opts.config.model.provider)
-        if (r.kind === 'ok') return { provider: r.provider, name: r.name }
-        try {
-          return assertResolved(r)
-        } catch (e) {
-          throw e instanceof ModelResolveError ? InvalidInputError.from(e, e.reason, e.detail) : e
-        }
-      },
     },
 
     schedules: {

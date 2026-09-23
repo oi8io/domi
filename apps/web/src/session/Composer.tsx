@@ -590,10 +590,8 @@ export function groupByProvider(models: readonly ModelItem[]): Array<[string, Mo
 const SEP = ''
 
 /**
- * 切换模型（原型 .ctb-select）：选项来自 model.list（PRD-M9-003 AC-2：启用的供应商按组列出，同名模型各占一行）；
- * 「搜索 / 手填…」给一个带补全的输入框：选中清单里的条目按那一条切，手填的名字交给 daemon 归属（model.resolve，AC-3）——
- * 只填模型名，不再有 `名字 [provider]` 的写法：provider 是配置概念，不在对话里切。
- * 切换成功后 model.switch 事件自己会出现在对话里，这里只显示会失去的能力。
+ * 切换模型（原型 .ctb-select）：纯下拉，按 provider 分组（PRD-M12-001：删手填分支）。
+ * 清单为空时 select disabled + 提示去设置页启用。
  */
 export function ModelSwitch({
   client,
@@ -611,8 +609,6 @@ export function ModelSwitch({
   onNotice: (msg: string | null) => void
 }) {
   const [list, setList] = useState<ModelList | null>(null)
-  const [custom, setCustom] = useState(false)
-  const [model, setModel] = useState('')
   useEffect(() => {
     client.listModels().then(setList, () => setList(null))
   }, [client])
@@ -620,8 +616,6 @@ export function ModelSwitch({
   const switchTo = (name: string, p?: string): void => {
     client.switchModel(sessionId, name, p).then(
       (lost) => {
-        setModel('')
-        setCustom(false)
         onNotice(lost.length > 0 ? tr('web.composer.switchedLost', { join: lost.join(tr('common.listSep')) }) : null)
       },
       (err: Error) => onNotice(err.message),
@@ -629,71 +623,18 @@ export function ModelSwitch({
   }
 
   const models = list?.models ?? []
-  if (custom || (list !== null && models.length === 0)) {
-    const submit = (): void => {
-      const text = model.trim()
-      if (text === '') return
-      // 补全里选中的是「名字 · 供应商」这一行：按那一条切；否则交给 daemon 归属
-      const picked = models.find((m) => optionLabel(m) === text)
-      if (picked) {
-        switchTo(picked.name, picked.provider)
-        return
-      }
-      client.resolveModel(text).then(
-        (r) => switchTo(r.name, r.provider),
-        (err: Error) => onNotice(err.message),
-      )
-    }
-    return (
-      <span className="flex items-center gap-1">
-        <input
-          className="w-56 rounded-sm border border-border bg-bg2 px-2 py-1 font-mono text-xs text-ink outline-none focus:border-accent"
-          value={model}
-          // biome-ignore lint/a11y/noAutofocus: 选了「搜索 / 手填…」就是要马上输入
-          autoFocus={custom}
-          list="domi-models"
-          placeholder={current || tr('web.composer.modelName')}
-          onChange={(e) => setModel(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              submit()
-            }
-            if (e.key === 'Escape') setCustom(false)
-          }}
-          disabled={busy}
-          aria-label={tr('web.composer.switchModel')}
-          title={tr('web.composer.switchModelHint')}
-        />
-        <datalist id="domi-models">
-          {models.map((m) => (
-            <option key={`${m.provider}/${m.name}`} value={optionLabel(m)} />
-          ))}
-        </datalist>
-        {custom && (
-          <Button variant="ghost" size="xs" onClick={() => setCustom(false)}>
-            {tr('common.cancel')}
-          </Button>
-        )}
-      </span>
-    )
-  }
-  // 清单还没到时只有当前这一项
+  const empty = list !== null && models.length === 0
   const here = provider ?? list?.current.provider ?? ''
   const value = `${here}${SEP}${current}`
   const known = models.some((m) => m.name === current && m.provider === here)
   return (
     <select
       className="max-w-56 rounded-sm border border-border bg-bg2 px-2 py-1 font-mono text-xs text-ink"
-      disabled={busy}
+      disabled={busy || empty}
       value={value}
-      title={tr('web.composer.switchModel')}
+      title={empty ? tr('web.composer.noModels') : tr('web.composer.switchModel')}
       aria-label={tr('web.composer.switchModel')}
       onChange={(e) => {
-        if (e.target.value === '__custom') {
-          setCustom(true)
-          return
-        }
         const [p, name] = e.target.value.split(SEP)
         if (name && e.target.value !== value) switchTo(name, p)
       }}
@@ -709,7 +650,6 @@ export function ModelSwitch({
           ))}
         </optgroup>
       ))}
-      <option value="__custom">{tr('web.composer.searchOrType')}</option>
     </select>
   )
 }

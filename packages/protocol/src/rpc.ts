@@ -531,13 +531,6 @@ export const METHODS = {
       current: z.object({ provider: z.string(), name: z.string() }),
     }),
   },
-  'model.resolve': {
-    summary:
-      '手填的模型名归属到哪一家（PRD-M9-003 AC-3）：默认模型所在的那一家有 → 它；只有一家有 → 那一家；' +
-      '好几家都有 → INVALID_PARAMS，data = { reason: AMBIGUOUS, candidates: [{ provider, providerName }] }；没有 → data.reason = MODEL_UNRESOLVED',
-    params: z.object({ name: z.string().min(1) }),
-    result: z.object({ provider: z.string(), name: z.string() }),
-  },
   'schedule.list': {
     summary: '定时任务列表（PRD-M8-007），带下一次运行时间与最近一次触发',
     params: z.object({}),

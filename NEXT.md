@@ -1,6 +1,8 @@
-在做: **M11「会话体验深化」**：000–008 全部 done（2026-09-21 夜间自主 TDD + 用户复核扩围）。
-      **新需求 PRD-M11-009（会话窗口化加载）已 COMMITTED**（2026-09-22 用户拍板：按轮不拆、按屏预算、短会话全量、最少 1 轮、服务端算权重）——
-      待 SPEC/任务拆分（任务编号避开 TASK-M11-008，从 009 起）。
+在做: **M12「体验修订」COMMITTED**（2026-09-23 四条全部拍板定案）：
+      ① 模型纯下拉（Web+TUI 都不手填，resolveModel 删）/ ② 三档会话级+对话框内选，UI「确认模式」配置键 permissions.mode、TUI /mode、全仓 review 清零 /
+      ③ plan/act 取消=B方案（产出计划→确认弹框多tab abcd+自定义→执行；无确认点且无阻止提示直接开跑）/ ④ 会话标题改名同步+空标题口径统一首条40字。
+      待 SPEC/任务拆分（任务编号从 TASK-M12-000 起）。
+      **M11「会话体验深化」000–009 全部 done**（009 窗口化加载已完成：尾部窗口+seq 锚点分页，commit 3be34ab 等）。
       顺手修 bug（commit 721e95b）：状态栏 token/context 一直不显示——根因是 readEvents 走 pumpAll=view() 不调 pump()，
       而 onMetrics emit 只在 pump() 里，打开旧会话 daemon 从不推 session.metrics。runtime 抽 emitMetricsNow()，
       readEvents 末尾补推一次。裸 WS 探针实测 metrics=0 → metrics=2，runtime 141/141 绿。
