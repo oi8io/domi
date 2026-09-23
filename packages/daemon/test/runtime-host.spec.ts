@@ -195,7 +195,8 @@ describe('RuntimeHost', () => {
     const b = new Conn('b')
     await call(daemon, b, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 't' })
     const sub = await call(daemon, b, 'session.subscribe', { sessionId: branchId, fromSeq: 0 })
-    expect(sub.result).toEqual({ head: at })
+    // PRD-M11-009 起 subscribe 还带窗口信息；分支会话从头就是全量
+    expect(sub.result).toEqual({ head: at, oldestSeq: 1, hasOlder: false })
     expect(b.events().map((e) => e.seq)).toEqual(Array.from({ length: at }, (_, i) => i + 1))
     expect(JSON.stringify(b.events())).toContain('主线第一问')
 

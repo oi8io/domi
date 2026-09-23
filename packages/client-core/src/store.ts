@@ -144,6 +144,13 @@ export function summarizeArgs(args: unknown): string {
   return json.length <= ARG_SUMMARY_LIMIT ? json : `${json.slice(0, ARG_SUMMARY_LIMIT)}…`
 }
 
+/** 确认模式三档的显示名（复用 Composer 下拉的文案，PRD-M12-002） */
+const PERMISSIONS_MODE_LABEL = {
+  'always-ask': 'web.composer.modeAlwaysAsk',
+  'on-demand': 'web.composer.modeOnDemand',
+  'allow-all': 'web.composer.modeAllowAll',
+} as const
+
 export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
   const $items = atom<TranscriptItem[]>([])
   const $status = atom<StatusSnapshot>({
@@ -335,6 +342,17 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           text: ev.final ? tr('core.ev.unverifiedEnd') : tr('core.ev.verifyNudge'),
           summary: ev.message,
         })
+        break
+      // M12：确认模式切换进对话流；旧会话（v10–v12）里的 mode.switch 照旧显示
+      case 'permissions.mode.switch':
+        push({
+          seq: env.seq,
+          kind: 'context',
+          text: tr('core.ev.permissionsMode', { mode: tr(PERMISSIONS_MODE_LABEL[ev.mode]) }),
+        })
+        break
+      case 'mode.switch':
+        push({ seq: env.seq, kind: 'context', text: ev.to === 'plan' ? tr('core.ev.planMode') : tr('core.ev.actMode') })
         break
       case 'plan.proposed':
         push({ seq: env.seq, kind: 'task', text: tr('core.ev.planProposed'), summary: ev.plan.slice(0, 400) })

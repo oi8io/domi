@@ -43,6 +43,7 @@ const MIXED = [
   ...load('legacy-v10.jsonl'),
   ...load('legacy-v11.jsonl'),
   ...load('legacy-v12.jsonl'),
+  ...load('legacy-v13.jsonl'),
 ]
 /** v1 代码写下的 error（没有 counters）与 v2 新增的 fs.snapshot —— 新代码都得认得 */
 const V1_V2 = load('legacy-v1-error.jsonl')
@@ -51,7 +52,7 @@ const V2_V3 = load('v2-to-v3.jsonl')
 
 describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
-    expect(MIXED).toHaveLength(39)
+    expect(MIXED).toHaveLength(42)
     for (const e of MIXED) {
       expect(() => parseEvent(e.ev, e.schemaVersion)).not.toThrow()
     }
@@ -79,6 +80,15 @@ describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', (
       expect(ev.__unparsed).toEqual(raw!.ev)
       expect(ev.__schemaVersion).toBe(raw!.schemaVersion)
     }
+  })
+
+  test('v13（M12）：确认模式切换是已知事件；v10 的 mode.switch 仍按已知事件读（类型没删）', () => {
+    for (const t of ['permissions.mode.switch', 'mode.switch']) {
+      const raw = MIXED.find((e) => e.ev.t === t)!
+      expect(isUnknownEvent(parseEvent(raw.ev, raw.schemaVersion))).toBe(false)
+    }
+    const byMode = MIXED.find((e) => e.ev.t === 'permission' && e.ev.source === 'mode')!
+    expect(isUnknownEvent(parseEvent(byMode.ev, byMode.schemaVersion))).toBe(false)
   })
 
   test('已知类型 + 未来新增字段：解析成功且字段必须留下来（passthrough）', () => {

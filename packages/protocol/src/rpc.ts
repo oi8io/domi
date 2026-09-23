@@ -690,7 +690,8 @@ export const METHODS = {
     result: z.object({ ok: z.literal(true) }),
   },
   'session.permissionsMode': {
-    summary: '切换会话确认模式（PRD-M12-002）：always-ask / on-demand（默认）/ allow-all。写 permissions.mode.switch 事件，重开恢复',
+    summary:
+      '切换会话确认模式（PRD-M12-002）：always-ask / on-demand（默认）/ allow-all。写 permissions.mode.switch 事件，重开恢复',
     params: z.object({ sessionId: z.string(), mode: z.enum(['always-ask', 'on-demand', 'allow-all']) }),
     result: z.object({ mode: z.enum(['always-ask', 'on-demand', 'allow-all']), changed: z.boolean() }),
   },

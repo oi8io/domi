@@ -16,6 +16,7 @@ function sample() {
   seq = 0
   const s = createSessionStore()
   s.applyEvents([
+    env(0, { t: 'permissions.mode.switch', mode: 'allow-all' }),
     env(100, { t: 'user.input', text: '帮我看看 dod 测试' }),
     env(2000, { t: 'model.reason', text: '先看' }),
     env(2600, { t: 'model.reason', text: '测试文件' }),

@@ -1,0 +1,3 @@
+{"seq": 40, "sessionId": "legacy", "parentSeq": 39, "ts": 1758600000000, "schemaVersion": 13, "ev": {"t": "permissions.mode.switch", "mode": "allow-all"}}
+{"seq": 41, "sessionId": "legacy", "parentSeq": 40, "ts": 1758600000001, "schemaVersion": 13, "ev": {"t": "permission", "capabilityId": "shell.exec", "decision": "allow", "source": "mode", "matchedRule": null}}
+{"seq": 42, "sessionId": "legacy", "parentSeq": 41, "ts": 1758600000002, "schemaVersion": 13, "ev": {"t": "permissions.mode.switch", "mode": "on-demand"}}

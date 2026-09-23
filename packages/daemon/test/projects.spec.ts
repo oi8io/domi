@@ -169,23 +169,24 @@ describe('PRD-M8-003 AC-3 / AC-4 · 自动建项目、任务数与归档', () =>
   })
 })
 
-describe('PRD-M8-005 AC-1 / AC-2 / AC-3 · 按目标建任务', () => {
-  test('短目标直接开干；长目标先进计划模式；目标作为第一句话发出去', async () => {
+describe('PRD-M8-005 AC-1 · 按目标建任务', () => {
+  // AC-2 / AC-3（先规划 + 计划审阅策略）随 M7-005 计划模式一起被 M12-004 取消，PRD v1.14 划掉；
+  // 替代它的「出计划 → 按需确认 → 执行」流程是 TASK-M12-004 的剩余部分。现在长短目标都直接开干。
+  test('长短目标都直接开干；目标作为第一句话发出去', async () => {
     const { call } = setup()
     await handshake(call)
     const { project } = (await call('project.create', { path: repo() })) as { project: { id: string } }
     const short = (await call('task.create', { projectId: project.id, goal: '修个错字' })) as {
       sessionId: string
-      planned: boolean
       isolation: { isolate: boolean; reason: string }
     }
-    expect(short.planned).toBe(false)
+    expect(short).not.toHaveProperty('planned')
     expect(short.isolation).toEqual({ isolate: false, reason: 'clean' })
     const long = (await call('task.create', {
       projectId: project.id,
       goal: '先读一遍现有实现，再把设置页的通用标签拆成两个组件，并补上对应的单元测试，然后更新文档',
-    })) as { sessionId: string; planned: boolean }
-    expect(long.planned).toBe(true)
+    })) as { sessionId: string }
+    expect(long).not.toHaveProperty('planned')
     await Bun.sleep(200)
     const events = (await call('session.subscribe', { sessionId: short.sessionId, fromSeq: 0 })) as { head: number }
     expect(events.head).toBeGreaterThan(0)

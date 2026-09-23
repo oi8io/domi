@@ -367,6 +367,14 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
           ),
         )
         break
+      case 'permissions.mode.switch':
+        nodes.push(node(env.seq, 'other', tr('trace.permissionsMode', { mode: ev.mode }), ''))
+        break
+      case 'mode.switch':
+        nodes.push(
+          node(env.seq, 'other', ev.to === 'plan' ? tr('trace.planMode') : tr('trace.actMode'), ev.reason ?? ''),
+        )
+        break
       case 'plan.proposed':
         nodes.push(node(env.seq, 'task', tr('trace.planProposed'), ev.plan))
         break

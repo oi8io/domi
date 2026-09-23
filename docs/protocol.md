@@ -1853,15 +1853,11 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
         "isolate",
         "reason"
       ]
-    },
-    "planned": {
-      "type": "boolean"
     }
   },
   "required": [
     "sessionId",
-    "isolation",
-    "planned"
+    "isolation"
   ]
 }
 ```
@@ -2440,49 +2436,6 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
     "models",
     "providers",
     "current"
-  ]
-}
-```
-
-### `model.resolve`
-
-手填的模型名归属到哪一家（PRD-M9-003 AC-3）：默认模型所在的那一家有 → 它；只有一家有 → 那一家；好几家都有 → INVALID_PARAMS，data = { reason: AMBIGUOUS, candidates: [{ provider, providerName }] }；没有 → data.reason = MODEL_UNRESOLVED
-
-**params**
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "name": {
-      "type": "string",
-      "minLength": 1
-    }
-  },
-  "required": [
-    "name"
-  ]
-}
-```
-
-**result**
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "provider": {
-      "type": "string"
-    },
-    "name": {
-      "type": "string"
-    }
-  },
-  "required": [
-    "provider",
-    "name"
   ]
 }
 ```
@@ -4092,9 +4045,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
-### `session.mode`
+### `session.permissionsMode`
 
-切换计划模式 / 执行模式（PRD-M7-005）。只追加一条 mode.switch；和当前一样时什么都不写
+切换会话确认模式（PRD-M12-002）：always-ask / on-demand（默认）/ allow-all。写 permissions.mode.switch 事件，重开恢复
 
 **params**
 
@@ -4109,8 +4062,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
     "mode": {
       "type": "string",
       "enum": [
-        "plan",
-        "act"
+        "always-ask",
+        "on-demand",
+        "allow-all"
       ]
     }
   },
@@ -4131,8 +4085,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
     "mode": {
       "type": "string",
       "enum": [
-        "plan",
-        "act"
+        "always-ask",
+        "on-demand",
+        "allow-all"
       ]
     },
     "changed": {
@@ -4566,7 +4521,7 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 
 ### `session.subscribe`
 
-订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏。分支会话的 seq 是**视图编号**：父链到分叉点的那一段排在前面、从 1 连续编下来，自己的事件接在后面
+订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏。分支会话的 seq 是**视图编号**：父链到分叉点的那一段排在前面、从 1 连续编下来。PRD-M11-009：fromSeq=0（首连）时服务端只回尾部窗口（按轮 + 屏预算），result.oldestSeq 是本窗口最老事件 seq、hasOlder 表示前面还有更早历史——客户端向上滚到顶再调 session.history(beforeSeq=oldestSeq) 拉更早一页。
 
 **params**
 
@@ -4582,6 +4537,11 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
       "default": 0,
       "type": "integer",
       "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "maxLines": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
       "maximum": 9007199254740991
     }
   },
@@ -4602,10 +4562,1732 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
       "type": "integer",
       "minimum": 0,
       "maximum": 9007199254740991
+    },
+    "oldestSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "hasOlder": {
+      "type": "boolean"
     }
   },
   "required": [
     "head"
+  ]
+}
+```
+
+### `session.history`
+
+PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口（按轮 + 屏预算）。配合 session.subscribe 的 oldestSeq/hasOlder：beforeSeq = 当前窗口最老事件的 seq。
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "beforeSeq": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "maxLines": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "sessionId",
+    "beforeSeq"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "parentSeq": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ts": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "ev": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "user.input"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "attachments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id"
+                          ]
+                        }
+                      },
+                      "uploads": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "mime": {
+                              "type": "string"
+                            },
+                            "size": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "mime",
+                            "size"
+                          ]
+                        }
+                      },
+                      "files": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "skills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "text"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.request"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "tokensIn": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "provider",
+                      "model",
+                      "tokensIn"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.delta"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "text"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.reason"
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "text"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.usage"
+                      },
+                      "raw": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "raw"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "tool.call"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "args": {}
+                    },
+                    "required": [
+                      "t",
+                      "id",
+                      "name",
+                      "args"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "fs.snapshot"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "phase": {
+                        "type": "string",
+                        "enum": [
+                          "before",
+                          "after"
+                        ]
+                      },
+                      "sha256": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "phase",
+                      "sha256",
+                      "bytes"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "tool.result"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "ok": {
+                        "type": "boolean"
+                      },
+                      "payload": {},
+                      "ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "id",
+                      "ok",
+                      "payload",
+                      "ms"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "permission"
+                      },
+                      "capabilityId": {
+                        "type": "string"
+                      },
+                      "decision": {
+                        "type": "string",
+                        "enum": [
+                          "allow",
+                          "deny",
+                          "ask"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "default",
+                          "config",
+                          "user",
+                          "mode",
+                          "session-grant"
+                        ]
+                      },
+                      "matchedRule": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "channel": {
+                        "type": "string"
+                      },
+                      "grant": {
+                        "type": "object",
+                        "properties": {
+                          "capability": {
+                            "type": "string"
+                          },
+                          "scope": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "capability"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "capabilityId",
+                      "decision",
+                      "source",
+                      "matchedRule"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "model.switch"
+                      },
+                      "from": {
+                        "type": "string"
+                      },
+                      "to": {
+                        "type": "string"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "lostCapabilities": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "from",
+                      "to"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "permissions.mode.switch"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "always-ask",
+                          "on-demand",
+                          "allow-all"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "mode"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "snapshot"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "files": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "largeFilesSkipped": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "id",
+                      "label",
+                      "files"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "revert"
+                      },
+                      "toSeq": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "files",
+                          "conversation",
+                          "both"
+                        ]
+                      },
+                      "snapshotId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "undoSnapshotId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "toSeq",
+                      "scope",
+                      "snapshotId",
+                      "undoSnapshotId"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.cleanup"
+                      },
+                      "fromSeq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "toSeq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "tokensBefore": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "tokensAfter": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "saved": {
+                        "type": "object",
+                        "properties": {
+                          "dedupe": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "verbose": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "resolvedError": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "stack": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "dedupe",
+                          "verbose",
+                          "resolvedError",
+                          "stack"
+                        ]
+                      },
+                      "preserved": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "fromSeq",
+                      "toSeq",
+                      "tokensBefore",
+                      "tokensAfter",
+                      "saved",
+                      "preserved"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.compact"
+                      },
+                      "fromSeq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "toSeq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "keptTurns": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "tokensBefore": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "tokensAfter": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "trigger": {
+                        "type": "string",
+                        "enum": [
+                          "threshold",
+                          "manual"
+                        ]
+                      },
+                      "summary": {
+                        "type": "object",
+                        "properties": {
+                          "intent": {
+                            "type": "string"
+                          },
+                          "filesModified": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "keyDecisions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "openQuestions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "nextSteps": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "intent",
+                          "filesModified",
+                          "keyDecisions",
+                          "openQuestions",
+                          "nextSteps"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "fromSeq",
+                      "toSeq",
+                      "keptTurns",
+                      "tokensBefore",
+                      "tokensAfter",
+                      "trigger",
+                      "summary"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.ref"
+                      },
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "fromSeq": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "toSeq": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "sessionId",
+                      "fromSeq",
+                      "toSeq"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "memory.write"
+                      },
+                      "layer": {
+                        "type": "string",
+                        "enum": [
+                          "L3",
+                          "L4"
+                        ]
+                      },
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "add",
+                          "delete",
+                          "extracted",
+                          "update",
+                          "review"
+                        ]
+                      },
+                      "diff": {
+                        "type": "string"
+                      },
+                      "item": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "fact",
+                              "preference",
+                              "entity"
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "sourceRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "sessionId": {
+                                  "type": "string"
+                                },
+                                "seq": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "sessionId",
+                                "seq"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "text",
+                          "sourceRefs"
+                        ]
+                      },
+                      "itemId": {
+                        "type": "string"
+                      },
+                      "range": {
+                        "type": "object",
+                        "properties": {
+                          "sessionId": {
+                            "type": "string"
+                          },
+                          "fromSeq": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "toSeq": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "sessionId",
+                          "fromSeq",
+                          "toSeq"
+                        ]
+                      },
+                      "changes": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "section": {
+                              "type": "string",
+                              "enum": [
+                                "工作习惯",
+                                "技术偏好",
+                                "沟通风格",
+                                "领域知识",
+                                "对用户的模型",
+                                "失败教训"
+                              ]
+                            },
+                            "op": {
+                              "type": "string",
+                              "enum": [
+                                "add",
+                                "update",
+                                "remove"
+                              ]
+                            },
+                            "before": {
+                              "type": "string"
+                            },
+                            "after": {
+                              "type": "string"
+                            },
+                            "sources": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "section",
+                            "op",
+                            "sources"
+                          ]
+                        }
+                      },
+                      "reviews": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "changeId": {
+                              "type": "string"
+                            },
+                            "decision": {
+                              "type": "string",
+                              "enum": [
+                                "accept",
+                                "reject"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "changeId",
+                            "decision"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "layer",
+                      "op",
+                      "diff"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.spawn"
+                      },
+                      "childSessionId": {
+                        "type": "string"
+                      },
+                      "goal": {
+                        "type": "string"
+                      },
+                      "tools": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "childSessionId",
+                      "goal"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.run"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "spec": {},
+                      "cwd": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "name",
+                      "spec"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.node"
+                      },
+                      "nodeId": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "started",
+                          "done",
+                          "failed"
+                        ]
+                      },
+                      "attempt": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "output": {
+                        "type": "string"
+                      },
+                      "error": {
+                        "type": "string"
+                      },
+                      "sessionId": {
+                        "type": "string"
+                      },
+                      "ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "nodeId",
+                      "status",
+                      "attempt"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.resume"
+                      },
+                      "completed": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "rerun": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "completed",
+                      "rerun"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.retry"
+                      },
+                      "nodeId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "nodeId"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "plugin.error"
+                      },
+                      "plugin": {
+                        "type": "string"
+                      },
+                      "tool": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "plugin",
+                      "message"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "task.end"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "done",
+                          "failed",
+                          "cancelled"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "status"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "workspace.trust"
+                      },
+                      "root": {
+                        "type": "string"
+                      },
+                      "trusted": {
+                        "type": "boolean"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "stored",
+                          "default"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "root",
+                      "trusted",
+                      "source"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "hook.run"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "on": {
+                        "type": "string",
+                        "enum": [
+                          "pre",
+                          "post",
+                          "stop"
+                        ]
+                      },
+                      "capabilityId": {
+                        "type": "string"
+                      },
+                      "ms": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "exitCode": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "blocked": {
+                        "type": "boolean"
+                      },
+                      "timedOut": {
+                        "type": "boolean"
+                      },
+                      "output": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "name",
+                      "on",
+                      "ms",
+                      "exitCode",
+                      "blocked",
+                      "timedOut"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "verify.required"
+                      },
+                      "attempt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "final": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "attempt",
+                      "message"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "mode.switch"
+                      },
+                      "to": {
+                        "type": "string",
+                        "enum": [
+                          "plan",
+                          "act"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "to"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "plan.proposed"
+                      },
+                      "plan": {
+                        "type": "string"
+                      },
+                      "steps": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "goal": {
+                              "type": "string"
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "goal"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "plan"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "plan.decided"
+                      },
+                      "approved": {
+                        "type": "boolean"
+                      },
+                      "comment": {
+                        "type": "string"
+                      },
+                      "asTask": {
+                        "type": "boolean"
+                      },
+                      "runId": {
+                        "type": "string"
+                      },
+                      "shape": {
+                        "type": "string",
+                        "enum": [
+                          "single",
+                          "dag"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "policy"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "approved"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "worktree.create"
+                      },
+                      "repo": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "branch": {
+                        "type": "string"
+                      },
+                      "base": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "repo",
+                      "path",
+                      "branch",
+                      "base"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "worktree.discard"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "trash": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "trash"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "worktree.restore"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "trash": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "trash"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "worktree.apply"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "squash",
+                          "merge",
+                          "branch"
+                        ]
+                      },
+                      "ok": {
+                        "type": "boolean"
+                      },
+                      "commit": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "mode",
+                      "ok"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "budget.warn"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "tokens",
+                          "costUsd",
+                          "toolCalls"
+                        ]
+                      },
+                      "used": {
+                        "type": "number"
+                      },
+                      "limit": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "kind",
+                      "used",
+                      "limit"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "budget.decided"
+                      },
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "continue",
+                          "stop",
+                          "raise"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "tokens",
+                          "costUsd",
+                          "toolCalls"
+                        ]
+                      },
+                      "limit": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "action",
+                      "kind"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "session.kind"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "chat",
+                          "task"
+                        ]
+                      },
+                      "cwd": {
+                        "type": "string"
+                      },
+                      "isolation": {
+                        "type": "object",
+                        "properties": {
+                          "isolate": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "isolate",
+                          "reason"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "kind",
+                      "cwd"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "project.assign"
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "auto": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "projectId",
+                      "path",
+                      "auto"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "schedule.fire"
+                      },
+                      "scheduleId": {
+                        "type": "string"
+                      },
+                      "due": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "late": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "scheduleId",
+                      "due",
+                      "late"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "review.findings"
+                      },
+                      "findings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "file": {
+                              "type": "string"
+                            },
+                            "line": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "severity": {
+                              "type": "string",
+                              "enum": [
+                                "high",
+                                "medium",
+                                "low"
+                              ]
+                            },
+                            "problem": {
+                              "type": "string"
+                            },
+                            "basis": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "file",
+                            "severity",
+                            "problem",
+                            "basis"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "findings"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "error"
+                      },
+                      "scope": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "recoverable": {
+                        "type": "boolean"
+                      },
+                      "counters": {
+                        "type": "object",
+                        "properties": {
+                          "toolCalls": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "argParseRetries": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "elapsedMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "toolCalls",
+                          "argParseRetries",
+                          "elapsedMs"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "scope",
+                      "message",
+                      "recoverable"
+                    ],
+                    "additionalProperties": {}
+                  }
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "t": {
+                    "type": "string"
+                  },
+                  "__unparsed": {},
+                  "__schemaVersion": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "t",
+                  "__unparsed",
+                  "__schemaVersion"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "seq",
+          "sessionId",
+          "parentSeq",
+          "ts",
+          "schemaVersion",
+          "ev"
+        ]
+      }
+    },
+    "fromSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "toSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "hasOlder": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "events",
+    "fromSeq",
+    "toSeq",
+    "hasOlder"
   ]
 }
 ```
@@ -5104,6 +6786,28 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                       "t",
                       "from",
                       "to"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "permissions.mode.switch"
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "always-ask",
+                          "on-demand",
+                          "allow-all"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "mode"
                     ],
                     "additionalProperties": {}
                   },
@@ -6522,11 +8226,12 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
             "failed"
           ]
         },
-        "mode": {
+        "permissionsMode": {
           "type": "string",
           "enum": [
-            "plan",
-            "act"
+            "always-ask",
+            "on-demand",
+            "allow-all"
           ]
         },
         "turns": {

@@ -28,9 +28,12 @@ import { z } from 'zod'
  *          `permission` 新增可选的 `grant`，`permission.source` 新增取值 `session-grant`（本会话内始终允许）。
  * v11 → v12：M9——`model.switch` 新增可选的 `provider`（切到了哪一家；同名模型可能在多家，恢复会话要靠它，PRD-M9-003 AC-5/6）。
  *          没有新类型；v11 写下的 `model.switch` 没有 provider，恢复时按名字归属（SPEC-M9-003 取舍-5）。
+ * v12 → v13：M12——新增 `permissions.mode.switch`（会话确认模式：always-ask / on-demand / allow-all，PRD-M12-002）；
+ *          `mode.switch` 不再产生（M12-004 取消计划 / 执行模式），类型保留以读旧会话；
+ *          `permission.source: mode` 的含义从「计划模式拒绝的」改为「确认模式为全部放行时放行的」（PRD-M12-002 回写 2026-09-23）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 12
+export const SCHEMA_VERSION = 13
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -134,7 +137,7 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     t: z.literal('permission'),
     capabilityId: z.string(),
     decision: z.enum(['allow', 'deny', 'ask']),
-    /** mode：计划模式下只读之外的能力一律拒绝（M7-005） */
+    /** mode：v10–v12 是计划模式拒绝的（M7-005，已取消）；v13 起是确认模式「全部放行」放行的（PRD-M12-002） */
     /** session-grant：命中了本会话里之前给过的「始终允许」（M8-016） */
     source: z.enum(['default', 'config', 'user', 'mode', 'session-grant']),
     matchedRule: z.string().nullable(),
@@ -316,7 +319,11 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     message: z.string(),
     final: z.boolean().optional(),
   }),
-  /** M7-005：计划模式 / 执行模式 */
+  /**
+   * M7-005：计划模式 / 执行模式。M12-004 取消了这两个模式，新代码**不再产生**这条事件；
+   * 类型留在联合里是为了 v10–v12 写下的旧会话还能按已知事件读（INV-01：事件只增不改，删类型等于改历史）
+   */
+  z.looseObject({ t: z.literal('mode.switch'), to: z.enum(['plan', 'act']), reason: z.string().optional() }),
   z.looseObject({
     t: z.literal('plan.proposed'),
     plan: z.string(),
