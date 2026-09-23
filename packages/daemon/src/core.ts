@@ -119,7 +119,6 @@ export interface SessionHandle {
   checkReady?(): Promise<void>
   switchModel(model: string, provider?: string): Promise<{ lost: string[] }>
   /** 计划 / 执行模式（M7-005）。老宿主没有 */
-  setMode?(mode: 'plan' | 'act'): Promise<{ mode: 'plan' | 'act'; changed: boolean }>
   setPermissionsMode?(mode: 'always-ask' | 'on-demand' | 'allow-all'): Promise<{ mode: string; changed: boolean }>
   /** 用量上限（M7-009） */
   setBudget?(b: { tokens?: number; costUsd?: number; toolCalls?: number }): Promise<void>
@@ -903,15 +902,6 @@ export class Daemon {
         if (!session.setBudget) return unsupported(req.id, 'budget')
         await session.setBudget(p.budget)
         return ok(req.id, { ok: true })
-      }
-
-      case 'session.mode': {
-        const p = params as { sessionId: string; mode: 'plan' | 'act' }
-        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.switch')
-        const session = await this.session(p.sessionId)
-        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
-        if (!session.setMode) return unsupported(req.id, 'planMode')
-        return ok(req.id, await session.setMode(p.mode))
       }
 
       case 'session.permissionsMode': {

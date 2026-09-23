@@ -171,14 +171,6 @@ const fullStrategy: ContextStrategy = (events, policy) => {
         flush()
         out.push({ role: 'user', content: `[运行时提示] ${ev.message}` })
         break
-      case 'mode.switch':
-        // 模式切换（M7-005）：并进下一条用户消息的前面，不单独成一条
-        quoted.push(
-          ev.to === 'plan'
-            ? '[运行时提示] 现在是计划模式：只能读代码、不能改文件或执行命令。想清楚方案后调用 plan.submit 提交给用户审批。'
-            : '[运行时提示] 现在是执行模式：可以按批准的计划动手了。',
-        )
-        break
       default:
         // model.request / model.usage / permission / error：轨迹事件，不进上下文
         break

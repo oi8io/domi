@@ -86,7 +86,6 @@ import { BUDGET_DECISION_SCHEMA, type BudgetLimits, makeBudgetGate } from './bud
 import { memorySearchPlugin } from './builtin-plugins.ts'
 import { HookRunner } from './hooks.ts'
 import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
-import { makePlanSubmitTool } from './plan.ts'
 import {
   findRepoRoot,
   hasProjectContent,
@@ -120,9 +119,6 @@ export class RefError extends KeyedError {
   }
 }
 
-/** 新建任务时系统开计划模式用的 reason（M8-005）。审阅策略只对这种规划生效 */
-export const AUTO_PLAN_REASON = '新任务先规划'
-
 export interface PendingAsk {
   capabilityId: string
   args: unknown
@@ -145,7 +141,6 @@ export interface MetricsSnapshot {
   unpricedModels: string[]
   /** 本轮验证状态（M7-004） */
   verify: VerifyState
-  mode: 'plan' | 'act'
   turns?: number
   steps?: number
   tokPerSec?: number | null
@@ -264,14 +259,10 @@ export class DomiSession {
   private noticesDelivered = 0
   private busy = false
   /** 计划模式（M7-005）。从事件流里最后一条 mode.switch 恢复 */
-  private mode: 'plan' | 'act' = 'act'
-  private modeLoaded = false
-  /** 当前的计划模式是新建任务时系统开的（M8-005），不是用户切的 */
-  private autoPlanned = false
   /** PRD-M12-002：会话级确认模式（always-ask/on-demand/allow-all），默认 on-demand */
   private permissionsMode: ReviewMode = 'on-demand'
+  private permissionsModeLoaded = false
   private titleTried = false
-  private planTool!: ReturnType<typeof makePlanSubmitTool>
   private currentModel: string
   private currentProvider: string
 
@@ -285,7 +276,6 @@ export class DomiSession {
       {
         rules: [...(opts.extraRules ?? []), ...opts.config.permissions.rules],
         ...(opts.scope ? { scope: opts.scope } : {}),
-        mode: () => this.mode,
         ...(opts.askAlways && opts.askAlways.length > 0
           ? { askAlways: (c: string) => (opts.askAlways as readonly string[]).includes(c) }
           : {}),
@@ -349,20 +339,6 @@ export class DomiSession {
       : undefined
     if (this.skillSource) this.tools.register(makeSkillLoadTool(this.skillSource))
     if ((opts.spawnDepth ?? 0) < MAX_SPAWN_DEPTH) this.tools.register(makeSpawnTool(this))
-    // plan.submit 一直在册，但只有计划模式下能用（权限层按模式放行 / 拒绝）；执行模式下不发给模型
-    this.planTool = makePlanSubmitTool({
-      approved: () => {
-        this.mode = 'act'
-        this.tools.unregister('plan.submit')
-        return [{ t: 'mode.switch', to: 'act', reason: '计划已批准' }]
-      },
-      ...(opts.startTask
-        ? { startTask: (spec: unknown) => (opts.startTask as NonNullable<typeof opts.startTask>)(spec, opts.cwd) }
-        : {}),
-      // 项目的审阅策略只管系统替用户开的规划（新任务）；用户自己切到计划模式的，照旧每次都问
-      reviewPolicy: () => (this.autoPlanned && opts.planReview ? opts.planReview() : 'always'),
-    })
-
     // M1-001：provider 由工厂按配置建。kernel 与本文件都不知道「有哪些 provider」，
     // 那份知识只在 packages/model/src/factory.ts 里（AC-4 的 diff 为 0 靠这个成立）
     this.injectedProvider = opts.provider !== undefined
@@ -505,7 +481,6 @@ export class DomiSession {
       contextLevel: contextLevel(m.contextPercent),
       unpricedModels: m.unpricedModels,
       verify: verifyState(all, { command: this.opts.config.verify?.command }),
-      mode: this.mode,
       permissionsMode: this.permissionsMode,
       turns: m.turns,
       steps: m.steps,
@@ -791,46 +766,18 @@ export class DomiSession {
     return this.askUser(capabilityId, { message, ...detail })
   }
 
-  /** 事件流里最后一条 mode.switch 决定当前模式（重开会话后仍在计划模式） */
+  /** 事件流里最后一条 permissions.mode.switch 恢复确认模式（M12-002） */
   private async loadMode(): Promise<void> {
-    if (this.modeLoaded) return
-    this.modeLoaded = true
+    if (this.permissionsModeLoaded) return
+    this.permissionsModeLoaded = true
     const view = await this.view()
-    let foundMode = false
     for (let i = view.length - 1; i >= 0; i--) {
-      const ev = (view[i] as EventEnvelope).ev as { t: string; to?: 'plan' | 'act'; reason?: string; mode?: ReviewMode }
-      if (!foundMode && ev.t === 'mode.switch' && ev.to) {
-        this.applyMode(ev.to)
-        this.autoPlanned = ev.reason === AUTO_PLAN_REASON
-        foundMode = true
-      }
-      // PRD-M12-002：确认模式也从事件流恢复（从后往前第一条即最后一条）
+      const ev = (view[i] as EventEnvelope).ev as { t: string; mode?: ReviewMode }
       if (ev.t === 'permissions.mode.switch' && ev.mode) {
         this.permissionsMode = ev.mode
         break
       }
     }
-  }
-
-  private applyMode(to: 'plan' | 'act'): void {
-    this.mode = to
-    if (to === 'plan') this.tools.register(this.planTool)
-    else this.tools.unregister('plan.submit')
-  }
-
-  /** 切换计划 / 执行模式（PRD-M7-005）。和当前一样时什么都不写 */
-  async setMode(to: 'plan' | 'act', reason?: string): Promise<{ mode: 'plan' | 'act'; changed: boolean }> {
-    await this.loadMode()
-    if (this.mode === to) return { mode: to, changed: false }
-    this.applyMode(to)
-    this.autoPlanned = reason === AUTO_PLAN_REASON
-    await this.log.append(this.opts.sessionId, [{ t: 'mode.switch', to, ...(reason === undefined ? {} : { reason }) }])
-    await this.pump()
-    return { mode: to, changed: true }
-  }
-
-  getMode(): 'plan' | 'act' {
-    return this.mode
   }
 
   /** PRD-M12-002：切会话确认模式（写事件流，重开恢复） */
@@ -1057,7 +1004,7 @@ export class DomiSession {
    */
   private async verifyGate(events: readonly EventEnvelope[]): Promise<{ again: boolean; events: DomiEvent[] }> {
     const v = this.opts.config.verify
-    if (!v?.enabled || this.mode === 'plan') return { again: false, events: [] }
+    if (!v?.enabled) return { again: false, events: [] }
     const state = verifyState(events, { command: v.command })
     if (state === 'verified' || state === 'clean' || !changedThisTurn(events)) return { again: false, events: [] }
     const n = verifyNudges(events)

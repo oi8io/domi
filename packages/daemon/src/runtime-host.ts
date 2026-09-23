@@ -29,7 +29,6 @@ import type { PluginHost } from '@domi/plugin'
 import type { DomiEvent, EventEnvelope, Schedule } from '@domi/protocol'
 import {
   AttachmentError,
-  AUTO_PLAN_REASON,
   applyWorktree,
   assertResolved,
   collectDiff,
@@ -280,10 +279,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       await createTask(id, project.path, project.id, '', isolation)
     }
     if (p.schedule) await index.append(id, [{ t: 'schedule.fire', ...p.schedule }])
-    // 小任务不强制先规划（SPEC-M8-005）：目标很短、项目也没要求每次都审
-    const planned = !(p.goal.trim().length < 40 && project.settings.planReview !== 'always')
-    if (planned) await (await live(id)).setMode('plan', AUTO_PLAN_REASON)
-    return { sessionId: id, isolation, planned }
+    // M12-004：取消 plan/act，任务直接执行（确认点由 permissionsMode 处理）
+    return { sessionId: id, isolation }
   }
 
   const now = opts.now ?? Date.now
@@ -553,7 +550,6 @@ return {
           }
           return s.switchModel(target.name, { provider: target.provider })
         },
-        setMode: (mode) => s.setMode(mode),
         setPermissionsMode: (mode) => s.setPermissionsMode(mode as 'always-ask' | 'on-demand' | 'allow-all'),
         setBudget: (b) => s.setBudget(b),
         compactNow: (trigger) => s.compactNow(trigger),

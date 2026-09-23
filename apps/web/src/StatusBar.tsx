@@ -77,7 +77,6 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
         <span className={cn('pill', CTX_CLASS[level])} data-ctx={level}>
           ctx {m?.contextPercent ?? 0}%
         </span>
-        {m?.mode === 'plan' && <span className="pill border-info bg-info-d text-info">{tr('common.planMode')}</span>}
         {m?.verify !== undefined && m.verify !== 'clean' && (
           <span className={cn('pill', VERIFY_CLASS[m.verify])} data-verify={m.verify}>
             {VERIFY_LABEL[m.verify]}

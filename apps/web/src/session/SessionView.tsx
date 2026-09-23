@@ -16,7 +16,7 @@ import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
 import { ChangesBar } from './ChangesBar.tsx'
-import { Composer, ModelSwitch, ModeToggle, PermissionsModeSwitch, type PendingRef } from './Composer.tsx'
+import { Composer, ModelSwitch, PermissionsModeSwitch, type PendingRef } from './Composer.tsx'
 import { CredentialNotice } from './CredentialNotice.tsx'
 import { JumpBar } from './JumpBar.tsx'
 import { ReviewFindings } from './ReviewFindings.tsx'
@@ -282,13 +282,6 @@ export function SessionView({
           provider={status.provider}
           onNotice={setNotice}
         />
-        <ModeToggle
-          client={client}
-          sessionId={sessionId}
-          busy={status.busy}
-          mode={status.metrics?.mode ?? 'act'}
-          onNotice={setNotice}
-        />
         <PermissionsModeSwitch
           client={client}
           sessionId={sessionId}
@@ -451,4 +444,4 @@ export function SessionTools({
   )
 }
 
-export { Composer, ModelSwitch, ModeToggle, PermissionsModeSwitch } from './Composer.tsx'
+export { Composer, ModelSwitch, PermissionsModeSwitch } from './Composer.tsx'

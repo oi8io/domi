@@ -80,7 +80,6 @@ export function StatusBar({
         {sep}
         <Text {...t.fg(CONTEXT_TONE[level])}>{`ctx ${pct}%`}</Text>
         {sep}
-        <Text {...t.fg('info')}>{m?.mode === 'plan' ? tr('common.planMode') : tr('common.actMode')}</Text>
         {m?.verify !== undefined && m.verify !== 'clean' ? (
           <Text {...t.fg(VERIFY_TONE[m.verify])}>{` · ${VERIFY_LABEL[m.verify]}`}</Text>
         ) : (

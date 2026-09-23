@@ -537,42 +537,6 @@ export function Composer({
 }
 
 /** 计划模式开关（PRD-M7-005）：计划模式下 domi 只读代码，想好方案提交审批，批准后才动手 */
-export function ModeToggle({
-  client,
-  sessionId,
-  busy,
-  mode,
-  onNotice,
-}: {
-  client: DomiClient
-  sessionId: string
-  busy: boolean
-  mode: 'plan' | 'act'
-  onNotice: (msg: string | null) => void
-}) {
-  const toggle = (): void => {
-    client.setMode(sessionId, mode === 'plan' ? 'act' : 'plan').then(
-      () => onNotice(null),
-      (err: Error) => onNotice(err.message),
-    )
-  }
-  return (
-    <button
-      type="button"
-      className={cn(
-        'rounded-sm border px-2.5 py-1 text-xs font-medium',
-        mode === 'plan' ? 'border-info bg-info-d text-info' : 'border-border text-mut hover:text-ink2',
-      )}
-      data-mode={mode}
-      disabled={busy}
-      onClick={toggle}
-      title={tr('web.composer.planHint')}
-    >
-      {mode === 'plan' ? tr('common.planMode') : tr('common.actMode')}
-    </button>
-  )
-}
-
 /** PRD-M12-002：会话确认模式三档下拉（always-ask/on-demand/allow-all） */
 export function PermissionsModeSwitch({
   client,

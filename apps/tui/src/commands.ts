@@ -23,7 +23,6 @@ export type SlashCommand =
   | { kind: 'soul-review'; changeId: string; decision: 'accept' | 'reject' }
   | { kind: 'memory'; query: string }
   | { kind: 'extract' }
-  | { kind: 'mode'; mode: 'plan' | 'act' }
   | { kind: 'permissions-mode'; mode: 'always-ask' | 'on-demand' | 'allow-all' }
   | { kind: 'budget'; budget: { tokens?: number; costUsd?: number; toolCalls?: number } }
   | { kind: 'changes'; path?: string }
@@ -42,8 +41,6 @@ export const COMMANDS = (): ReadonlyArray<{ name: string; args?: string; desc: s
   { name: '/restore', args: tr('tui.cmd.argSession'), desc: tr('tui.cmd.restore') },
   { name: '/branch', args: '[seq]', desc: tr('tui.cmd.branch') },
   { name: '/ref', args: tr('tui.cmd.argRef'), desc: tr('tui.cmd.ref') },
-  { name: '/plan', desc: tr('tui.cmd.plan') },
-  { name: '/act', desc: tr('tui.cmd.act') },
   { name: '/model', args: tr('tui.cmd.argModel'), desc: tr('tui.cmd.model') },
   { name: '/mode', args: '[on-demand|always-ask|allow-all]', desc: tr('tui.cmd.permissionsMode') },
   { name: '/compact', desc: tr('tui.cmd.compact') },
@@ -124,10 +121,6 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       return { kind: 'extract' }
     case '/settings':
       return { kind: 'settings' } // PRD-M10-004 AC-1
-    case '/plan':
-      return { kind: 'mode', mode: 'plan' } // PRD-M7-005
-    case '/act':
-      return { kind: 'mode', mode: 'act' }
     case '/mode': // PRD-M12-002：会话确认模式三档
       if (!rest[0]) return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }
       if (rest.length > 1) return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }

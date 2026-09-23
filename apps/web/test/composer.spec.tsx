@@ -7,7 +7,7 @@
 import { describe, expect, test } from 'bun:test'
 import { DomiClient, type WireSocket } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { Composer, ModelSwitch, ModeToggle, PendingRefs, triggerAt } from '../src/session/Composer.tsx'
+import { Composer, ModelSwitch, PendingRefs, triggerAt } from '../src/session/Composer.tsx'
 
 const client = new DomiClient({
   clientName: 't',
@@ -121,16 +121,4 @@ describe('PRD-M8-010 AC-5 · 模型下拉与模式按钮', () => {
     expect(html).toContain('切换模型')
   })
 
-  test('模式按钮显示当前模式，点一下切另一边', () => {
-    const act = renderToStaticMarkup(
-      <ModeToggle client={client} sessionId="s-1" busy={false} mode="act" onNotice={() => undefined} />,
-    )
-    const plan = renderToStaticMarkup(
-      <ModeToggle client={client} sessionId="s-1" busy={false} mode="plan" onNotice={() => undefined} />,
-    )
-    expect(act).toContain('执行模式')
-    expect(act).toContain('data-mode="act"')
-    expect(plan).toContain('计划模式')
-    expect(plan).toContain('data-mode="plan"')
-  })
 })

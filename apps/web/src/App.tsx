@@ -24,7 +24,7 @@ import { SessionsView } from './views/SessionsView.tsx'
 import { SettingsView } from './views/SettingsView.tsx'
 import { TasksView } from './views/TasksView.tsx'
 
-export { ModeToggle, SessionTools, SessionView } from './session/SessionView.tsx'
+export { SessionTools, SessionView } from './session/SessionView.tsx'
 
 export function App({
   client,

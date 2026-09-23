@@ -112,15 +112,7 @@ describe('PRD-M8-008 AC-2 · 状态栏 pill：连接、turns / steps / tok/s、t
     expect(html).toContain('$0.21')
     expect(html).toContain('72%')
     expect(html).toContain('已改未验')
-    // 执行模式是默认态，不占一个 pill；计划模式才亮出来
-    expect(html).not.toContain('计划模式')
-    const plan = renderToStaticMarkup(
-      <StatusBar
-        status={{ ...status, metrics: { ...(status.metrics as NonNullable<StatusSnapshot['metrics']>), mode: 'plan' } }}
-        connection="open"
-      />,
-    )
-    expect(plan).toContain('计划模式')
+    // M12-004：plan/act 已取消，不再有模式 pill
   })
 
   test('上下文到 70% 以上是警告色', () => {

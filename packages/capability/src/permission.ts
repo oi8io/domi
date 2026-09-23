@@ -27,7 +27,6 @@ export interface PermissionConfig {
    * 计划模式（PRD-M7-005）：plan 时只有只读能力还按规则走，其余一律拒绝（source: mode）。
    * 每次检查现取——模式在会话中途会变
    */
-  mode?: () => 'plan' | 'act'
   /**
    * 收紧（PRD-M8-004）：这些能力即使规则说 allow 也要问人；规则说 deny 的照样拒。只会更严，不会更松。
    * 自由会话用它让 shell.exec 每次都问——命令能碰到哪些路径没法静态判断
@@ -82,27 +81,6 @@ function covers(g: SessionGrant, want: SessionGrant): boolean {
   return rel === '' || !(rel.startsWith('..') || isAbsolute(rel))
 }
 
-/** 计划模式下拒绝时 matchedRule 的值 */
-export const PLAN_MODE_RULE = 'plan-mode'
-
-/** 计划模式下仍可使用的能力（其余一律拒绝）。code.* 是 M7-007 的只读代码理解 */
-export const PLAN_MODE_READONLY: readonly string[] = [
-  'fs.read',
-  'memory.search',
-  'memory.recall',
-  'skill.load',
-  'code.*',
-]
-
-/** 提交计划的能力：只在计划模式下存在，由模式放行，不需要规则 */
-export const PLAN_SUBMIT_CAPABILITY = 'plan.submit'
-
-function readonlyInPlan(capabilityId: string): boolean {
-  return PLAN_MODE_READONLY.some(
-    (c) => c === capabilityId || (c.endsWith('.*') && capabilityId.startsWith(c.slice(0, -1))),
-  )
-}
-
 /**
  * 交互式回答的来源；TUI 的确认框实现它。channel 是用户在哪个端上回答的。
  * grantable = 这次可以答「本会话始终允许」；答了就在返回里带 grant: true
@@ -142,14 +120,6 @@ export class PermissionEngine {
   async check(capabilityId: CapabilityId, args: unknown): Promise<Decision> {
     if (this.config.scope && !this.config.scope(capabilityId)) {
       return { decision: 'deny', source: 'default', matchedRule: PARENT_SCOPE_RULE }
-    }
-    if (this.config.mode?.() === 'plan') {
-      if (capabilityId === PLAN_SUBMIT_CAPABILITY) {
-        return { decision: 'allow', source: 'mode', matchedRule: PLAN_MODE_RULE }
-      }
-      if (!readonlyInPlan(capabilityId)) return { decision: 'deny', source: 'mode', matchedRule: PLAN_MODE_RULE }
-    } else if (capabilityId === PLAN_SUBMIT_CAPABILITY) {
-      return { decision: 'deny', source: 'mode', matchedRule: PLAN_MODE_RULE }
     }
     const rule = findRule(this.config.rules ?? [], capabilityId)
     const mode = this.config.reviewMode?.() ?? 'on-demand'

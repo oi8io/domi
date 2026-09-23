@@ -201,8 +201,6 @@ const MetricsSchema = z.object({
   turnMs: z.number().int().nonnegative().optional(),
   /** 本轮的验证状态（PRD-M7-004 AC-3）：clean 没改文件 / unverified 改了没验 / verified / failed */
   verify: z.enum(['clean', 'unverified', 'verified', 'failed']).optional(),
-  /** 计划模式 / 执行模式（PRD-M7-005） */
-  mode: z.enum(['plan', 'act']).optional(),
   /** PRD-M12-002：会话确认模式（always-ask/on-demand/allow-all） */
   permissionsMode: z.enum(['always-ask', 'on-demand', 'allow-all']).optional(),
   /** PRD-M8-008 AC-2：轮数、模型请求次数、最近一轮输出速度、缓存命中率（老 daemon 不推） */
@@ -691,11 +689,6 @@ export const METHODS = {
         .strict(),
     }),
     result: z.object({ ok: z.literal(true) }),
-  },
-  'session.mode': {
-    summary: '切换计划模式 / 执行模式（PRD-M7-005）。只追加一条 mode.switch；和当前一样时什么都不写',
-    params: z.object({ sessionId: z.string(), mode: z.enum(['plan', 'act']) }),
-    result: z.object({ mode: z.enum(['plan', 'act']), changed: z.boolean() }),
   },
   'session.permissionsMode': {
     summary: '切换会话确认模式（PRD-M12-002）：always-ask / on-demand（默认）/ allow-all。写 permissions.mode.switch 事件，重开恢复',

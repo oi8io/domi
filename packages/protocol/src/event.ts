@@ -312,7 +312,6 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     final: z.boolean().optional(),
   }),
   /** M7-005：计划模式 / 执行模式 */
-  z.looseObject({ t: z.literal('mode.switch'), to: z.enum(['plan', 'act']), reason: z.string().optional() }),
   z.looseObject({
     t: z.literal('plan.proposed'),
     plan: z.string(),
