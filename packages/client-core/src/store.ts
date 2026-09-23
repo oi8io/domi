@@ -42,7 +42,8 @@ export interface MetricsSnapshot {
   turnMs?: number | undefined
   /** 本轮验证状态（M7-004）。老 daemon 不推 */
   verify?: 'clean' | 'unverified' | 'verified' | 'failed' | undefined
-  /** 计划模式（M7-005） */
+  /** PRD-M12-002：会话确认模式（always-ask/on-demand/allow-all） */
+  permissionsMode?: 'always-ask' | 'on-demand' | 'allow-all' | undefined
   /** M8-008：轮数、模型请求次数、最近一轮输出速度、缓存命中率。老 daemon 不推 */
   turns?: number | undefined
   steps?: number | undefined
@@ -334,8 +335,6 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
           text: ev.final ? tr('core.ev.unverifiedEnd') : tr('core.ev.verifyNudge'),
           summary: ev.message,
         })
-        break
-      case 'mode.switch':
         break
       case 'plan.proposed':
         push({ seq: env.seq, kind: 'task', text: tr('core.ev.planProposed'), summary: ev.plan.slice(0, 400) })

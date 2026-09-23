@@ -141,6 +141,8 @@ export interface MetricsSnapshot {
   unpricedModels: string[]
   /** 本轮验证状态（M7-004） */
   verify: VerifyState
+  /** PRD-M12-002：会话确认模式 */
+  permissionsMode?: 'always-ask' | 'on-demand' | 'allow-all'
   turns?: number
   steps?: number
   tokPerSec?: number | null

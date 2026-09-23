@@ -153,6 +153,11 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     reason: z.string().optional(),
     lostCapabilities: z.array(z.string()).optional(),
   }),
+  /** PRD-M12-002：会话确认模式切换（always-ask/on-demand/allow-all） */
+  z.looseObject({
+    t: z.literal('permissions.mode.switch'),
+    mode: z.enum(['always-ask', 'on-demand', 'allow-all']),
+  }),
   /** M1-011：一次影子仓库快照 */
   z.looseObject({
     t: z.literal('snapshot'),

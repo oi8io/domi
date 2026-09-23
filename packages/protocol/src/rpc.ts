@@ -453,7 +453,6 @@ export const METHODS = {
     result: z.object({
       sessionId: z.string(),
       isolation: z.object({ isolate: z.boolean(), reason: z.string() }),
-      planned: z.boolean(),
     }),
   },
   'usage.summary': {

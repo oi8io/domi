@@ -4,7 +4,7 @@
  * 计划模式是权限的一种范围（SPEC 取舍-7）：只读之外一律拒绝。模型想清楚之后调 plan.submit，
  * 用户在确认框里批准 / 驳回（可附意见、可选转成长任务）。批准 → 切回执行模式。
  */
-import { PLAN_SUBMIT_CAPABILITY, type Tool } from '@domi/capability'
+import { type Tool } from '@domi/capability'
 import type { DomiEvent } from '@domi/protocol'
 import { z } from 'zod'
 
@@ -87,7 +87,7 @@ export function stepsToDag(plan: string, steps: z.infer<typeof PlanStep>[]): unk
 export function makePlanSubmitTool(host: PlanHost): Tool<PlanSubmitArgs, Record<string, unknown>> {
   return {
     name: 'plan.submit',
-    capability: PLAN_SUBMIT_CAPABILITY,
+    capability: 'plan.submit',
     description: '计划模式下，把想好的方案提交给用户审批。批准后才能动手改；驳回时会带上用户的意见。',
     schema: PlanSubmitArgs,
     async execute(args, ctx) {

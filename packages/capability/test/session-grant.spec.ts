@@ -60,15 +60,6 @@ describe('PRD-M8-016 AC-2 · 越不过 deny，也不改变别的层', () => {
     expect(asked).toHaveLength(0)
   })
 
-  test('计划模式里写操作照旧被拒（授权不越过模式范围）', async () => {
-    const asked: string[] = []
-    const e = new PermissionEngine({ rules, cwd, mode: () => 'plan' }, async (c) => {
-      asked.push(c)
-      return { allowed: true, grant: true }
-    })
-    expect(await e.check('fs.write', { path: '/repo/a.ts' })).toMatchObject({ decision: 'deny', source: 'mode' })
-    expect(asked).toEqual([])
-  })
 
   test('父范围之外的能力也一样（子 agent）', async () => {
     const e = new PermissionEngine({ rules, cwd, scope: scopeOf(['fs.read']) }, async () => ({

@@ -367,11 +367,6 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
           ),
         )
         break
-      case 'mode.switch':
-        nodes.push(
-
-        )
-        break
       case 'plan.proposed':
         nodes.push(node(env.seq, 'task', tr('trace.planProposed'), ev.plan))
         break
