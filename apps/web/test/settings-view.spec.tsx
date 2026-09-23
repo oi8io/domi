@@ -274,11 +274,3 @@ describe('PRD-M8-013 AC-2 · 用量：6 张数字卡 + 按模型柱状图', () =
   })
 })
 
-describe('PRD-M11-005 AC-1 · 审核档位', () => {
-  test('RuntimeTab 渲染三档下拉（on-demand/always-ask/allow-all），当前值选中', () => {
-    const html = renderToStaticMarkup(<RuntimeTab s={s} />)
-    expect(html).toContain('on-demand')
-    expect(html).toContain('always-ask')
-    expect(html).toContain('allow-all')
-  })
-})

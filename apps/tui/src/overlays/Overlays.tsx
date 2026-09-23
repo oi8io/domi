@@ -150,38 +150,13 @@ export function languageItems(current: string): OverlayItem[] {
   }))
 }
 
-// PRD-M11-005：审核三档（key 前缀 r: 与语言分流）
-function reviewItems(current: string): OverlayItem[] {
-  return (
-    [
-      ['on-demand', tr('web.settings.reviewOnDemand')],
-      ['always-ask', tr('web.settings.reviewAlways')],
-      ['allow-all', tr('web.settings.reviewAllowAll')],
-    ] as const
-  ).map(([value, label]) => ({
-    key: `r:${value}`,
-    label,
-    dot: current === value ? 'accent' : 'off',
-  }))
-}
-
 function SettingsOverlay({ client, current, onClose }: { client: DomiClient; current: string; onClose(): void }) {
   const [notice, setNotice] = useState<string | null>(null)
-  const [review, setReview] = useState<string>('on-demand')
-  useEffect(() => {
-    client.getSettings().then(
-      (v) => {
-        const r = (v.values as Record<string, unknown>)['permissions.review']
-        if (typeof r === 'string') setReview(r)
-      },
-      () => undefined,
-    )
-  }, [client])
   return (
     <Overlay
       title={tr('tui.settings.title')}
       searchable={false}
-      items={[...languageItems(current), ...reviewItems(review)]}
+      items={languageItems(current)}
       empty={tr('common.none')}
       hints={[
         ['enter', tr('tui.key.select')],
@@ -189,7 +164,7 @@ function SettingsOverlay({ client, current, onClose }: { client: DomiClient; cur
       ]}
       notice={notice}
       onSelect={(it) => {
-        const patch = it.key.startsWith('r:') ? { 'permissions.review': it.key.slice(2) } : { 'ui.locale': it.key }
+        const patch = { 'ui.locale': it.key }
         client.setSettings(patch).then(
           () => setNotice(tr('tui.settings.appliesOnRestart')),
           (e: unknown) => setNotice(e instanceof Error ? e.message : String(e)),

@@ -388,6 +388,12 @@ export function Root({
             if (!changed) setNotice(cmd.mode === 'plan' ? tr('tui.mode.alreadyPlan') : tr('tui.mode.alreadyAct'))
             return
           }
+          case 'permissions-mode': {
+            const changed = await client.setPermissionsMode(sessionId, cmd.mode)
+            if (!changed) setNotice(tr('tui.mode.alreadyPermissionsMode'))
+            else setNotice(tr('tui.mode.permissionsModeSet', { mode: cmd.mode }))
+            return
+          }
           case 'branch': {
             const id = await client.branchSession(sessionId, cmd.atSeq)
             const { model, provider } = store.$status.get()

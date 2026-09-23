@@ -24,6 +24,7 @@ export type SlashCommand =
   | { kind: 'memory'; query: string }
   | { kind: 'extract' }
   | { kind: 'mode'; mode: 'plan' | 'act' }
+  | { kind: 'permissions-mode'; mode: 'always-ask' | 'on-demand' | 'allow-all' }
   | { kind: 'budget'; budget: { tokens?: number; costUsd?: number; toolCalls?: number } }
   | { kind: 'changes'; path?: string }
   | { kind: 'discard'; path: string }
@@ -44,6 +45,7 @@ export const COMMANDS = (): ReadonlyArray<{ name: string; args?: string; desc: s
   { name: '/plan', desc: tr('tui.cmd.plan') },
   { name: '/act', desc: tr('tui.cmd.act') },
   { name: '/model', args: tr('tui.cmd.argModel'), desc: tr('tui.cmd.model') },
+  { name: '/mode', args: '[on-demand|always-ask|allow-all]', desc: tr('tui.cmd.permissionsMode') },
   { name: '/compact', desc: tr('tui.cmd.compact') },
   { name: '/budget', args: tr('tui.cmd.argBudget'), desc: tr('tui.cmd.budget') },
   { name: '/changes', args: tr('tui.cmd.argFileOpt'), desc: tr('tui.cmd.changes') },
@@ -126,6 +128,14 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       return { kind: 'mode', mode: 'plan' } // PRD-M7-005
     case '/act':
       return { kind: 'mode', mode: 'act' }
+    case '/mode': // PRD-M12-002：会话确认模式三档
+      if (!rest[0]) return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }
+      if (rest.length > 1) return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }
+      const m = rest[0]
+      if (m !== 'on-demand' && m !== 'always-ask' && m !== 'allow-all') {
+        return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }
+      }
+      return { kind: 'permissions-mode', mode: m }
     // 用量上限（PRD-M7-009）：/budget tokens 200000 · /budget cost 2 · /budget calls 100
     case '/budget': {
       const key = { tokens: 'tokens', cost: 'costUsd', calls: 'toolCalls' }[rest[0] ?? ''] as

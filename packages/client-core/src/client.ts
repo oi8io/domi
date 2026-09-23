@@ -219,6 +219,12 @@ export class DomiClient {
     return r.changed
   }
 
+  /** PRD-M12-002：切会话确认模式（always-ask/on-demand/allow-all） */
+  async setPermissionsMode(sessionId: string, mode: 'always-ask' | 'on-demand' | 'allow-all'): Promise<boolean> {
+    const r = await this.request('session.permissionsMode', { sessionId, mode })
+    return r.changed
+  }
+
   /** 隔离会话（M7-006）：在 cwd 所在仓库建 git worktree，会话在里面干活 */
   async createIsolatedSession(
     cwd?: string,

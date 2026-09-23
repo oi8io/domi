@@ -83,10 +83,9 @@ export const ConfigSchema = z.object({
   permissions: z
     .object({
       rules: z.array(PermissionRuleSchema).default([]),
-      // PRD-M11-005 SPEC-M11-004：默认 on-demand = 现状 fail-closed 行为
-      review: z.enum(['always-ask', 'on-demand', 'allow-all']).default('on-demand'),
+      // PRD-M12-002：确认模式改为会话级（permissions.mode.switch 事件），不再有全局 review
     })
-    .default({ rules: [], review: 'on-demand' }),
+    .default({ rules: [] }),
   mcp: McpConfigSchema,
   /**
    * 记忆与 Soul（PRD-M4-001/002 · docs/adr/018/019）。

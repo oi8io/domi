@@ -554,6 +554,7 @@ return {
           return s.switchModel(target.name, { provider: target.provider })
         },
         setMode: (mode) => s.setMode(mode),
+        setPermissionsMode: (mode) => s.setPermissionsMode(mode as 'always-ask' | 'on-demand' | 'allow-all'),
         setBudget: (b) => s.setBudget(b),
         compactNow: (trigger) => s.compactNow(trigger),
         async readEvents(fromSeq, opts?: { maxLines?: number | undefined }) {

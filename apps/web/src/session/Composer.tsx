@@ -573,6 +573,51 @@ export function ModeToggle({
   )
 }
 
+/** PRD-M12-002：会话确认模式三档下拉（always-ask/on-demand/allow-all） */
+export function PermissionsModeSwitch({
+  client,
+  sessionId,
+  busy,
+  mode,
+  onNotice,
+}: {
+  client: DomiClient
+  sessionId: string
+  busy: boolean
+  mode: 'always-ask' | 'on-demand' | 'allow-all'
+  onNotice: (msg: string | null) => void
+}) {
+  const OPTIONS: Array<{ value: typeof mode; label: string; title: string }> = [
+    { value: 'on-demand', label: tr('web.composer.modeOnDemand'), title: tr('web.composer.modeOnDemandHint') },
+    { value: 'always-ask', label: tr('web.composer.modeAlwaysAsk'), title: tr('web.composer.modeAlwaysAskHint') },
+    { value: 'allow-all', label: tr('web.composer.modeAllowAll'), title: tr('web.composer.modeAllowAllHint') },
+  ]
+  const current = OPTIONS.find((o) => o.value === mode) ?? OPTIONS[0]
+  return (
+    <select
+      className="rounded-sm border border-border bg-panel px-1.5 py-1 text-xs text-mut hover:text-ink2 disabled:opacity-50"
+      aria-label={tr('web.composer.mode')}
+      data-permissions-mode={mode}
+      disabled={busy}
+      value={mode}
+      title={current?.title}
+      onChange={(e) => {
+        const v = e.target.value as typeof mode
+        client.setPermissionsMode(sessionId, v).then(
+          () => onNotice(null),
+          (err: Error) => onNotice(err.message),
+        )
+      }}
+    >
+      {OPTIONS.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 type ModelList = Awaited<ReturnType<DomiClient['listModels']>>
 type ModelItem = ModelList['models'][number]
 

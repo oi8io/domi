@@ -39,6 +39,7 @@ import {
   MissingCredentialError,
   providerConnection,
 } from '@domi/config'
+import { type ReviewMode } from '@domi/capability'
 import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import {
   aggregate,
@@ -267,6 +268,8 @@ export class DomiSession {
   private modeLoaded = false
   /** 当前的计划模式是新建任务时系统开的（M8-005），不是用户切的 */
   private autoPlanned = false
+  /** PRD-M12-002：会话级确认模式（always-ask/on-demand/allow-all），默认 on-demand */
+  private permissionsMode: ReviewMode = 'on-demand'
   private titleTried = false
   private planTool!: ReturnType<typeof makePlanSubmitTool>
   private currentModel: string
@@ -287,7 +290,7 @@ export class DomiSession {
           ? { askAlways: (c: string) => (opts.askAlways as readonly string[]).includes(c) }
           : {}),
         cwd: opts.cwd,
-        reviewMode: () => opts.config.permissions.review,
+        reviewMode: () => this.permissionsMode,
       },
       (capabilityId, args, o) => this.askUser(capabilityId, args, o?.grantable === true),
     )
@@ -503,6 +506,7 @@ export class DomiSession {
       unpricedModels: m.unpricedModels,
       verify: verifyState(all, { command: this.opts.config.verify?.command }),
       mode: this.mode,
+      permissionsMode: this.permissionsMode,
       turns: m.turns,
       steps: m.steps,
       tokPerSec: m.tokPerSec,
@@ -792,11 +796,17 @@ export class DomiSession {
     if (this.modeLoaded) return
     this.modeLoaded = true
     const view = await this.view()
+    let foundMode = false
     for (let i = view.length - 1; i >= 0; i--) {
-      const ev = (view[i] as EventEnvelope).ev as { t: string; to?: 'plan' | 'act'; reason?: string }
-      if (ev.t === 'mode.switch' && ev.to) {
+      const ev = (view[i] as EventEnvelope).ev as { t: string; to?: 'plan' | 'act'; reason?: string; mode?: ReviewMode }
+      if (!foundMode && ev.t === 'mode.switch' && ev.to) {
         this.applyMode(ev.to)
         this.autoPlanned = ev.reason === AUTO_PLAN_REASON
+        foundMode = true
+      }
+      // PRD-M12-002：确认模式也从事件流恢复（从后往前第一条即最后一条）
+      if (ev.t === 'permissions.mode.switch' && ev.mode) {
+        this.permissionsMode = ev.mode
         break
       }
     }
@@ -821,6 +831,20 @@ export class DomiSession {
 
   getMode(): 'plan' | 'act' {
     return this.mode
+  }
+
+  /** PRD-M12-002：切会话确认模式（写事件流，重开恢复） */
+  async setPermissionsMode(mode: ReviewMode): Promise<{ mode: ReviewMode; changed: boolean }> {
+    await this.loadMode()
+    if (this.permissionsMode === mode) return { mode, changed: false }
+    this.permissionsMode = mode
+    await this.log.append(this.opts.sessionId, [{ t: 'permissions.mode.switch', mode }])
+    await this.pump()
+    return { mode, changed: true }
+  }
+
+  getPermissionsMode(): ReviewMode {
+    return this.permissionsMode
   }
 
   /**

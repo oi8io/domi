@@ -54,7 +54,6 @@ export const WRITABLE_KEYS: readonly string[] = [
   'loop.maxToolCalls',
   'loop.maxArgParseRetries',
   'loop.maxWallClockMs',
-  'permissions.review',
 ]
 
 /** 每个 provider 能改的字段（PRD-M9-002 AC-8）。能力覆盖是模型特性，不是权限，放开 */
@@ -281,7 +280,6 @@ export function readSettings(opts: LoadOptions = {}): SettingsView {
     'loop.maxToolCalls': cfg.loop.maxToolCalls,
     'loop.maxArgParseRetries': cfg.loop.maxArgParseRetries,
     'loop.maxWallClockMs': cfg.loop.maxWallClockMs,
-    'permissions.review': cfg.permissions.review,
   }
   const ctx = { env, file, secrets, defaultProvider: cfg.model.provider }
   const secretView: SettingsView['secrets'] = {}
