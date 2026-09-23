@@ -7,9 +7,10 @@
 
 ## 1. 一句话现状
 
-M0–M11 的功能全部落地；M12（体验修订）四条里 001 / 003 已完成，002 剩命名残留，**004 只做了一半**（删了计划 / 执行模式，替代它的「出计划 → 多 tab 确认 → 执行」流程没做）。
-`pnpm check`（typecheck + lint + 22 道守卫 + 144 个文件 1358 条测试 + L1 评估）当前全绿——2026-09-23 体检前它已经红了 3 天（M11 起），见 `docs/tasks/M12.md` 的 TASK-M12-005。
-剩下的是 **M12-004 新流程**、**验证补齐**（M4 / M5 / M6 / M11）与**用户侧走查**（各里程碑 DoD）。
+M0–M12 的功能全部落地（M11 的 desktop 自启与 TUI 中断仍在等拍板）。M12 第二轮（2026-09-23）加了问题框 `ask.user`、
+「计划必须」（`plan.update` + 闸门 + 审批跟确认模式走）与中断续跑，见 `docs/spec/M12.md` 的 SPEC-M12-004 第二轮。
+`pnpm check`（typecheck + lint + 22 道守卫 + 150 个文件 1419 条测试 + L1 评估）当前全绿——2026-09-23 体检前它已经红了 3 天（M11 起），见 `docs/tasks/M12.md` 的 TASK-M12-005。
+剩下的是**验证补齐**（M4 / M5 / M6 / M10 / M11）与**用户侧走查**（各里程碑 DoD）。
 
 远端：`origin = git@github.com:oi8io/domi.git`（2026-09-23 起）。`.github/workflows/ci.yml` 就是 `pnpm check`，**以 CI 绿为准**，不要只跑某一个包的测试就说「全绿」。
 
@@ -64,7 +65,7 @@ pnpm check            # = typecheck + guard + test + eval(L1)；必须全绿才�
 | M9 模型配置与体验 | done | done | TASK-M9-012 已补齐（修了 BUG-M9-003）；TUI 双渲染器要真终端手测（见 §7） |
 | M10 会话体验与运行控制 | done | 部分 | TASK-M10-007（验证补齐）todo；AC 覆盖已强制 |
 | M11 会话体验深化 | done（desktop 自启 blocked，TUI 中断等终止方案） | todo | TASK-M11-007 收口 todo；BUG-M11-001（shell 指纹绕过）、BUG-M11-002 已修 |
-| M12 体验修订 | 001 / 003 done，002 review，**004 doing** | todo | 「全部放行」= 跳过所有确认（用户 2026-09-23 拍板） |
+| M12 体验修订 | done（000–009） | 部分 | 「全部放行」= 跳过所有确认；任务里动手前必须有计划（用户 2026-09-23 拍板） |
 
 `check-ac-coverage` 目前对 **M0 / M1 / M7 / M8 / M9** 强制（224 条 AC 全部有测试点名）。
 中间几个里程碑的 AC 有测试但没在测试里写编号——**补完哪个里程碑的验证，就把它加进 `scripts/check-ac-coverage.ts` 的 `ACTIVE` 正则**，这是唯一防回退的机制。
@@ -97,7 +98,7 @@ Web 首页与 Composer 引导去「设置 › 模型供应商」。细节在 `do
 1. **commit message 里不要出现任何 AI 作者 / 协作信息**（不要 `Co-Authored-By:`、session 链接之类的行）。
 2. **凭据不进仓库**。`guard:secrets` 扫 `fixtures` 与 `docs`；`demos/m0-loop.md` 历史上出现过真 key，
    改它之前先 `git diff` 看一眼再决定提不提交（当前工作区里有一处无害的本机模型名改动，没提交）。
-3. **事件只增不改**（INV-01）。新事件类型或事件加字段要升 `SCHEMA_VERSION`（现在 13），**删类型也不行**——不再产生的类型留在联合里读旧会话，旧事件流 fixture 放 `fixtures/events/legacy-v*.jsonl`，迁移只能加列 / 加表 / 加索引，
+3. **事件只增不改**（INV-01）。新事件类型或事件加字段要升 `SCHEMA_VERSION`（现在 14），**删类型也不行**——不再产生的类型留在联合里读旧会话，旧事件流 fixture 放 `fixtures/events/legacy-v*.jsonl`，迁移只能加列 / 加表 / 加索引，
    `guard:migrations` 会查（现有 14 条迁移）。
 4. **端上没有业务逻辑**（INV-02）。`apps/*` 只经 `client-core` + Domi Protocol 跟 daemon 说话；
    投影逻辑放 `packages/client-core`，不要放在组件里。

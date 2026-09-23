@@ -1,18 +1,17 @@
-在做: 2026-09-23 体检止血完成（TASK-M12-005）：
-      - `pnpm check` 全绿（1358 pass / 0 fail，lint + 22 道守卫、typecheck、L1 评估）；M11 起它红了 3 天
-      - 修 BUG-M11-001（shell「始终允许」指纹可被 && / ; / sh -c 等绕过，安全）、BUG-M11-002（按需档 allow 规则不算数，M7 写代码每写一个文件都问）
-      - 用户拍板：「全部放行」= 跳过所有确认（同 Claude skip all approvals，只剩显式 deny 与父范围）；「按需」下用户写的 allow 规则算数
-      - 协议：SCHEMA_VERSION 13，mode.switch 类型恢复（读旧会话），协议文档与 API 快照重新生成
-      - 总 PRD v1.14：补记 M11、追加 M12、划掉 M7-005 / M8-005 AC-2·3 / M8-010 AC-5 / M9-003 AC-3·4
-      - origin 已配置并推送（git@github.com:oi8io/domi.git）
+在做: 2026-09-23 M12 第二轮完成（TASK-M12-006…009），`pnpm check` 全绿（1419 pass / 0 fail）：
+      - 问题框 ask.user：多 tab、a–d + 其他、核对后提交（参考 Claude Code 的 AskUserQuestion）；Web / TUI 同一个状态机
+      - 计划必须：任务里动手前先 plan.update，没计划被拦（这一轮不结束）；计划常驻上下文、重开还在
+      - 审批跟确认模式走：每次都问要批准；按需只在「先别动 / 先给方案」时要；全部放行不审批；可转长任务
+      - 续跑：「计划还剩 N 步 · 继续」（Web 按钮 / TUI /continue），被打断时突出
+      - 状态栏常驻显示确认模式；ReviewMode 改名收尾；项目页删了「计划审阅策略」
+      - 协议：SCHEMA_VERSION 14（plan.update），MetricsSchema 加可选 plan
 
-下一步: 1. TASK-M12-004 新流程：出计划 → 多 tab 确认（abcd + 自定义）→ 执行；阻止提示判定；转长任务。现在长目标任务直接开干
-        2. TASK-M12-002 收尾：capability 的 reviewMode / ReviewMode 改名；计划模式的死 i18n key 清掉
-        3. 状态栏显示当前确认模式（「全部放行」时要看得见）
-        4. TASK-M11-007 收口（总 PRD 的 M11 条目补逐条 AC 后进覆盖强制）、M10-007 / M4–M6 验证补齐
-        5. 用户侧：M8–M12 的 DoD 手测
+下一步: 1. 用户手测 M12 DoD（重点：TUI 问题框的按键手感、任务先写计划、每次都问档的审批、关掉再开的续跑）
+        2. M12 进 AC 覆盖强制范围（总 PRD 的 M11 条目先补逐条 AC）；TASK-M11-007 收口
+        3. 历史欠账：M10-007 / M4–M6 验证补齐、各里程碑 DoD
+        4. 等拍板：TUI 中断（终止方案 S1–S4）、desktop 自启（ADR-021 冲突 + 需要 Rust）
 
 规矩: 做完 = `pnpm check` 全绿（CI 为准）；改协议必须升 SCHEMA_VERSION + legacy fixture + 重新生成文档；
       改已交付功能走回写门，在总 PRD 顶部记一条；任务状态以 docs/tasks 为准，提交里引用的 TASK 编号必须在任务文件里存在。
 
-卡在: 无。daemon 需要重启才能跑新的 runtime 代码。
+卡在: 无。daemon 需要重启才能跑新代码；老会话里如果是任务，下一次动手前会被要求先写计划（预期行为）。
