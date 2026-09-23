@@ -360,7 +360,7 @@ function SessionTitle({
             setEditing(true)
           }}
         >
-          {title === '' ? tr('common.untitled') : title}
+          {title ?? ''}
         </button>
       )}
     </span>
