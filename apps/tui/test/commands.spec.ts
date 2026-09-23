@@ -8,12 +8,20 @@ describe('斜杠命令', () => {
     expect(parseSlash('/compact', 3)).toEqual({ kind: 'compact' })
   })
 
-  test('PRD-M9-003 AC-4 · /model 只接受模型名；不带参数打开模型列表；provider 参数没有了', () => {
-    expect(parseSlash('/model glm-4.6', 3)).toEqual({ kind: 'model', model: 'glm-4.6' })
+  test('PRD-M9-003 AC-8 / PRD-M12-001 AC-6 · /model 只开模型列表，不再接受手填模型名', () => {
     expect(parseSlash('/model', 3)).toEqual({ kind: 'model-picker' })
-    const old = parseSlash('/model glm-4.6 anthropic', 3)
-    expect(old.kind).toBe('invalid')
-    expect((old as { message: string }).message).toContain('只填模型名')
+    for (const typed of ['/model glm-4.6', '/model glm-4.6 anthropic']) {
+      expect(parseSlash(typed, 3).kind).toBe('invalid')
+    }
+  })
+
+  test('PRD-M12-002 AC-2 · /mode 切会话确认模式：三档之一，别的都是用法错误', () => {
+    for (const mode of ['on-demand', 'always-ask', 'allow-all'] as const) {
+      expect(parseSlash(`/mode ${mode}`, 3)).toEqual({ kind: 'permissions-mode', mode })
+    }
+    for (const bad of ['/mode', '/mode review', '/mode allow-all now', '/mode plan']) {
+      expect(parseSlash(bad, 3).kind).toBe('invalid')
+    }
   })
 
   test('/ref 会话 [起-止]：记下一个引用，下一句话带上（PRD-M3-005）', () => {

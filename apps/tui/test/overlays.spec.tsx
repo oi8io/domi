@@ -245,7 +245,7 @@ describe('PRD-M8-015 AC-2 / AC-3 / AC-4 · 三个弹层的内容', () => {
     h.unmount()
   })
 
-  test('PRD-M11-005：设置层含审核三档，选档位写 permissions.review', async () => {
+  test('PRD-M12-002 AC-1：设置层不再有确认模式三档（挪到对话里的 /mode），语言切换仍在', async () => {
     const calls: unknown[][] = []
     const h = renderAt(
       80,
@@ -257,9 +257,8 @@ describe('PRD-M8-015 AC-2 / AC-3 / AC-4 · 三个弹层的内容', () => {
         onOpenSession={() => undefined}
       />,
     )
-    await h.waitFor((f) => f.includes('每次都问'), 2000)
-    expect(h.lastFrame()).toContain('按需')
-    expect(h.lastFrame()).toContain('全部放行')
+    await h.waitFor((f) => f.includes('简体中文'), 2000)
+    for (const tier of ['每次都问', '全部放行']) expect(h.lastFrame()).not.toContain(tier)
     h.unmount()
   })
 

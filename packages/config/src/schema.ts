@@ -253,7 +253,7 @@ export const ConfigSchema = z.object({
       /** 额外允许的浏览器 Origin（本地开发域名，如 https://domi.z.io）；缺省只认回环 */
       allowedOrigins: z.array(z.string()).default([]),
     })
-    .default({ host: '127.0.0.1', port: 7437 }),
+    .default({ host: '127.0.0.1', port: 7437, allowedOrigins: [] }),
   context: z
     .object({
       maxTokens: z.number().int().positive().default(150_000),

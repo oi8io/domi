@@ -24,6 +24,7 @@ import {
   makeShellOutputTool,
   makeSkillLoadTool,
   PermissionEngine,
+  type ReviewMode,
   SkillOverlay,
   type SkillRegistry,
   scopeOf,
@@ -39,15 +40,14 @@ import {
   MissingCredentialError,
   providerConnection,
 } from '@domi/config'
-import { type ReviewMode } from '@domi/capability'
 import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import {
   aggregate,
   type ContextPolicy,
   contextLevel,
   formatCost,
-  paginateByTurns,
   type PricingTable,
+  paginateByTurns,
   recoveryEvents,
   runTurn,
   type TurnResult,

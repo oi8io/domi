@@ -125,7 +125,10 @@ export interface SessionHandle {
   compactNow(trigger: 'manual' | 'threshold'): Promise<{ ok: boolean; detail: string }>
   readEvents(fromSeq: number, opts?: { maxLines?: number }): Promise<EventEnvelope[]>
   /** PRD-M11-009：向上翻页。beforeSeq 只取 view seq < beforeSeq 的事件。 */
-  history?(beforeSeq: number, maxLines?: number): Promise<{
+  history?(
+    beforeSeq: number,
+    maxLines?: number,
+  ): Promise<{
     events: EventEnvelope[]
     fromSeq: number
     toSeq: number
@@ -176,7 +179,6 @@ export interface HostComposer {
   attach(sessionId: string, file: { name: string; mime: string; data: Uint8Array }): Promise<ResultOf<'attachment.put'>>
   skills(sessionId: string | undefined): Promise<ResultOf<'skill.list'>['skills']>
   models(refresh?: boolean): Promise<ResultOf<'model.list'>>
-  /** 手填模型名归属到哪一家（PRD-M9-003 AC-3）。归属不了抛 InvalidInputError（MODEL_UNRESOLVED / AMBIGUOUS） */
 }
 
 export interface SessionSummary {
@@ -990,8 +992,10 @@ export class Daemon {
       case 'session.history': {
         const hp = params as { sessionId: string; beforeSeq: number; maxLines?: number }
         const session = await this.session(hp.sessionId)
-        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: hp.sessionId })
-        if (!session.history) return failKey(req.id, 'UNKNOWN_METHOD', 'error.not_implemented', { method: 'session.history' })
+        if (!session)
+          return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: hp.sessionId })
+        if (!session.history)
+          return failKey(req.id, 'UNKNOWN_METHOD', 'error.not_implemented', { method: 'session.history' })
         const page = await session.history(hp.beforeSeq, hp.maxLines)
         return ok(req.id, page)
       }

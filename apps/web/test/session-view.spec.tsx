@@ -39,7 +39,7 @@ const status: StatusSnapshot = {
     unpricedModels: [],
     turnMs: 12_400,
     verify: 'unverified',
-    mode: 'act',
+    permissionsMode: 'on-demand',
     turns: 4,
     steps: 9,
     tokPerSec: 42,

@@ -1,9 +1,18 @@
 # domi — 产品需求文档（全量）
 
-> 覆盖 M0–M10 全部 11 个里程碑（M7 为 v1.8 追加，M8 为 v1.10 追加，M9 为 v1.12 追加，M10 为 v1.13 追加）。
-> **v1.13** · 2026-09-19（初版 v1.0 · 2026-09-14）· 作者：PM 环节
+> 覆盖 M0–M12 全部 13 个里程碑（M7 为 v1.8 追加，M8 为 v1.10 追加，M9 为 v1.12 追加，M10 为 v1.13 追加，M11 / M12 为 v1.14 补记与追加）。
+> **v1.14** · 2026-09-23（初版 v1.0 · 2026-09-14）· 作者：PM 环节
 > 上位文档：`PRD-VISION.md` v1.1（不变量，冲突时以其为准）
 > 变更：v1.0 经两轮独立门禁审计后修订，见 `docs/qa/prd-gate-audit-v1.0.md`
+> **v1.14 回写**（2026-09-23，体检后止血；`docs/prd/M11.md` · `docs/prd/M12.md`）——三件事：
+> 1. **M11 章事后补记**：M11 在 2026-09-21 进了总表（v1.13 之后没升版本号），但之后的两处改动没回写到这里——PRD-M11-003 已扩为 Web + TUI；PRD-M11-009「会话窗口化加载」2026-09-22 追加。本版补上。**M11 / M12 都没有 `docs/qa/M1x-prd-review.md` 复核记录**，这里事后补记，不追认为「过了复核门」。
+> 2. **M12 章追加**（4 条，用户 2026-09-23 拍板 `COMMITTED`）。它是对已交付功能的修订，连带划掉上游 AC（走回写门，原文保留）：
+>    PRD-M7-005 AC-1…AC-3（计划模式取消）；PRD-M8-005 AC-2 / AC-3（先规划与计划审阅策略，由 PRD-M12-004 的新流程接手，**新流程尚未完成**）；
+>    PRD-M8-010 AC-5 → AC-6（去掉模式按钮）；PRD-M9-003 AC-3 / AC-4 → AC-8（端上不再手填模型名）。
+> 3. **确认模式语义（用户 2026-09-23 拍板，两条）**，改 PRD-M11-005 与 PRD-M12-002：
+>    「全部放行」= 跳过所有确认（同 Claude 的 skip all approvals），危险能力也不问，只剩用户显式写的 deny 规则与子 agent 父范围；
+>    「按需」（默认）下用户亲手写的 allow 规则算数，危险能力有 allow 规则就放行（M11 原写「规则 allow 仍弹确认」，导致 M7 写代码每写一个文件都要问）。没写规则的危险能力仍拒，「每次都问」档仍收紧。
+>    同时修了 shell「始终允许」指纹可被 `&&` / `;` / `sh -c` 等绕过的问题（安全缺陷，不改 AC，SPEC-M11-006 的实现没做到 AC-5「宁可少放行不可误放」）。
 > **v1.13 回写**（2026-09-19，`docs/prd/M10.md` · `docs/qa/M10-prd-review.md`）——**仅追加** M10 一章（5 条需求，用户拍板后直接 `COMMITTED`）；M0–M9 的编号与 AC 一字未改，不变量不增不改。
 > 唯一改动是 **PRD-M0-002 AC-2**（走回写门）：原文「单轮达到 20 次工具循环时强制停止」划掉，改为「达到 `loop.maxToolCalls`（默认 100）时强制停止」——M10-003 把护栏默认值定成 100（工作区 `kernel/src/loop.ts` 早已按 100 运行），M0 的「20 次」是 M0 时代的硬编码护栏，改为引用配置默认值。fixture `20-tool-loop` 按注入 limits 验证行为，不受默认值影响。
 > **v1.2 回写**（触发：`docs/adr/003` 方向变更）——**原 45 条编号与 AC 全部保留不动**，仅追加 5 条新需求
@@ -68,6 +77,8 @@
 | M8 · 工作台 | `COMMITTED` | 2026-09-17 追加并再批准（v1.11 并入 TUI），见 `docs/prd/M8.md` |
 | M9 · 模型配置与体验 | `COMMITTED` | 2026-09-18 追加并批准，见 `docs/prd/M9.md` |
 | M10 · 会话体验与运行控制 | `COMMITTED` | 2026-09-19 追加并批准，见 `docs/prd/M10.md` |
+| M11 · 会话体验深化 | `COMMITTED` | 2026-09-21 追加（v1.14 补记；缺复核记录），见 `docs/prd/M11.md` |
+| M12 · 体验修订 | `COMMITTED` | 2026-09-23 追加（缺复核记录），见 `docs/prd/M12.md` |
 
 **再批准门**：进入任何非 `COMMITTED` 里程碑之前，必须把该章重写为 `COMMITTED` 并重过 PM 门禁。跳过 = 跑偏。
 
@@ -113,6 +124,8 @@ P0 的定义是"DoD 依赖它"，降级 P0 等于偷偷改 DoD——这正是腐
 | M8 | 工作台 | — | 36.5 天 | Web 能否成为日常主界面，TUI 同一套概念 | —（v1.10 追加） |
 | M9 | 模型配置与体验 | — | 11.5 天 | 模型从哪来、界面说什么语言、终端里长会话看得清不 | —（v1.12 追加） |
 | M10 | 会话体验与运行控制 | — | 3 天 | 会话列表可读、护栏可调、TUI 能切语言、思考不淹没对话 | —（v1.13 追加） |
+| M11 | 会话体验深化 | — | 6–7 天 | 长会话读得顺、确认不打扰又不放过危险操作 | —（v1.14 补记） |
+| M12 | 体验修订 | — | 4–5 天 | 模型只选不填、确认模式跟会话走、不再有计划/执行两套心智 | —（v1.14 追加） |
 
 合计 **124 天**全职 ≈ 6 个月；业余（每周 10 小时）约 12 个月。（v1.2：+14 天，来自 5 条新增需求）
 （v1.3：MCP 的 5 天从 M2 挪到 M3，**合计不变**——这是排期调整，不是范围变化。见 `docs/adr/011`）
@@ -834,9 +847,9 @@ AC 原文不变（`docs/adr/011`）。进入 M3 的批准门上必须重新过�
 ### PRD-M7-005 · 计划模式
 - **用户价值**：大改动先看方案再动手，方案不对只花了读代码的钱。
 - **AC**
-  - AC-1：计划模式下所有写能力（`fs.write` 类、`shell.exec`、`task.spawn`、MCP 与插件工具）一律拒绝，拒绝决策的来源标为 mode 并落 `permission` 事件
-  - AC-2：模型提交计划落 `plan.proposed` 事件；用户批准 / 驳回（可附意见）落 `plan.decided` 事件；批准后同一会话切回执行模式，计划原文作为上下文保留
-  - AC-3：批准时可选「转成长任务」：计划的步骤生成一份 PRD-M5-002 格式的 DAG 配置，经同一套校验
+  - ~~AC-1：计划模式下所有写能力（`fs.write` 类、`shell.exec`、`task.spawn`、MCP 与插件工具）一律拒绝，拒绝决策的来源标为 mode 并落 `permission` 事件~~（v1.14 划掉：PRD-M12-004 取消计划 / 执行模式）
+  - ~~AC-2：模型提交计划落 `plan.proposed` 事件；用户批准 / 驳回（可附意见）落 `plan.decided` 事件；批准后同一会话切回执行模式，计划原文作为上下文保留~~（v1.14 划掉：PRD-M12-004 取消计划 / 执行模式）
+  - ~~AC-3：批准时可选「转成长任务」：计划的步骤生成一份 PRD-M5-002 格式的 DAG 配置，经同一套校验~~（v1.14 划掉：PRD-M12-004 取消计划 / 执行模式；转长任务能力由 M12-004 AC-5 接手）
 - **验收方式**：`bun test runtime/plan-mode.spec.ts`
 - **归类**：plan-execute 抄算法（PRD-VISION §6 已列）
 - **层级**：Invariant（INV-03）· **优先级**：P1
@@ -958,8 +971,8 @@ AC 原文不变（`docs/adr/011`）。进入 M3 的批准门上必须重新过�
 - **用户价值**：不写 YAML，说清楚要什么就行；是一口气做完还是拆成多步，系统自己判断。
 - **AC**
   - AC-1：`task.create {projectId, goal, attachments?, schedule?}` 建一个 `task` 会话并开始；YAML 入口保留为高级选项
-  - AC-2：执行形态由系统决定：先规划，计划给出步骤与建议形态（单会话 / 多节点）；多节点时经 PRD-M7-005 AC-3 转成 DAG 运行；决定落 `plan.decided` 的 `shape` 字段
-  - AC-3：计划审阅策略按项目设置 `always / auto / never`（默认 auto：多节点或计划涉及写操作超过阈值时才让人审）；不审时自动批准也落 `plan.decided{source:'policy'}`
+  - ~~AC-2：执行形态由系统决定：先规划，计划给出步骤与建议形态（单会话 / 多节点）；多节点时经 PRD-M7-005 AC-3 转成 DAG 运行；决定落 `plan.decided` 的 `shape` 字段~~（v1.14 划掉：由 PRD-M12-004「出计划 → 按需确认 → 执行」接手；新流程未完成前，任务直接开干）
+  - ~~AC-3：计划审阅策略按项目设置 `always / auto / never`（默认 auto：多节点或计划涉及写操作超过阈值时才让人审）；不审时自动批准也落 `plan.decided{source:'policy'}`~~（v1.14 划掉：同上，审阅由会话确认模式 PRD-M12-002 与 M12-004 的确认弹框承担）
   - AC-4：任务页列出进行中与历史任务（单会话任务与 DAG 运行统一展示），可看节点、重试失败节点、取消、打开节点会话
 - **验收方式**：`bun test runtime/task-create.spec.ts` + `apps/web/test/tasks-view.spec.tsx`
 - **层级**：Negotiable · **优先级**：P0
@@ -1009,7 +1022,8 @@ AC 原文不变（`docs/adr/011`）。进入 M3 的批准门上必须重新过�
   - AC-2：「文件」与输入 `@`：从项目文件清单（`fs.list`，遵守 .gitignore，复用 M7-001 的清单）里选，作为引用带进这一轮；会话里选的是沙盒文件
   - AC-3：上传与粘贴附件：存到 `~/.domi/attachments/<会话>/`，单个上限可配置（默认 20MB）；模型支持图片时作为图片输入，不支持时如实提示而不是静默丢弃；`user.input.uploads` 记录附件引用
   - AC-4：「技能」与输入 `/`：列出可用 Skill（`skill.list`），可搜索；选中的 Skill 这一轮强制注入，记在 `user.input.skills`
-  - AC-5：模型下拉来自 `model.list`（已配置的供应商与模型）；切换走 `session.switchModel`；模式按钮切换执行 / 计划（M7-005）
+  - ~~AC-5：模型下拉来自 `model.list`（已配置的供应商与模型）；切换走 `session.switchModel`；模式按钮切换执行 / 计划（M7-005）~~（v1.14 划掉：计划模式取消）
+  - AC-6：模型下拉来自 `model.list`（已配置的供应商与模型）；切换走 `session.switchModel`；确认模式三档在 Composer 工具栏（PRD-M12-002）
 - **验收方式**：`bun test runtime/attachments.spec.ts` + `apps/web/test/composer.spec.tsx`
 - **层级**：Negotiable · **优先级**：P1
 
@@ -1133,11 +1147,12 @@ TUI 应用内鼠标拖选复制 · 翻译用户内容 / 事件流 / 轨迹 / sou
 - **AC**
   - AC-1：默认是一个模型：`model.provider`（provider id）+ `model.name`；设置页在每个 provider 的模型列表里「设为默认」；新会话用它；provider 上没有「默认」开关
   - AC-2：`model.list` 返回扁平条目 `{ provider, providerName, name, source, vision, toolCall }`，只含启用的 provider；Web 下拉按 provider 分组、可搜索；同名模型在不同 provider 下各占一行，能力按所属 provider 计算
-  - AC-3：手填模型名（Composer「其他…」、TUI `/model <名>`）只接受模型名，由 daemon 统一归属：默认 provider 下有同名 → 它；否则唯一命中的 provider；多处命中 → 返回候选让用户选；无命中 → `INVALID_PARAMS`（`data.reason = MODEL_UNRESOLVED`），提示去设置页添加
-  - AC-4：TUI `/model` 不带参数打开按 provider 分组的模型弹层；带参数按 AC-3；provider 参数移除
+  - ~~AC-3：手填模型名（Composer「其他…」、TUI `/model <名>`）只接受模型名，由 daemon 统一归属：默认 provider 下有同名 → 它；否则唯一命中的 provider；多处命中 → 返回候选让用户选；无命中 → `INVALID_PARAMS`（`data.reason = MODEL_UNRESOLVED`），提示去设置页添加~~（v1.14 划掉：PRD-M12-001 两端取消手填，见 AC-8）
+  - ~~AC-4：TUI `/model` 不带参数打开按 provider 分组的模型弹层；带参数按 AC-3；provider 参数移除~~（v1.14 划掉：同上）
   - AC-5：`model.switch` 事件追加可选 `provider`（SCHEMA_VERSION 11 → 12，旧事件照读）；`session.switchModel` 的 `provider` 由端从选中的条目带上，不作为用户可见的切换入口
   - AC-6：重开会话（含 domid 重启）后，会话用的模型与 provider 与关闭前一致（回放最后一条 `model.switch`）；那个 provider 已停用或删除时回到默认模型，并在对话里提示一次
   - AC-7：切换仍产生 `model.switch`，切到能力更弱的模型时列出失去的能力（PRD-M1-002 AC-1/2 不回退）
+  - AC-8（v1.14）：端上没有手填模型名的入口——Web 只有下拉，TUI `/model` 只打开模型弹层、带参数算用法错误；`session.switchModel` 不带 provider 时由 daemon 按原 AC-3 的规则归属（默认那一家 → 唯一命中 → 多处命中报候选 → 无命中 `MODEL_UNRESOLVED`）
 - **验收方式**：`bun test runtime/model-resolve.spec.ts` + `bun test runtime/model-restore.spec.ts` + `apps/web/test/composer.spec.tsx` + `apps/tui/test/commands.spec.ts`
 - **层级**：Negotiable · **优先级**：P0
 
@@ -1243,9 +1258,9 @@ TUI 本轮不做完整设置页（只做语言切换）· 不引入思考折叠�
 - **AC**：距底<160px 贴底；上翻后累计浮条计数；回底清计数。详见分册。
 - **层级**：Negotiable · **优先级**：P1
 
-### PRD-M11-003 · 会话 Markdown 渲染（Web）
+### PRD-M11-003 · 会话 Markdown 渲染（Web + TUI）
 - **用户价值**：assistant 回复有代码块/标题/列表层次；XSS 安全（不开 rehype-raw）。
-- **AC**：Web assistant 分支 react-markdown+remark-gfm；降级纯文本；script/javascript: 不渲染。详见分册。
+- **AC**：Web assistant 分支 react-markdown+remark-gfm；TUI 复用 remark 解析器自写 mdast→ANSI（v1.14 补记：2026-09-21 复核扩围）；降级纯文本；script/javascript: 不渲染。详见分册。
 - **层级**：Negotiable · **优先级**：P1
 
 ### PRD-M11-004 · 展开后显示完整内容
@@ -1255,7 +1270,8 @@ TUI 本轮不做完整设置页（只做语言切换）· 不引入思考折叠�
 
 ### PRD-M11-005 · 审核接受模式（会话级档位 + 一次「始终允许」）
 - **用户价值**：危险能力（写文件/跑命令/调外部）按三档问人；shell 命令指纹「始终允许」只对安全命令出现一次。
-- **AC**：on-demand（默认）/always-ask/allow-all；危险能力任何档不自动放行；无人在场 fail-closed；commandFingerprint 非 null 才可 grant。详见分册。
+- **AC**：on-demand（默认）/always-ask/allow-all；~~危险能力任何档不自动放行~~（v1.14：「全部放行」跳过所有确认；「按需」下用户写的 allow 规则算数、没写规则的危险能力仍拒；「每次都问」下危险能力即使 allow 也问）；无人在场 fail-closed；commandFingerprint 非 null 才可 grant，带 shell 元字符 / 解释器 / 危险子命令的命令一律不可 grant。详见分册。
+- **归属变化**：档位从全局配置改为会话级，见 PRD-M12-002。
 - **层级**：Committed · **优先级**：P0
 
 ### PRD-M11-006 · 三端自启后台进程（确认 + 补齐）
@@ -1268,7 +1284,63 @@ TUI 本轮不做完整设置页（只做语言切换）· 不引入思考折叠�
 - **AC**：占位，等终止方案 S1–S4 拍板。详见分册。
 - **层级**：Negotiable · **优先级**：P2
 
-**M11 DoD**：打开长会话停底部、运行贴底、上浮出浮条；Markdown 有层次、代码块不丢字；tool 展开看全文；设置页切三档危险能力都确认；shell「始终允许」只对安全指纹出现一次。→ 只有用户能做。
+### PRD-M11-009 · 会话窗口化加载（v1.14 补记，2026-09-22 追加）
+- **用户价值**：长会话打开不卡：进来只拉最近一屏，往上翻再按需取更早的历史。
+- **AC**：`session.subscribe` 返回尾部窗口与 `oldestSeq` / `hasOlder`；`session.history` 按 seq 锚点向上分页；翻页后滚动位置不跳。详见分册。
+- **层级**：Negotiable · **优先级**：P1
+
+**M11 DoD**：打开长会话停底部、运行贴底、上浮出浮条；Markdown 有层次、代码块不丢字；tool 展开看全文；对话里切确认模式（M12 起不在设置页）；shell「始终允许」只对安全指纹出现一次。→ 只有用户能做。
+
+### PRD-M12-001 · 模型切换纯下拉 + 会话级展示
+- **用户价值**：模型是会话内的选择，不是自由输入；下拉跟随会话实际状态。
+- **AC**
+  - AC-1：Web 模型切换只有下拉，无任何可输入框；选项 = 已启用 provider 的模型（按组，同名各占一行）
+  - AC-2：下拉里没有「搜索 / 手填…」入口；`model.resolve` RPC 删除
+  - AC-3：新会话显示默认模型；会话中途切换后显示会话当前模型，重开保持
+  - AC-4：清单为空时下拉禁用 + 引导去设置页，不出现输入框
+  - AC-5：切换仍写 `model.switch`（INV-01）
+  - AC-6：TUI `/model` 只开选择器，带参数算用法错误
+- **验收方式**：`apps/web/test/composer.spec.tsx` + `apps/tui/test/commands.spec.ts`
+- **层级**：Negotiable · **优先级**：P1
+
+### PRD-M12-002 · 确认模式三档：会话级 + 对话框内选择
+- **用户价值**：档位跟着会话走，互不污染；不用去设置页翻全局开关。
+- **AC**
+  - AC-1：Web 设置页与 TUI 设置层不再出现三档
+  - AC-2：对话框内可选三档（Web Composer 工具栏下拉；TUI `/mode`）；切换即生效于当前会话
+  - AC-3：档位会话级：A 会话改了不影响 B；新会话默认 on-demand
+  - AC-4：档位写 `permissions.mode.switch` 事件（SCHEMA_VERSION 13），重开会话恢复
+  - AC-5：子 agent 继承父会话档位
+  - AC-6：三档语义（v1.14 用户拍板）：always-ask = 危险能力即使规则 allow 也问、无规则非危险也问；on-demand = 用户写的规则算数、无规则拒；allow-all = 跳过所有确认，只剩显式 deny 规则与父范围
+  - AC-7：审计事件记录档位来源（allow-all 放行的 `permission.source = mode`）
+  - AC-8：全仓无 `review` 命名残留（配置键 / i18n key / TUI 命令 / 文档 / 注释）
+- **验收方式**：`packages/capability/test/permission.spec.ts` + runtime 会话级档位测试 + Web / TUI 组件测试 + grep
+- **层级**：Negotiable · **优先级**：P1
+
+### PRD-M12-003 · 右上角标题与侧边栏同步
+- **用户价值**：改一个名字，所有显示它的地方一起变；空标题时两边同一个口径。
+- **AC**
+  - AC-1：会话标题改名后，右上角与侧边栏都显示新标题，无需手动刷新
+  - AC-2：项目名改名后两处同步（回归）
+  - AC-3：空标题口径统一为首条输入前 40 字
+  - AC-4：改名后刷新链路幂等
+- **验收方式**：Web 组件测试 + 手工走查
+- **层级**：Negotiable · **优先级**：P1
+
+### PRD-M12-004 · 计划流改造：取消计划 / 执行模式
+- **用户价值**：不再有两套心智；系统先把不确定的点问明白，确认后直接执行；没疑问就直接开跑。
+- **AC**
+  - AC-1：全仓无计划 / 执行模式概念残留（权限引擎无 plan 分支、会话无 mode、Composer 无模式按钮）
+  - AC-2：需要确认时，确认弹框按问题数分 tab，每题 abcd… + 自定义输入；确认后按结果执行
+  - AC-3：无需确认时，用户信息无阻止提示 → 直接执行；有阻止提示 → 先问
+  - AC-4：新任务走新流程（替代 PRD-M8-005 AC-2 / AC-3），行为不倒退
+  - AC-5：转长任务能力保留
+  - AC-6：新确认弹框遵守会话确认模式（PRD-M12-002 AC-6）
+- **验收方式**：权限引擎回归 + runtime 新流程测试 + Web / TUI 确认弹框组件测试
+- **层级**：Negotiable · **优先级**：P1
+- **现状（v1.14）**：只做了 AC-1；AC-2…AC-6 的新流程未做，TASK-M12-004 未关
+
+**M12 DoD**：模型切换只有下拉；对话里切三档确认模式且 A / B 会话互不影响；新任务直接出计划、有疑问弹多 tab 确认框；改会话标题后两处同步。→ 只有用户能做。
 
 ---
 

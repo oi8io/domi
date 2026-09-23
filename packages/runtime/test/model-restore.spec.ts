@@ -84,7 +84,7 @@ describe('BUG-M9-001 · 重开会话回到关闭前的模型', () => {
   })
 })
 
-describe('PRD-M9-003 AC-3 · 手填模型名的归属', () => {
+describe('PRD-M9-003 AC-8 · 端上只给模型名时 daemon 的归属规则（手填入口已随 M12-001 移除）', () => {
   const entry = (provider: string, name: string) => ({
     provider,
     providerName: provider.toUpperCase(),

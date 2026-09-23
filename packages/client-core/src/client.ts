@@ -407,8 +407,6 @@ export class DomiClient {
     return this.request('model.list', refresh ? { refresh } : {})
   }
 
-  /** 手填的模型名归属到哪一家（PRD-M9-003 AC-3） */
-
   /**
    * 回答一次权限询问。返回 false = 没生效（已经被别的客户端答过）。
    * 不在这里清确认框：等 daemon 推 session.askDone 再清，所有客户端走同一条路

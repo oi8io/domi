@@ -138,7 +138,7 @@ describe('PRD-M9-002 · provider 的增删改（config.set 白名单）', () => 
     }
   })
 
-  test('AC-5：默认模型所在的那一家不能停用、不能删（reason = DEFAULT_PROVIDER）；先换默认就可以', () => {
+  test('AC-5 / PRD-M10-002 AC-2（回归）：默认模型所在的那一家不能停用、不能删（reason = DEFAULT_PROVIDER）；先换默认就可以', () => {
     const h = home(`${BASE}providers:\n  anthropic:\n    base_url: https://a.example\n  deepseek: {}\n`)
     for (const bad of [{ 'providers.anthropic.enabled': false }, { 'providers.anthropic': null }]) {
       try {

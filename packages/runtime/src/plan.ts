@@ -4,7 +4,7 @@
  * 计划模式是权限的一种范围（SPEC 取舍-7）：只读之外一律拒绝。模型想清楚之后调 plan.submit，
  * 用户在确认框里批准 / 驳回（可附意见、可选转成长任务）。批准 → 切回执行模式。
  */
-import { type Tool } from '@domi/capability'
+import type { Tool } from '@domi/capability'
 import type { DomiEvent } from '@domi/protocol'
 import { z } from 'zod'
 

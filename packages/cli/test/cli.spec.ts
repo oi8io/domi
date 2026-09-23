@@ -56,7 +56,7 @@ describe('AC-4 · doctor 的每条问题都带可执行命令', () => {
     }
   })
 
-  test('PRD-M10-003：传了 loop 就显示生效的限制；没传不查', () => {
+  test('PRD-M10-003 AC-5：传了 loop 就显示生效的限制（来源 = 配置或默认）；没传不查', () => {
     const f = diagnose({
       ...BASE,
       loop: { maxToolCalls: 200, maxArgParseRetries: 5, maxWallClockMs: 1_200_000 },

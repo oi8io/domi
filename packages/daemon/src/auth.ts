@@ -78,7 +78,8 @@ export function resolveServerSettings({ config, env, home }: Sources): ServerSet
   const port = env.DOMI_PORT === undefined || env.DOMI_PORT === '' ? config.server.port : Number(env.DOMI_PORT)
   const allowedOrigins = config.server.allowedOrigins ?? []
   if (env.DOMI_TOKEN) return { hostname, port, token: checked(env.DOMI_TOKEN, 'DOMI_TOKEN'), allowedOrigins }
-  if (config.server.token) return { hostname, port, token: checked(config.server.token, 'config.yaml 的 server.token'), allowedOrigins }
+  if (config.server.token)
+    return { hostname, port, token: checked(config.server.token, 'config.yaml 的 server.token'), allowedOrigins }
   if (isLoopback(hostname)) return { hostname, port, token: null, allowedOrigins }
 
   const tokenFile = tokenFilePath(home)

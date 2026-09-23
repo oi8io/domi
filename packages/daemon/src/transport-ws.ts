@@ -40,7 +40,11 @@ export function isAllowedOrigin(origin: string | null, extra: readonly string[] 
     if (isLoopback(host) || host === 'tauri.localhost') return true
     // 显式白名单（本地开发域名经 nginx 反代）
     return extra.some((o) => {
-      try { return new URL(o).origin === u.origin } catch { return false }
+      try {
+        return new URL(o).origin === u.origin
+      } catch {
+        return false
+      }
     })
   } catch {
     return false

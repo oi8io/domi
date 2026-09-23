@@ -60,7 +60,6 @@ describe('PRD-M8-016 AC-2 · 越不过 deny，也不改变别的层', () => {
     expect(asked).toHaveLength(0)
   })
 
-
   test('父范围之外的能力也一样（子 agent）', async () => {
     const e = new PermissionEngine({ rules, cwd, scope: scopeOf(['fs.read']) }, async () => ({
       allowed: true,

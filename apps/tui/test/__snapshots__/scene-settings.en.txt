@@ -3,9 +3,6 @@
   │ › ○ Follow system                                                        │
   │   ○ 简体中文                                                             │
   │   ● English                                                              │
-  │   ● On demand (recommended): follow rules, ask only when unclear         │
-  │   ○ Always ask: confirm every risky action regardless of rules           │
-  │   ○ Allow all: skip non-risky asks; risky actions still ask (never off)  │
   │──────────────────────────────────────────────────────────────────────────│
   │  enter  select   esc  close                                              │
   ╰──────────────────────────────────────────────────────────────────────────╯

@@ -121,7 +121,8 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
       return { kind: 'extract' }
     case '/settings':
       return { kind: 'settings' } // PRD-M10-004 AC-1
-    case '/mode': // PRD-M12-002：会话确认模式三档
+    case '/mode': {
+      // PRD-M12-002：会话确认模式三档
       if (!rest[0]) return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }
       if (rest.length > 1) return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }
       const m = rest[0]
@@ -129,6 +130,7 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
         return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }
       }
       return { kind: 'permissions-mode', mode: m }
+    }
     // 用量上限（PRD-M7-009）：/budget tokens 200000 · /budget cost 2 · /budget calls 100
     case '/budget': {
       const key = { tokens: 'tokens', cost: 'costUsd', calls: 'toolCalls' }[rest[0] ?? ''] as

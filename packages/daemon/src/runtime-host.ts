@@ -502,9 +502,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     async open(sessionId: string): Promise<SessionHandle> {
       const s = await live(sessionId)
       let head = 0
-      
+
       let hostWindowMeta: { oldestSeq: number; hasOlder: boolean } | undefined
-return {
+      return {
         id: sessionId,
         submit: (text, refs, inputs) => s.submit(text, { ...(refs === undefined ? {} : { refs }), ...(inputs ?? {}) }),
         async checkReady() {

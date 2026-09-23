@@ -8,7 +8,7 @@
  * - 从尾部往前累加，到预算就停；不拆轮；最少 1 轮（不白页）
  * - beforeSeq 只考虑 view seq < beforeSeq 的事件（向上翻页锚点）
  */
-import { isKnownEvent, type AnyEvent, type DomiEvent, type EventEnvelope } from '@domi/protocol'
+import { type AnyEvent, type EventEnvelope, isKnownEvent } from '@domi/protocol'
 
 export interface PageBudget {
   /** 主预算：估算渲染行数。到了就停。 */
