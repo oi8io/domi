@@ -95,6 +95,8 @@ function ToolStatus({ result }: { result: TranscriptItem | null }) {
   )
 }
 
+const PLAN_MARK = { done: '✓', in_progress: '▸', skipped: '–', pending: '○' } as const
+
 function ItemBody({ item }: { item: TranscriptItem }) {
   switch (item.kind) {
     case 'user':
@@ -144,6 +146,32 @@ function ItemBody({ item }: { item: TranscriptItem }) {
           </span>
           <span className="min-w-0 truncate">{item.text}</span>
           {item.summary !== undefined && <span className="truncate text-mut2">{item.summary}</span>}
+        </div>
+      )
+    case 'plan':
+      // 计划卡片（PRD-M12-004 AC-8）：每步一行，状态用勾 / 箭头 / 划线
+      return (
+        <div className="my-1 rounded-md border border-border2 px-3.5 py-2 text-[13px]" data-part="plan">
+          <div className={cn(ROLE, 'text-info')}>{item.text}</div>
+          <ol className="grid gap-0.5">
+            {(item.plan ?? []).map((s, i) => (
+              <li
+                // biome-ignore lint/suspicious/noArrayIndexKey: 计划步骤按位置展示，整份替换
+                key={i}
+                data-status={s.status}
+                className={cn(
+                  'flex gap-2',
+                  s.status === 'done' && 'text-mut line-through',
+                  s.status === 'skipped' && 'text-mut2 line-through',
+                  s.status === 'in_progress' && 'font-medium text-accent',
+                )}
+              >
+                <span className="font-mono">{PLAN_MARK[s.status]}</span>
+                <span>{s.text}</span>
+              </li>
+            ))}
+          </ol>
+          {item.summary !== undefined && <div className="mt-1 text-xs text-mut">{item.summary}</div>}
         </div>
       )
     case 'context':

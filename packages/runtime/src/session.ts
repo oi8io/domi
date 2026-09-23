@@ -70,6 +70,14 @@ import type { DomiEvent, EventEnvelope, RefLink, UploadRef } from '@domi/protoco
 import { z } from 'zod'
 import { ASK_USER_CAPABILITY, makeAskUserTool } from './ask-user.ts'
 import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
+import {
+  makePlanGate,
+  makePlanUpdateTool,
+  PLAN_CAPABILITY,
+  type PlanPolicy,
+  PlanTracker,
+  planPromptText,
+} from './plan.ts'
 
 /**
  * 在**组合根**注册确定性清理策略（PRD-M2-002）。
@@ -126,7 +134,20 @@ export class RefError extends KeyedError {
  */
 export const INTRINSIC_RULES: ReadonlyArray<{ name: string; capability: string; decision: 'allow' }> = [
   { name: 'builtin.ask-user', capability: ASK_USER_CAPABILITY, decision: 'allow' },
+  { name: 'builtin.plan', capability: PLAN_CAPABILITY, decision: 'allow' },
 ]
+
+/** 计划闸门先于预算闸门：没计划 / 没批准的调用直接拦下（不结束这一轮），不去算用量 */
+function withPlanGate(
+  plan: ReturnType<typeof makePlanGate>,
+  budget: NonNullable<ConstructorParameters<typeof ToolRegistry>[0]['gate']>,
+): NonNullable<ConstructorParameters<typeof ToolRegistry>[0]['gate']> {
+  return async (info) => {
+    const reject = plan(info)
+    if (reject) return { stop: false, reject, events: [] }
+    return budget(info)
+  }
+}
 
 export interface PendingAsk {
   capabilityId: string
@@ -197,8 +218,11 @@ export interface SessionOptions {
    * 带不带项目上下文（PRD-M8-004）。false = 自由会话：不问工作区信任、不加载规矩文件与项目级 Skill。默认 true
    */
   projectContext?: boolean
-  /** 计划审阅策略（PRD-M8-005）。任务会话取项目设置；不给 = 每个计划都问人 */
-  planReview?: () => 'auto' | 'always' | 'never'
+  /**
+   * 计划必须（PRD-M12-004 AC-8）：true = 动手（只读之外的工具）前必须先用 plan.update 写计划。
+   * daemon 给任务会话的顶层会话打开；子 agent、长任务节点、自由会话不强制
+   */
+  planRequired?: boolean
   /** 即使规则放行也要问人的能力（PRD-M8-004：自由会话里的 shell.exec）。只收紧不放松 */
   askAlways?: readonly string[]
   /** 这个会话自己的用量上限（M7-009，长任务节点用）。覆盖配置里的 budget */
@@ -273,6 +297,10 @@ export class DomiSession {
   /** PRD-M12-002：会话级确认模式（always-ask/on-demand/allow-all），默认 on-demand */
   private permissionsMode: PermissionsMode = 'on-demand'
   private permissionsModeLoaded = false
+  /** 计划（PRD-M12-004 AC-8）。重开会话时从事件流恢复一次（loadPlan） */
+  private readonly plan = new PlanTracker()
+  private planLoaded = false
+  private readonly planPolicy: PlanPolicy
   private titleTried = false
   private currentModel: string
   private currentProvider: string
@@ -296,6 +324,12 @@ export class DomiSession {
       (capabilityId, args, o) => this.askUser(capabilityId, args, o?.grantable === true),
     )
     this.permissions = permissions
+    this.planPolicy = {
+      tracker: this.plan,
+      required: () => opts.planRequired === true,
+      mode: () => this.permissionsMode,
+    }
+    const planGate = makePlanGate(this.planPolicy)
     const outputDir = join(dirname(opts.dbPath), 'outputs', opts.sessionId)
     this.attachments = new AttachmentStore(
       dirname(opts.dbPath),
@@ -310,21 +344,28 @@ export class DomiSession {
       jobs: this.jobs,
       outputDir,
       ...(this.hooks.empty ? {} : { hooks: this.hooks.toolHooks() }),
-      // 预算闸门（M7-009）：每次调用之前算用量，到顶问人
-      gate: makeBudgetGate({
-        base: () => ({ ...(opts.config.budget ?? {}), ...(opts.budget ?? {}) }),
-        events: () => this.view(),
-        pricing: opts.pricing ?? {},
-        ask: async (message, detail) => {
-          const r = await this.askInput('budget.exceeded', { message, requestedSchema: BUDGET_DECISION_SCHEMA }, detail)
-          if (r.action !== 'accept') return { action: 'stop' }
-          const limit =
-            typeof r.content?.limit === 'number' && Number.isFinite(r.content.limit) ? r.content.limit : undefined
-          return r.content?.action === 'raise' && limit !== undefined
-            ? { action: 'raise', limit }
-            : { action: 'continue' }
-        },
-      }),
+      // 闸门：先看计划（PRD-M12-004 AC-8 / AC-9，拦下不结束这一轮），再看预算（M7-009，到顶问人）
+      gate: withPlanGate(
+        planGate,
+        makeBudgetGate({
+          base: () => ({ ...(opts.config.budget ?? {}), ...(opts.budget ?? {}) }),
+          events: () => this.view(),
+          pricing: opts.pricing ?? {},
+          ask: async (message, detail) => {
+            const r = await this.askInput(
+              'budget.exceeded',
+              { message, requestedSchema: BUDGET_DECISION_SCHEMA },
+              detail,
+            )
+            if (r.action !== 'accept') return { action: 'stop' }
+            const limit =
+              typeof r.content?.limit === 'number' && Number.isFinite(r.content.limit) ? r.content.limit : undefined
+            return r.content?.action === 'raise' && limit !== undefined
+              ? { action: 'raise', limit }
+              : { action: 'continue' }
+          },
+        }),
+      ),
     })
       .register(fsRead)
       .register(fsWrite)
@@ -340,6 +381,15 @@ export class DomiSession {
       .register(makeDiagnosticsTool(this.diagnostics))
       // PRD-M12-004 AC-7：问用户（和用户说话，内置放行）
       .register(makeAskUserTool())
+      // PRD-M12-004 AC-8：计划（内置放行）；审批时可转长任务（AC-5）
+      .register(
+        makePlanUpdateTool({
+          ...this.planPolicy,
+          ...(opts.startTask
+            ? { startTask: (spec: unknown) => (opts.startTask as NonNullable<typeof opts.startTask>)(spec, opts.cwd) }
+            : {}),
+        }),
+      )
     // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用。以插件形态注册（PRD-M6-001 AC-3）
     for (const t of memorySearchPlugin.tools?.({ search: this.log.search }) ?? []) this.tools.register(t)
     if (opts.memory) this.tools.register(makeMemoryRecallTool(opts.memory))
@@ -436,7 +486,7 @@ export class DomiSession {
   ): Promise<{ action: 'accept' | 'decline'; content?: Record<string, unknown> }> {
     // 运行时自己问的（预算到顶）与问题框（ask.user）用原名；工具要输入时显示为「同组.input」
     const capabilityId =
-      detail !== undefined || capability === ASK_USER_CAPABILITY
+      detail !== undefined || capability === ASK_USER_CAPABILITY || capability === PLAN_CAPABILITY
         ? capability
         : `${capability.split('.').slice(0, -1).join('.') || capability}.input`
     return new Promise((resolve) => {
@@ -781,6 +831,18 @@ export class DomiSession {
     return this.askUser(capabilityId, { message, ...detail })
   }
 
+  /** 计划从事件流恢复（PRD-M12-004 AC-8）。只做一次；之后由 plan.update 工具与 submit 维护 */
+  private async loadPlan(): Promise<void> {
+    if (this.planLoaded) return
+    this.planLoaded = true
+    this.plan.restore(await this.view())
+  }
+
+  /** 当前计划（client 续跑条之外的地方要看，比如测试与桥接） */
+  planSnapshot(): { steps: PlanTracker['steps']; remaining: number; approved: boolean } {
+    return { steps: this.plan.steps, remaining: this.plan.remaining, approved: this.plan.approved() }
+  }
+
   /** 事件流里最后一条 permissions.mode.switch 恢复确认模式（M12-002） */
   private async loadMode(): Promise<void> {
     if (this.permissionsModeLoaded) return
@@ -1003,6 +1065,11 @@ export class DomiSession {
     if (catalog !== '') {
       extra.push({ id: 'builtin.skills', role: 'system', priority: 450, cacheable: true, render: () => catalog })
     }
+    // 计划常驻上下文（PRD-M12-004 AC-8）：动态层，不缓存；压缩时它不在被压的消息里，所以不会丢
+    const planText = planPromptText(this.planPolicy)
+    if (planText !== '') {
+      extra.push({ id: 'session.plan', role: 'user', priority: 900, cacheable: false, render: () => planText })
+    }
     const layers = mergeLayers([...BUILTIN_LAYERS, ...extra], layersFromConfig(this.opts.config.prompt.layers))
     const a = assemble(layers, { cwd: this.opts.cwd, model: this.currentModel })
     const text = (role: 'system' | 'user'): string =>
@@ -1101,6 +1168,9 @@ export class DomiSession {
     for (const t of this.opts.extraTools?.(this.opts.cwd) ?? []) this.tools.register(t)
     await this.deliverNotices()
     await this.loadMode()
+    // 计划（PRD-M12-004 AC-8 / AC-9）：先从事件流恢复（不含这一句），再记下这一句有没有「先别动」
+    await this.loadPlan()
+    this.plan.onUserInput(text)
     await this.ensureTrust()
     await this.maybeAutoCompact()
     const policy: ContextPolicy = {
@@ -1132,7 +1202,8 @@ export class DomiSession {
               this.attachments.load(this.opts.sessionId, ref, { vision: this.provider.capabilities.vision }),
             skill: async (name) => this.skillSource?.get(name)?.prompt,
           },
-          prompt: this.prompt(),
+          // 每次请求模型前现拼：一轮里计划更新了，下一次请求就带上（PRD-M12-004 AC-8）
+          prompt: () => this.prompt(),
           beforeComplete: (events) => this.verifyGate(events),
         },
         this.opts.sessionId,

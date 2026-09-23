@@ -122,9 +122,12 @@ export function QuestionsDialog({
             const picked = [...(s.selected[i] ?? []), ...((s.other[i] ?? '').trim() === '' ? [] : [s.other[i]?.trim()])]
             return (
               <p key={qq.header} className="mb-1 text-[13px]">
-                <span className="text-mut">{qq.header}：</span>
+                <span className="text-mut">
+                  {qq.header}
+                  {tr('common.labelSep')}
+                </span>
                 {picked.length > 0 ? (
-                  picked.join('、')
+                  picked.join(tr('common.listSep'))
                 ) : (
                   <span className="text-warn">{tr('web.questions.unanswered')}</span>
                 )}

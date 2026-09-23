@@ -13,7 +13,17 @@ import { atom, computed } from 'nanostores'
 
 export interface TranscriptItem {
   seq: number
-  kind: 'user' | 'assistant' | 'reason' | 'tool-call' | 'tool-result' | 'permission' | 'error' | 'context' | 'task'
+  kind:
+    | 'user'
+    | 'assistant'
+    | 'reason'
+    | 'tool-call'
+    | 'tool-result'
+    | 'permission'
+    | 'error'
+    | 'context'
+    | 'task'
+    | 'plan'
   text: string
   ok?: boolean
   /** 工具调用的参数摘要：JSON 序列化后前 80 字符 + …（PRD-M0-005 AC-1 写死的规则） */
@@ -29,6 +39,13 @@ export interface TranscriptItem {
   ms?: number
   /** 事件时间戳（流式段是第一条的）。轨迹时间线用（M8-008 AC-3） */
   ts?: number
+  /** 计划卡片（kind = plan，PRD-M12-004 AC-8）：每步文本与状态 */
+  plan?: PlanStepView[]
+}
+
+export interface PlanStepView {
+  text: string
+  status: 'pending' | 'in_progress' | 'done' | 'skipped'
 }
 
 export interface MetricsSnapshot {
@@ -151,7 +168,11 @@ export function toolResultSummary(name: string | undefined, payload: unknown): s
     const p = payload as { answered?: boolean; answers?: Array<{ header?: unknown; answer?: unknown }> } | null
     if (p?.answered === false) return tr('core.ask.unanswered')
     if (Array.isArray(p?.answers))
-      return clip(p.answers.map((a) => `${String(a.header ?? '')}：${String(a.answer ?? '')}`).join('；'))
+      return clip(
+        p.answers
+          .map((a) => `${String(a.header ?? '')}${tr('common.labelSep')}${String(a.answer ?? '')}`)
+          .join(tr('core.listSepStrong')),
+      )
   }
   return summarizeArgs(payload)
 }
@@ -390,6 +411,18 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
       case 'mode.switch':
         push({ seq: env.seq, kind: 'context', text: ev.to === 'plan' ? tr('core.ev.planMode') : tr('core.ev.actMode') })
         break
+      case 'plan.update': {
+        const steps = ev.steps.map((s) => ({ text: s.text, status: s.status }))
+        const done = steps.filter((s) => s.status === 'done' || s.status === 'skipped').length
+        push({
+          seq: env.seq,
+          kind: 'plan',
+          text: tr('core.ev.planUpdate', { done, total: steps.length }),
+          plan: steps,
+          ...(ev.note ? { summary: ev.note } : {}),
+        })
+        break
+      }
       case 'plan.proposed':
         push({ seq: env.seq, kind: 'task', text: tr('core.ev.planProposed'), summary: ev.plan.slice(0, 400) })
         break

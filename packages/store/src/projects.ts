@@ -8,6 +8,7 @@ import type { Database } from 'bun:sqlite'
 
 export interface ProjectSettings {
   isolation: 'auto' | 'always' | 'never'
+  /** 已废弃（PRD v1.14 划掉 M8-005 AC-3）：计划审批改由会话确认模式决定。旧数据照读，不再有人读它 */
   planReview: 'auto' | 'always' | 'never'
 }
 

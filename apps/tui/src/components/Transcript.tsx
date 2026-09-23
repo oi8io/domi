@@ -20,9 +20,14 @@ export const PREFIX: Record<TranscriptItem['kind'], string> = {
   error: '✗',
   context: '✂',
   task: '▸',
+  plan: '≡',
 }
 
+/** 计划步骤的状态标记（与 Web 同一套） */
+const PLAN_MARK = { done: '✓', in_progress: '▸', skipped: '–', pending: '○' } as const
+
 /** 工具调用那一行右边的「状态 · 耗时」：看紧跟着它的结果 */
+
 export function toolMeta(result: TranscriptItem | undefined): string {
   if (result === undefined || result.kind !== 'tool-result') return tr('common.running')
   const state = result.ok ? 'done' : 'failed'
@@ -99,6 +104,23 @@ export function Line({
             {item.summary}
           </Text>
         </Text>
+      )
+    case 'plan':
+      // 计划卡片（PRD-M12-004 AC-8）
+      return (
+        <Box flexDirection="column">
+          <Text {...t.fg('info')}>{`${prefix} ${item.text}`}</Text>
+          {(item.plan ?? []).map((s, i) => (
+            <Text
+              // biome-ignore lint/suspicious/noArrayIndexKey: 计划步骤按位置展示，整份替换
+              key={i}
+              {...t.fg(s.status === 'in_progress' ? 'accent' : s.status === 'pending' ? 'ink2' : 'mut')}
+              strikethrough={s.status === 'skipped'}
+            >
+              {`   ${PLAN_MARK[s.status]} ${s.text}`}
+            </Text>
+          ))}
+        </Box>
       )
     case 'error':
       return <Text {...t.fg('bad')}>{`${prefix} ${item.text}`}</Text>

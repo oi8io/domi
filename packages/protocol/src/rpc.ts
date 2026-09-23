@@ -79,6 +79,7 @@ export const ProjectSettingsSchema = z.object({
   /** 任务要不要在隔离工作区里做（PRD-M8-006） */
   isolation: z.enum(['auto', 'always', 'never']).default('auto'),
   /** 计划要不要先给人审（PRD-M8-005） */
+  /** 已废弃（PRD v1.14）：计划审批改由会话确认模式决定。留着是为了旧数据与旧客户端照样能读写 */
   planReview: z.enum(['auto', 'always', 'never']).default('auto'),
 })
 export const ProjectSchema = z.object({

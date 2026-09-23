@@ -59,9 +59,9 @@ export function QuestionsDialog({ questions, state }: { questions: readonly Ques
             const picked = [...(state.selected[i] ?? []), ...(other === '' ? [] : [other])]
             return (
               <Text key={qq.header}>
-                <Text {...t.fg('mut')}>{`${qq.header}：`}</Text>
+                <Text {...t.fg('mut')}>{`${qq.header}${tr('common.labelSep')}`}</Text>
                 {picked.length > 0 ? (
-                  picked.join('、')
+                  picked.join(tr('common.listSep'))
                 ) : (
                   <Text {...t.fg('warn')}>{tr('web.questions.unanswered')}</Text>
                 )}

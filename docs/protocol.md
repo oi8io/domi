@@ -5800,6 +5800,58 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                     "properties": {
                       "t": {
                         "type": "string",
+                        "const": "plan.update"
+                      },
+                      "steps": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending",
+                                "in_progress",
+                                "done",
+                                "skipped"
+                              ]
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "text",
+                            "status"
+                          ],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "steps"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
                         "const": "plan.proposed"
                       },
                       "plan": {
@@ -7581,6 +7633,58 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                     "required": [
                       "t",
                       "to"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "plan.update"
+                      },
+                      "steps": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "pending",
+                                "in_progress",
+                                "done",
+                                "skipped"
+                              ]
+                            },
+                            "dependsOn": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "text",
+                            "status"
+                          ],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "steps"
                     ],
                     "additionalProperties": {}
                   },

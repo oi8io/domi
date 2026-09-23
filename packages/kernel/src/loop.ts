@@ -60,8 +60,11 @@ export interface LoopDeps {
   refs?: RefResolver
   /** 附件与指定技能的读取端口（PRD-M8-010）。事件流里有 uploads / skills 时用它 */
   inputs?: InputResolver
-  /** 拼好的提示词（BUG-M3-015）。不给就只发对话本身（回放与大部分单测走这条） */
-  prompt?: PromptParts
+  /**
+   * 拼好的提示词（BUG-M3-015）。不给就只发对话本身（回放与大部分单测走这条）。
+   * 给函数 = 每次请求模型前现取（PRD-M12-004 AC-8：一轮里计划更新了，下一次请求就要带上新的）
+   */
+  prompt?: PromptParts | (() => PromptParts)
   /**
    * 模型要结束这一轮时问一次（PRD-M7-004）：返回的事件先落盘；again = 再来一轮（比如改了还没验证）。
    * 不给就直接结束
@@ -196,7 +199,8 @@ export async function runTurn(
       ...(uploads.size > 0 ? { uploads } : {}),
       ...(skills.size > 0 ? { skills } : {}),
     })
-    const messages = deps.prompt ? withPrompt(history, deps.prompt) : history
+    const prompt = typeof deps.prompt === 'function' ? deps.prompt() : deps.prompt
+    const messages = prompt ? withPrompt(history, prompt) : history
 
     const pending: ToolCallRequest[] = []
     const produced: DomiEvent[] = []

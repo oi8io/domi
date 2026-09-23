@@ -230,23 +230,6 @@ export function ProjectView({
               ))}
             </select>
           </label>
-          <label className="grid gap-1">
-            <span className="font-medium">{tr('web.project.reviewPlan')}</span>
-            <span className="text-[11.5px] text-mut">{tr('web.project.reviewPlanHint')}</span>
-            <select
-              className="field-input"
-              value={settings.planReview}
-              onChange={(e) =>
-                act(client.updateProject(project.id, { settings: { planReview: e.target.value as 'auto' } }))
-              }
-            >
-              {Object.entries(MODE_LABEL()).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
           <div>
             <Button variant="danger" onClick={() => act(client.archiveProject(project.id, project.archived !== true))}>
               {project.archived ? tr('common.unarchive') : tr('web.project.archive')}

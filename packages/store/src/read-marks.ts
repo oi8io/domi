@@ -13,6 +13,7 @@ export const REPLY_TYPES = [
   'tool.result',
   'error',
   'plan.proposed',
+  'plan.update',
   'task.end',
   'verify.required',
 ] as const

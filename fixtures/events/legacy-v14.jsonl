@@ -1,0 +1,2 @@
+{"seq": 43, "sessionId": "legacy", "parentSeq": 42, "ts": 1758700000000, "schemaVersion": 14, "ev": {"t": "plan.update", "steps": [{"id": "s1", "text": "读现有实现", "status": "done"}, {"id": "s2", "text": "改 a.ts", "status": "in_progress", "dependsOn": ["s1"]}]}}
+{"seq": 44, "sessionId": "legacy", "parentSeq": 43, "ts": 1758700000001, "schemaVersion": 14, "ev": {"t": "plan.decided", "approved": true, "shape": "single", "source": "user"}}

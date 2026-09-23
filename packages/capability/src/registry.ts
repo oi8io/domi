@@ -50,9 +50,17 @@ export interface ToolHooks {
 }
 
 /**
- * 预算闸门（PRD-M7-009）：每次调用之前、权限之前问一次。stop = 这次不执行，本轮该结束了
+ * 调用前的闸门（权限之前）：
+ * - stop（预算，PRD-M7-009）= 这次不执行，本轮该结束了；
+ * - reject（计划，PRD-M12-004 AC-8 / AC-9）= 这次不执行，原因写进工具结果，本轮照常继续——模型按原因改做法。
+ *   reject 不落 permission 事件：这不是权限决定
  */
-export type ToolGate = (call: ToolCallInfo) => Promise<{ stop: boolean; message?: string; events: DomiEvent[] }>
+export type ToolGate = (call: ToolCallInfo) => Promise<{
+  stop: boolean
+  message?: string
+  reject?: { reason: string; message: string }
+  events: DomiEvent[]
+}>
 
 export interface ToolRegistryOptions {
   cwd: string
@@ -131,6 +139,9 @@ export class ToolRegistry {
           events: gateEvents,
           payload: { message: g.message ?? '用量到了上限，用户选择停止。不要再调用工具，总结目前的进展后结束。' },
         }
+      }
+      if (g.reject) {
+        return { ok: false, reason: g.reject.reason, events: gateEvents, payload: { message: g.reject.message } }
       }
     }
 

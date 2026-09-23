@@ -31,9 +31,10 @@ import { z } from 'zod'
  * v12 → v13：M12——新增 `permissions.mode.switch`（会话确认模式：always-ask / on-demand / allow-all，PRD-M12-002）；
  *          `mode.switch` 不再产生（M12-004 取消计划 / 执行模式），类型保留以读旧会话；
  *          `permission.source: mode` 的含义从「计划模式拒绝的」改为「确认模式为全部放行时放行的」（PRD-M12-002 回写 2026-09-23）。
+ * v13 → v14：M12-004 第二轮——新增 `plan.update`（整份计划 + 每步状态，任务里动手前必须有）；`plan.proposed` 不再产生，类型保留。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 13
+export const SCHEMA_VERSION = 14
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -324,6 +325,23 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
    * 类型留在联合里是为了 v10–v12 写下的旧会话还能按已知事件读（INV-01：事件只增不改，删类型等于改历史）
    */
   z.looseObject({ t: z.literal('mode.switch'), to: z.enum(['plan', 'act']), reason: z.string().optional() }),
+  /**
+   * M12-004 第二轮：计划（整份替换，同 Claude Code 的 TodoWrite），投影只看最后一条。
+   * 任务会话里动手前必须有它（PRD-M12-004 AC-8）；常驻上下文
+   */
+  z.looseObject({
+    t: z.literal('plan.update'),
+    steps: z.array(
+      z.looseObject({
+        id: z.string(),
+        text: z.string(),
+        status: z.enum(['pending', 'in_progress', 'done', 'skipped']),
+        dependsOn: z.array(z.string()).optional(),
+      }),
+    ),
+    note: z.string().optional(),
+  }),
+  /** M7-005：模型提交的计划全文。M12-004 第二轮起不再产生（由 plan.update 取代），类型保留读旧会话 */
   z.looseObject({
     t: z.literal('plan.proposed'),
     plan: z.string(),
@@ -337,7 +355,7 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     comment: z.string().optional(),
     asTask: z.boolean().optional(),
     runId: z.string().optional(),
-    /** M8-005：最后按哪种形态执行；谁批的（policy = 项目的审阅策略说不用问人） */
+    /** M8-005：最后按哪种形态执行；谁批的（policy = 项目的审阅策略说不用问人；M12 起只有 user） */
     shape: z.enum(['single', 'dag']).optional(),
     source: z.enum(['user', 'policy']).optional(),
   }),

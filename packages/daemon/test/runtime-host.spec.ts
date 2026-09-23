@@ -64,6 +64,14 @@ let n = 0
 const call = (d: Daemon, c: Conn, method: string, params: unknown = {}) =>
   d.handle(c, { jsonrpc: '2.0', id: ++n, method, params })
 
+/** 任务会话里动手前要有计划（PRD-M12-004 AC-8）：测试脚本先写一步计划 */
+const PLAN_STEP = {
+  type: 'tool-call' as const,
+  id: 'p0',
+  name: 'plan.update',
+  args: { steps: [{ id: 's1', text: '写文件', status: 'in_progress' }] },
+}
+
 describe('RuntimeHost', () => {
   test('建会话 → 列得出来', async () => {
     const { daemon } = setup()
@@ -105,6 +113,8 @@ describe('RuntimeHost', () => {
   test('需要确认的工具：询问推到客户端，允许之后文件才真的写下去', async () => {
     const { daemon, dir } = setup(
       new StubProvider([
+        // 任务里动手前先写计划（PRD-M12-004 AC-8）
+        [PLAN_STEP],
         [{ type: 'tool-call', id: 'c1', name: 'fs.write', args: { path: 'out.txt', content: '来自 Web' } }],
         [{ type: 'delta', text: '写好了' }],
       ]),

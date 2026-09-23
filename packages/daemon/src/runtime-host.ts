@@ -394,20 +394,13 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       // 自由会话（M8-004）：不带项目上下文，命令每次都问
       const chat: Partial<SessionOptions> =
         row.kind === 'chat' ? { projectContext: false, askAlways: ['shell.exec'] } : {}
-      // 任务：计划审阅策略取所在项目的设置，每次现读（设置页改了就生效）
-      const projectId = row.projectId
-      const planReview: Partial<SessionOptions> =
-        projectId === null
-          ? {}
-          : {
-              planReview: () => {
-                try {
-                  return projects.get(projectId).settings.planReview
-                } catch {
-                  return 'always'
-                }
-              },
-            }
+      // 计划必须（PRD-M12-004 AC-8）：任务的顶层会话。长任务的运行会话（run-…）只编排不调模型，
+      // 子 agent / 长任务节点（spawnedBy）本身就是计划里的一步，审阅会话只读——都不强制
+      const planRequired =
+        row.kind === 'task' &&
+        row.spawnedBy === null &&
+        !sessionId.startsWith('run-') &&
+        !sessionId.startsWith(REVIEW_PREFIX)
       // 隔离会话被删过又恢复时 worktree 目录已经清掉了：按分支重新挂上（M7-006）
       const tree = await worktreeOf(sessionId)
       if (tree) await wt(() => ensureWorktree(tree))
@@ -425,7 +418,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         // 花费与预算的金额上限（M7-009）
         pricing: pricingOf(opts.config),
         ...chat,
-        ...planReview,
+        planRequired,
         ...extra,
         // 计划批准后转长任务（M7-005）：同一个 TaskService
         startTask: async (spec, cwd) => {

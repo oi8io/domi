@@ -38,11 +38,11 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
     //   2. fixtures/events/legacy-v{n}.jsonl 补了吗？
     //   3. packages/protocol/.api.md 重新生成了吗？
     // 三个都答完再改数字。这条测试的价值就在于逼人停一下。
-    expect(SCHEMA_VERSION).toBe(13)
+    expect(SCHEMA_VERSION).toBe(14)
     const tags = DomiEventSchema.options.map(
       (o) => (o.shape.t as unknown as { _zod: { def: { values: string[] } } })._zod.def.values[0],
     )
-    expect(tags).toHaveLength(41)
+    expect(tags).toHaveLength(42)
     expect(new Set(tags).size).toBe(tags.length)
     expect(tags).toContain('fs.snapshot')
     expect(tags).toContain('revert')
@@ -54,6 +54,8 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
     // M12：新增确认模式切换；mode.switch 不再产生但必须还认得（旧会话）
     expect(tags).toContain('permissions.mode.switch')
     expect(tags).toContain('mode.switch')
+    // M12 第二轮：计划
+    expect(tags).toContain('plan.update')
     for (const t of ['task.spawn', 'task.run', 'task.node', 'task.resume', 'task.retry', 'task.end']) {
       expect(tags).toContain(t)
     }

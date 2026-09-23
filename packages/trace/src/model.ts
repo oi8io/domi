@@ -375,6 +375,23 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
           node(env.seq, 'other', ev.to === 'plan' ? tr('trace.planMode') : tr('trace.actMode'), ev.reason ?? ''),
         )
         break
+      case 'plan.update': {
+        const done = ev.steps.filter((x) => x.status === 'done' || x.status === 'skipped').length
+        nodes.push(
+          node(
+            env.seq,
+            'task',
+            tr('core.ev.planUpdate', { done, total: ev.steps.length }),
+            ev.steps
+              .map(
+                (x) =>
+                  `${x.status === 'done' ? '✓' : x.status === 'in_progress' ? '▸' : x.status === 'skipped' ? '–' : '○'} ${x.text}`,
+              )
+              .join('\n'),
+          ),
+        )
+        break
+      }
       case 'plan.proposed':
         nodes.push(node(env.seq, 'task', tr('trace.planProposed'), ev.plan))
         break

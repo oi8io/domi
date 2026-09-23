@@ -64,9 +64,9 @@ describe('PRD-M8-003 AC-5 · 项目详情与全部项目', () => {
     expect(detail).toContain('接手 M3')
   })
 
-  test('项目设置在详情页里：隔离策略与计划审阅策略（PRD-M8-005 AC-3 / M8-006 AC-1）', () => {
+  test('项目设置在详情页里：隔离策略（PRD-M8-006 AC-1）；计划审阅策略已移除，审批跟会话确认模式走（PRD v1.15）', () => {
     expect(detail).toContain('在单独的工作区里改')
-    expect(detail).toContain('计划先给我审')
+    expect(detail).not.toContain('计划先给我审')
     // 界面上不出现「隔离会话」（PRD-M8-006 AC-2）
     expect(detail).not.toContain('隔离会话')
   })

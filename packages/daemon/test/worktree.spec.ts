@@ -112,6 +112,15 @@ function setup(script: Array<Array<Record<string, unknown>>> = [[{ type: 'delta'
 }
 
 const WRITES = [
+  // 任务里动手前先写计划（PRD-M12-004 AC-8）
+  [
+    {
+      type: 'tool-call',
+      id: 'p0',
+      name: 'plan.update',
+      args: { steps: [{ id: 's1', text: '写文件', status: 'in_progress' }] },
+    },
+  ],
   [
     { type: 'tool-call', id: 'w1', name: 'fs.write', args: { path: 'b.txt', content: '新文件 b\n' } },
     { type: 'tool-call', id: 'w2', name: 'fs.write', args: { path: 'keep.txt', content: '改过的 keep\n' } },

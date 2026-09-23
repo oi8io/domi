@@ -51,6 +51,7 @@ const TAG: Record<TranscriptItem['kind'], TrajTag> = {
   error: 'system',
   context: 'context',
   task: 'system',
+  plan: 'system',
 }
 
 export function trajectoryTurns(items: readonly TranscriptItem[]): TrajTurn[] {
