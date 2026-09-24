@@ -37,7 +37,8 @@ export function groupRows(items: readonly TranscriptItem[]): Row[] {
 
 /** 每一轮的范围：从这一轮的用户输入，到下一轮用户输入之前。最后一轮的终点交给 daemon 截（PRD-M3-005） */
 export function turnRanges(items: readonly TranscriptItem[]): Array<{ seq: number; fromSeq: number; toSeq: number }> {
-  const users = items.filter((i) => i.kind === 'user')
+  // 运行中补充（PRD-M13-001 AC-4）不是轮边界
+  const users = items.filter((i) => i.kind === 'user' && i.note !== true)
   return users.map((u, i) => {
     const next = users[i + 1]
     return { seq: u.seq, fromSeq: u.seq, toSeq: next === undefined ? Number.MAX_SAFE_INTEGER : next.seq - 1 }
@@ -102,7 +103,14 @@ function ItemBody({ item }: { item: TranscriptItem }) {
     case 'user':
       return (
         <div className="rounded-md border border-accent-b bg-accent-d px-3.5 py-2.5">
-          <div className={cn(ROLE, 'text-accent')}>{tr('web.transcript.you')}</div>
+          <div className={cn(ROLE, 'text-accent')}>
+            {tr('web.transcript.you')}
+            {item.note === true && (
+              <span className="ml-1.5 rounded-sm border border-accent-b px-1 text-[10px] font-normal" data-note="">
+                {tr('web.transcript.note')}
+              </span>
+            )}
+          </div>
           <div className={TEXT}>{item.text}</div>
         </div>
       )
@@ -249,26 +257,27 @@ export function Transcript({
         ) : (
           <li key={row.item.seq} className="group relative" data-row={row.item.kind} data-seq={row.item.seq}>
             <ItemBody item={row.item} />
-            {(onBranch !== undefined || (onQuote !== undefined && row.item.kind === 'user')) && (
-              <RowActions>
-                {onQuote !== undefined && row.item.kind === 'user' && (
-                  <button
-                    type="button"
-                    className={ACTION_BTN}
-                    data-action="quote"
-                    title={tr('web.transcript.quoteTurnHint')}
-                    onClick={() => {
-                      const t = turns.get(row.item.seq)
-                      if (t) onQuote({ fromSeq: t.fromSeq, toSeq: t.toSeq, label: row.item.text.slice(0, 40) })
-                    }}
-                  >
-                    <IconQuote size={11} />
-                    {tr('web.transcript.quoteTurn')}
-                  </button>
-                )}
-                {onBranch !== undefined && <BranchButton seq={row.item.seq} onBranch={onBranch} />}
-              </RowActions>
-            )}
+            {(onBranch !== undefined || (onQuote !== undefined && row.item.kind === 'user')) &&
+              row.item.note !== true && (
+                <RowActions>
+                  {onQuote !== undefined && row.item.kind === 'user' && (
+                    <button
+                      type="button"
+                      className={ACTION_BTN}
+                      data-action="quote"
+                      title={tr('web.transcript.quoteTurnHint')}
+                      onClick={() => {
+                        const t = turns.get(row.item.seq)
+                        if (t) onQuote({ fromSeq: t.fromSeq, toSeq: t.toSeq, label: row.item.text.slice(0, 40) })
+                      }}
+                    >
+                      <IconQuote size={11} />
+                      {tr('web.transcript.quoteTurn')}
+                    </button>
+                  )}
+                  {onBranch !== undefined && <BranchButton seq={row.item.seq} onBranch={onBranch} />}
+                </RowActions>
+              )}
           </li>
         ),
       )}

@@ -1,0 +1,2 @@
+{"seq": 45, "sessionId": "legacy", "parentSeq": 44, "ts": 1758800000000, "schemaVersion": 15, "ev": {"t": "user.note", "id": "n-1", "text": "顺便把测试也跑一下", "from": "domi-web"}}
+{"seq": 46, "sessionId": "legacy", "parentSeq": 45, "ts": 1758800000001, "schemaVersion": 15, "ev": {"t": "error", "scope": "loop", "message": "本轮被用户中断", "recoverable": true, "stopReason": "interrupted", "by": "domi-tui"}}

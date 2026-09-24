@@ -42,7 +42,8 @@ export const SPAWN_PROMPT = (goal: string): string =>
 export interface ChildSession {
   on(k: 'onAsk', fn: (ask: PendingAskLike | null) => void): unknown
   on(k: 'onEvents', fn: (envs: EventEnvelope[]) => void): unknown
-  submit(text: string): Promise<{ stopReason: string }>
+  /** signal：父轮被中断时一起停（PRD-M13-002 · SPEC-M13-002 取舍-4） */
+  submit(text: string, opts?: { signal?: AbortSignal }): Promise<{ stopReason: string }>
   lastAnswer(): Promise<string>
   flushAndClose(): Promise<void>
 }
@@ -70,7 +71,7 @@ let counter = 0
 export async function runSubAgent(
   parent: SpawnParent,
   args: SpawnArgs,
-  opts: { sessionId?: string; depth?: number } = {},
+  opts: { sessionId?: string; depth?: number; signal?: AbortSignal } = {},
 ): Promise<SpawnResult> {
   counter += 1
   const childSessionId = opts.sessionId ?? `${parent.id}.sub-${Date.now().toString(36)}${counter}`
@@ -83,7 +84,10 @@ export async function runSubAgent(
   child.on('onAsk', (ask) => parent.forwardAsk(ask))
   if (childEvents) child.on('onEvents', (envs) => childEvents(childSessionId, envs))
   try {
-    const r = await child.submit(SPAWN_PROMPT(args.goal))
+    const r = await child.submit(SPAWN_PROMPT(args.goal), opts.signal === undefined ? {} : { signal: opts.signal })
+    if (r.stopReason === 'interrupted') {
+      return { childSessionId, ok: false, conclusion: '子 agent 被用户中断，没有做完。' }
+    }
     const conclusion = await child.lastAnswer()
     return {
       childSessionId,
@@ -106,7 +110,8 @@ export function makeSpawnTool(parent: SpawnParent): Tool<SpawnArgs, SpawnResult>
       '你只会收到它最后的结论。适合「读一堆文件后总结」这类会把上下文撑大的活。',
     schema: SpawnArgs,
     async execute(args, ctx) {
-      const r = await runSubAgent(parent, args)
+      // 父轮被中断时子 agent 一起停，不让父轮干等它跑完（SPEC-M13-002 取舍-4）
+      const r = await runSubAgent(parent, args, { signal: ctx.signal })
       ctx.emit({
         t: 'task.spawn',
         childSessionId: r.childSessionId,

@@ -32,9 +32,11 @@ import { z } from 'zod'
  *          `mode.switch` 不再产生（M12-004 取消计划 / 执行模式），类型保留以读旧会话；
  *          `permission.source: mode` 的含义从「计划模式拒绝的」改为「确认模式为全部放行时放行的」（PRD-M12-002 回写 2026-09-23）。
  * v13 → v14：M12-004 第二轮——新增 `plan.update`（整份计划 + 每步状态，任务里动手前必须有）；`plan.proposed` 不再产生，类型保留。
+ * v14 → v15：M13——新增 `user.note`（运行中补充，在安全点送达，不是轮边界）；`error` 新增可选的 `stopReason` / `by`
+ *          （这一轮因何停下、中断来自哪个端）；`user.input` 新增可选的 `noteIds`（由残留补充拼成的那句话）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 14
+export const SCHEMA_VERSION = 15
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -102,6 +104,22 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     files: z.array(z.string()).optional(),
     /** M8-010：这一轮强制注入的 Skill 名字 */
     skills: z.array(z.string()).optional(),
+    /**
+     * M13：这句话是由哪些补充拼成的（上一轮正常收场后才到的补充，daemon 用它们开了这一轮，SPEC-M13-001 取舍-4）。
+     * 端上凭它把本地排队的补充认作「已送达」
+     */
+    noteIds: z.array(z.string()).optional(),
+  }),
+  /**
+   * M13：运行中补充（PRD-M13-001）。agent 跑着时用户补的一句，由 loop 在安全点（每步开头 / 收场前）落盘，
+   * 所以它在流里的位置就是模型真正看到它的位置。**不是轮边界**——轮仍然只按 user.input 切。
+   * id 是 daemon 分配的 noteId（端上凭它把「排队中」对上「已送达」）；from 是发送端的名字
+   */
+  z.looseObject({
+    t: z.literal('user.note'),
+    id: z.string(),
+    text: z.string(),
+    from: z.string().optional(),
   }),
   z.looseObject({
     t: z.literal('model.request'),
@@ -435,6 +453,10 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
         elapsedMs: z.number().int().nonnegative(),
       })
       .optional(),
+    /** M13：这一轮为什么停下（kernel 的 StopReason，如 interrupted / max_tool_calls）。可选——旧事件没有 */
+    stopReason: z.string().optional(),
+    /** M13：中断来自哪个端（PRD-M13-002 AC-4）。只在 stopReason = interrupted 时有 */
+    by: z.string().optional(),
   }),
 ])
 export type DomiEvent = z.infer<typeof DomiEventSchema>

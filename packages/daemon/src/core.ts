@@ -110,7 +110,11 @@ export interface ClientConn {
 /** daemon 需要的会话能力。runtime 的 DomiSession 满足它——但 core 不 import runtime */
 export interface SessionHandle {
   readonly id: string
-  submit(text: string, refs?: readonly RefLink[], inputs?: SubmitExtras): Promise<unknown>
+  /**
+   * 跑一轮。run 是 daemon 给这一轮的补充队列与中断信号（PRD-M13）；返回值带 stopReason 时 daemon 据此决定
+   * 残留的补充是开下一轮还是退回（SPEC-M13-001 取舍-4）。老宿主不认 run、返回别的 → 当作正常收场
+   */
+  submit(text: string, refs?: readonly RefLink[], inputs?: SubmitExtras, run?: TurnRun): Promise<unknown>
   /** 校验并规整引用；不成立时抛 InvalidRefError。在接受提交之前调 */
   checkRefs?(refs: readonly RefLink[]): Promise<RefLink[]>
   /** 校验附件 / 文件 / 技能（PRD-M8-010）；不成立时抛 InvalidInputError */
@@ -139,6 +143,33 @@ export interface SessionHandle {
   head(): Promise<number>
   close(): Promise<void>
 }
+
+/** 一条排队中的补充（PRD-M13-001） */
+export interface QueuedNote {
+  id: string
+  text: string
+  from?: string
+}
+
+/**
+ * daemon 交给这一轮的东西（SPEC-M13-001 取舍-1 · SPEC-M13-002 取舍-1）：
+ * notes 在安全点来取（取走即清空）；signal 是中断信号，reason = { by: 端名 }；
+ * noteIds 只在「用残留的补充开下一轮」时有——这一轮的 user.input 就是这些补充
+ */
+export interface TurnRun {
+  notes: { take(): readonly QueuedNote[] }
+  signal: AbortSignal
+  noteIds?: readonly string[]
+}
+
+/** daemon 发起的一轮：补充队列 + 中断开关。从占住「忙」的那一刻起就在，到释放「忙」为止 */
+interface ActiveTurn {
+  queue: QueuedNote[]
+  ac: AbortController
+}
+
+let noteCounter = 0
+const newNoteId = (): string => `n-${Date.now().toString(36)}-${(++noteCounter).toString(36)}`
 
 /** 一轮输入里除文字之外的东西（PRD-M8-010） */
 export interface SubmitExtras {
@@ -399,6 +430,8 @@ export class Daemon {
   private readonly busy = new Set<string>()
   /** 宿主报告的忙闲（真正在跑模型/工具）。订阅时补发，重连的客户端才知道「还在跑」 */
   private readonly hostBusy = new Set<string>()
+  /** daemon 发起、正在跑的一轮（PRD-M13）：补充排在这里，中断从这里发 */
+  private readonly active = new Map<string, ActiveTurn>()
   /** 等人回答的询问。任务停在那里等，所以订阅时必须补发——否则后连上来的客户端永远看不见它 */
   private readonly asks = new Map<string, HostAsk & { sessionId: string }>()
   private readonly metrics = new Map<string, HostMetrics>()
@@ -981,6 +1014,9 @@ export class Daemon {
         for (const ask of this.asks.values()) {
           if (ask.sessionId === p.sessionId) conn.send(this.askNotice(p.sessionId, ask))
         }
+        // 排队中的补充（PRD-M13-001 AC-5）：有一轮在跑就补发一次，哪怕是空的——端上据此核对本地副本
+        const turn = this.active.get(p.sessionId)
+        if (turn) conn.send(notify('session.notes', { sessionId: p.sessionId, pending: [...turn.queue] }))
         const wm = p.fromSeq === 0 ? session.windowMeta : undefined
         return ok(req.id, {
           head: await session.head(),
@@ -1010,49 +1046,51 @@ export class Daemon {
 
       case 'session.submit': {
         const p = params as { sessionId: string; text: string; refs?: RefLink[] } & SubmitExtras
-        // **检查与占位之间不许有 await。**
-        // 第一版把 `this.busy.add` 放在 `await this.session(...)` 之后，
-        // 于是十个并发请求全都在任何一个占住之前通过了检查——十个全被接受。
-        // 这是 M3-004 存在的理由本身，而它是被那条十客户端的测试抓出来的，不是想出来的。
-        if (this.busy.has(p.sessionId)) {
-          // 不排队也不丢弃：排队让用户以为没发出去，丢弃让他以为发出去了（AC-3）
-          return failKey(req.id, 'SESSION_BUSY', 'error.busy.submit')
-        }
-        this.busy.add(p.sessionId)
+        const refused = await this.acceptTurn(req.id, p)
+        return refused ?? ok(req.id, { accepted: true })
+      }
 
-        let session: SessionHandle | null
-        let refs: RefLink[] = []
-        try {
-          session = await this.session(p.sessionId)
-          // 缺凭据要在接受之前说：接受之后才失败的话，界面只会看到一轮莫名其妙的空转
-          if (session?.checkReady) await session.checkReady()
-          // 引用要在接受之前校验：接受之后的错误只会被吞掉，用户以为引用成功了
-          if (session && p.refs && p.refs.length > 0) {
-            if (!session.checkRefs)
-              throw new InvalidRefError(tr('error.unsupported', { feature: tr('error.feature.refs') }))
-            refs = await session.checkRefs(p.refs)
-          }
-          if (session && hasExtras(p)) {
-            if (!session.checkInputs)
-              throw InvalidInputError.keyed('INVALID', 'error.unsupported', { feature: ref('error.feature.composer') })
-            await session.checkInputs(extrasOf(p))
-          }
-        } catch (e) {
-          this.busy.delete(p.sessionId)
-          throw e
+      case 'session.note': {
+        const p = params as { sessionId: string; text: string }
+        const turn = this.active.get(p.sessionId)
+        if (turn) {
+          // 有一轮在跑（含「已接受、还在校验」）：进队列，下一个安全点送达（PRD-M13-001）
+          const from = this.clientNames.get(conn.id)
+          const note: QueuedNote = { id: newNoteId(), text: p.text, ...(from === undefined ? {} : { from }) }
+          turn.queue.push(note)
+          this.broadcastNotes(p.sessionId)
+          return ok(req.id, { state: 'queued' as const, noteId: note.id })
         }
-        if (!session) {
-          this.busy.delete(p.sessionId)
-          return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
-        }
+        // 会话被 host 自己占着（评审、定时任务、长任务节点）：没人会来取，不排队
+        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.submit')
+        // 完全空闲：就是一次普通提交
+        const refused = await this.acceptTurn(req.id, p)
+        return refused ?? ok(req.id, { state: 'submitted' as const })
+      }
 
-        // **不 await**：提交是异步的，客户端拿到 accepted 就该回去等事件推送。
-        // await 的话，一次长任务会把这条连接的响应通道占住
-        void session
-          .submit(p.text, refs.length > 0 ? refs : undefined, hasExtras(p) ? extrasOf(p) : undefined)
-          .catch(() => undefined)
-          .finally(() => this.busy.delete(p.sessionId))
-        return ok(req.id, { accepted: true })
+      case 'session.note.withdraw': {
+        const p = params as { sessionId: string; noteId: string }
+        const turn = this.active.get(p.sessionId)
+        const i = turn?.queue.findIndex((n) => n.id === p.noteId) ?? -1
+        if (!turn || i < 0) return ok(req.id, { withdrawn: false })
+        turn.queue.splice(i, 1)
+        this.broadcastNotes(p.sessionId)
+        return ok(req.id, { withdrawn: true })
+      }
+
+      case 'session.interrupt': {
+        const p = params as { sessionId: string }
+        const turn = this.active.get(p.sessionId)
+        if (!turn || turn.ac.signal.aborted) return ok(req.id, { interrupted: false })
+        turn.ac.abort({ by: this.clientNames.get(conn.id) ?? 'unknown' })
+        // 挂着的询问一并结掉：不结的话工具一直在等回答，中断形同虚设（SPEC-M13-002 取舍-3）
+        for (const [askId, ask] of this.asks) {
+          if (ask.sessionId !== p.sessionId) continue
+          this.asks.delete(askId)
+          ask.answer(false, undefined, 'interrupt')
+          this.broadcast(p.sessionId, notify('session.askDone', { sessionId: p.sessionId, askId, allowed: false }))
+        }
+        return ok(req.id, { interrupted: true })
       }
 
       case 'session.compact': {
@@ -1092,6 +1130,141 @@ export class Daemon {
       default:
         return failKey(req.id, 'UNKNOWN_METHOD', 'error.not_implemented', { method })
     }
+  }
+
+  /**
+   * 接受一轮输入（session.submit 与空闲时的 session.note 共用）。被拒返回错误响应；接受了返回 null，
+   * 这一轮在后台跑，不等它。
+   */
+  private async acceptTurn(
+    reqId: string | number,
+    p: { sessionId: string; text: string; refs?: RefLink[] } & SubmitExtras,
+  ): Promise<RpcResponse | null> {
+    // **检查与占位之间不许有 await。**
+    // 第一版把 `this.busy.add` 放在 `await this.session(...)` 之后，
+    // 于是十个并发请求全都在任何一个占住之前通过了检查——十个全被接受。
+    // 这是 M3-004 存在的理由本身，而它是被那条十客户端的测试抓出来的，不是想出来的。
+    if (this.busy.has(p.sessionId)) {
+      // 不排队也不丢弃：排队让用户以为没发出去，丢弃让他以为发出去了（AC-3）。
+      // 运行中想补一句走 session.note——它的队列看得见（PRD-M13-001 AC-5）
+      return failKey(reqId, 'SESSION_BUSY', 'error.busy.submit')
+    }
+    this.busy.add(p.sessionId)
+    // 队列与中断开关跟「忙」同时出现：校验期间来的补充也有地方排（SPEC-M13-001 取舍-1）
+    const turn: ActiveTurn = { queue: [], ac: new AbortController() }
+    this.active.set(p.sessionId, turn)
+
+    let session: SessionHandle | null
+    let refs: RefLink[] = []
+    try {
+      session = await this.session(p.sessionId)
+      // 缺凭据要在接受之前说：接受之后才失败的话，界面只会看到一轮莫名其妙的空转
+      if (session?.checkReady) await session.checkReady()
+      // 引用要在接受之前校验：接受之后的错误只会被吞掉，用户以为引用成功了
+      if (session && p.refs && p.refs.length > 0) {
+        if (!session.checkRefs)
+          throw new InvalidRefError(tr('error.unsupported', { feature: tr('error.feature.refs') }))
+        refs = await session.checkRefs(p.refs)
+      }
+      if (session && hasExtras(p)) {
+        if (!session.checkInputs)
+          throw InvalidInputError.keyed('INVALID', 'error.unsupported', { feature: ref('error.feature.composer') })
+        await session.checkInputs(extrasOf(p))
+      }
+    } catch (e) {
+      this.endTurn(p.sessionId, turn, false)
+      throw e
+    }
+    if (!session) {
+      this.endTurn(p.sessionId, turn, false)
+      return failKey(reqId, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
+    }
+    this.launch(
+      p.sessionId,
+      session,
+      turn,
+      p.text,
+      refs.length > 0 ? refs : undefined,
+      hasExtras(p) ? extrasOf(p) : undefined,
+    )
+    return null
+  }
+
+  /**
+   * 让宿主跑这一轮。**不 await**：提交是异步的，客户端拿到 accepted 就该回去等事件推送。
+   * await 的话，一次长任务会把这条连接的响应通道占住
+   */
+  private launch(
+    sessionId: string,
+    session: SessionHandle,
+    turn: ActiveTurn,
+    text: string,
+    refs?: readonly RefLink[],
+    extras?: SubmitExtras,
+    noteIds?: readonly string[],
+  ): void {
+    if (turn.ac.signal.aborted) {
+      // 还在校验时就被中断了：这一轮不跑
+      this.endTurn(sessionId, turn, false)
+      return
+    }
+    const run: TurnRun = {
+      notes: {
+        take: () => {
+          const out = turn.queue
+          if (out.length === 0) return out
+          turn.queue = []
+          this.broadcastNotes(sessionId)
+          return out
+        },
+      },
+      signal: turn.ac.signal,
+      ...(noteIds === undefined ? {} : { noteIds }),
+    }
+    void session.submit(text, refs, extras, run).then(
+      (r) => {
+        const stop = (r as { stopReason?: unknown } | undefined)?.stopReason
+        this.endTurn(sessionId, turn, stop === undefined || stop === 'completed', session)
+      },
+      () => this.endTurn(sessionId, turn, false),
+    )
+  }
+
+  /**
+   * 这一轮收场（SPEC-M13-001 取舍-4）。**判定与释放「忙」之间不许有 await**：
+   * 正常收场还有残留补充 → 不释放，直接用它们开下一轮（等于会话空闲时发送）；
+   * 否则释放，残留退回给发送端。
+   */
+  private endTurn(sessionId: string, turn: ActiveTurn, completed: boolean, session?: SessionHandle): void {
+    const leftover = turn.queue
+    turn.queue = []
+    if (leftover.length > 0 && completed && session && !turn.ac.signal.aborted) {
+      const next: ActiveTurn = { queue: [], ac: new AbortController() }
+      this.active.set(sessionId, next)
+      this.broadcastNotes(sessionId)
+      this.launch(
+        sessionId,
+        session,
+        next,
+        leftover.map((n) => n.text).join('\n\n'),
+        undefined,
+        undefined,
+        leftover.map((n) => n.id),
+      )
+      return
+    }
+    if (this.active.get(sessionId) === turn) this.active.delete(sessionId)
+    this.busy.delete(sessionId)
+    if (leftover.length > 0) {
+      this.broadcast(sessionId, notify('session.notes', { sessionId, pending: [] }))
+      this.broadcast(sessionId, notify('session.notes.returned', { sessionId, notes: leftover }))
+    }
+  }
+
+  /** 补充队列变了：推给这个会话的所有订阅者 */
+  private broadcastNotes(sessionId: string): void {
+    const pending = this.active.get(sessionId)?.queue ?? []
+    this.broadcast(sessionId, notify('session.notes', { sessionId, pending: [...pending] }))
   }
 
   private isBusy(id: string): boolean {

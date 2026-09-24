@@ -3812,6 +3812,115 @@
         ]
       }
     },
+    "session.note": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200000
+          }
+        },
+        "required": [
+          "sessionId",
+          "text"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "const": "queued"
+              },
+              "noteId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "state",
+              "noteId"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "const": "submitted"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        ]
+      }
+    },
+    "session.note.withdraw": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "noteId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId",
+          "noteId"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "withdrawn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "withdrawn"
+        ]
+      }
+    },
+    "session.interrupt": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "interrupted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "interrupted"
+        ]
+      }
+    },
     "session.subscribe": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3993,10 +4102,40 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "noteIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             }
                           },
                           "required": [
                             "t",
+                            "text"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "string",
+                              "const": "user.note"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "from": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "id",
                             "text"
                           ],
                           "additionalProperties": {}
@@ -5547,6 +5686,12 @@
                                 "argParseRetries",
                                 "elapsedMs"
                               ]
+                            },
+                            "stopReason": {
+                              "type": "string"
+                            },
+                            "by": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -5803,10 +5948,40 @@
                               "items": {
                                 "type": "string"
                               }
+                            },
+                            "noteIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
                             }
                           },
                           "required": [
                             "t",
+                            "text"
+                          ],
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "t": {
+                              "type": "string",
+                              "const": "user.note"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "text": {
+                              "type": "string"
+                            },
+                            "from": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "t",
+                            "id",
                             "text"
                           ],
                           "additionalProperties": {}
@@ -7357,6 +7532,12 @@
                                 "argParseRetries",
                                 "elapsedMs"
                               ]
+                            },
+                            "stopReason": {
+                              "type": "string"
+                            },
+                            "by": {
+                              "type": "string"
                             }
                           },
                           "required": [
@@ -7645,6 +7826,78 @@
         "required": [
           "sessionId",
           "busy"
+        ]
+      }
+    },
+    "session.notes": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "text"
+              ]
+            }
+          }
+        },
+        "required": [
+          "sessionId",
+          "pending"
+        ]
+      }
+    },
+    "session.notes.returned": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "text"
+              ]
+            }
+          }
+        },
+        "required": [
+          "sessionId",
+          "notes"
         ]
       }
     },

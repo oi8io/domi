@@ -50,7 +50,12 @@ export function Line({
   const prefix = PREFIX[item.kind]
   switch (item.kind) {
     case 'user':
-      return <Text {...t.fg('ok')}>{`${prefix} ${item.text}`}</Text>
+      // 运行中补充（PRD-M13-001）：标出来，在模型真正看到它的位置
+      return (
+        <Text {...t.fg('ok')}>
+          {item.note === true ? `${prefix} ${tr('web.transcript.note')} ${item.text}` : `${prefix} ${item.text}`}
+        </Text>
+      )
     case 'reason':
       // 折叠态：单行「· 思考 · 前 N 字…」，截断口径 = summarizeReason（与 summarizeArgs 同一 80 字符原则）
       return collapsed ? (

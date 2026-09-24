@@ -45,6 +45,7 @@ export function weightLines(ev: AnyEvent): number {
   if (!isKnownEvent(ev)) return 0
   switch (ev.t) {
     case 'user.input':
+    case 'user.note':
       return Math.max(1, Math.ceil((ev.text ?? '').length / 80))
     case 'model.delta':
     case 'model.reason':

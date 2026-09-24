@@ -82,6 +82,7 @@ export function projectText(ev: AnyEvent): string {
   if (!isKnownEvent(ev)) return JSON.stringify(ev)
   switch (ev.t) {
     case 'user.input':
+    case 'user.note':
       return ev.text
     case 'model.delta':
     case 'model.reason':

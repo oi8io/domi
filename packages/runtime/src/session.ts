@@ -46,6 +46,7 @@ import {
   type ContextPolicy,
   contextLevel,
   formatCost,
+  type NoteSource,
   type PricingTable,
   paginateByTurns,
   recoveryEvents,
@@ -1170,7 +1171,18 @@ export class DomiSession {
     return { files: hits.slice(0, limit), truncated: hits.length > limit }
   }
 
-  async submit(text: string, opts: { refs?: readonly RefLink[] } & SubmitInputs = {}): Promise<TurnResult> {
+  async submit(
+    text: string,
+    opts: {
+      refs?: readonly RefLink[]
+      /** 运行中补充的队列（PRD-M13-001）：daemon 持有，loop 在安全点来取 */
+      notes?: NoteSource
+      /** 中断信号（PRD-M13-002）：reason = { by: 端名 } */
+      signal?: AbortSignal
+      /** 这句话由哪些补充拼成（SPEC-M13-001 取舍-4） */
+      noteIds?: readonly string[]
+    } & SubmitInputs = {},
+  ): Promise<TurnResult> {
     this.checkCredential()
     const inputs = this.checkInputs(opts)
     this.busy = true
@@ -1215,13 +1227,16 @@ export class DomiSession {
           // 每次请求模型前现拼：一轮里计划更新了，下一次请求就带上（PRD-M12-004 AC-8）
           prompt: () => this.prompt(),
           beforeComplete: (events) => this.verifyGate(events),
+          ...(opts.notes === undefined ? {} : { notes: opts.notes }),
         },
         this.opts.sessionId,
         {
           text,
           ...(opts.refs && opts.refs.length > 0 ? { refs: opts.refs } : {}),
           ...inputs,
+          ...(opts.noteIds && opts.noteIds.length > 0 ? { noteIds: opts.noteIds } : {}),
         },
+        opts.signal,
       )
       return { ...result, verify: verifyState(await this.view(), { command: this.opts.config.verify?.command }) }
     } finally {

@@ -41,6 +41,23 @@ export interface TranscriptItem {
   ts?: number
   /** 计划卡片（kind = plan，PRD-M12-004 AC-8）：每步文本与状态 */
   plan?: PlanStepView[]
+  /** 运行中补充（kind = user，PRD-M13-001）：在模型真正看到它的位置；不带按轮操作 */
+  note?: boolean
+}
+
+/**
+ * PRD-M13-001 AC-7：退回的补充放回草稿——拼在正在打的字前面，空行分隔，不覆盖。
+ * Web 与 TUI 同一口径（INV-02：三端不各算一套）
+ */
+export function mergeDraft(returned: readonly string[], current: string): string {
+  return [...returned, current].filter((t) => t !== '').join('\n\n')
+}
+
+/** 一条排队中的补充（PRD-M13-001 AC-5） */
+export interface QueuedNoteView {
+  id: string
+  text: string
+  from?: string | undefined
 }
 
 export interface PlanStepView {
@@ -245,6 +262,10 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
   const $hasOlder = atom<boolean>(false)
   /** 正在向上翻页（防重复触发） */
   const $loadingOlder = atom<boolean>(false)
+  /** PRD-M13-001：daemon 那边排队中的补充（所有端发的） */
+  const $notes = atom<QueuedNoteView[]>([])
+  /** PRD-M13-001 AC-7：退回给本端的补充文字，等输入框取走放回草稿 */
+  const $returned = atom<string[]>([])
 
   /** 最后一条 assistant 文本，流式增量往它上面拼 */
   const $streaming = computed($items, (items) => {
@@ -278,6 +299,10 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     switch (ev.t) {
       case 'user.input':
         push({ seq: env.seq, kind: 'user', text: ev.text })
+        break
+      // 运行中补充（PRD-M13-001）：也是用户说的话，标出来
+      case 'user.note':
+        push({ seq: env.seq, kind: 'user', text: ev.text, note: true })
         break
       // 思考与回答都是逐 token 推来的：紧挨着的同类片段拼成一段（BUG-M3-001）
       case 'model.reason':
@@ -583,6 +608,20 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     $hasOlder,
     $loadingOlder,
     $streaming,
+    $notes,
+    $returned,
+    setNotes(pending: readonly QueuedNoteView[]): void {
+      $notes.set([...pending])
+    },
+    addReturned(texts: readonly string[]): void {
+      if (texts.length > 0) $returned.set([...$returned.get(), ...texts])
+    },
+    /** 输入框取走退回的文字（取完清空） */
+    takeReturned(): string[] {
+      const out = $returned.get()
+      if (out.length > 0) $returned.set([])
+      return out
+    },
     applyEvents(envelopes: EventEnvelope[]): void {
       for (const e of envelopes) applyEvent(e)
     },

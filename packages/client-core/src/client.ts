@@ -76,6 +76,17 @@ interface Pending {
 interface Watch {
   store: SessionStore
   lastSeq: number
+  /**
+   * 本端发出、还没见到结局的补充（SPEC-M13-001 取舍-6）：noteId → 文字。
+   * 见到送达、被退回、撤回成功就删；重连后 daemon 没有、也没见送达的，当作退回
+   */
+  sent: Map<string, string>
+  /** 最近一次 subscribe 期间 daemon 推来的队列快照（没推 = 那边没有一轮在跑） */
+  snapshot: Set<string> | null
+  /** 已见到送达的 noteId：note() 的回应比送达事件晚到时，不再把它记成「还在路上」 */
+  delivered: Set<string>
+  /** 退回通知比 note() 的回应先到：先存着，回应到了再认领 */
+  unclaimed: Map<string, string>
 }
 
 export class DomiClient {
@@ -367,6 +378,48 @@ export class DomiClient {
     })
   }
 
+  /**
+   * 运行中补充（PRD-M13-001）：会话在跑 → 排队（queued），下一步送达；空闲 → 就是一次提交（submitted）。
+   * 排队的记进本地副本，结局（送达 / 退回 / 撤回）没见到之前一直记着
+   */
+  async note(sessionId: string, text: string): Promise<ResultOf<'session.note'>> {
+    const r = await this.request('session.note', { sessionId, text })
+    const w = this.watches.get(sessionId)
+    if (w && r.state === 'queued') {
+      const early = w.unclaimed.get(r.noteId)
+      if (early !== undefined) {
+        w.unclaimed.delete(r.noteId)
+        w.store.addReturned([early])
+      } else if (!w.delivered.has(r.noteId)) {
+        w.sent.set(r.noteId, text)
+      }
+    }
+    return r
+  }
+
+  /** 撤回一条还在排队的补充（PRD-M13-001 AC-6）。已送达 / 已退回 → false */
+  async withdrawNote(sessionId: string, noteId: string): Promise<boolean> {
+    const { withdrawn } = await this.request('session.note.withdraw', { sessionId, noteId })
+    if (withdrawn) this.watches.get(sessionId)?.sent.delete(noteId)
+    return withdrawn
+  }
+
+  /** 中断当前轮（PRD-M13-002）。会话闲着 → false */
+  async interrupt(sessionId: string): Promise<boolean> {
+    return (await this.request('session.interrupt', { sessionId })).interrupted
+  }
+
+  /** 本地副本对账：daemon 队列里没有、也没见送达的补充 → 退回输入框 */
+  private reconcileNotes(w: Watch): void {
+    const back: string[] = []
+    for (const [id, text] of w.sent) {
+      if (w.snapshot?.has(id)) continue
+      back.push(text)
+      w.sent.delete(id)
+    }
+    if (back.length > 0) w.store.addReturned(back)
+  }
+
   /** 报告已读到视图第几条（PRD-M8-009）。老 daemon 没有这个方法时静默忽略 */
   async markRead(sessionId: string, seq: number): Promise<boolean> {
     try {
@@ -469,7 +522,14 @@ export class DomiClient {
    * 已经订阅过的会话再调一次只会换 store，续订锚点保持不变。
    */
   async watch(sessionId: string, store: SessionStore): Promise<ResultOf<'session.subscribe'>> {
-    const w = this.watches.get(sessionId) ?? { store, lastSeq: 0 }
+    const w = this.watches.get(sessionId) ?? {
+      store,
+      lastSeq: 0,
+      sent: new Map<string, string>(),
+      snapshot: null,
+      delivered: new Set<string>(),
+      unclaimed: new Map<string, string>(),
+    }
     w.store = store
     this.watches.set(sessionId, w)
     // 必须在 await 之前把 fromSeq 记到局部变量：daemon 端先推 session.events 通知（带 backlog），
@@ -477,7 +537,9 @@ export class DomiClient {
     // 等 await resolve 时 w.lastSeq 早就不是 0 了——之前用 w.lastSeq===0 判定首连永远不成立，
     // setWindowMeta 不执行，hasOlder 永远 false，翻页入口根本不触发。
     const fromSeq = w.lastSeq
+    w.snapshot = null
     const res = await this.request('session.subscribe', { sessionId, fromSeq })
+    this.reconcileNotes(w)
     // PRD-M11-009：首连（fromSeq=0）服务端回尾部窗口，把窗口边界写进 store
     if (fromSeq === 0 && res.oldestSeq !== undefined && res.hasOlder !== undefined) {
       store.setWindowMeta({ oldestSeq: res.oldestSeq, hasOlder: res.hasOlder })
@@ -568,7 +630,10 @@ export class DomiClient {
       this.$lastError.set(null)
       // 重连后按各自的锚点续订。顺序无所谓：每个会话的 seq 独立
       for (const [sessionId, w] of this.watches) {
+        w.snapshot = null
         await this.request('session.subscribe', { sessionId, fromSeq: w.lastSeq })
+        // 断开期间 daemon 可能重启过、队列没了：本端还在等的补充退回输入框（PRD-M13-001 AC-7）
+        this.reconcileNotes(w)
       }
       return r
     } catch (e) {
@@ -617,6 +682,29 @@ export class DomiClient {
       const store = this.watches.get(p.sessionId)?.store
       // 只清同一个询问：答完之后紧接着来了下一个的话，不能把新的也清掉
       if (store && store.$ask.get()?.askId === p.askId) store.setAsk(null)
+    } else if (msg.method === 'session.notes') {
+      const p = msg.params as NotifyParamsOf<'session.notes'>
+      const w = this.watches.get(p.sessionId)
+      if (w) {
+        w.snapshot = new Set(p.pending.map((n) => n.id))
+        w.store.setNotes(p.pending)
+      }
+    } else if (msg.method === 'session.notes.returned') {
+      // 只认领本端发的：别的端发的退回到它们自己的输入框（PRD-M13-001 AC-7）
+      const p = msg.params as NotifyParamsOf<'session.notes.returned'>
+      const w = this.watches.get(p.sessionId)
+      if (w) {
+        const mine: string[] = []
+        for (const n of p.notes) {
+          if (w.sent.has(n.id)) {
+            mine.push(n.text)
+            w.sent.delete(n.id)
+          } else if (!w.delivered.has(n.id)) {
+            w.unclaimed.set(n.id, n.text)
+          }
+        }
+        if (mine.length > 0) w.store.addReturned(mine)
+      }
     } else if (msg.method === 'sessions.changed') {
       this.changedIds = (msg.params as NotifyParamsOf<'sessions.changed'>).sessionIds
       this.$sessionsVersion.set(this.$sessionsVersion.get() + 1)
@@ -643,6 +731,20 @@ export class DomiClient {
     }
     if (fresh.length === 0) return
     w.lastSeq = cursor
+    // 补充送达了：user.note 本身，或由残留补充拼成的 user.input（SPEC-M13-001 取舍-4）
+    for (const e of fresh) {
+      const ev = e.ev as { t: string; id?: unknown; noteIds?: unknown }
+      const ids =
+        ev.t === 'user.note' && typeof ev.id === 'string'
+          ? [ev.id]
+          : ev.t === 'user.input' && Array.isArray(ev.noteIds)
+            ? (ev.noteIds as string[])
+            : []
+      for (const id of ids) {
+        w.sent.delete(id)
+        w.delivered.add(id)
+      }
+    }
     w.store.applyEvents(fresh)
   }
 

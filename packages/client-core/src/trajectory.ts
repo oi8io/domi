@@ -58,7 +58,8 @@ export function trajectoryTurns(items: readonly TranscriptItem[]): TrajTurn[] {
   const turns: TrajTurn[] = []
   let current: TrajTurn | null = null
   for (const it of items) {
-    if (it.kind === 'user' || current === null) {
+    // 运行中补充（PRD-M13-001 AC-4）不开新轮
+    if ((it.kind === 'user' && it.note !== true) || current === null) {
       current = { index: turns.length + 1, rows: [] }
       turns.push(current)
     }

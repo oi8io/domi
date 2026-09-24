@@ -38,11 +38,11 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
     //   2. fixtures/events/legacy-v{n}.jsonl 补了吗？
     //   3. packages/protocol/.api.md 重新生成了吗？
     // 三个都答完再改数字。这条测试的价值就在于逼人停一下。
-    expect(SCHEMA_VERSION).toBe(14)
+    expect(SCHEMA_VERSION).toBe(15)
     const tags = DomiEventSchema.options.map(
       (o) => (o.shape.t as unknown as { _zod: { def: { values: string[] } } })._zod.def.values[0],
     )
-    expect(tags).toHaveLength(42)
+    expect(tags).toHaveLength(43)
     expect(new Set(tags).size).toBe(tags.length)
     expect(tags).toContain('fs.snapshot')
     expect(tags).toContain('revert')
@@ -56,9 +56,44 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
     expect(tags).toContain('mode.switch')
     // M12 第二轮：计划
     expect(tags).toContain('plan.update')
+    // M13：运行中补充
+    expect(tags).toContain('user.note')
     for (const t of ['task.spawn', 'task.run', 'task.node', 'task.resume', 'task.retry', 'task.end']) {
       expect(tags).toContain(t)
     }
+  })
+})
+
+describe('PRD-M13-001 AC-1 / PRD-M13-002 AC-4 · 运行中补充与中断的事件形状', () => {
+  test('user.note 是已知事件：id + text，from 可选', () => {
+    const ev = parseEvent({ t: 'user.note', id: 'n-1', text: '顺便把测试也跑一下', from: 'domi-web' })
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect(ev).toEqual({ t: 'user.note', id: 'n-1', text: '顺便把测试也跑一下', from: 'domi-web' })
+    expect(isUnknownEvent(parseEvent({ t: 'user.note', id: 'n-2', text: 'x' }))).toBe(false)
+  })
+
+  test('user.note 缺 id 或 text → 降级为未知事件，不抛（INV-01）', () => {
+    for (const bad of [
+      { t: 'user.note', text: 'x' },
+      { t: 'user.note', id: 'n-1' },
+    ]) {
+      expect(() => parseEvent(bad)).not.toThrow()
+      expect(isUnknownEvent(parseEvent(bad))).toBe(true)
+    }
+  })
+
+  test('error 可带 stopReason / by；旧的不带照样解析', () => {
+    const ev = parseEvent({
+      t: 'error',
+      scope: 'loop',
+      message: '本轮被中断',
+      recoverable: true,
+      stopReason: 'interrupted',
+      by: 'domi-tui',
+    })
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect(ev).toMatchObject({ stopReason: 'interrupted', by: 'domi-tui' })
+    expect(isUnknownEvent(parseEvent({ t: 'error', scope: 'loop', message: 'x', recoverable: true }))).toBe(false)
   })
 })
 

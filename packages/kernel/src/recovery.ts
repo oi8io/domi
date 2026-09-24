@@ -62,6 +62,18 @@ export function notRunResult(id: string, why: string): DomiEvent {
   return { t: 'tool.result', id, ok: false, payload: { error: `没有执行：${why}` }, ms: 0, reason: 'not_run' }
 }
 
+/** 被用户中断、没来得及跑的调用的结果（PRD-M13-002 AC-3） */
+export function interruptedResult(id: string): DomiEvent {
+  return {
+    t: 'tool.result',
+    id,
+    ok: false,
+    payload: { error: '本轮被用户中断，没有执行。' },
+    ms: 0,
+    reason: 'interrupted',
+  }
+}
+
 /** 补到一致点需要追加的事件。已经一致时返回空数组——可以放心地每次打开会话都调一遍 */
 export function recoveryEvents(events: readonly EventEnvelope[]): DomiEvent[] {
   const s = turnState(events)

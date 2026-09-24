@@ -123,12 +123,17 @@ export function unmarkToolResult(s: string): string {
   return m?.[1] ?? s
 }
 
+/** 运行中补充在上下文里的标记（PRD-M13-001）。与「[运行时提示]」同一风格；模型侧不做 i18n */
+export const NOTE_MARK = '[运行中补充]'
+
 const fullStrategy: ContextStrategy = (events, policy) => {
   const out: ModelMessages = []
   let text = ''
   let calls: ToolCall[] = []
   /** 还没交出去的引用：拼进下一条用户消息的前面 */
   let quoted: string[] = []
+  /** 最近一条补充消息的位置：紧挨着的下一条补充并进它 */
+  let lastNoteAt = -1
 
   const flush = (): void => {
     if (text === '' && calls.length === 0) return
@@ -148,6 +153,18 @@ const fullStrategy: ContextStrategy = (events, policy) => {
         const content = quoted.length > 0 ? `${quoted.join('\n\n')}\n\n${input.text}` : input.text
         out.push(input.images.length > 0 ? { role: 'user', content, images: input.images } : { role: 'user', content })
         quoted = []
+        break
+      }
+      case 'user.note': {
+        // 运行中补充（PRD-M13-001）：一条带标记的 user 消息；连续几条合并成一条
+        flush()
+        const prev = out[out.length - 1]
+        if (prev !== undefined && lastNoteAt === out.length - 1) {
+          out[lastNoteAt] = { role: 'user', content: `${prev.content}\n\n${ev.text}` }
+        } else {
+          out.push({ role: 'user', content: `${NOTE_MARK} ${ev.text}` })
+          lastNoteAt = out.length - 1
+        }
         break
       }
       case 'ctx.ref':

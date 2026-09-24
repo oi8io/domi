@@ -45,6 +45,7 @@ const MIXED = [
   ...load('legacy-v12.jsonl'),
   ...load('legacy-v13.jsonl'),
   ...load('legacy-v14.jsonl'),
+  ...load('legacy-v15.jsonl'),
 ]
 /** v1 代码写下的 error（没有 counters）与 v2 新增的 fs.snapshot —— 新代码都得认得 */
 const V1_V2 = load('legacy-v1-error.jsonl')
@@ -53,7 +54,7 @@ const V2_V3 = load('v2-to-v3.jsonl')
 
 describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
-    expect(MIXED).toHaveLength(44)
+    expect(MIXED).toHaveLength(46)
     for (const e of MIXED) {
       expect(() => parseEvent(e.ev, e.schemaVersion)).not.toThrow()
     }
@@ -90,6 +91,13 @@ describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', (
     }
     const byMode = MIXED.find((e) => e.ev.t === 'permission' && e.ev.source === 'mode')!
     expect(isUnknownEvent(parseEvent(byMode.ev, byMode.schemaVersion))).toBe(false)
+  })
+
+  test('v15（M13）：运行中补充是已知事件；带 stopReason 的 error 仍是已知事件', () => {
+    const note = MIXED.find((e) => e.ev.t === 'user.note')!
+    expect(isUnknownEvent(parseEvent(note.ev, note.schemaVersion))).toBe(false)
+    const stopped = MIXED.find((e) => e.ev.t === 'error' && e.ev.stopReason === 'interrupted')!
+    expect(isUnknownEvent(parseEvent(stopped.ev, stopped.schemaVersion))).toBe(false)
   })
 
   test('已知类型 + 未来新增字段：解析成功且字段必须留下来（passthrough）', () => {

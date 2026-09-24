@@ -57,6 +57,11 @@ export function renderRef(ref: RefLink, events: readonly EventEnvelope[] | undef
         flush()
         lines.push(`用户：${clean(ev.text)}`)
         break
+      case 'user.note':
+        // 运行中补充（PRD-M13-001）
+        flush()
+        lines.push(`用户（补充）：${clean(ev.text)}`)
+        break
       case 'model.delta':
         text += ev.text
         break

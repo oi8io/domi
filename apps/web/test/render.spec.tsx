@@ -58,12 +58,13 @@ describe('状态来自 client-core，页面不自己算', () => {
     expect(html).toContain('data-seq="2"')
   })
 
-  test('忙的时候发送按钮不可点（PRD-M3-004 AC-3 的前端那一半）', () => {
+  test('忙的时候发送变成「补充」（PRD-M13-001 AC-9；原 PRD-M3-004 AC-3 的前端那一半由 session.note 的排队接手）', () => {
     const store = createSessionStore()
     store.setBusy(true)
     const client = new DomiClient({ clientName: 't', connect: neverConnects })
     const html = renderToStaticMarkup(<SessionView client={client} sessionId="s" store={store} />)
-    expect(html).toMatch(/<button type="submit"[^>]*disabled=""[^>]*data-action="send"/)
+    expect(html).not.toMatch(/<button type="submit"[^>]*disabled=""[^>]*data-action="send"/)
+    expect(html).toMatch(/data-action="send"[^>]*>补充</)
   })
 
   test('连接状态与握手失败原因直接显示', () => {

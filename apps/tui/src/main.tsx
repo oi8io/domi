@@ -20,6 +20,7 @@ import {
   type DomiClient,
   DomiRpcError,
   focusIdOf,
+  mergeDraft,
   questionsContent,
   questionsOf,
   type RefLink,
@@ -45,7 +46,8 @@ import { editAction, Prompt } from './components/Prompt.tsx'
 import { SlashHints } from './components/SlashHints.tsx'
 import { dumpText } from './components/Transcript.tsx'
 import { connectChat, connectDaemon } from './connect.ts'
-import { isReasonToggle, moveOf, questionKey, routeKey } from './keys.ts'
+import { isInterruptKey, isReasonToggle, moveOf, questionKey, routeKey } from './keys.ts'
+import { notesLine } from './notes.ts'
 import { type OverlayState, Overlays } from './overlays/Overlays.tsx'
 import { $questions, questionsStateFor } from './questions-state.ts'
 import { clearFallback, fallbackMarked, fallbackPath, markFallback } from './render/fallback.ts'
@@ -156,6 +158,14 @@ export function Root({
   const status = useStore(store.$status)
   const connection = useStore(client.$state)
   const busy = sending || status.busy
+  // PRD-M13-001：排队中的补充；退回给本端的补充放回草稿（AC-7）
+  const queued = useStore(store.$notes)
+  const returned = useStore(store.$returned)
+  useEffect(() => {
+    if (returned.length === 0) return
+    const back = store.takeReturned()
+    setDraft((d) => mergeDraft(back, d))
+  }, [returned, store])
   const [theme, setTheme] = useState(initialTheme)
   const [context, setContext] = useState<{ project: string | null; title: string }>({ project: null, title: '' })
   // 弹层（PRD-M8-015）与 `/` 补全的选中项
@@ -184,6 +194,18 @@ export function Root({
     }
   }, [client, sessionId, atQuery])
   const slash = atQuery !== undefined ? fileHits.map((f) => ({ name: f })) : completeSlash(draft)
+
+  /** PRD-M13-001 AC-6：撤回本端最后一条排队中的补充 */
+  const unqueue = async (): Promise<void> => {
+    const mine = store.$notes.get().filter((n) => n.from === 'domi-tui')
+    const last = mine[mine.length - 1]
+    if (!last) {
+      setNotice(tr('tui.notes.none'))
+      return
+    }
+    const ok = await client.withdrawNote(sessionId, last.id).catch(() => false)
+    setNotice(ok ? tr('tui.notes.withdrawn', { text: last.text }) : tr('tui.notes.none'))
+  }
 
   /** 切到另一个会话：先订阅新的再放掉旧的（id 不存在时 watch 抛错，留在原会话里） */
   const switchTo = useCallback(
@@ -304,6 +326,17 @@ export function Root({
     }
     if (overlay !== null) return
 
+    // PRD-M13-002 AC-6：Esc 停下这一轮（有询问时上面已经 return，Esc 归问题框）
+    if (isInterruptKey(key, { busy, overlay: false, asking: false })) {
+      void client.interrupt(sessionId).then(
+        (ok) => {
+          if (ok) setNotice(tr('tui.interrupted'))
+        },
+        (e: unknown) => setNotice(e instanceof Error ? e.message : String(e)),
+      )
+      return
+    }
+
     // PRD-M10-005 AC-2：e 在输入框空时切换思考折叠（不占滚动键；滚动键是 PgUp/PgDn/Ctrl+Home/End）
     if (isReasonToggle(input, key, draft === '')) {
       setReasonsExpanded((x) => !x)
@@ -331,7 +364,7 @@ export function Root({
       }
     }
 
-    if (busy) return
+    // 跑着的时候照样能打字：回车 = 补充（PRD-M13-001 AC-9）
     const edit = editAction(input, key)
     if (edit === null) return
     if (edit.kind === 'newline') {
@@ -341,6 +374,24 @@ export function Root({
     if (edit.kind === 'submit') {
       const text = draft.trim()
       if (text === '') return
+      if (busy) {
+        // 运行中补充（PRD-M13-001）：排进 daemon 的队列，下一步送达；只收文字
+        if (text.startsWith('/')) {
+          if (parseSlash(text, 0).kind === 'unqueue') {
+            setDraft('')
+            void unqueue()
+          } else setNotice(tr('tui.notes.onlyText'))
+          return
+        }
+        setDraft('')
+        setNotice(null)
+        client.note(sessionId, text).catch((e: unknown) => {
+          // 没发出去：原文放回输入框，不丢
+          setDraft((d) => mergeDraft([text], d))
+          setNotice(e instanceof Error ? e.message : String(e))
+        })
+        return
+      }
       setDraft('')
       setSending(true)
       setNotice(null)
@@ -354,6 +405,9 @@ export function Root({
             return client.request('session.compact', { sessionId })
           case 'model-picker':
             setOverlay({ id: 'models' })
+            return
+          case 'unqueue':
+            await unqueue()
             return
           case 'settings':
             setOverlay({ id: 'settings' }) // PRD-M10-004 AC-1
@@ -546,9 +600,10 @@ export function Root({
         reasonsExpanded={reasonsExpanded}
       >
         {notice !== null && <Text dimColor>{notice}</Text>}
+        {notesLine(queued) !== null && <Text dimColor>{notesLine(queued)}</Text>}
         {/* 上下两条横线，不闭合（PRD-M9-005 AC-6） */}
         <Box borderStyle="single" borderLeft={false} borderRight={false} borderDimColor>
-          <Prompt value={draft} disabled={busy} />
+          <Prompt value={draft} disabled={false} />
         </Box>
         <SlashHints
           items={slash}

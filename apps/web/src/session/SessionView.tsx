@@ -25,6 +25,7 @@ import { ChangesBar } from './ChangesBar.tsx'
 import { Composer, ModelSwitch, type PendingRef, PermissionsModeSwitch } from './Composer.tsx'
 import { CredentialNotice } from './CredentialNotice.tsx'
 import { JumpBar } from './JumpBar.tsx'
+import { NotesBar } from './NotesBar.tsx'
 import { ResumeBar } from './ResumeBar.tsx'
 import { ReviewFindings } from './ReviewFindings.tsx'
 import { Trajectory } from './Trajectory.tsx'
@@ -71,6 +72,9 @@ export function SessionView({
   // PRD-M11-009：窗口化加载——是否还有更早历史、正在向上翻页
   const hasOlder = useStore(store.$hasOlder)
   const loadingOlder = useStore(store.$loadingOlder)
+  // PRD-M13-001：排队中的补充、退回给本端的补充
+  const notes = useStore(store.$notes)
+  const returned = useStore(store.$returned)
   const [notice, setNotice] = useState<ReactNode>(null)
   const scroller = useRef<HTMLDivElement>(null)
   // PRD-M11-002：用户上翻离开底部后，新内容累计成「N 条新消息」浮条
@@ -279,6 +283,12 @@ export function SessionView({
           <ConfirmDialog ask={ask} onAnswer={answer} />
         </div>
       )}
+      <div className="shrink-0 px-5 empty:hidden">
+        <NotesBar
+          notes={notes}
+          onWithdraw={(id) => void client.withdrawNote(sessionId, id).catch((err: Error) => setNotice(err.message))}
+        />
+      </div>
       <div className="shrink-0 px-5 pb-1.5 empty:hidden">
         <ResumeBar
           status={status}
@@ -293,13 +303,17 @@ export function SessionView({
       </div>
       <Composer
         busy={status.busy}
+        running={status.busy}
+        restore={returned}
+        onRestored={() => store.takeReturned()}
         notice={notice}
         refs={refs}
         onRemoveRef={(i) => onRefsChange?.(refs.filter((_, j) => j !== i))}
-        placeholder={status.busy ? tr('web.session.busy') : tr('web.session.placeholder')}
+        placeholder={status.busy ? tr('web.session.notePlaceholder') : tr('web.session.placeholder')}
         tools={{ client, sessionId }}
         onSubmit={(text, extras) =>
-          client.submit(sessionId, text, refs, extras).then(
+          // 跑着的时候是补充（PRD-M13-001）：排进队列，下一步送达；闲了 daemon 会当普通提交
+          (status.busy ? client.note(sessionId, text) : client.submit(sessionId, text, refs, extras)).then(
             () => {
               setNotice(null)
               if (refs.length > 0) onRefsChange?.([])
@@ -329,6 +343,19 @@ export function SessionView({
           mode={status.metrics?.permissionsMode ?? 'on-demand'}
           onNotice={setNotice}
         />
+        {status.busy && (
+          // PRD-M13-002 AC-6：停下这一轮
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            data-action="interrupt"
+            title={tr('web.composer.interruptHint')}
+            onClick={() => void client.interrupt(sessionId).catch((err: Error) => setNotice(err.message))}
+          >
+            {tr('web.composer.interrupt')}
+          </Button>
+        )}
       </Composer>
     </section>
   )

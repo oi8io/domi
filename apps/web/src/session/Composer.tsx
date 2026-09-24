@@ -6,7 +6,7 @@
  * 校验都在 daemon：附件太大、模型不支持图片，提交时原样把错误给人看。
  */
 
-import type { DomiClient, RefLink } from '@domi/client-core'
+import { type DomiClient, mergeDraft, type RefLink } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import {
   type ClipboardEvent,
@@ -189,8 +189,14 @@ function Popover({
   )
 }
 
+/** PRD-M13-001 AC-7：退回的补充放回草稿（口径在 client-core，两端共用） */
+export { mergeDraft }
+
 export function Composer({
   busy,
+  running = false,
+  restore,
+  onRestored,
   notice,
   refs = [],
   onRemoveRef,
@@ -202,6 +208,13 @@ export function Composer({
   tools,
 }: {
   busy: boolean
+  /**
+   * PRD-M13-001：会话在跑，发送变成「补充」——忙也能发，只收文字（文件 / 技能 / 附件按钮禁用）
+   */
+  running?: boolean
+  /** PRD-M13-001 AC-7：退回的补充文字，放回草稿；放完调 onRestored 让上层清掉 */
+  restore?: readonly string[]
+  onRestored?: () => void
   /** 一句提示；缺凭据时是带链接的那段（CredentialNotice） */
   notice?: ReactNode
   refs?: readonly PendingRef[]
@@ -231,8 +244,17 @@ export function Composer({
   const picker = useRef<HTMLInputElement>(null)
   const client = tools?.client
   const sessionId = tools?.sessionId
-  const canFiles = client !== undefined && sessionId !== undefined
-  const canSkills = client !== undefined
+  // 运行中的补充首版只收文字（PRD-M13 §2 d）
+  const canFiles = client !== undefined && sessionId !== undefined && !running
+  const canSkills = client !== undefined && !running
+  const blocked = busy && !running
+
+  // 退回的补充放回草稿（PRD-M13-001 AC-7）
+  useEffect(() => {
+    if (!restore || restore.length === 0) return
+    setText((cur) => mergeDraft(restore, cur))
+    onRestored?.()
+  }, [restore, onRestored])
   const popKind = pop?.kind
   const popQuery = pop?.query ?? ''
 
@@ -320,9 +342,13 @@ export function Composer({
   const submit = (e?: FormEvent): void => {
     e?.preventDefault()
     const t = text.trim()
-    if (t === '' || busy || pending) return
+    if (t === '' || blocked || pending) return
     if (failed) {
       setLocalNotice(tr('web.composer.uploadFailed'))
+      return
+    }
+    if (running && (files.length > 0 || skills.length > 0 || uploads.length > 0 || refs.length > 0)) {
+      setLocalNotice(tr('web.composer.noteTextOnly'))
       return
     }
     onSubmit(t, { uploads: uploads.map((u) => u.id as string), files, skills }).then(
@@ -527,8 +553,14 @@ export function Composer({
           </Button>
           <span className="flex-1" />
           {children}
-          <Button type="submit" variant="primary" disabled={busy || pending} data-action="send">
-            {submitLabel}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={blocked || pending}
+            data-action="send"
+            {...(running ? { title: tr('web.composer.addNoteHint') } : {})}
+          >
+            {running ? tr('web.composer.addNote') : submitLabel}
           </Button>
         </div>
       </div>

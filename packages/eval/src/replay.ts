@@ -14,6 +14,7 @@ import {
   type Clock,
   type ContextPolicy,
   type EventSink,
+  type NoteSource,
   runTurn,
   type ToolOutcome,
   type ToolRunner,
@@ -130,8 +131,21 @@ export async function replay(fixture: Fixture, opts: ReplayOptions = {}): Promis
   const clock: Clock = opts.clock ?? { now: () => ++tick }
   const policy: ContextPolicy = opts.policy ?? { maxTokens: 10_000_000, includeReasoning: false }
 
+  // 运行中补充按录制位置送达（PRD-M13-001 AC-10）：已经发过几次模型请求，就交出排在那之前的补充
+  const pending = [...(fixture.notes ?? [])]
+  let noteN = 0
+  const notes: NoteSource = {
+    take: () => {
+      const requests = sink.all().filter((e) => e.ev.t === 'model.request').length
+      const due = pending.filter((n) => n.beforeRequest <= requests)
+      if (due.length === 0) return []
+      pending.splice(0, due.length)
+      return due.map((n) => ({ id: `replay-n-${++noteN}`, text: n.text }))
+    },
+  }
+
   for (const input of fixture.inputs) {
-    await runTurn({ sink, provider, tools, clock, policy, model: 'replay' }, fixture.sessionId, input)
+    await runTurn({ sink, provider, tools, clock, policy, model: 'replay', notes }, fixture.sessionId, input)
   }
 
   const events = sink.all()

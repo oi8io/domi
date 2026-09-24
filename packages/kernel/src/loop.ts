@@ -14,7 +14,7 @@ import type { DomiEvent, EventEnvelope, RefLink, UploadRef } from '@domi/protoco
 import { buildContext, type ContextPolicy, type LoadedUpload } from './build-context.ts'
 import type { Clock, EventSink, ToolCallRequest, ToolRunner } from './ports.ts'
 import { type PromptParts, withPrompt } from './preamble.ts'
-import { notRunResult } from './recovery.ts'
+import { interruptedResult, notRunResult } from './recovery.ts'
 import { type RefResolver, refKey } from './refs.ts'
 import type { VerifyState } from './verify.ts'
 
@@ -70,6 +70,19 @@ export interface LoopDeps {
    * 不给就直接结束
    */
   beforeComplete?: (events: readonly EventEnvelope[]) => Promise<{ again: boolean; events: DomiEvent[] }>
+  /**
+   * 运行中补充（PRD-M13-001）。只在两个安全点取：每一步开头（上一步的 tool.result 都已落盘）、
+   * 收场之前（取到了就再跑一步）。不给就没有补充
+   */
+  notes?: NoteSource
+}
+
+/**
+ * 运行中补充的来源（PRD-M13-001 · SPEC-M13-001 取舍-2）。队列在 daemon，kernel 只在安全点来取：
+ * 取走即清空，按发送顺序。kernel 不碰 IO——谁持有队列、怎么广播变化是调用方的事
+ */
+export interface NoteSource {
+  take(): ReadonlyArray<{ id: string; text: string; from?: string }>
 }
 
 /** 一次用户输入。refs 是这句话引用的其他会话片段；uploads / files / skills 见 PRD-M8-010 */
@@ -79,6 +92,8 @@ export interface TurnInput {
   uploads?: readonly UploadRef[]
   files?: readonly string[]
   skills?: readonly string[]
+  /** 这句话由哪些补充拼成（PRD-M13-001 · SPEC-M13-001 取舍-4），原样记进 user.input */
+  noteIds?: readonly string[]
 }
 
 /** 附件与技能正文的读取口（kernel 不碰 IO）。读不到返回 undefined，拼上下文时照实说 */
@@ -95,6 +110,8 @@ export type StopReason =
   | 'stream_error'
   /** 用量到顶、用户选择停止（PRD-M7-009）。工具端以 reason 'budget_stop' 报上来 */
   | 'budget'
+  /** 用户中断了这一轮（PRD-M13-002）：外部 signal 触发，signal.reason = { by: 端名 } */
+  | 'interrupted'
 
 export interface TurnResult {
   stopReason: StopReason
@@ -117,6 +134,16 @@ export async function runTurn(
   const limits = { ...DEFAULT_LIMITS, ...deps.limits }
   const ac = new AbortController()
   signal?.addEventListener('abort', () => ac.abort(), { once: true })
+  /**
+   * 外部中断（PRD-M13-002 · SPEC-M13-002 取舍-2）。只看外部 signal——loop 自己 stop() 时也会 abort 内部的 ac，
+   * 那不是中断
+   */
+  const interrupted = (): boolean => signal?.aborted === true
+  const interruptedBy = (): string | undefined => {
+    const r = signal?.reason as { by?: unknown } | undefined
+    return typeof r?.by === 'string' ? r.by : undefined
+  }
+  const INTERRUPTED = '本轮被用户中断。已输出的内容保留；想接着做就再说一句。'
 
   const startedAt = deps.clock.now()
   let toolCalls = 0
@@ -134,10 +161,21 @@ export async function runTurn(
     skipped: readonly ToolCallRequest[] = [],
   ): Promise<TurnResult> => {
     const c = counters()
+    const cut = reason === 'interrupted'
+    const by = cut ? interruptedBy() : undefined
     // 停下时还没跑的调用也要配上结果：悬空的 tool_use 会让下一轮请求被 provider 拒掉（BUG-M3-014）
     await deps.sink.append(sessionId, [
-      ...skipped.map((call) => notRunResult(call.id, `本轮已停止（${reason}）`)),
-      { t: 'error', scope: 'loop', message, recoverable: true, counters: c },
+      ...skipped.map((call) => (cut ? interruptedResult(call.id) : notRunResult(call.id, `本轮已停止（${reason}）`))),
+      // stopReason / by（M13）：轨迹里看得出是哪个上限、谁中断的
+      {
+        t: 'error',
+        scope: 'loop',
+        message,
+        recoverable: true,
+        counters: c,
+        stopReason: reason,
+        ...(by === undefined ? {} : { by }),
+      },
     ])
     ac.abort()
     return { stopReason: reason, counters: c }
@@ -152,6 +190,7 @@ export async function runTurn(
       ...(extra.uploads && extra.uploads.length > 0 ? { uploads: [...extra.uploads] } : {}),
       ...(extra.files && extra.files.length > 0 ? { files: [...extra.files] } : {}),
       ...(extra.skills && extra.skills.length > 0 ? { skills: [...extra.skills] } : {}),
+      ...(extra.noteIds && extra.noteIds.length > 0 ? { noteIds: [...extra.noteIds] } : {}),
     },
   ])
   /** 同一轮里多次拼上下文，引用内容只读一次（它不会变：事件只增不改） */
@@ -159,10 +198,33 @@ export async function runTurn(
   const uploads = new Map<string, LoadedUpload>()
   const skills = new Map<string, string>()
 
+  /**
+   * 安全点送达（SPEC-M13-001 取舍-2）：取走队列里的补充，各落一条 user.note。
+   * 只在「上一步的 tool.result 都已落盘、下一次 model.request 之前」调——不会插进 tool_use / tool_result 之间
+   */
+  const deliverNotes = async (): Promise<boolean> => {
+    const notes = deps.notes?.take() ?? []
+    if (notes.length === 0) return false
+    await deps.sink.append(
+      sessionId,
+      notes.map((n) => ({
+        t: 'user.note' as const,
+        id: n.id,
+        text: n.text,
+        ...(n.from === undefined ? {} : { from: n.from }),
+      })),
+    )
+    return true
+  }
+
   for (;;) {
+    // 检查点 ①：每一步开头
+    if (interrupted()) return stop('interrupted', INTERRUPTED)
     if (deps.clock.now() - startedAt >= limits.maxWallClockMs) {
       return stop('wall_clock', `单轮墙钟超过 ${limits.maxWallClockMs}ms，已终止。`)
     }
+    // 安全点 ①：每一步开头
+    await deliverNotes()
 
     const events = await deps.sink.read(sessionId)
     if (deps.refs) {
@@ -244,6 +306,10 @@ export async function runTurn(
 
     await deps.sink.append(sessionId, produced)
 
+    // 检查点 ②：模型流结束后（不管是被中止、报错还是正常结束）。已吐出的内容上面已经落盘（AC-2）；
+    // 本步解析出的工具调用一个都不执行
+    if (interrupted()) return stop('interrupted', INTERRUPTED, pending)
+
     if (streamError) {
       // 流中途截断：会话事件流仍然完整，用户可以继续输入（PRD-M0-002 AC-4）
       return stop('stream_error', `模型流中断：${streamError.message}`, pending)
@@ -255,6 +321,8 @@ export async function runTurn(
         if (r.events.length > 0) await deps.sink.append(sessionId, r.events)
         if (r.again) continue
       }
+      // 安全点 ②：收场之前。模型写完最终回答时用户又补了一句——带着它再跑一步（PRD-M13-001 AC-3）
+      if (await deliverNotes()) continue
       return { stopReason: 'completed', counters: counters() }
     }
 
@@ -273,12 +341,17 @@ export async function runTurn(
       }
       const ms = deps.clock.now() - t0
 
-      const result: DomiEvent = outcome.reason
-        ? { t: 'tool.result', id: call.id, ok: outcome.ok, payload: outcome.payload, ms, reason: outcome.reason }
+      // 执行中被中断：结果照录，reason 标 interrupted（PRD-M13-002 AC-3）
+      const cut = interrupted()
+      const reason = cut ? 'interrupted' : outcome.reason
+      const result: DomiEvent = reason
+        ? { t: 'tool.result', id: call.id, ok: outcome.ok, payload: outcome.payload, ms, reason }
         : { t: 'tool.result', id: call.id, ok: outcome.ok, payload: outcome.payload, ms }
       // 工具产生的事件排在 tool.result 之前：权限决策与文件指纹都发生在结果之前，
       // 轨迹按 seq 读下来必须还原成真实的因果顺序
       await deps.sink.append(sessionId, [...(outcome.events ?? []), result])
+      // 检查点 ③：每个工具返回后
+      if (cut) return stop('interrupted', INTERRUPTED, pending.slice(i + 1))
 
       if (outcome.reason === 'budget_stop') {
         return stop('budget', '用量到了上限，用户选择停止，这一轮到此结束。', pending.slice(i + 1))

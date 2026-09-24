@@ -138,6 +138,11 @@ export function buildTrace(events: readonly EventEnvelope[], opts: BuildOptions 
         nodes.push(node(env.seq, 'input', tr('trace.youSaid'), ev.text))
         break
 
+      // 运行中补充（PRD-M13-001）：在模型真正看到它的位置
+      case 'user.note':
+        nodes.push(node(env.seq, 'input', tr('trace.youAdded'), ev.text))
+        break
+
       case 'model.request':
         model = ev.model
         break

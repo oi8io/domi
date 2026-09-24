@@ -30,6 +30,7 @@ export type SlashCommand =
   | { kind: 'undo'; trash: string }
   | { kind: 'apply'; mode: 'squash' | 'merge' | 'branch' }
   | { kind: 'settings' } // PRD-M10-004 AC-1：TUI 设置入口（本轮只做语言切换）
+  | { kind: 'unqueue' } // PRD-M13-001 AC-6：撤回最后一条排队中的补充
   | { kind: 'invalid'; message: string }
 
 /** 命令表：`/` 补全与帮助弹层用（PRD-M8-015 AC-5）。和 parseSlash 的分支一一对应 */
@@ -43,6 +44,7 @@ export const COMMANDS = (): ReadonlyArray<{ name: string; args?: string; desc: s
   { name: '/ref', args: tr('tui.cmd.argRef'), desc: tr('tui.cmd.ref') },
   { name: '/model', args: tr('tui.cmd.argModel'), desc: tr('tui.cmd.model') },
   { name: '/continue', args: '', desc: tr('tui.cmd.continue') },
+  { name: '/unqueue', desc: tr('tui.cmd.unqueue') },
   { name: '/mode', args: '[on-demand|always-ask|allow-all]', desc: tr('tui.cmd.permissionsMode') },
   { name: '/compact', desc: tr('tui.cmd.compact') },
   { name: '/budget', args: tr('tui.cmd.argBudget'), desc: tr('tui.cmd.budget') },
@@ -125,6 +127,8 @@ export function parseSlash(text: string, lastSeq: number): SlashCommand {
     // PRD-M12-004 AC-10：续跑 = 替用户说一句「接着做」，计划本身已经在上下文里
     case '/continue':
       return { kind: 'submit', text: continuePrompt() }
+    case '/unqueue':
+      return { kind: 'unqueue' }
     case '/mode': {
       // PRD-M12-002：会话确认模式三档
       if (!rest[0]) return { kind: 'invalid', message: tr('tui.usage.permissionsMode') }

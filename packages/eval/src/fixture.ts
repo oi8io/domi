@@ -34,6 +34,11 @@ export interface Fixture {
   toolResults: RecordedToolResult[]
   /** 期望的工具调用序列：名称 + 归一化后的参数（AC-2 的判据） */
   expectedCalls: Array<{ name: string; args: unknown }>
+  /**
+   * 运行中补充（PRD-M13-001 AC-10 · SPEC-M13-001 取舍-7）：beforeRequest = 它之前出现过几次 model.request。
+   * 可选——没有补充的会话不写这个字段，旧 fixture 照读
+   */
+  notes?: Array<{ beforeRequest: number; text: string }>
 }
 
 export function record(events: readonly EventEnvelope[], sessionId: string): Fixture {
@@ -41,6 +46,7 @@ export function record(events: readonly EventEnvelope[], sessionId: string): Fix
   const turns: RecordedTurn[] = []
   const toolResults: RecordedToolResult[] = []
   const expectedCalls: Array<{ name: string; args: unknown }> = []
+  const notes: Array<{ beforeRequest: number; text: string }> = []
 
   let current: RecordedTurn | null = null
 
@@ -51,6 +57,9 @@ export function record(events: readonly EventEnvelope[], sessionId: string): Fix
     switch (ev.t) {
       case 'user.input':
         inputs.push(ev.text)
+        break
+      case 'user.note':
+        notes.push({ beforeRequest: turns.length, text: ev.text })
         break
       case 'model.request':
         // 每个 model.request 开一轮
@@ -87,7 +96,15 @@ export function record(events: readonly EventEnvelope[], sessionId: string): Fix
     }
   }
 
-  return { version: 1, sessionId, inputs, turns, toolResults, expectedCalls }
+  return {
+    version: 1,
+    sessionId,
+    inputs,
+    turns,
+    toolResults,
+    expectedCalls,
+    ...(notes.length > 0 ? { notes } : {}),
+  }
 }
 
 export function serialize(f: Fixture): string {

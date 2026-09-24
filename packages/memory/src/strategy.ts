@@ -34,7 +34,7 @@ export function applyCleanup(events: readonly EventEnvelope[], opts?: CleanupOpt
 
     let next: AnyEvent = ev
     if (ev.t === 'tool.result') next = { ...ev, payload: item.text }
-    else if (ev.t === 'model.delta' || ev.t === 'model.reason' || ev.t === 'user.input')
+    else if (ev.t === 'model.delta' || ev.t === 'model.reason' || ev.t === 'user.input' || ev.t === 'user.note')
       next = { ...ev, text: item.text }
     else if (ev.t === 'error') next = { ...ev, message: item.text }
     return { ...env, ev: next }

@@ -4519,6 +4519,151 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `session.note`
+
+运行中补充（PRD-M13-001）：会话正在跑一轮时进 daemon 的队列，由 loop 在下一个安全点（每步开头 / 收场前）送达，落成 user.note；会话空闲时等同一次 session.submit（同样校验凭据），回 submitted。会话忙但不是 daemon 发起的一轮（评审、定时任务、长任务节点）→ SESSION_BUSY。首版只收文本
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200000
+    }
+  },
+  "required": [
+    "sessionId",
+    "text"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "queued"
+        },
+        "noteId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "noteId"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "const": "submitted"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    }
+  ]
+}
+```
+
+### `session.note.withdraw`
+
+撤回一条还在排队的补充（PRD-M13-001 AC-6）。已送达（已写进事件流）、已退回或不存在 → withdrawn=false，不产生任何事件
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "noteId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "noteId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "withdrawn": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "withdrawn"
+  ]
+}
+```
+
+### `session.interrupt`
+
+中断当前轮（PRD-M13-002）：已输出的内容保留，正在跑的工具收到中止信号，没跑完的调用补 interrupted 结果，落 error{stopReason:"interrupted", by}；挂着的询问按 channel=interrupt 结掉。不自动续跑。会话闲 → interrupted=false，不产生事件
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "interrupted": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "interrupted"
+  ]
+}
+```
+
 ### `session.subscribe`
 
 订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏。分支会话的 seq 是**视图编号**：父链到分叉点的那一段排在前面、从 1 连续编下来。PRD-M11-009：fromSeq=0（首连）时服务端只回尾部窗口（按轮 + 屏预算），result.oldestSeq 是本窗口最老事件 seq、hasOlder 表示前面还有更早历史——客户端向上滚到顶再调 session.history(beforeSeq=oldestSeq) 拉更早一页。
@@ -4723,10 +4868,40 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "noteIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
                       }
                     },
                     "required": [
                       "t",
+                      "text"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "user.note"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "from": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "id",
                       "text"
                     ],
                     "additionalProperties": {}
@@ -6277,6 +6452,12 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                           "argParseRetries",
                           "elapsedMs"
                         ]
+                      },
+                      "stopReason": {
+                        "type": "string"
+                      },
+                      "by": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -6564,10 +6745,40 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "noteIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
                       }
                     },
                     "required": [
                       "t",
+                      "text"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "user.note"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "from": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "id",
                       "text"
                     ],
                     "additionalProperties": {}
@@ -8118,6 +8329,12 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                           "argParseRetries",
                           "elapsedMs"
                         ]
+                      },
+                      "stopReason": {
+                        "type": "string"
+                      },
+                      "by": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -8434,6 +8651,92 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
   "required": [
     "sessionId",
     "busy"
+  ]
+}
+```
+
+### `session.notes`
+
+运行中补充的队列（PRD-M13-001 AC-5）：还没送达的补充，按发送顺序
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "pending": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ]
+      }
+    }
+  },
+  "required": [
+    "sessionId",
+    "pending"
+  ]
+}
+```
+
+### `session.notes.returned`
+
+没送达的补充被退回（PRD-M13-001 AC-7）：这一轮出错 / 撞护栏 / 用量上限 / 被中断时，队列里剩下的
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ]
+      }
+    }
+  },
+  "required": [
+    "sessionId",
+    "notes"
   ]
 }
 ```

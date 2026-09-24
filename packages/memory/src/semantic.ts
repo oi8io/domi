@@ -26,6 +26,8 @@ export function transcriptOf(events: readonly EventEnvelope[], maxChars = 24_000
     }
     flush()
     if (ev.t === 'user.input') lines.push(`[${e.seq}] 用户：${ev.text}`)
+    // 运行中补充（PRD-M13-001）：也是用户说的话，标明是补充
+    else if (ev.t === 'user.note') lines.push(`[${e.seq}] 用户（补充）：${ev.text}`)
     else if (ev.t === 'tool.call') lines.push(`[${e.seq}] 调用 ${ev.name}`)
   }
   flush()

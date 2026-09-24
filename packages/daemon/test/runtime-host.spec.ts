@@ -292,3 +292,37 @@ describe('PRD-M10-001 · 会话标题接入运行时（daemon 侧）', () => {
     expect(title).not.toBe('sess-1') // AC-2：侧栏不再显示会话 id
   }, 15_000)
 })
+
+describe('PRD-M13-001 AC-2 / AC-8 · 补充经真实运行时送达', () => {
+  test('等确认时发补充 → 不影响确认；工具返回后的下一步落 user.note，模型下一次请求看得到它', async () => {
+    const provider = new StubProvider([
+      [{ type: 'tool-call', id: 'c1', name: 'fs.write', args: { path: 'a.txt', content: 'x' } }],
+      [{ type: 'delta', text: '收到补充' }],
+    ])
+    const { daemon } = setup(provider)
+    const c = new Conn('c')
+    await call(daemon, c, 'handshake', { protocolVersion: PROTOCOL_VERSION, client: 'domi-web' })
+    await call(daemon, c, 'session.create')
+    await call(daemon, c, 'session.subscribe', { sessionId: 'sess-1', fromSeq: 0 })
+    await call(daemon, c, 'session.submit', { sessionId: 'sess-1', text: '写个文件' })
+    const asks = () =>
+      c.got
+        .filter((m): m is RpcNotification => 'method' in m && m.method === 'session.ask')
+        .map((m) => m.params as { askId: string })
+    for (let i = 0; i < 100 && asks().length === 0; i++) await Bun.sleep(10)
+
+    const note = await call(daemon, c, 'session.note', { sessionId: 'sess-1', text: '文件名用 b.txt' })
+    expect(note.result).toMatchObject({ state: 'queued' })
+    await call(daemon, c, 'session.answer', { askId: asks()[0]!.askId, allowed: true })
+    for (let i = 0; i < 100 && !c.events().some((e) => e.ev.t === 'model.delta'); i++) await Bun.sleep(10)
+
+    const ts = c.events().map((e) => e.ev.t)
+    const at = ts.indexOf('user.note')
+    expect(at).toBeGreaterThan(ts.indexOf('tool.result'))
+    expect(ts[at + 1]).toBe('model.request')
+    expect(c.events()[at]!.ev).toMatchObject({ text: '文件名用 b.txt', from: 'domi-web' })
+    const last = provider.calls[1]!.messages.at(-1)!
+    expect(last.role).toBe('user')
+    expect(last.content).toContain('文件名用 b.txt')
+  })
+})

@@ -39,6 +39,17 @@ export function routeKey(
 }
 
 /**
+ * PRD-M13-002 AC-6：Esc 中断这一轮——只在跑着、没有弹层、没有待答的询问时。
+ * 有弹层 / 询问时 Esc 归它们（问题框里 Esc = 不回答）；Ctrl+C 语义不变
+ */
+export function isInterruptKey(
+  key: { escape?: boolean; ctrl?: boolean; meta?: boolean },
+  state: { busy: boolean; overlay: boolean; asking: boolean },
+): boolean {
+  return key.escape === true && !key.ctrl && !key.meta && state.busy && !state.overlay && !state.asking
+}
+
+/**
  * PRD-M10-005 AC-2：e 在输入框空时切换思考折叠。纯函数，main.tsx 的 useInput 直接问它；
  * 与滚动键（PgUp/PgDn/Ctrl+Home/End，render/viewport.ts 的 scrollKey）不冲突
  */

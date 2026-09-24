@@ -32,13 +32,22 @@ export interface SearchOptions {
 }
 
 /** 进上下文的四类事件之外，检索还要覆盖思考与错误——"上次那个报错"是真实问法 */
-const INDEXED_TYPES = new Set(['user.input', 'model.delta', 'model.reason', 'tool.call', 'tool.result', 'error'])
+const INDEXED_TYPES = new Set([
+  'user.input',
+  'user.note',
+  'model.delta',
+  'model.reason',
+  'tool.call',
+  'tool.result',
+  'error',
+])
 
 /** 事件的可检索文本。与轨迹的投影口径一致，但这里要的是**可搜到**，不是好看 */
 export function searchableText(ev: AnyEvent): string | null {
   if (!isKnownEvent(ev)) return null
   switch (ev.t) {
     case 'user.input':
+    case 'user.note':
     case 'model.delta':
     case 'model.reason':
       return ev.text

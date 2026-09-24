@@ -782,6 +782,30 @@ export const METHODS = {
     }),
     result: z.object({ accepted: z.literal(true) }),
   },
+  'session.note': {
+    summary:
+      '运行中补充（PRD-M13-001）：会话正在跑一轮时进 daemon 的队列，由 loop 在下一个安全点（每步开头 / 收场前）送达，' +
+      '落成 user.note；会话空闲时等同一次 session.submit（同样校验凭据），回 submitted。' +
+      '会话忙但不是 daemon 发起的一轮（评审、定时任务、长任务节点）→ SESSION_BUSY。首版只收文本',
+    params: z.object({ sessionId: z.string(), text: z.string().min(1).max(200_000) }),
+    result: z.discriminatedUnion('state', [
+      z.object({ state: z.literal('queued'), noteId: z.string() }),
+      z.object({ state: z.literal('submitted') }),
+    ]),
+  },
+  'session.note.withdraw': {
+    summary:
+      '撤回一条还在排队的补充（PRD-M13-001 AC-6）。已送达（已写进事件流）、已退回或不存在 → withdrawn=false，不产生任何事件',
+    params: z.object({ sessionId: z.string(), noteId: z.string() }),
+    result: z.object({ withdrawn: z.boolean() }),
+  },
+  'session.interrupt': {
+    summary:
+      '中断当前轮（PRD-M13-002）：已输出的内容保留，正在跑的工具收到中止信号，没跑完的调用补 interrupted 结果，' +
+      '落 error{stopReason:"interrupted", by}；挂着的询问按 channel=interrupt 结掉。不自动续跑。会话闲 → interrupted=false，不产生事件',
+    params: z.object({ sessionId: z.string() }),
+    result: z.object({ interrupted: z.boolean() }),
+  },
   'session.subscribe': {
     summary:
       '订阅事件流。fromSeq 是**断点续订**的锚点：给上次收到的最后一个 seq，不重不漏。' +
@@ -877,6 +901,22 @@ export const NOTIFICATIONS = {
   'session.busy': {
     summary: '会话忙闲变化',
     params: z.object({ sessionId: z.string(), busy: z.boolean() }),
+  },
+  /** M13：排队中的补充。队列每次变化推一次，订阅时补发一次 */
+  'session.notes': {
+    summary: '运行中补充的队列（PRD-M13-001 AC-5）：还没送达的补充，按发送顺序',
+    params: z.object({
+      sessionId: z.string(),
+      pending: z.array(z.object({ id: z.string(), text: z.string(), from: z.string().optional() })),
+    }),
+  },
+  /** M13：这一轮异常收场，没送达的补充退回——发送它的端把文字放回输入框 */
+  'session.notes.returned': {
+    summary: '没送达的补充被退回（PRD-M13-001 AC-7）：这一轮出错 / 撞护栏 / 用量上限 / 被中断时，队列里剩下的',
+    params: z.object({
+      sessionId: z.string(),
+      notes: z.array(z.object({ id: z.string(), text: z.string(), from: z.string().optional() })),
+    }),
   },
   'sessions.changed': {
     summary:

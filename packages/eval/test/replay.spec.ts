@@ -206,3 +206,42 @@ describe('fixture 里没录到的工具调用', () => {
     expect((first?.ev as { reason?: string } | undefined)?.reason).toBe('not_recorded')
   })
 })
+
+describe('PRD-M13-001 AC-10 · 带补充的会话能录能放（INV-13）', () => {
+  function withNote(): EventEnvelope[] {
+    seq = 0
+    return [
+      env({ t: 'user.input', text: '读 a.txt' }),
+      env({ t: 'model.request', provider: 'p', model: 'm', tokensIn: 1 }),
+      env({ t: 'tool.call', id: 'c1', name: 'fs.read', args: { path: 'a.txt' } }),
+      env({ t: 'tool.result', id: 'c1', ok: true, payload: 'A', ms: 1 }),
+      env({ t: 'user.note', id: 'n-1', text: '顺便读 b.txt' }),
+      env({ t: 'model.request', provider: 'p', model: 'm', tokensIn: 2 }),
+      env({ t: 'tool.call', id: 'c2', name: 'fs.read', args: { path: 'b.txt' } }),
+      env({ t: 'tool.result', id: 'c2', ok: true, payload: 'B', ms: 1 }),
+      env({ t: 'model.request', provider: 'p', model: 'm', tokensIn: 3 }),
+      env({ t: 'model.delta', text: '都读了' }),
+    ]
+  }
+
+  test('录制：补充记下「在第几次模型请求之前」', () => {
+    const f = record(withNote(), 's1')
+    expect(f.notes).toEqual([{ beforeRequest: 1, text: '顺便读 b.txt' }])
+    expect(f.inputs).toEqual(['读 a.txt'])
+  })
+
+  test('回放：补充落在同一步，工具调用序列一致', async () => {
+    const r = await replay(record(withNote(), 's1'))
+    expect(r.ok).toBe(true)
+    const ts = r.events.map((e) => e.ev.t)
+    const at = ts.indexOf('user.note')
+    expect(ts.slice(at - 1, at + 2)).toEqual(['tool.result', 'user.note', 'model.request'])
+    expect(ts.filter((t) => t === 'model.request')).toHaveLength(3)
+  })
+
+  test('旧 fixture（没有 notes 字段）照读照放', async () => {
+    const f = record(realSession(), 's1')
+    expect(f.notes).toBeUndefined()
+    expect((await replay(parse(serialize(f)))).ok).toBe(true)
+  })
+})

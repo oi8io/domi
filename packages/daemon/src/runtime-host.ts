@@ -499,7 +499,19 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       let hostWindowMeta: { oldestSeq: number; hasOlder: boolean } | undefined
       return {
         id: sessionId,
-        submit: (text, refs, inputs) => s.submit(text, { ...(refs === undefined ? {} : { refs }), ...(inputs ?? {}) }),
+        submit: (text, refs, inputs, run) =>
+          s.submit(text, {
+            ...(refs === undefined ? {} : { refs }),
+            ...(inputs ?? {}),
+            // PRD-M13：补充队列、中断信号、由补充拼成的那句话
+            ...(run === undefined
+              ? {}
+              : {
+                  notes: run.notes,
+                  signal: run.signal,
+                  ...(run.noteIds === undefined ? {} : { noteIds: run.noteIds }),
+                }),
+          }),
         async checkReady() {
           try {
             s.checkCredential()
