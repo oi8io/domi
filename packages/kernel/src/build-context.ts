@@ -2,11 +2,12 @@
  * 上下文拼装 —— SPEC-M0-002 · docs/spec/M0.md §3.5 · docs/adr/005
  *
  * **纯函数**：不读时钟、不读随机、不碰 IO（INV-02，由 dependency-cruiser 的
- * no-io-in-kernel 规则守）。这一点不是洁癖——M2 的压缩和 M2-008 的回放评估
+ * no-io-in-kernel 规则守）。这一点不是洁癖——压缩（packages/memory）和回放评估（packages/eval，M2-008）
  * 都建立在"同一事件流必然拼出同一份上下文"之上。
  *
  * 策略是 ContextPolicy 上的**可选项**，不是两套实现（ADR-005 的限定）：
- * M0 只实现 'full'，'incremental' 占位且调用即报错，**不静默降级**。
+ * kernel 里只有 'full'；压缩类策略由 packages/memory 在外面注册（kernel 不认识它们的名字，有测试守着），
+ * 内部都落回 'full'。'incremental' 是 ADR-005 留的占位，调用即报错，**不静默降级**。
  */
 import {
   type EventEnvelope,
@@ -199,7 +200,7 @@ const fullStrategy: ContextStrategy = (events, policy) => {
 
 const incrementalPlaceholder: ContextStrategy = () => {
   throw new Error(
-    "上下文拼装策略 'incremental' 在 M0 只是占位，没有实现。\n" +
+    "上下文拼装策略 'incremental' 只是占位，没有实现。\n" +
       '这是 docs/adr/005 的限定：option 是注册点，不是两套实现——' +
       '在拿到真实会话的性能数据之前不写增量实现。\n' +
       "要么用 'full'，要么按 ADR-005 的『触发重新激活压测的条件』先补数据再实现。",
@@ -211,8 +212,8 @@ registerContextStrategy('incremental', incrementalPlaceholder)
 
 /**
  * 粗估 token 数：字符数 / 4。
- * 故意粗糙——M0 不做压缩，这个数只用来在超长时**明确报错**而不是让模型 400。
- * 真正的计数在 M1 的状态栏（PRD-M1-004）接 provider 返回的 usage。
+ * 故意粗糙——它只用来在拼完仍超长时**明确报错**，而不是让模型 400。
+ * 真正的计数（状态栏、自动压缩的 70% 阈值）走 provider 返回的 usage（kernel/metrics.ts 的 aggregate）。
  */
 /** 一张图按多少 token 估（各家按像素算，量级在 1~2k；base64 的长度和它无关） */
 const IMAGE_TOKENS = 1600
@@ -245,8 +246,9 @@ export function buildContext(events: readonly EventEnvelope[], policy: ContextPo
   const tokens = estimateTokens(msgs)
   if (tokens > policy.maxTokens) {
     throw new Error(
-      `上下文约 ${tokens} tokens，超过 maxTokens=${policy.maxTokens}。\n` +
-        'M0 不做压缩，超长直接报错（docs/PRD.md §M0 不做什么）。压缩见 M2 / PRD-M2-002。',
+      `上下文约 ${tokens} tokens，超过 maxTokens=${policy.maxTokens}（策略 '${name}'）。\n` +
+        `拼装不会悄悄截断。可以：换一个会压缩的 context.strategy（已注册：${listContextStrategies().join(', ')}）；` +
+        '在对话里手动压缩一次；调小 context.keepTurns；或在模型窗口允许时调大 context.maxTokens。',
     )
   }
   return msgs

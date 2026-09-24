@@ -156,7 +156,6 @@ export function writeConfigPatch(patch: ConfigPatch, opts: LoadOptions = {}): Wr
   const existing = new Set(Object.keys((readConfigFile(src).providers ?? {}) as Record<string, unknown>))
   const denied = keys.filter((k) => !isWritable(k, patch[k], existing))
   if (denied.length > 0) throw ConfigWriteError.keyed('error.config.denied', { keys: denied.join(', ') })
-  if (src.legacy) throw ConfigWriteError.keyed('error.config.legacyToml', { path: src.path })
   const sPath = secretsPath(dirname(src.path))
 
   // 删整条 provider：config 里那一节删掉，secrets 里那一家的 key 也删掉

@@ -52,7 +52,7 @@ describe('AC-2 · 恢复会话', () => {
     l.close()
   })
 
-  test('按标题过滤（M1 只有列表与标题过滤，内容检索是 M2-004）', async () => {
+  test('按标题过滤（内容检索是另一回事，见 memory 的 episodic / PRD-M2-004）', async () => {
     const l = log()
     await l.append('a', turn(1))
     await l.append('b', turn(1))

@@ -1,9 +1,9 @@
 /**
  * PRD-M3-003 AC-2 · client-core 要能在浏览器里跑
  *
- * **为什么 M0 就测这个**：这条约束只会越来越难守。
- * 等 M3 做 Web 端才发现 client-core 里混进了 node:fs，
- * 要往回扒的是几个月的代码；现在守成本为零。
+ * **为什么 M0 就开始测**：这条约束只会越来越难守。
+ * 要是等到 M3 做 Web 端才发现 client-core 里混进了 node:fs，
+ * 要往回扒的是几个月的代码；从第一天守，成本为零。
  * （PROCESS.md 缺口五：决策必须落盘成机器可读的约束，而不是只写在文档里）
  */
 import { afterEach, describe, expect, test } from 'bun:test'

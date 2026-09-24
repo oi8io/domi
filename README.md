@@ -29,7 +29,7 @@
 
 | 路径 | 是什么 | 产出角色 |
 |---|---|---|
-| [`docs/PRD.md`](docs/PRD.md) | 全量 PRD，覆盖 M0–M9 | 产品专家 |
+| [`docs/PRD.md`](docs/PRD.md) | 全量 PRD，覆盖 M0–M13 | 产品专家 |
 | `docs/prd/M{n}.md` | 单册 PRD——`SKETCH` 里程碑过**再批准门**时在此重写为 `COMMITTED` | 产品专家 |
 | `docs/spec/M{n}.md` | 接口契约 + 取舍记录 | 架构师 |
 | `docs/tasks/M{n}.md` | 任务清单 + 状态机 | 工程师 |
@@ -54,17 +54,17 @@ INV-xx ──→ PRD-M{n}-xxx ──→ SPEC-M{n}-xxx ──→ TASK-M{n}-xxx �
 
 ## 当前进度
 
-> 2026-09-19 · 十个里程碑（M0–M9）的**功能全部落地**，剩下的是验证补齐与用户侧 DoD。接手请先读 [`HANDOFF.md`](HANDOFF.md)。
+> 2026-09-24 · 十四个里程碑（M0–M13）的**功能全部落地**，剩下的是验证补齐与用户侧 DoD。接手请先读 [`HANDOFF.md`](HANDOFF.md)，最新进度看 [`NEXT.md`](NEXT.md)。
 
 | 环节 | 状态 | 产出 |
 |---|---|---|
-| 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.12**（82 条，M0–M9 全部 `COMMITTED`）· 各里程碑再批准材料在 `docs/prd/` |
-| 架构师 | ✅ 完成 | `docs/spec/M0 / M1 / M2 / M6 / M7 / M8 / M9.md`，均带"触发重新决策的条件"· 27 份 ADR |
-| 工程师 | ✅ 功能完成 | M0–M9 共 10 个任务文件；typecheck + lint + 22 道守卫 + **1257 个测试** + L1 回放全绿 |
-| 测试工程师 | 🔵 进行中 | M0 / M1 / M7 / M8 / M9 已纳入 `check-ac-coverage` 强制范围（224 条 AC）；M4 / M5 / M6 的「验证补齐」待做 |
+| 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.18**（101 条，M0–M13）· 各里程碑再批准材料在 `docs/prd/` |
+| 架构师 | ✅ 完成 | `docs/spec/M0 / M1 / M2 / M6 … M13.md`，均带"触发重新决策的条件"· 27 份 ADR |
+| 工程师 | ✅ 功能完成 | M0–M13 共 14 个任务文件；typecheck + lint + 22 道守卫 + **1511 个测试** + L1 回放全绿 |
+| 测试工程师 | 🔵 进行中 | M0 / M1 / M7 / M8 / M9 / M10 已纳入 `check-ac-coverage` 强制范围（236 条 AC）；M11–M13 待进强制范围，M4 / M5 / M6 的「验证补齐」待做 |
 
-**下一步**：M4 / M5 / M6 验证补齐。
-只有用户能做的：各里程碑 DoD、M8 逐屏截图走查、TUI fullscreen 真终端手测、桌面端与 macOS 沙箱的真机验证。详见 `NEXT.md`。
+**下一步**：M11–M13 进 AC 覆盖强制范围；M4 / M5 / M6 验证补齐。
+只有用户能做的：各里程碑 DoD（M12 / M13 优先）、M8 逐屏截图走查、TUI fullscreen 真终端手测、桌面端与 macOS 沙箱的真机验证。详见 `NEXT.md`。
 
 **2026-09-14 方向变更**：见 `docs/adr/003-revert-to-self-built-runtime.md`。
 `docs/RECON-DSH.md` 的"收缩为 DSH 发行版"结论已作废，该文档降级为情报文档。

@@ -252,7 +252,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     ])
   }
 
-  /** 按目标建任务（PRD-M8-005 / 006）：隔离决定 → 建会话 → 需要时先进计划模式 */
+  /** 按目标建任务（PRD-M8-005 / 006）：隔离决定 → 建会话。计划由模型动手前用 plan.update 写（PRD-M12-004） */
   async function createGoalTask(p: {
     projectId: string
     goal: string
@@ -420,7 +420,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         ...chat,
         planRequired,
         ...extra,
-        // 计划批准后转长任务（M7-005）：同一个 TaskService
+        // 计划转长任务（plan.update 的选项，PRD-M12-004）：同一个 TaskService
         startTask: async (spec, cwd) => {
           const meta = await runMeta(sessionId, cwd)
           try {

@@ -767,12 +767,9 @@ export const en: Record<keyof typeof zh, string> = {
   'cli.doctor.noConfig': 'Config file not found',
   'cli.doctor.noConfigDetail':
     '{configPath} not found. domi runs without it (everything via environment variables), but creating one is recommended.',
-  'cli.doctor.tomlIgnored': 'The old TOML config is ignored',
+  'cli.doctor.tomlIgnored': 'The old config.toml is no longer read',
   'cli.doctor.tomlIgnoredDetail':
-    "A YAML config already exists, so {path} is ignored (docs/adr/014). Once you've confirmed the YAML has everything it needs, you can delete it.",
-  'cli.doctor.tomlInUse': 'Still using the old TOML config',
-  'cli.doctor.tomlInUseDetail':
-    '{path} can still be read, but the config format is now YAML (docs/adr/014); TOML support will be removed.',
+    '{path} is still there, but domi only reads YAML config (docs/adr/014; TOML support has been removed). Move its settings into {yaml} by hand, then delete it.',
   'cli.doctor.credential': 'Model credentials',
   'cli.doctor.credentialSet': 'Set ({provider})',
   'cli.doctor.noCredential': 'No model credentials',
@@ -874,9 +871,6 @@ export const en: Record<keyof typeof zh, string> = {
   'cli.init.created': 'Created in {root}:\n{join}\n',
   'cli.init.projectHint':
     'Rules go in AGENT.md, project-level Skills in .domi/skills/<name>/SKILL.md. The first time you open a session here, domi asks whether you trust this repository.',
-  'cli.init.noLegacy': '{legacy} not found; nothing to migrate.\n$ domi init > {join}   # start from the template',
-  'cli.init.convertedHeader':
-    "# Converted from {legacy} (domi init --from-toml). Comments in the original file couldn't be carried over; add them back by hand if you need them.",
   'cli.trust.none': "You haven't answered for any repository yet.",
   'cli.trust.trusted': 'trusted  ',
   'cli.trust.untrusted': 'untrusted',
@@ -909,7 +903,6 @@ Usage:
   domi doctor               health check; every problem comes with a command you can paste and run
   domi doctor --ping        also send one real request, to tell "wrong key / gateway down / wrong model name" apart
   domi init                 print a config.yaml template
-  domi init --from-toml     print the old config.toml converted to YAML (comments can't be carried over)
   domi init --project       create .domi/ (project-level Skills) and an AGENT.md template in this repository
   domi trust [path] [--revoke]  trust / stop trusting a repository (its AGENT.md and .domi/skills are read only once trusted)
   domi trust list           list repositories you've answered for
@@ -1284,8 +1277,6 @@ server:
   'error.ref.outOfRange': 'Reference out of range: session {sessionId} has only {head} events, not event {fromSeq}',
   'error.ref.reversed': 'The reference range is reversed: {fromSeq}–{toSeq}',
   'error.config.denied': "These settings can't be changed from here: {keys}",
-  'error.config.legacyToml':
-    'The config is still in the old TOML format ({path}); migrate it to YAML first: domi init --from-toml',
   'error.config.notString': '{key} must be a string',
   'error.config.defaultProvider':
     '"{provider}" hosts the default model, so it can\'t be disabled or deleted. Switch the default model to another provider first.',

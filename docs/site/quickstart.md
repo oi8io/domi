@@ -42,8 +42,9 @@ providers:
 domi                           # 进 TUI；第一次会在后台拉起 domid
 ```
 
-对话里常用的命令：`/model` 换模型、`/compact` 压缩上下文、`/branch` 从某一条分出新会话、
-`/ref <会话> [起-止]` 引用另一个会话的一段、`/soul` 看 Soul 待审阅的改动。
+对话里常用的命令：`/model` 换模型、`/mode <档位>` 切确认模式、`/compact` 压缩上下文、`/branch` 从某一条分出新会话、
+`/ref <会话> [起-止]` 引用另一个会话的一段、`/continue` 接着做计划里没做完的步骤、`/soul` 看 Soul 待审阅的改动。
+模型跑着的时候也能接着打字：回车是**补充**，排队、下一步送达；要停下这一轮，Web 点「停止」、TUI 按 `Esc`。
 
 浏览器里打开 Web 端（`pnpm --filter @domi/web dev`），看到的是同一个 domid 里的同一批会话。
 
@@ -56,7 +57,7 @@ PgUp / PgDn 翻半屏，Ctrl+Home / Ctrl+End 到顶 / 到底，鼠标滚轮也�
 
 ## 3. 权限
 
-默认一律拒绝。`config.yaml` 的 `permissions.rules` 按能力放行，`decision` 是 `allow` / `ask` / `deny`：
+没有规则的能力默认拒绝。`config.yaml` 的 `permissions.rules` 按能力放行，`decision` 是 `allow` / `ask` / `deny`：
 
 ```yaml
 permissions:
@@ -64,6 +65,12 @@ permissions:
     - { name: read, capability: fs.read, decision: allow }
     - { name: write, capability: fs.write, decision: ask }
 ```
+
+每个会话还有一个**确认模式**（`/mode`，Web 在输入框的下拉里，状态栏常驻显示）：
+
+- `on-demand`（默认）：按上面的规则走；危险能力（写 / 删 / 移动文件、跑命令、联网、MCP 与插件工具）只有你亲手写了 `allow` 规则才放行，规则是 `ask` 就问；
+- `always-ask`：没规则的普通能力也问你（没规则的危险能力仍然拒绝），危险能力即使规则 `allow` 也每次都问；
+- `allow-all`：跳过所有确认，只剩你显式写的 `deny` 规则还拦。
 
 下面这段就是 domi 里通配规则的匹配方式——`mcp.github.*` 管得到 `mcp.github.create_issue`，管不到 `mcp.githubx.y`：
 

@@ -1,13 +1,12 @@
 /**
- * DomiSession —— M0 的进程内接线层。
+ * DomiSession —— 一个会话的接线层（kernel + store + capability + 记忆的装配点）。
  *
- * **为什么要有这一层**：M0「不拆 daemon」（PRD §M0 不做什么），但 INV-02 要求
- * 三端零业务逻辑。如果让 `apps/tui` 自己去 new SqliteEventLog、装配 loop，
- * 那 TUI 里就有了业务逻辑，M3 拆 daemon 时要把它们一个个抠出来。
+ * **为什么要有这一层**：M0 还没拆 daemon，但 INV-02 要求三端零业务逻辑。
+ * 如果当时让 `apps/tui` 自己去 new SqliteEventLog、装配 loop，TUI 里就有了业务逻辑，
+ * M3 拆 daemon 时得一个个抠出来。所以装配从一开始就集中在这里。
  *
- * 所以装配集中在这里，`apps/tui` 只看得到 DomiSession 这个门面。
- * M3 的做法是：daemon 里跑 DomiSession，客户端换成 Domi Protocol 的代理实现，
- * **TUI 一行不用改**——门面的方法签名就是按将来的协议形状设计的。
+ * M3 拆完之后：DomiSession 跑在 domid 里（`packages/daemon` 的 runtime-host），
+ * 客户端经 Domi Protocol 访问它；门面的方法签名当初就是按协议形状设计的，TUI 没有因此改写。
  */
 
 import { existsSync } from 'node:fs'
@@ -237,7 +236,7 @@ export interface SessionOptions {
   askAlways?: readonly string[]
   /** 这个会话自己的用量上限（M7-009，长任务节点用）。覆盖配置里的 budget */
   budget?: BudgetLimits
-  /** 计划批准后转长任务（M7-005）。daemon 里接 TaskService；不给就不能转 */
+  /** 计划转长任务（plan.update 工具的选项，PRD-M12-004）。daemon 里接 TaskService；不给就不能转 */
   startTask?: (spec: unknown, cwd: string) => Promise<string>
   /** 子 agent 会话的事件往哪推（daemon 里是这个子会话的订阅者） */
   childEvents?: (sessionId: string, envs: EventEnvelope[]) => void
@@ -303,7 +302,6 @@ export class DomiSession {
   private readonly offset: number
   private noticesDelivered = 0
   private busy = false
-  /** 计划模式（M7-005）。从事件流里最后一条 mode.switch 恢复 */
   /** PRD-M12-002：会话级确认模式（always-ask/on-demand/allow-all），默认 on-demand */
   private permissionsMode: PermissionsMode = 'on-demand'
   private permissionsModeLoaded = false
@@ -517,7 +515,10 @@ export class DomiSession {
     })
   }
 
-  /** 把自上次以来的新事件推给订阅者。轮询而非推送是 M0 的简化，M3 换成协议推送 */
+  /**
+   * 把自上次以来的新事件推给订阅者：每次落盘后调，从库里读增量（库是唯一真相，内存里不另存一份）。
+   * 在 domid 里订阅者就是协议推送（M3），客户端不轮询
+   */
   async pump(): Promise<void> {
     const own = await this.log.read(this.opts.sessionId, { fromSeq: this.lastSeq + 1 })
     if (own.length === 0) return

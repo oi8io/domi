@@ -34,13 +34,6 @@ export interface Clock {
 
 export const systemClock: Clock = { now: () => Date.now() }
 
-export class NotImplementedError extends Error {
-  constructor(what: string) {
-    super(`not implemented: ${what}`)
-    this.name = 'NotImplementedError'
-  }
-}
-
 export function eventOf(env: EventEnvelope): AnyEvent {
   return env.ev
 }

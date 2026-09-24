@@ -4,7 +4,7 @@
  * 这一层存在的唯一理由是**边界**：kernel 不 import 任何 provider SDK（INV-02），
  * 只 import 这里导出的类型。ADR-004 的逃生口也在这里——
  * `providerOptions` 与原始 usage **原样透传**，适配层不做字段归一、不丢字段。
- * 丢了的话，M2 的「压缩 × prompt cache 交叉」就没有输入。
+ * 缓存命中率（状态栏）与压缩时保住 prompt cache 前缀的判断都靠这份原始 usage，丢了就没有输入。
  */
 import type { ModelMessages, ToolSchema } from '@domi/protocol'
 import type { ModelCapabilities } from './capability.ts'

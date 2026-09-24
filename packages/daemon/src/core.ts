@@ -122,7 +122,7 @@ export interface SessionHandle {
   /** 这个会话现在能不能跑一轮（缺模型凭据 → InvalidInputError，reason = MISSING_CREDENTIAL，OPT-M8-001） */
   checkReady?(): Promise<void>
   switchModel(model: string, provider?: string): Promise<{ lost: string[] }>
-  /** 计划 / 执行模式（M7-005）。老宿主没有 */
+  /** 会话确认模式（PRD-M12-002）。老宿主没有 */
   setPermissionsMode?(mode: 'always-ask' | 'on-demand' | 'allow-all'): Promise<{ mode: string; changed: boolean }>
   /** 用量上限（M7-009） */
   setBudget?(b: { tokens?: number; costUsd?: number; toolCalls?: number }): Promise<void>

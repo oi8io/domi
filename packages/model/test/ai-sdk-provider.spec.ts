@@ -136,7 +136,7 @@ describe('docs/adr/004 的红线', () => {
     const evs = await drain(p.generate({ model: 'm', messages: [USER] }, new AbortController().signal))
     const usage = evs.find((e) => e.type === 'usage') as { raw: Record<string, unknown> } | undefined
     expect(usage).toBeDefined()
-    // 这两个字段是 M2「压缩 × prompt cache」的唯一输入，丢了那块就没法做
+    // 这两个字段是缓存命中率与「压缩 × prompt cache」的唯一输入，丢了那块就没法做
     expect(JSON.stringify(usage?.raw)).toContain('cacheReadInputTokens')
     expect(JSON.stringify(usage?.raw)).toContain('cacheCreationInputTokens')
   })

@@ -1,16 +1,18 @@
 # domi 交接
 
-> 2026-09-23 · 接手的人从这份开始读，读完再去 `CONTRIBUTING.md`。
+> 2026-09-24 · 接手的人从这份开始读，读完再去 `CONTRIBUTING.md`。
 > 这份只讲**现在在哪、下一步做什么、哪些地方会踩坑**；规矩与背景在别的文档里，本文只给指路。
 
 ---
 
 ## 1. 一句话现状
 
-M0–M12 的功能全部落地（M11 的 desktop 自启与 TUI 中断仍在等拍板）。M12 第二轮（2026-09-23）加了问题框 `ask.user`、
-「计划必须」（`plan.update` + 闸门 + 审批跟确认模式走）与中断续跑，见 `docs/spec/M12.md` 的 SPEC-M12-004 第二轮。
-`pnpm check`（typecheck + lint + 22 道守卫 + 150 个文件 1419 条测试 + L1 评估）当前全绿——2026-09-23 体检前它已经红了 3 天（M11 起），见 `docs/tasks/M12.md` 的 TASK-M12-005。
-剩下的是**验证补齐**（M4 / M5 / M6 / M10 / M11）与**用户侧走查**（各里程碑 DoD）。
+M0–M13 的功能全部落地（只剩 M11 的 desktop 自启在等拍板；TUI 中断已由 PRD-M13-002 接手做掉）。
+M12 第二轮（2026-09-23）加了问题框 `ask.user`、「计划必须」（`plan.update` + 闸门 + 审批跟确认模式走）与中断续跑，见 `docs/spec/M12.md` 的 SPEC-M12-004 第二轮；
+M13（2026-09-24）加了运行中「补充」（排队、下一步送达）与「中断当前轮」（Web 停止 / TUI `Esc`），见 `docs/spec/M13.md`。
+`pnpm check`（typecheck + lint + 22 道守卫 + 165 个文件 1511 条测试 + L1 评估）当前全绿——2026-09-23 体检前它曾红了 3 天（M11 起），见 `docs/tasks/M12.md` 的 TASK-M12-005。
+2026-09-24 删掉了 TOML 配置支持（ADR-014 过渡期结束，PRD v1.18），配置只认 `~/.domi/config.yaml`。
+剩下的是**验证补齐**（M4 / M5 / M6 / M10 / M11 / M12 / M13）与**用户侧走查**（各里程碑 DoD）。
 
 远端：`origin = git@github.com:oi8io/domi.git`（2026-09-23 起）。`.github/workflows/ci.yml` 就是 `pnpm check`，**以 CI 绿为准**，不要只跑某一个包的测试就说「全绿」。
 
@@ -64,10 +66,11 @@ pnpm check            # = typecheck + guard + test + eval(L1)；必须全绿才�
 | M8 工作台 | done | done | 只剩用户侧 DoD 与逐屏截图走查 |
 | M9 模型配置与体验 | done | done | TASK-M9-012 已补齐（修了 BUG-M9-003）；TUI 双渲染器要真终端手测（见 §7） |
 | M10 会话体验与运行控制 | done | 部分 | TASK-M10-007（验证补齐）todo；AC 覆盖已强制 |
-| M11 会话体验深化 | done（desktop 自启 blocked，TUI 中断等终止方案） | todo | TASK-M11-007 收口 todo；BUG-M11-001（shell 指纹绕过）、BUG-M11-002 已修 |
-| M12 体验修订 | done（000–009） | 部分 | 「全部放行」= 跳过所有确认；任务里动手前必须有计划（用户 2026-09-23 拍板） |
+| M11 会话体验深化 | done（desktop 自启 blocked；TUI 中断由 M13-002 接手） | todo | TASK-M11-007 收口 todo；BUG-M11-001（shell 指纹绕过）、BUG-M11-002 已修 |
+| M12 体验修订 | done（000–011） | 部分 | 「全部放行」= 跳过所有确认；任务里动手前必须有计划（用户 2026-09-23 拍板） |
+| M13 运行中对话 | done（000–008） | 部分 | 补充 + 中断当前轮；**daemon 要重启**才有 session.note / session.interrupt；用户侧 DoD 待手测 |
 
-`check-ac-coverage` 目前对 **M0 / M1 / M7 / M8 / M9** 强制（224 条 AC 全部有测试点名）。
+`check-ac-coverage` 目前对 **M0 / M1 / M7 / M8 / M9 / M10** 强制（236 条 AC 全部有测试点名）。
 中间几个里程碑的 AC 有测试但没在测试里写编号——**补完哪个里程碑的验证，就把它加进 `scripts/check-ac-coverage.ts` 的 `ACTIVE` 正则**，这是唯一防回退的机制。
 
 ---

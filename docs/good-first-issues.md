@@ -8,9 +8,11 @@
 `packages/trace/src/cli.ts` 用 `log.read(sessionId)`，分支会话只显示自己那一段。改成 `readLineage`，
 并在轨迹里标出「继承自父会话」的那一段。验收：`packages/trace` 加一个分支会话的测试。
 
-## 2. 状态栏显示 prompt cache 命中率（PRD-M1-004 AC-4）
+## 2. `domi doctor` 的发现支持 `--json`
 
-`packages/kernel/src/metrics.ts` 已经有 `cacheRead`。在 `session.metrics` 里加一个命中率字段，TUI 与 Web 的状态栏都显示。
+`packages/cli/src/doctor.ts` 的 `diagnose()` 已经返回结构化的 `Finding[]`，现在只有 `formatFindings` 一种输出。
+`--json` 已经在参数解析里了：`doctor` 分支在 `cli.flags.json` 时直接打印 `JSON.stringify(findings)`。
+验收：`packages/cli/test/run.spec.ts` 加一条，断言输出能 `JSON.parse` 且每条都有 `ok` / `title` / `fix`。
 
 ## 3. `domi session list` 支持 `--json`
 

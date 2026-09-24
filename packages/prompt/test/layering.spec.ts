@@ -95,7 +95,7 @@ describe('PRD-M1-004 AC-3 · 前缀 byte 级稳定', () => {
     expect((a.messages.at(-1) as { content: string }).content).toContain('/tmp/work')
   })
 
-  test('prefixLayerCount 指到前缀边界，M2 选压缩点要用', () => {
+  test('prefixLayerCount 指到前缀边界（dump 标边界用）', () => {
     const a = assemble(BUILTIN_LAYERS, CTX)
     expect(a.prefixLayerCount).toBe(BUILTIN_LAYERS.filter((l) => l.cacheable).length)
   })

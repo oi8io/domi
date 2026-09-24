@@ -2,7 +2,8 @@
  * 配置装载 —— PRD-M0-008 AC-1（环境变量优先）
  *
  * 优先级：环境变量 > ~/.domi/config.yaml > 内置默认。
- * 格式是 YAML（docs/adr/014）；旧的 config.toml 过渡期内仍可读，到 M4 再批准门删掉。
+ * 格式是 YAML（docs/adr/014）。旧的 config.toml 已于 2026-09-24 停止读取（过渡期结束），
+ * 只在 doctor 里提示它还躺在那儿。
  * 这个顺序不是随便定的：出问题时人要能用一条 `DEEPSEEK_API_KEY=... domi` 临时绕开配置文件，
  * 反过来（文件覆盖环境变量）会让"我明明设了环境变量为什么没生效"变成常见困惑。
  * base_url 不走环境变量（`DOMI_BASE_URL` 已于 2026-09-20 废弃）：它随终端环境漂，
@@ -50,39 +51,24 @@ export interface LoadOptions {
 
 export interface ConfigSource {
   path: string
-  format: 'yaml' | 'toml'
   exists: boolean
-  /** 读的是旧格式（ADR-014 过渡期）。doctor 据此给出迁移命令 */
-  legacy: boolean
-  /** YAML 与旧 TOML 同时存在时，被忽略的那个 TOML 的路径 */
-  ignoredLegacy: string | null
+  /** ~/.domi/config.toml 还在（ADR-014：已不再读取）。只给 doctor 提示用，不参与装载 */
+  staleToml: string | null
 }
 
-/** 找配置文件：显式路径 > ~/.domi/config.yaml > config.yml > 旧的 config.toml */
+/** 找配置文件：显式路径（DOMI_CONFIG）> ~/.domi/config.yaml > config.yml。一律按 YAML 解析 */
 export function configSource(opts: LoadOptions = {}): ConfigSource {
   const env = opts.env ?? process.env
   const explicit = opts.path ?? env.DOMI_CONFIG
-  if (explicit !== undefined) {
-    const toml = explicit.endsWith('.toml')
-    return {
-      path: explicit,
-      format: toml ? 'toml' : 'yaml',
-      exists: existsSync(explicit),
-      legacy: toml,
-      ignoredLegacy: null,
-    }
-  }
+  if (explicit !== undefined) return { path: explicit, exists: existsSync(explicit), staleToml: null }
   const dir = join(opts.home ?? homedir(), '.domi')
-  const legacyPath = join(dir, 'config.toml')
-  const hasLegacy = existsSync(legacyPath)
+  const tomlPath = join(dir, 'config.toml')
+  const staleToml = existsSync(tomlPath) ? tomlPath : null
   for (const name of ['config.yaml', 'config.yml']) {
     const p = join(dir, name)
-    if (existsSync(p)) {
-      return { path: p, format: 'yaml', exists: true, legacy: false, ignoredLegacy: hasLegacy ? legacyPath : null }
-    }
+    if (existsSync(p)) return { path: p, exists: true, staleToml }
   }
-  if (hasLegacy) return { path: legacyPath, format: 'toml', exists: true, legacy: true, ignoredLegacy: null }
-  return { path: join(dir, 'config.yaml'), format: 'yaml', exists: false, legacy: false, ignoredLegacy: null }
+  return { path: join(dir, 'config.yaml'), exists: false, staleToml }
 }
 
 export function configPath(opts: LoadOptions = {}): string {
@@ -95,7 +81,7 @@ export function readConfigFile(src: ConfigSource): Record<string, unknown> {
   let raw: unknown
   try {
     const text = readFileSync(src.path, 'utf8')
-    raw = src.format === 'toml' ? Bun.TOML.parse(text) : Bun.YAML.parse(text)
+    raw = Bun.YAML.parse(text)
   } catch (e) {
     throw new ConfigParseError(src.path, e instanceof Error ? e.message : String(e))
   }

@@ -82,9 +82,11 @@ describe('PRD-M0-006 AC-3 · 输出可深比较断言', () => {
     expect(buildContext(evs, P)).toHaveLength(4)
   })
 
-  test('超长直接报错，M0 不做压缩', () => {
+  test('拼完仍超长：明确报错并指出可调的配置，不让模型 400', () => {
     const big = [env({ t: 'user.input', text: 'x'.repeat(10_000) })]
-    expect(() => buildContext(big, { maxTokens: 10, includeReasoning: false })).toThrow(/maxTokens|超长/)
+    expect(() => buildContext(big, { maxTokens: 10, includeReasoning: false })).toThrow(
+      /maxTokens[\s\S]*context\.strategy/,
+    )
   })
 })
 

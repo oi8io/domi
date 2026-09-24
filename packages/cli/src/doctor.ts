@@ -30,8 +30,8 @@ export interface DoctorInput {
   model: string
   /** 自定义网关地址。拿不到官方 key 时这是主路径，不是边缘场景 */
   baseUrl?: string | undefined
-  /** 旧格式配置（ADR-014 过渡期）。ignored = 同时有 YAML，这个 TOML 没被读 */
-  legacyConfig?: { path: string; ignored: boolean } | undefined
+  /** 还躺在 ~/.domi 里的旧 config.toml（ADR-014：2026-09-24 起不再读取） */
+  staleToml?: string | undefined
   /** --ping 的结果；没跑就是 undefined */
   ping?: PingResult | undefined
   /** 插件沙箱（PRD-M6-003）。没给就不查 */
@@ -106,24 +106,14 @@ export function diagnose(input: DoctorInput): Finding[] {
     })
   }
 
-  if (input.legacyConfig) {
-    const { path, ignored } = input.legacyConfig
-    const yamlPath = path.replace(/\.toml$/, '.yaml')
-    out.push(
-      ignored
-        ? {
-            ok: false,
-            title: tr('cli.doctor.tomlIgnored'),
-            detail: tr('cli.doctor.tomlIgnoredDetail', { path }),
-            fix: `$ rm ${path}`,
-          }
-        : {
-            ok: false,
-            title: tr('cli.doctor.tomlInUse'),
-            detail: tr('cli.doctor.tomlInUseDetail', { path }),
-            fix: `$ domi init --from-toml > ${yamlPath}`,
-          },
-    )
+  if (input.staleToml) {
+    const path = input.staleToml
+    out.push({
+      ok: false,
+      title: tr('cli.doctor.tomlIgnored'),
+      detail: tr('cli.doctor.tomlIgnoredDetail', { path, yaml: path.replace(/\.toml$/, '.yaml') }),
+      fix: `$ rm ${path}`,
+    })
   }
 
   out.push(

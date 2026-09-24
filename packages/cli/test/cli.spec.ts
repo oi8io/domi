@@ -88,21 +88,11 @@ describe('AC-4 · doctor 的每条问题都带可执行命令', () => {
     expect(formatFindings(findings)).toContain('一切正常')
   })
 
-  test('ADR-014 · 还在用旧的 config.toml → 给出迁移命令', () => {
-    const f = diagnose({ ...BASE, legacyConfig: { path: '/h/.domi/config.toml', ignored: false } }).find((x) =>
-      x.title.includes('TOML'),
-    )!
+  test('ADR-014 · 旧的 config.toml 还在 → 说清楚已不再读取、要手动搬到 YAML', () => {
+    const f = diagnose({ ...BASE, staleToml: '/h/.domi/config.toml' }).find((x) => x.title.includes('config.toml'))!
     expect(f.ok).toBe(false)
-    expect(f.fix).toBe('$ domi init --from-toml > /h/.domi/config.yaml')
-  })
-
-  test('ADR-014 · YAML 与旧 TOML 都在 → 说清楚 TOML 已被忽略', () => {
-    const f = diagnose({ ...BASE, legacyConfig: { path: '/h/.domi/config.toml', ignored: true } }).find((x) =>
-      x.title.includes('TOML'),
-    )!
-    expect(f.ok).toBe(false)
-    expect(f.detail).toContain('被忽略')
-    expect(f.fix).toMatch(/^\$ /)
+    expect(f.detail).toContain('/h/.domi/config.yaml')
+    expect(f.fix).toBe('$ rm /h/.domi/config.toml')
   })
 
   test('git 缺失时说清楚「仍能跑，但没有安全网」', () => {

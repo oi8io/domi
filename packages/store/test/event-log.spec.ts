@@ -2,8 +2,7 @@
  * PRD-M0-001 · 会话以 append-only 事件流持久化
  * SPEC-M0-001（存储引擎）· §4.1 表结构
  *
- * 本文件在 TASK-M0-006 提交时**必须是红的**——实现留到 TASK-M0-007。
- * 红的原因必须是 NotImplementedError，不是加载失败或语法错误。
+ * （TDD 起点：TASK-M0-006 先提交这份红的测试，TASK-M0-007 再补实现。）
  */
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'

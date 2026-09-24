@@ -57,13 +57,13 @@ export function exportableConfig(src: ConfigSource): string {
   return toYamlWithoutSecrets(readConfigFile(src), tr('cli.data.exportHeader', { path: src.path }))
 }
 
-/** 结构原样转成 YAML，去掉 model.api_key 与 server.token。迁移与导出共用 */
-export function toYamlWithoutSecrets(config: Record<string, unknown>, header: string, keepSecrets = false): string {
+/** 结构原样转成 YAML，去掉 model.api_key 与 server.token。导出用 */
+export function toYamlWithoutSecrets(config: Record<string, unknown>, header: string): string {
   const copy = structuredClone(config)
   const model = copy.model as Record<string, unknown> | undefined
-  if (!keepSecrets && model && 'api_key' in model) delete model.api_key
+  if (model && 'api_key' in model) delete model.api_key
   const server = copy.server as Record<string, unknown> | undefined
-  if (!keepSecrets && server && 'token' in server) delete server.token
+  if (server && 'token' in server) delete server.token
   return `${header}\n${Bun.YAML.stringify(copy, null, 2).replace(/: \n/g, ':\n')}\n`
 }
 

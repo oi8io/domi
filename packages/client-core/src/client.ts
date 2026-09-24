@@ -224,8 +224,7 @@ export class DomiClient {
     await this.request('session.budget', { sessionId, budget })
   }
 
-  /** 计划模式 / 执行模式（M7-005）。切换本身以 mode.switch 事件出现在对话里 */
-  /** PRD-M12-002：切会话确认模式（always-ask/on-demand/allow-all） */
+  /** PRD-M12-002：切会话确认模式（always-ask/on-demand/allow-all）。切换以 permissions.mode.switch 事件出现在对话里 */
   async setPermissionsMode(sessionId: string, mode: 'always-ask' | 'on-demand' | 'allow-all'): Promise<boolean> {
     const r = await this.request('session.permissionsMode', { sessionId, mode })
     return r.changed

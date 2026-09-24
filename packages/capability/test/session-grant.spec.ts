@@ -1,7 +1,7 @@
 /**
  * 本会话内始终允许 —— PRD-M8-016 AC-1 / AC-2 / AC-3
  *
- * 授权只能把「要问」变成「允许」：越不过 deny，也越不过计划模式与父范围；
+ * 授权只能把「要问」变成「允许」：越不过 deny，也越不过父范围；
  * shell.exec / MCP / 插件工具不给这个选项；重开会话时从事件恢复。
  */
 import { describe, expect, test } from 'bun:test'

@@ -4,34 +4,20 @@
  * **这一整块在 packages 里而不是 apps 里。**
  * 第一版我写在 apps/tui/src/cli.ts，tsc 立刻报「apps 找不到 @domi/checkpoint」——
  * 那不是缺依赖，是边界在说话：命令实现要读事件流、读配置、问影子仓库，
- * 那些都是业务（INV-02）。放在端上的话 M3 拆 daemon 时要整体搬家。
+ * 那些都是业务（INV-02）。放在端上的话 M3 拆 daemon 时就得整体搬家——当时放对了，M3 没动它。
  * `apps/tui` 只负责把 argv 递进来、把字符串打出去。
  */
 
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { ShadowRepo } from '@domi/checkpoint'
-import {
-  configSource,
-  credentialEnvNames,
-  listProviders,
-  loadConfig,
-  providerConnection,
-  readConfigFile,
-} from '@domi/config'
+import { configSource, credentialEnvNames, listProviders, loadConfig, providerConnection } from '@domi/config'
 import { tr } from '@domi/i18n'
 import { buildManifest, formatManifest } from '@domi/observability'
 import { assemble, BUILTIN_LAYERS, formatDump, layersFromConfig, mergeLayers } from '@domi/prompt'
 import { formatAbsolute, formatMigrate, formatRelative, migrateDatabase, SqliteEventLog } from '@domi/store'
 import { CONFIG_TEMPLATE, HELP, type ParsedCli } from './args.ts'
-import {
-  exportAll,
-  exportableConfig,
-  formatPurgePlan,
-  PURGE_CONFIRM_WORD,
-  planPurge,
-  toYamlWithoutSecrets,
-} from './data.ts'
+import { exportAll, exportableConfig, formatPurgePlan, PURGE_CONFIRM_WORD, planPurge } from './data.ts'
 import { diagnose, formatFindings } from './doctor.ts'
 import type { Io } from './io.ts'
 import { formatOnboarding } from './onboarding.ts'
@@ -127,18 +113,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         )
         return 0
       }
-      if (!cli.flags.fromToml) {
-        io.out(CONFIG_TEMPLATE())
-        return 0
-      }
-      // ADR-014 的迁移：结构原样搬过去，api_key 也保留（这是用户自己的文件，不是导出）
-      const legacy = join(dataDir(), 'config.toml')
-      const src = configSource({ path: legacy })
-      if (!src.exists) {
-        io.err(tr('cli.init.noLegacy', { legacy, join: join(dataDir(), 'config.yaml') }))
-        return 1
-      }
-      io.out(toYamlWithoutSecrets(readConfigFile(src), tr('cli.init.convertedHeader', { legacy }), true))
+      io.out(CONFIG_TEMPLATE())
       return 0
     }
 
@@ -176,7 +151,6 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       const home = userHome()
       const cfg = loadConfig({ home })
       const src = configSource({ home })
-      const legacyPath = src.legacy ? src.path : src.ignoredLegacy
       const conn = providerConnection(cfg, cfg.model.provider)
       const pingResult = cli.flags.ping
         ? await ping({
@@ -190,7 +164,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
         : undefined
       const findings = diagnose({
         configPath: src.path,
-        legacyConfig: legacyPath ? { path: legacyPath, ignored: !src.legacy } : undefined,
+        staleToml: src.staleToml ?? undefined,
         baseUrl: conn.baseUrl,
         ping: pingResult,
         hasCredential: Boolean(conn.apiKey),

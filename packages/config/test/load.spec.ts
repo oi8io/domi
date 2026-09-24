@@ -1,6 +1,6 @@
 /**
  * PRD-M0-008 · 配置与凭据（AC-1 / AC-3）· SPEC-M0-009 · INV-11
- * 配置格式：YAML（docs/adr/014，PRD v1.4 回写）；旧的 TOML 过渡期内仍可读
+ * 配置格式：YAML（docs/adr/014，PRD v1.4 回写）；旧的 config.toml 2026-09-24 起不再读取
  */
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -46,7 +46,7 @@ permissions:
       decision: allow
 `
 
-/** 同一份配置的旧格式，用来测过渡期 */
+/** 同一份配置的旧格式：过渡期已结束，用来证明它**不再**被读 */
 const LEGACY_TOML = `
 [model]
 provider = "anthropic"
@@ -216,11 +216,15 @@ model:
   })
 })
 
-describe('ADR-014 · YAML 与旧 TOML 的过渡', () => {
+describe('ADR-014 · 只认 YAML（TOML 过渡期 2026-09-24 结束）', () => {
   test('默认位置是 ~/.domi/config.yaml', () => {
     const h = home()
     expect(configPath({ home: h, env: {} })).toBe(join(h, '.domi', 'config.yaml'))
-    expect(configSource({ home: h, env: {} })).toMatchObject({ format: 'yaml', exists: false, legacy: false })
+    expect(configSource({ home: h, env: {} })).toEqual({
+      path: join(h, '.domi', 'config.yaml'),
+      exists: false,
+      staleToml: null,
+    })
   })
 
   test('也认 config.yml', () => {
@@ -228,31 +232,31 @@ describe('ADR-014 · YAML 与旧 TOML 的过渡', () => {
     expect(loadConfig({ home: h, env: {} }).model.name).toBe('from-yml')
   })
 
-  test('只有旧的 config.toml：照常读，并标记为 legacy', () => {
+  test('只有旧的 config.toml：不读，按没有配置文件处理，只标出来给 doctor', () => {
     const h = home(undefined, { 'config.toml': LEGACY_TOML })
     const src = configSource({ home: h, env: {} })
-    expect(src).toMatchObject({ format: 'toml', exists: true, legacy: true, ignoredLegacy: null })
-    expect(src.path).toBe(join(h, '.domi', 'config.toml'))
+    expect(src).toEqual({
+      path: join(h, '.domi', 'config.yaml'),
+      exists: false,
+      staleToml: join(h, '.domi', 'config.toml'),
+    })
     const cfg = loadConfig({ home: h, env: {} })
-    expect(cfg.model.name).toBe('claude-from-toml')
-    expect(cfg.permissions.rules).toHaveLength(1)
+    expect(cfg.model.name).not.toBe('claude-from-toml')
   })
 
-  test('两个都在：只读 YAML，并报出被忽略的 TOML', () => {
+  test('两个都在：读 YAML，TOML 同样只标出来', () => {
     const h = home(YAML, { 'config.toml': LEGACY_TOML })
     const src = configSource({ home: h, env: {} })
-    expect(src.format).toBe('yaml')
-    expect(src.ignoredLegacy).toBe(join(h, '.domi', 'config.toml'))
+    expect(src.staleToml).toBe(join(h, '.domi', 'config.toml'))
     expect(loadConfig({ home: h, env: {} }).model.name).toBe('claude-from-file')
   })
 
-  test('DOMI_CONFIG 指到 .toml 时按 TOML 解析', () => {
+  test('DOMI_CONFIG 指到 .toml 也按 YAML 解析——TOML 语法直接报配置错误，不静默当成空配置', () => {
     const d = mkdtempSync(join(tmpdir(), 'domi-cfg3-'))
     dirs.push(d)
     const p = join(d, 'old.toml')
     writeFileSync(p, LEGACY_TOML, 'utf8')
-    expect(configSource({ env: { DOMI_CONFIG: p } })).toMatchObject({ format: 'toml', legacy: true })
-    expect(loadConfig({ env: { DOMI_CONFIG: p } }).model.name).toBe('claude-from-toml')
+    expect(() => loadConfig({ env: { DOMI_CONFIG: p } })).toThrow(ConfigParseError)
   })
 
   test('空的 YAML 文件等于没写，不是报错', () => {

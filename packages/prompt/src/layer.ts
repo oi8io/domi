@@ -2,7 +2,7 @@
  * 分层提示词 —— PRD-M1-003 / PRD-M1-004 · SPEC-M1-004
  *
  * 这是 M1 最要紧的一条，因为它同时是三件事的地基：
- * 提示词可组合、prompt cache 能打对、以及 M2 的「压缩 × cache 交叉」。
+ * 提示词可组合、prompt cache 能打对、以及压缩时不打坏 cache（compact 原样保留 system 前缀，见 memory/compact.ts）。
  *
  * **核心约束只有一条**：prompt cache 按**前缀**匹配。
  * 一旦前面混进会变的内容，它后面所有 cacheable 层的缓存全部作废。
@@ -65,7 +65,7 @@ export interface AssembledPrompt {
   layers: LayerDump[]
   /** 稳定前缀：所有 cacheable 层拼起来的原文。cache 能不能打中，看的就是它稳不稳 */
   prefixText: string
-  /** 前缀到第几层为止。M2 选压缩点时要用 */
+  /** 前缀到第几层为止。目前只给 `domi prompt dump` 标前缀边界用（压缩没有用它，而是整段保留 system 前缀） */
   prefixLayerCount: number
 }
 

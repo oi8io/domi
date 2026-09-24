@@ -457,7 +457,7 @@ export const METHODS = {
   'task.create': {
     summary:
       '按目标新建任务（PRD-M8-005）：在项目下建任务会话，按项目设置决定要不要隔离（PRD-M8-006），' +
-      '目标较长或项目要求时先规划（计划模式），然后把目标作为第一句话提交。返回会话 id 与隔离决定',
+      '然后把目标作为第一句话提交；动手前由模型用 plan.update 写计划（PRD-M12-004）。返回会话 id 与隔离决定',
     params: z.object({ projectId: z.string(), goal: z.string().min(1) }),
     result: z.object({
       sessionId: z.string(),

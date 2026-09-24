@@ -742,11 +742,9 @@ export const zh = {
   'cli.doctor.config': '配置文件',
   'cli.doctor.noConfig': '配置文件不存在',
   'cli.doctor.noConfigDetail': '{configPath} 没找到。没有它也能跑（全部走环境变量），但建议建一个。',
-  'cli.doctor.tomlIgnored': '旧的 TOML 配置被忽略了',
+  'cli.doctor.tomlIgnored': '旧的 config.toml 已不再读取',
   'cli.doctor.tomlIgnoredDetail':
-    '已经有 YAML 配置，{path} 已被忽略（docs/adr/014）。确认 YAML 里该有的都有了，就可以删掉它。',
-  'cli.doctor.tomlInUse': '还在用旧的 TOML 配置',
-  'cli.doctor.tomlInUseDetail': '{path} 现在还能读，但配置格式已改为 YAML（docs/adr/014），TOML 的支持会在 M4 去掉。',
+    '{path} 还在，但 domi 只读 YAML 配置（docs/adr/014，TOML 支持已删除）。里面的设置请手动搬到 {yaml}，搬完删掉它。',
   'cli.doctor.credential': '模型凭据',
   'cli.doctor.credentialSet': '已设置（{provider}）',
   'cli.doctor.noCredential': '没有模型凭据',
@@ -832,9 +830,6 @@ export const zh = {
   'cli.init.created': '在 {root} 里新建了：\n{join}\n',
   'cli.init.projectHint':
     '规矩写进 AGENT.md，项目级 Skill 放 .domi/skills/<名字>/SKILL.md。第一次在这里打开会话时 domi 会问你是否信任这个仓库。',
-  'cli.init.noLegacy': '没有找到 {legacy}，不需要迁移。\n$ domi init > {join}   # 从模板开始',
-  'cli.init.convertedHeader':
-    '# 由 {legacy} 转换而来（domi init --from-toml）。原文件的注释没法带过来，需要的话对照着补。',
   'cli.trust.none': '还没有答过任何仓库。',
   'cli.trust.trusted': '信任  ',
   'cli.trust.untrusted': '不信任',
@@ -864,7 +859,6 @@ export const zh = {
   domi doctor               体检；每条问题都给一条可直接粘贴执行的命令
   domi doctor --ping        额外发一次真实请求，区分「key 不对 / 网关没通 / 模型名错」
   domi init                 打印一份 config.yaml 模板
-  domi init --from-toml     把旧的 config.toml 换成 YAML 打印出来（注释带不过来）
   domi init --project       在当前仓库建 .domi/（项目级 Skill）与 AGENT.md 模板
   domi trust [路径] [--revoke]  信任 / 取消信任一个仓库（信任后它的 AGENT.md 与 .domi/skills 才会被读）
   domi trust list           列出答过的仓库
@@ -1230,7 +1224,6 @@ server:
   'error.ref.outOfRange': '引用越界：会话 {sessionId} 只有 {head} 条，没有第 {fromSeq} 条',
   'error.ref.reversed': '引用的区间反了：{fromSeq}–{toSeq}',
   'error.config.denied': '这些设置不能从这里改：{keys}',
-  'error.config.legacyToml': '配置还是旧的 TOML 格式（{path}），先迁移成 YAML：domi init --from-toml',
   'error.config.notString': '{key} 必须是字符串',
   'error.config.defaultProvider': '「{provider}」是默认模型所在的供应商，不能停用或删除。先把默认模型换到别家。',
   'error.model.ambiguous': '「{name}」在好几家供应商下都有：{providers}。从下拉里选具体哪一个。',

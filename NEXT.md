@@ -1,4 +1,7 @@
-在做: 2026-09-24 M13 运行中对话完成（TASK-M13-000…007），typecheck / lint / 全部 guard / test（1514 pass）/ eval 全绿：
+在做: 2026-09-24 过时信息清理 + 删 TOML（TASK-M13-008）：全仓「将来时」里程碑注释 / 报错 / 测试名刷成现状；
+      ADR-014 过渡期结束，config.toml 不再读取、`domi init --from-toml` 删除，doctor 只提示残留文件（PRD v1.18）；
+      README / HANDOFF / good-first-issues / quickstart 跟上。`pnpm check` 全绿（1511 pass）
+      2026-09-24 M13 运行中对话完成（TASK-M13-000…007），typecheck / lint / 全部 guard / test（1514 pass）/ eval 全绿：
       - 补充：跑着时回车 = 补充，进 daemon 队列，loop 在安全点（每步开头 / 收场前）落 user.note，下一步生效；
         可撤回；异常收场退回输入框；正常收场后才到的补充直接开下一轮（user.input.noteIds）
       - 中断：Web「停止」/ TUI Esc → session.interrupt；已输出保留、工具中止、未跑的补 interrupted；

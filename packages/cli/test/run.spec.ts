@@ -6,7 +6,6 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadConfig } from '@domi/config'
 import { SqliteEventLog } from '@domi/store'
 import { parseCli, runCommand, VERSION } from '../src/index.ts'
 
@@ -178,41 +177,6 @@ describe('session', () => {
       expect(r.out).not.toContain('已恢复')
       expect(r.err).toContain('s-nope')
     })
-  })
-})
-
-describe('ADR-014 · init --from-toml', () => {
-  const realHome = process.env.HOME
-  afterEach(() => {
-    process.env.HOME = realHome
-  })
-
-  test('把旧的 config.toml 原样换成 YAML 打印出来，读回来是同一份配置', async () => {
-    const home = tmp()
-    process.env.HOME = home
-    mkdirSync(join(home, '.domi'), { recursive: true })
-    const tomlPath = join(home, '.domi', 'config.toml')
-    writeFileSync(
-      tomlPath,
-      '[model]\nprovider = "anthropic"\nname = "glm"\nbase_url = "https://api.z.ai/api/anthropic"\n\n' +
-        '[model.capabilities]\ntoolCall = true\n\n[[permissions.rules]]\nname = "r"\ncapability = "fs.read"\ndecision = "allow"\n',
-      'utf8',
-    )
-    const r = await run(['init', '--from-toml'])
-    expect(r.code).toBe(0)
-    expect(r.out).toContain('注释') // 开头说明注释没法带过来
-
-    const yamlPath = join(home, 'converted.yaml')
-    writeFileSync(yamlPath, r.out, 'utf8')
-    const env = { ANTHROPIC_API_KEY: 'k' }
-    expect(loadConfig({ path: yamlPath, env })).toEqual(loadConfig({ path: tomlPath, env }))
-  })
-
-  test('没有旧文件时说清楚，退出码 1', async () => {
-    process.env.HOME = tmp()
-    const r = await run(['init', '--from-toml'])
-    expect(r.code).toBe(1)
-    expect(r.err).toContain('config.toml')
   })
 })
 

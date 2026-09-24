@@ -3,7 +3,7 @@
  *
  * apps/tui 只许看到 runtime（门面）/ client-core（投影）/ config / protocol。
  * 直接 import kernel、store、capability 就是把业务逻辑搬到端上，
- * M3 拆 daemon 时要一个个抠出来。
+ * 迟早要一个个抠出来（M3 拆 daemon 时就靠这道守卫没抠）。
  */
 import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, rmSync, writeFileSync } from 'node:fs'

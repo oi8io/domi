@@ -435,10 +435,6 @@ function SessionTitle({
 }
 
 /**
- * 输入框（原型 .composer）：多行输入 + 底部工具栏。Enter 发送、Shift+Enter 换行，输入法组合中不发送。
- * 「文件」「技能」要等 PRD-M8-010 的接口，先占位。
- */
-/**
  * 会话级操作：删除要点两下——第一下变成「确认删除」，防手滑（软删除，可以在全部会话里恢复）。
  */
 export function SessionTools({

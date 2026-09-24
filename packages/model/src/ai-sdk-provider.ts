@@ -7,7 +7,7 @@
  *
  * ADR-004 的红线在这里落地：`providerOptions` 原样传下去，
  * `providerMetadata` 与 `usage` **整块**塞进 usage 事件，不挑字段。
- * 挑字段的那一刻，M2 的「压缩 × prompt cache」就失去了输入。
+ * 挑字段的那一刻，缓存命中率与「压缩 × prompt cache」就失去了输入。
  */
 import type { ModelMessages, ToolSchema } from '@domi/protocol'
 import type { LanguageModel } from 'ai'

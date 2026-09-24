@@ -1,8 +1,8 @@
 /**
  * PRD-M3-003（骨架）· Web 端只渲染
  *
- * 服务端渲染成字符串断言，不起浏览器——这一轮不做 Playwright（docs/prd/M3.md §3）。
- * parity 的逐项 e2e 在 docs/parity-checklist.md 里列着，下一轮补。
+ * 服务端渲染成字符串断言，不起浏览器——M3 起就没上 Playwright（docs/prd/M3.md §3）。
+ * parity 的逐项 e2e 在 docs/parity-checklist.md 里列着，和其它测试验证类工作一起放到最后统一补。
  */
 import { describe, expect, test } from 'bun:test'
 import { createSessionStore, DomiClient, type TranscriptItem, type WireSocket } from '@domi/client-core'
