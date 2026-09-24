@@ -173,3 +173,45 @@ describe('PRD-M8-008 AC-4 · 每条消息 hover 出「分支」，用户输入 h
     expect(view).toContain('href="#/s/s-1/trajectory"')
   })
 })
+
+describe('PRD-M11-009 AC-2 · 顶部「取更早」占位可点击兜底（BUG-M12-002）', () => {
+  const render = (store: ReturnType<typeof createSessionStore>): string =>
+    renderToStaticMarkup(
+      <SessionView
+        client={client}
+        sessionId="s-1"
+        store={store}
+        title="长会话"
+        tab="chat"
+        connection="open"
+        onBranched={() => undefined}
+        onRefsChange={() => undefined}
+        onDeleted={() => undefined}
+      />,
+    )
+
+  test('还有更早历史且空闲 → 占位是按钮（点击兜底），不是纯文本', () => {
+    const store = createSessionStore()
+    store.setWindowMeta({ oldestSeq: 4, hasOlder: true })
+    const html = render(store)
+    expect(html).toContain('data-action="load-older"')
+    expect(html).toContain('向上滚动加载更早历史')
+  })
+
+  test('正在加载更早 → 显示加载中占位，不提供重复点击', () => {
+    const store = createSessionStore()
+    store.setWindowMeta({ oldestSeq: 4, hasOlder: true })
+    store.setLoadingOlder(true)
+    const html = render(store)
+    expect(html).not.toContain('data-action="load-older"')
+    expect(html).toContain('正在加载更早历史')
+  })
+
+  test('没有更早历史 → 没有占位', () => {
+    const store = createSessionStore()
+    store.setWindowMeta({ oldestSeq: 1, hasOlder: false })
+    const html = render(store)
+    expect(html).not.toContain('data-action="load-older"')
+    expect(html).not.toContain('向上滚动加载更早历史')
+  })
+})

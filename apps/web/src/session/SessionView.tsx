@@ -17,7 +17,7 @@ import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
-import { NEAR_BOTTOM_PX, nextScrollAction } from '../lib/scroll.ts'
+import { NEAR_BOTTOM_PX, nextScrollAction, shouldFetchOlder } from '../lib/scroll.ts'
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
@@ -85,7 +85,9 @@ export function SessionView({
     setNewCount(0)
     lastLen.current = items.length
   }, [sessionId])
-  // biome-ignore lint/correctness/useExhaustiveDependencies: 内容/条数与询问变化是滚动的触发条件（流式逐 token 也在 items 上）
+  // hasOlder 必须进来：daemon 先推 session.events 再回 RPC 响应（带窗口边界），首屏事件落地时 hasOlder 还是 false，
+  // 等 setWindowMeta 翻转它时若不重跑本 effect，reportRead 不会复查——尾部窗口没撑满屏（无滚动条）时更早历史永远拉不到（BUG-M12-002）
+  // biome-ignore lint/correctness/useExhaustiveDependencies: 内容/条数、询问与窗口边界（hasOlder）是滚动的触发条件（流式逐 token 也在 items 上）
   useEffect(() => {
     const el = scroller.current
     if (!el) return
@@ -98,10 +100,32 @@ export function SessionView({
     if (action.newCount > 0) setNewCount((n) => n + action.newCount)
     lastLen.current = items.length
     reportRead()
-  }, [items, ask])
+  }, [items, ask, hasOlder])
 
   // 已读（PRD-M8-009 AC-2）：页面在前台、看到了底，就告诉 daemon 读到了哪；1 秒最多一次
   const lastReport = useRef({ at: 0, seq: 0, timer: 0 as ReturnType<typeof setTimeout> | 0 })
+
+  /**
+   * PRD-M11-009 AC-2：向上取更早一页，并保持当前视觉位置（加载完把 scrollTop 补回新内容的高度）。
+   * 顶部占位按钮与滚动触发共用这一个入口。
+   */
+  const fetchOlder = (): void => {
+    const prevHeight = scroller.current?.scrollHeight ?? 0
+    client
+      .loadOlder(sessionId)
+      .then(() => {
+        // loadOlder 是 async（网络往返 + prepend）。必须等它 resolve（新事件已落进 $items、
+        // React 重渲染、DOM 变高）之后再补 scrollTop——之前在 rAF 里立刻跑，那时 prepend
+        // 还没发生，scrollHeight 没变，差值算成 0，scrollTop 被钉死在 0，prepend 完成后
+        // 用户看到的是新内容顶部而不是原位置，感觉翻页没效果。
+        requestAnimationFrame(() => {
+          const el2 = scroller.current
+          if (el2) el2.scrollTop = el2.scrollHeight - prevHeight
+        })
+      })
+      .catch(() => undefined)
+  }
+
   const reportRead = (): void => {
     const el = scroller.current
     if (!el || document.visibilityState !== 'visible') return
@@ -113,23 +137,8 @@ export function SessionView({
     } else {
       awayFromBottom.current = true
     }
-    // PRD-M11-009 AC-2：向上滚到顶（scrollTop < 80px）且还有更早 → 加载一页
-    if (el.scrollTop < 80 && hasOlder && !loadingOlder) {
-      const prevHeight = el.scrollHeight
-      // loadOlder 是 async（网络往返 + prepend）。必须等它 resolve（新事件已落进 $items、
-      // React 重渲染、DOM 变高）之后再补 scrollTop——之前在 rAF 里立刻跑，那时 prepend
-      // 还没发生，scrollHeight 没变，差值算成 0，scrollTop 被钉死在 0，prepend 完成后
-      // 用户看到的是新内容顶部而不是原位置，感觉翻页没效果。
-      client
-        .loadOlder(sessionId)
-        .then(() => {
-          requestAnimationFrame(() => {
-            const el2 = scroller.current
-            if (el2) el2.scrollTop = el2.scrollHeight - prevHeight
-          })
-        })
-        .catch(() => undefined)
-    }
+    // PRD-M11-009 AC-2：滚到顶（或内容没撑满屏、scrollTop 被钳为 0）且还有更早 → 加载一页
+    if (shouldFetchOlder({ scrollTop: el.scrollTop, hasOlder, loadingOlder })) fetchOlder()
     if (dist > 80) return
     const r = lastReport.current
     if (r.timer !== 0) return
@@ -232,8 +241,20 @@ export function SessionView({
           ) : (
             <div className="mx-auto max-w-[860px] px-6 py-5">
               {hasOlder && (
-                <div className="mb-3 text-center text-xs text-zinc-500">
-                  {loadingOlder ? tr('web.session.loadingOlder') : tr('web.session.scrollToTopForMore')}
+                // PRD-M11-009 AC-2：占位可点击兜底——没有滚动条（内容没撑满屏）时也能点它拉更早
+                <div className="mb-3 text-center text-xs">
+                  {loadingOlder ? (
+                    <span className="text-zinc-500">{tr('web.session.loadingOlder')}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={fetchOlder}
+                      data-action="load-older"
+                      className="text-zinc-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
+                    >
+                      {tr('web.session.scrollToTopForMore')}
+                    </button>
+                  )}
                 </div>
               )}
               <Transcript

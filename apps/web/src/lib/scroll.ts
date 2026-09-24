@@ -44,3 +44,26 @@ export function nextScrollAction(input: ScrollFollowInput): ScrollFollowOutput {
   if (!input.awayFromBottom) return { stick: true, newCount: 0 }
   return { stick: false, newCount: Math.max(0, input.nextLen - input.prevLen) }
 }
+
+/** 顶部触发「取更早一页」的阈值（PRD-M11-009 AC-2）：滚到距顶 < 这个 px 就拉 */
+export const OLDER_TRIGGER_PX = 80
+
+/** 「取更早一页」的判定输入 */
+export interface OlderFetchSignal {
+  /** 当前 scrollTop（内容没撑满屏时被钳制为 0） */
+  scrollTop: number
+  /** 服务端说还有更早的轮 */
+  hasOlder: boolean
+  /** 正在加载更早，防重复触发 */
+  loadingOlder: boolean
+}
+
+/**
+ * 该不该触发「取更早一页」—— PRD-M11-009 AC-2
+ *
+ * BUG-M12-002：尾部窗口没撑满视口时没有滚动条，onScroll 永不触发，
+ * 但只要 hasOlder 翻转后复查一次，scrollTop=0 会命中这里 → 自动补拉历史。
+ */
+export function shouldFetchOlder(s: OlderFetchSignal): boolean {
+  return s.scrollTop < OLDER_TRIGGER_PX && s.hasOlder && !s.loadingOlder
+}

@@ -5,6 +5,9 @@
       - 续跑：「计划还剩 N 步 · 继续」（Web 按钮 / TUI /continue），被打断时突出
       - 状态栏常驻显示确认模式；ReviewMode 改名收尾；项目页删了「计划审阅策略」
       - 协议：SCHEMA_VERSION 14（plan.update），MetricsSchema 加可选 plan
+      2026-09-24 修 BUG-M12-002（TASK-M12-011）：会话首屏没撑满屏时拉不到更早历史
+      - 根因：daemon 先推事件再回窗口边界（hasOlder 晚到）+ 尾部窗口只有 1 行 → 无滚动条、onScroll 永不触发
+      - 修法：hasOlder 翻转重评估顶部取更早（自动补拉）+ 顶部占位可点击兜底（AC-2）+ shouldFetchOlder 纯函数
 
 下一步: 1. 用户手测 M12 DoD（重点：TUI 问题框的按键手感、任务先写计划、每次都问档的审批、关掉再开的续跑）
         2. M12 进 AC 覆盖强制范围（总 PRD 的 M11 条目先补逐条 AC）；TASK-M11-007 收口
