@@ -37,6 +37,7 @@
     "web": "pnpm --filter @domi/web dev",
     "build": "bun run scripts/build-binaries.ts",
     "build:all": "bun run scripts/build-binaries.ts --all",
+    "desktop": "bun run scripts/build-desktop.ts",
     "smoke": "bun run scripts/build-binaries.ts && bash scripts/smoke-binary.sh",
     "guard:live": "bun run scripts/check-ci-no-live-calls.ts",
     "bench:cache": "bun run scripts/measure-cache.ts",
