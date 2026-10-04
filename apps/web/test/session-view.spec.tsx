@@ -44,6 +44,8 @@ const status: StatusSnapshot = {
     steps: 9,
     tokPerSec: 42,
     cacheHitPercent: 62,
+    contextTokens: 108_000,
+    contextMaxTokens: 150_000,
   },
 }
 
@@ -117,6 +119,10 @@ describe('PRD-M8-008 AC-2 · 状态栏 pill：连接、turns / steps / tok/s、t
 
   test('上下文到 70% 以上是警告色', () => {
     expect(html).toContain('border-warn')
+  })
+
+  test('BUG-M13-002 · ctx% 悬停看得到怎么来的：当前占用 / 窗口', () => {
+    expect(html).toContain('title="108.0k / 150.0k tok"')
   })
 
   test('主题切换按钮在状态栏上（PRD-M8-001 AC-2）', () => {

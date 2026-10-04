@@ -186,6 +186,11 @@ export interface MetricsSnapshot {
   steps?: number
   tokPerSec?: number | null
   cacheHitPercent?: number | null
+  /** BUG-M13-002：当前占用（最近一次请求的提示词 token）与窗口；contextPercent = 两者之比 */
+  contextTokens?: number
+  contextMaxTokens?: number
+  /** BUG-M13-005：全会话工具调用次数，与 steps 同源 */
+  toolCalls?: number
 }
 
 export interface SessionEvents {
@@ -555,6 +560,9 @@ export class DomiSession {
       turnMs: m.turnMs,
       contextPercent: m.contextPercent,
       contextLevel: contextLevel(m.contextPercent),
+      contextTokens: m.contextTokens,
+      contextMaxTokens: this.opts.config.context.maxTokens,
+      toolCalls: m.toolCalls,
       unpricedModels: m.unpricedModels,
       verify: verifyState(all, { command: this.opts.config.verify?.command }),
       permissionsMode: this.permissionsMode,
@@ -1028,13 +1036,22 @@ export class DomiSession {
     ])
   }
 
-  /** 到窗口 70% 就自动压一次（AC-1）。只在 strategy = 'compact' 时生效 */
+  /**
+   * 到窗口 70% 就自动压一次（AC-1）。只在 strategy = 'compact' 时生效。
+   * 看的是**当前占用**（最近一次请求的提示词），不是全会话累计——累计只增不减，
+   * 过了阈值以后会每轮都压（BUG-M13-002）
+   */
   private async maybeAutoCompact(): Promise<void> {
     if (this.opts.config.context.strategy !== 'compact') return
     const events = await this.view()
-    const used = aggregate(events, { maxContextTokens: this.opts.config.context.maxTokens }).tokens
-    const total = used.input + used.output
-    if (!shouldCompact(total, this.opts.config.context.maxTokens, (this.opts.config.context.compactAt ?? 70) / 100))
+    const { contextTokens } = aggregate(events, { maxContextTokens: this.opts.config.context.maxTokens })
+    if (
+      !shouldCompact(
+        contextTokens,
+        this.opts.config.context.maxTokens,
+        (this.opts.config.context.compactAt ?? 70) / 100,
+      )
+    )
       return
     await this.compactNow('threshold')
   }

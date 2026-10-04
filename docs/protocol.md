@@ -8610,6 +8610,21 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
               "type": "null"
             }
           ]
+        },
+        "contextTokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "contextMaxTokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "toolCalls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": [

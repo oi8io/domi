@@ -1,4 +1,7 @@
-在做: 2026-10-05 修 BUG-M13-001（TASK-M13-009）：`data purge` 目录统计改 `lstatSync` 防符号链接环（ELOOP，
+在做: 2026-10-05 修 BUG-M13-002…005（TASK-M13-010）：状态栏统计口径——ctx% 改为最近一次请求的提示词 ÷ 窗口（原来是全会话累计，
+      2572.9k/150k 被截成 100%），自动压缩同步改口径；usage 归一认 AI SDK 7 / DeepSeek 等的缓存读（原来命中率恒 0%）；
+      model.request 开流前单独落盘，tok/s 不再含工具时间；工具次数以 daemon 全量聚合为准。
+      2026-10-05 修 BUG-M13-001（TASK-M13-009）：`data purge` 目录统计改 `lstatSync` 防符号链接环（ELOOP，
       根源是隔离会话 node_modules 里 pnpm 为 dev 依赖互链建的目录环）；purge 测试隔离 HOME。
       `pnpm check` 全绿（1512 pass / 0 fail，eval 1/1）
       2026-10-04 desktop：加 `pnpm desktop`（scripts/build-desktop.ts）——构建（只打 .app）→ 关旧 app → 替换 /Applications/domi.app → 确保 domid → 重启。本机 Rust 已就位（cargo 1.98.1），macOS 构建+替换验证跑通；README 补用法。

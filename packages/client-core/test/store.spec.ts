@@ -236,3 +236,36 @@ describe('PRD-M11-002 · 工具调用展开时带完整原文（detail 投影，
     expect(item?.detail).toBe(JSON.stringify({ output: big }))
   })
 })
+
+describe('BUG-M13-005 · 工具次数以 daemon 的全量聚合为准（PRD-M1-007 AC-1）', () => {
+  const metrics = (toolCalls?: number) => ({
+    tokens: { input: 0, output: 0, cacheRead: 0 },
+    cost: '—',
+    contextPercent: 0,
+    contextLevel: 'ok' as const,
+    unpricedModels: [],
+    ...(toolCalls === undefined ? {} : { toolCalls }),
+  })
+
+  test('端上只收到最后一页（2 次），daemon 推来 40 次 → 显示 40；之后实时 +1', () => {
+    seq = 0
+    const s = createSessionStore()
+    s.applyEvents([
+      env({ t: 'tool.call', id: 'a', name: 'fs.read', args: {} }),
+      env({ t: 'tool.call', id: 'b', name: 'fs.read', args: {} }),
+    ])
+    expect(s.$status.get().toolCalls).toBe(2)
+    s.setMetrics(metrics(40))
+    expect(s.$status.get().toolCalls).toBe(40)
+    s.applyEvents([env({ t: 'tool.call', id: 'c', name: 'fs.read', args: {} })])
+    expect(s.$status.get().toolCalls).toBe(41)
+  })
+
+  test('老 daemon 不推 toolCalls：保留端上自己的计数', () => {
+    seq = 0
+    const s = createSessionStore()
+    s.applyEvents([env({ t: 'tool.call', id: 'a', name: 'fs.read', args: {} })])
+    s.setMetrics(metrics())
+    expect(s.$status.get().toolCalls).toBe(1)
+  })
+})

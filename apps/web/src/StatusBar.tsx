@@ -6,6 +6,7 @@
 
 import {
   type ConnectionState,
+  formatContext,
   formatElapsed,
   formatTokens,
   permissionsModeBadge,
@@ -97,7 +98,11 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
           )}{' '}
           · {m === null ? '—' : m.cost}
         </span>
-        <span className={cn('pill', CTX_CLASS[level])} data-ctx={level}>
+        <span
+          className={cn('pill', CTX_CLASS[level])}
+          data-ctx={level}
+          title={(m === null ? null : formatContext(m)) ?? undefined}
+        >
           ctx {m?.contextPercent ?? 0}%
         </span>
         {m?.verify !== undefined && m.verify !== 'clean' && (

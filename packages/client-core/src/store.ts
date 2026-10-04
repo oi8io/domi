@@ -85,6 +85,11 @@ export interface MetricsSnapshot {
   steps?: number | undefined
   tokPerSec?: number | null | undefined
   cacheHitPercent?: number | null | undefined
+  /** BUG-M13-002：当前占用（最近一次请求的提示词 token）与窗口。老 daemon 不推 */
+  contextTokens?: number | undefined
+  contextMaxTokens?: number | undefined
+  /** BUG-M13-005：全会话工具调用次数（daemon 从事件流全量聚合）。老 daemon 不推 */
+  toolCalls?: number | undefined
 }
 
 export interface StatusSnapshot {
@@ -145,9 +150,19 @@ export function formatElapsed(ms: number): string {
   return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`
 }
 
+const k = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
+
+/** 上下文占用的明细（BUG-M13-002）：`60.0k / 150.0k tok`，让 ctx% 看得出是怎么来的。老 daemon 不推就是 null */
+export function formatContext(m: {
+  contextTokens?: number | undefined
+  contextMaxTokens?: number | undefined
+}): string | null {
+  if (m.contextTokens === undefined || m.contextMaxTokens === undefined) return null
+  return `${k(m.contextTokens)} / ${k(m.contextMaxTokens)} tok`
+}
+
 /** 状态栏的 token 段。TUI 与 Web 共用这一份，两端显示才会逐字一致 */
 export function formatTokens(t: { input: number; output: number; cacheRead: number }): string {
-  const k = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
   return t.cacheRead > 0
     ? `${k(t.input)}/${k(t.output)} tok (cache ${k(t.cacheRead)})`
     : `${k(t.input)}/${k(t.output)} tok`
@@ -653,7 +668,10 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
       $ask.set(ask)
     },
     setMetrics(metrics: MetricsSnapshot | null): void {
-      $status.set({ ...$status.get(), metrics })
+      // 工具次数以 daemon 的全量聚合为准（BUG-M13-005）：端上只数得到自己收到的 tool.call，
+      // 分页加载 / 重连之后会少算；两次推送之间的实时 +1 照旧
+      const toolCalls = metrics?.toolCalls ?? $status.get().toolCalls
+      $status.set({ ...$status.get(), metrics, toolCalls })
     },
     setModel(provider: string, model: string): void {
       const cur = $status.get()

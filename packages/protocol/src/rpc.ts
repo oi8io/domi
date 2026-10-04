@@ -217,6 +217,13 @@ const MetricsSchema = z.object({
   steps: z.number().int().nonnegative().optional(),
   tokPerSec: z.number().nonnegative().nullable().optional(),
   cacheHitPercent: z.number().min(0).max(100).nullable().optional(),
+  /**
+   * BUG-M13-002：当前上下文占用（最近一次请求的提示词 token）与窗口大小，contextPercent 就是两者之比。
+   * BUG-M13-005：全会话工具调用次数，与 steps 同一来源（事件流全量聚合）。老 daemon 不推
+   */
+  contextTokens: z.number().int().nonnegative().optional(),
+  contextMaxTokens: z.number().int().nonnegative().optional(),
+  toolCalls: z.number().int().nonnegative().optional(),
 })
 
 const AskSchema = z.object({

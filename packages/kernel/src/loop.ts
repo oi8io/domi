@@ -266,7 +266,11 @@ export async function runTurn(
 
     const pending: ToolCallRequest[] = []
     const produced: DomiEvent[] = []
-    produced.push({ t: 'model.request', provider: deps.provider.id, model: deps.model, tokensIn: messages.length })
+    // 请求单独先落盘（BUG-M13-004）：它的 ts 才是「请求发出」那一刻。
+    // 原来和这一步的输出攒成一批、共用流结束时的 ts，生成用了多久从事件流里量不出来（tok/s 靠它）
+    await deps.sink.append(sessionId, [
+      { t: 'model.request', provider: deps.provider.id, model: deps.model, tokensIn: messages.length },
+    ])
 
     let streamError: { message: string; recoverable: boolean } | null = null
     try {

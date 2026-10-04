@@ -38,14 +38,25 @@ export interface Metrics {
   toolCalls: number
   /** 最近一轮用了多久。传了 now（这一轮还在跑）就算到 now */
   turnMs: number
+  /**
+   * 当前上下文占用（token）：**最近一次请求**的提示词大小（input + cacheRead），不是全会话累计——
+   * 每次请求都把整段上下文重发一遍，累计值是「花了多少输入」，不是「窗口里装了多少」（BUG-M13-002）。
+   * 压缩之后、下一次请求之前，按压掉的量往下扣；下一次请求回来就以它的真实用量为准
+   */
+  contextTokens: number
+  /** contextTokens ÷ 窗口，0–100 取整 */
   contextPercent: number
   /** 用户输入了几次（PRD-M8-008 AC-2） */
   turns: number
   /** 发了几次模型请求 */
   steps: number
-  /** 最近一轮的输出速度：这一轮的输出 token ÷ 从这一轮第一次模型请求到最后一条事件的秒数。算不出来是 null */
+  /**
+   * 最近一轮的输出速度：这一轮各步输出 token 之和 ÷ 各步「model.request → model.usage」耗时之和。
+   * 不含工具执行与等人确认的时间；含首 token 延迟（端到端速度）。
+   * 量不出来（老会话的请求与用量同一个 ts、还没有一步完成）是 null（BUG-M13-004）
+   */
   tokPerSec: number | null
-  /** 缓存命中：cacheRead ÷（input + cacheRead），0–100 取整；没有输入是 null */
+  /** 缓存命中（全会话）：cacheRead ÷（input + cacheRead），0–100 取整；没有输入是 null */
   cacheHitPercent: number | null
 }
 
@@ -56,26 +67,67 @@ export interface AggregateOptions {
   now?: number
 }
 
-/** provider 的 usage 字段名各家不同，这里只做**读取**的归一，事件流里存的仍是原文（ADR-004）。
+/**
+ * provider 的 usage 字段名各家不同，这里只做**读取**的归一，事件流里存的仍是原文（ADR-004）。
  *
- * AI SDK 的 ai-sdk-provider 把 usage 包在 raw.usage 下（{ usage: {inputTokens,outputTokens}, providerMetadata, response }），
- * 旧形状是平铺在 raw 顶层。两种都认：先看 raw.usage，再回退顶层。 */
+ * 归一后的口径（BUG-M13-003）：
+ * - `cacheRead`：从缓存读的输入
+ * - `input`：这次请求里**没走缓存读**的输入（含缓存写——它也是这次的提示词，按输入价计）
+ * - 两者之和 = 这次请求的提示词大小
+ *
+ * 认的形状：
+ * - AI SDK 7（ai-sdk-provider 的 finish-step，包在 raw.usage 下）：inputTokens 是**含缓存的总输入**，
+ *   缓存读在 inputTokenDetails.cacheReadTokens；openai-compatible 只认 prompt_tokens_details.cached_tokens，
+ *   DeepSeek 原生的 prompt_cache_hit_tokens 要从 usage.raw（provider 原文）补
+ * - AI SDK 5：inputTokens 含缓存，缓存读在 cachedInputTokens
+ * - OpenAI / DeepSeek 原生：prompt_tokens 含缓存（prompt_tokens_details.cached_tokens / prompt_cache_hit_tokens）
+ * - Anthropic 原生（含 camelCase 变体）：input_tokens **不含**缓存，读与写另给
+ */
 export function readUsage(raw: Record<string, unknown>): TokenTotals {
-  // ai-sdk-provider 的 finish-step：raw = { usage: {...}, providerMetadata, response }
-  const inner = (raw.usage && typeof raw.usage === 'object' ? raw.usage : raw) as Record<string, unknown>
-  const pick = (...keys: string[]): number => {
-    for (const k of keys) {
-      const v = inner[k]
-      if (typeof v === 'number' && Number.isFinite(v)) return v
-    }
-    return 0
+  const inner = (isObj(raw.usage) ? raw.usage : raw) as Record<string, unknown>
+  const providerRaw = isObj(inner.raw) ? inner.raw : {}
+  const output = num(inner, 'output_tokens', 'outputTokens', 'completion_tokens') ?? 0
+
+  // 提示词总数里已经含缓存的几种形状
+  const details = isObj(inner.inputTokenDetails) ? inner.inputTokenDetails : null
+  const openaiDetails = isObj(inner.prompt_tokens_details) ? inner.prompt_tokens_details : null
+  const inclusiveTotal =
+    details !== null || inner.cachedInputTokens !== undefined ? num(inner, 'inputTokens') : num(inner, 'prompt_tokens')
+  if (inclusiveTotal !== null) {
+    const cacheRead = Math.min(
+      inclusiveTotal,
+      positive(details === null ? null : num(details, 'cacheReadTokens')) ??
+        positive(num(inner, 'cachedInputTokens', 'prompt_cache_hit_tokens')) ??
+        positive(openaiDetails === null ? null : num(openaiDetails, 'cached_tokens')) ??
+        positive(num(providerRaw, 'prompt_cache_hit_tokens')) ??
+        positive(
+          isObj(providerRaw.prompt_tokens_details) ? num(providerRaw.prompt_tokens_details, 'cached_tokens') : null,
+        ) ??
+        0,
+    )
+    return { input: inclusiveTotal - cacheRead, output, cacheRead }
   }
-  return {
-    input: pick('input_tokens', 'inputTokens', 'prompt_tokens'),
-    output: pick('output_tokens', 'outputTokens', 'completion_tokens'),
-    cacheRead: pick('cache_read_input_tokens', 'cacheReadInputTokens', 'cached_tokens'),
-  }
+
+  // Anthropic 式：input 不含缓存
+  const base = num(inner, 'input_tokens', 'inputTokens') ?? 0
+  const write = num(inner, 'cache_creation_input_tokens', 'cacheCreationInputTokens') ?? 0
+  const cacheRead = num(inner, 'cache_read_input_tokens', 'cacheReadInputTokens', 'cached_tokens') ?? 0
+  return { input: base + write, output, cacheRead }
 }
+
+function isObj(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+function num(o: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const k of keys) {
+    const v = o[k]
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+  }
+  return null
+}
+
+const positive = (n: number | null): number | null => (n !== null && n > 0 ? n : null)
 
 export function costOf(t: TokenTotals, p: ModelPrice): number {
   const cacheRate = p.cacheReadPer1M ?? p.inputPer1M
@@ -97,9 +149,12 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
   let lastTs = 0
   let turns = 0
   let steps = 0
-  /** 本轮第一次模型请求的时间、本轮输出 token */
-  let turnModelStart: number | null = null
+  /** 本轮：已完成各步的输出 token 与生成耗时；进行中那一步的请求时间（BUG-M13-004） */
   let turnOutput = 0
+  let turnGenMs = 0
+  let stepStart: number | null = null
+  /** 当前上下文占用（BUG-M13-002） */
+  let contextTokens = 0
 
   for (const env of events) {
     const ev: AnyEvent = env.ev
@@ -110,14 +165,15 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
       case 'user.input':
         turnStart = env.ts
         turns += 1
-        turnModelStart = null
         turnOutput = 0
+        turnGenMs = 0
+        stepStart = null
         break
       case 'model.request':
         model = ev.model
         provider = ev.provider
         steps += 1
-        if (turnModelStart === null) turnModelStart = env.ts
+        stepStart = env.ts
         break
       case 'model.switch':
         model = ev.to
@@ -125,12 +181,21 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
       case 'tool.call':
         toolCalls += 1
         break
+      case 'ctx.compact':
+        // 压缩后、下一次请求前：按压掉的量往下扣。下一次 model.usage 回来就以真实用量为准
+        contextTokens = Math.max(0, contextTokens - Math.max(0, ev.tokensBefore - ev.tokensAfter))
+        break
       case 'model.usage': {
         const t = readUsage(ev.raw)
         totals.input += t.input
         totals.output += t.output
         totals.cacheRead += t.cacheRead
-        turnOutput += t.output
+        contextTokens = t.input + t.cacheRead
+        if (stepStart !== null) {
+          turnOutput += t.output
+          turnGenMs += env.ts - stepStart
+          stepStart = null
+        }
         const price = pricing[model]
         if (price) {
           cost += costOf(t, price)
@@ -147,8 +212,6 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
 
   const used = totals.input + totals.cacheRead
   const max = opts.maxContextTokens ?? 0
-  const end = opts.now ?? lastTs
-  const genMs = turnModelStart === null ? 0 : end - turnModelStart
   return {
     model,
     provider,
@@ -157,10 +220,11 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
     unpricedModels: [...unpriced].sort(),
     toolCalls,
     turnMs: turnStart === null ? 0 : Math.max(0, (opts.now ?? lastTs) - turnStart),
-    contextPercent: max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0,
+    contextTokens,
+    contextPercent: max > 0 ? Math.min(100, Math.round((contextTokens / max) * 100)) : 0,
     turns,
     steps,
-    tokPerSec: genMs > 0 && turnOutput > 0 ? Math.round((turnOutput / genMs) * 1000) : null,
+    tokPerSec: turnGenMs > 0 && turnOutput > 0 ? Math.round((turnOutput / turnGenMs) * 1000) : null,
     cacheHitPercent: used > 0 ? Math.round((totals.cacheRead / used) * 100) : null,
   }
 }
