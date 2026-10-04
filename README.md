@@ -24,6 +24,7 @@
 | [`docs/DESIGN.md`](docs/DESIGN.md) | 架构与路线图：三个不可逆决策、10 项需求的固化分层、技术选型、M0–M6 排期 |
 | [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | 工程规约：walking skeleton、三层测试金字塔、架构守卫、发布工程 |
 | [`docs/PROCESS.md`](docs/PROCESS.md) | 研发流程：四角色环节、回写门、可追溯链、中断恢复机制 |
+| [`docs/site/index.md`](docs/site/index.md) | **开发者文档站**：架构导图、各子系统内部机制、扩展指南（加工具 / 加模型 / 插件 / Skill）、贡献指南 |
 
 ### 需求与执行
 
