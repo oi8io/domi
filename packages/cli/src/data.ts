@@ -6,7 +6,7 @@
  * purge 必须先把要删什么摆出来。
  */
 
-import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { type ConfigSource, readConfigFile } from '@domi/config'
 import { tr } from '@domi/i18n'
@@ -80,7 +80,10 @@ function dirSize(p: string): number {
   const walk = (d: string): void => {
     for (const name of readdirSync(d)) {
       const full = join(d, name)
-      const st = statSync(full)
+      // BUG-M13-001：lstat 不跟随符号链接。pnpm workspace 为互相有 dev 依赖的本地包
+      // （如 @domi/kernel ↔ @domi/capability）建双向链接，目录树里天然有环；跟随链接的
+      // 盲目递归会 ELOOP 崩溃。链接按自身大小计、不进递归（与 du 默认口径一致）。
+      const st = lstatSync(full)
       if (st.isDirectory()) walk(full)
       else n += st.size
     }

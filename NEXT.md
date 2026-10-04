@@ -1,4 +1,7 @@
-在做: 2026-10-04 desktop：加 `pnpm desktop`（scripts/build-desktop.ts）——构建（只打 .app）→ 关旧 app → 替换 /Applications/domi.app → 确保 domid → 重启。本机 Rust 已就位（cargo 1.98.1），macOS 构建+替换验证跑通；README 补用法。
+在做: 2026-10-05 修 BUG-M13-001（TASK-M13-009）：`data purge` 目录统计改 `lstatSync` 防符号链接环（ELOOP，
+      根源是隔离会话 node_modules 里 pnpm 为 dev 依赖互链建的目录环）；purge 测试隔离 HOME。
+      `pnpm check` 全绿（1512 pass / 0 fail，eval 1/1）
+      2026-10-04 desktop：加 `pnpm desktop`（scripts/build-desktop.ts）——构建（只打 .app）→ 关旧 app → 替换 /Applications/domi.app → 确保 domid → 重启。本机 Rust 已就位（cargo 1.98.1），macOS 构建+替换验证跑通；README 补用法。
       2026-09-24 过时信息清理 + 删 TOML（TASK-M13-008）：全仓「将来时」里程碑注释 / 报错 / 测试名刷成现状；
       ADR-014 过渡期结束，config.toml 不再读取、`domi init --from-toml` 删除，doctor 只提示残留文件（PRD v1.18）；
       README / HANDOFF / good-first-issues / quickstart 跟上。`pnpm check` 全绿（1511 pass）

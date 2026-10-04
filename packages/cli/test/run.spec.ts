@@ -3,10 +3,11 @@
  * 走的是和用户一样的入口，不是直接调实现函数。
  */
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SqliteEventLog } from '@domi/store'
+import { planPurge } from '../src/data.ts'
 import { parseCli, runCommand, VERSION } from '../src/index.ts'
 
 const dirs: string[] = []
@@ -127,11 +128,31 @@ describe('data', () => {
   })
 
   test('purge 会打印清单与确认词，且 --yes 不生效', async () => {
-    const r = await run(['data', 'purge', '--yes'])
-    expect(r.out).toContain('DELETE')
-    expect(r.out).toContain('--yes 对 purge 无效')
-    // 不可恢复的操作不该被一个 flag 绕过
-    expect(r.out).toContain('不可恢复')
+    // BUG-M13-001：不读真实 ~/.domi（本机有符号链接环就红），与同文件 session restore 测试一致
+    const realHome = process.env.HOME
+    process.env.HOME = tmp()
+    try {
+      const r = await run(['data', 'purge', '--yes'])
+      expect(r.out).toContain('DELETE')
+      expect(r.out).toContain('--yes 对 purge 无效')
+      // 不可恢复的操作不该被一个 flag 绕过
+      expect(r.out).toContain('不可恢复')
+    } finally {
+      process.env.HOME = realHome
+    }
+  })
+
+  test('BUG-M13-001 · planPurge 对符号链接环不抛 ELOOP、能列出条目与总大小', () => {
+    const root = tmp()
+    mkdirSync(join(root, 'a'), { recursive: true })
+    symlinkSync('..', join(root, 'a', 'loop')) // a/loop -> a，目录环（pnpm workspace 的 dev 依赖互链同构）
+    writeFileSync(join(root, 'plain.txt'), 'x')
+    let plan: ReturnType<typeof planPurge>
+    expect(() => {
+      plan = planPurge(root)
+    }).not.toThrow()
+    expect(plan!.entries.length).toBe(2) // a + plain.txt；a/loop 按链接自身计，不进递归
+    expect(plan!.totalBytes).toBeGreaterThanOrEqual(0)
   })
 
   test('export 真的写出文件', async () => {
