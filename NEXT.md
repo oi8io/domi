@@ -1,4 +1,5 @@
-在做: 2026-09-24 过时信息清理 + 删 TOML（TASK-M13-008）：全仓「将来时」里程碑注释 / 报错 / 测试名刷成现状；
+在做: 2026-10-04 desktop：加 `pnpm desktop`（scripts/build-desktop.ts）——构建（只打 .app）→ 关旧 app → 替换 /Applications/domi.app → 确保 domid → 重启。本机 Rust 已就位（cargo 1.98.1），macOS 构建+替换验证跑通；README 补用法。
+      2026-09-24 过时信息清理 + 删 TOML（TASK-M13-008）：全仓「将来时」里程碑注释 / 报错 / 测试名刷成现状；
       ADR-014 过渡期结束，config.toml 不再读取、`domi init --from-toml` 删除，doctor 只提示残留文件（PRD v1.18）；
       README / HANDOFF / good-first-issues / quickstart 跟上。`pnpm check` 全绿（1511 pass）
       2026-09-24 M13 运行中对话完成（TASK-M13-000…007），typecheck / lint / 全部 guard / test（1514 pass）/ eval 全绿：
@@ -22,7 +23,7 @@
         1. 用户手测 M12 DoD（重点：TUI 问题框的按键手感、任务先写计划、每次都问档的审批、关掉再开的续跑）
         2. M12 进 AC 覆盖强制范围（总 PRD 的 M11 条目先补逐条 AC）；TASK-M11-007 收口
         3. 历史欠账：M10-007 / M4–M6 验证补齐、各里程碑 DoD
-        4. 等拍板：desktop 自启（ADR-021 冲突 + 需要 Rust）（TUI 中断已由 M13-002 做掉）
+        4. 等拍板：desktop 自启（ADR-021 冲突；Rust 已就位）（TUI 中断已由 M13-002 做掉）
 
 规矩: 做完 = `pnpm check` 全绿（CI 为准）；改协议必须升 SCHEMA_VERSION + legacy fixture + 重新生成文档；
       改已交付功能走回写门，在总 PRD 顶部记一条；任务状态以 docs/tasks 为准，提交里引用的 TASK 编号必须在任务文件里存在。
