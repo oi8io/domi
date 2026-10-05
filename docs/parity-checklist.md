@@ -28,7 +28,7 @@
 | 6 | 会话恢复 | 🟡 对话里 `/restore <id>`；CLI `domi session restore <id>` | 🟡 回收站里点「恢复」，经 `session.restore` | ⬜ | ⬜ |
 | 7 | 会话分支 | 🟡 对话里 `/branch [seq]`，不带数字从最后一条分，分完切到新会话（BUG-M3-010 已修） | 🟡 每条旁「分支」按钮，经 `session.branch`，分完打开新会话；列表里标「分支」 | ⬜ | ⬜ |
 | 8 | 会话删除 | 🟡 对话里 `/delete <id>`（软删除；删的是当前会话就换一个新的） | 🟡 「删除会话」点两下，经 `session.delete`（软删除；正在处理的不许删） | ⬜ | ⬜ |
-| 9 | 状态栏六项指标 | ✅ `StatusBar`（四宽度 golden）；M8 补了 turns / steps / tok/s / cache 命中 | ✅ pill 版状态栏，同一份 metrics、同样的格式化函数 | ⬜ | ⬜ |
+| 9 | 状态栏六项指标 | ✅ `StatusBar`（四宽度 golden）；M8 补了 turns / steps / tok/s / cache 命中 | ✅ pill 版状态栏，同一份 metrics、同样的格式化函数；v1.19 起最多一行，模型与确认模式在 Composer 上（不进状态栏），主题切换在侧栏设置右边 | ⬜ | ⬜ |
 | 10 | 模型切换 | ✅ `/model` 弹层：按 provider 分组、可搜索（PRD-M9-003）；M12-001 起不接受手填模型名 | ✅ Composer 下拉按 provider 分组（M12-001 起只有下拉，没有手填） | ⬜ | ⬜ |
 | 11 | 确认模式（M12-002） | ✅ `/mode <档位>`；状态栏常驻显示，全部放行用 bad 色 | ✅ Composer 三档下拉；状态栏 pill，全部放行用警示色 | ⬜ | ⬜ |
 | 12 | 问题框（M12-004 AC-7） | ✅ 多 tab：←→ 切题、↑↓ 移动、回车 / 空格选、a–d 直选、「其他」可写、核对页回车提交（状态机与 Web 同一份） | ✅ 多 tab：点选项、「其他」输入框、核对页提交 | ⬜ | ⬜ |

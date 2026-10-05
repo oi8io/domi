@@ -22,6 +22,7 @@ import {
 } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
 import { formatRoute, type Route } from '../router.ts'
+import { ThemeToggle } from '../theme/ThemeToggle.tsx'
 import { dotOf, loadSet, type ProjectRow, type SessionRow, saveSet, titleOf } from './data.ts'
 
 export const RECENT_TASKS = 5
@@ -360,17 +361,19 @@ export function Sidebar(props: SidebarProps) {
         )}
       </div>
 
-      <div className="border-t border-border px-2 py-1.5">
+      {/* 设置 + 主题切换同一行（v1.19：主题切换从状态栏搬到这里） */}
+      <div className="flex items-center gap-1 border-t border-border px-2 py-1.5" data-part="sidebar-footer">
         <a
           href={formatRoute({ view: 'settings', tab: 'general' })}
           className={cn(
-            'flex w-full items-center gap-2 rounded-sm px-2.5 py-1.5 text-[13px] text-ink2 hover:bg-panel-h',
+            'flex min-w-0 flex-1 items-center gap-2 rounded-sm px-2.5 py-1.5 text-[13px] text-ink2 hover:bg-panel-h',
             route.view === 'settings' && 'bg-accent-d font-medium text-accent',
           )}
         >
           <IconGear size={14} className="opacity-70" />
           {tr('web.sidebar.settings')}
         </a>
+        <ThemeToggle />
       </div>
     </aside>
   )

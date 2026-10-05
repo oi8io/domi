@@ -110,7 +110,8 @@ describe('状态栏（parity 第 9 项）', () => {
       unpricedModels: ['glm'],
     })
     const html = renderToStaticMarkup(<StatusBar status={store.$status.get()} />)
-    expect(html).toContain('anthropic/glm')
+    // v1.19：Web 的模型在 Composer 的模型选择上，不进状态栏（TUI 没有别处显示，仍在状态栏）
+    expect(html).not.toContain('anthropic/glm')
     const text = html.replace(/<[^>]+>/g, '')
     expect(text).toContain('1.2k/30 tok')
     expect(text).toContain('0 次工具')
@@ -158,12 +159,8 @@ describe('状态栏（parity 第 9 项）', () => {
     }
   })
 
-  test('PRD-M12-002 AC-9 · 确认模式常驻显示；全部放行用警示色', () => {
-    for (const [mode, label, danger] of [
-      ['on-demand', '按需', false],
-      ['always-ask', '每次都问', false],
-      ['allow-all', '全部放行', true],
-    ] as const) {
+  test('PRD-M12-002 AC-9（v1.19）· Web 状态栏不再显示确认模式——它常驻在输入框的模式选择上（composer.spec）', () => {
+    for (const mode of ['on-demand', 'always-ask', 'allow-all'] as const) {
       const store = createSessionStore({ provider: 'anthropic', model: 'glm' })
       store.setMetrics({
         tokens: { input: 1, output: 1, cacheRead: 0 },
@@ -174,9 +171,8 @@ describe('状态栏（parity 第 9 项）', () => {
         permissionsMode: mode,
       })
       const html = renderToStaticMarkup(<StatusBar status={store.$status.get()} />)
-      const pill = html.match(/<span[^>]*data-pill="permissions-mode"[^>]*>([^<]*)<\/span>/)
-      expect(pill?.[1]).toBe(label)
-      expect(pill?.[0].includes('text-bad')).toBe(danger)
+      expect(html).not.toContain('data-pill="permissions-mode"')
+      expect(html).not.toContain('anthropic/glm')
     }
   })
 

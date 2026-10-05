@@ -590,7 +590,11 @@ export function PermissionsModeSwitch({
   const current = OPTIONS.find((o) => o.value === mode) ?? OPTIONS[0]
   return (
     <select
-      className="rounded-sm border border-border bg-panel px-1.5 py-1 text-xs text-mut hover:text-ink2 disabled:opacity-50"
+      className={cn(
+        'rounded-sm border bg-panel px-1.5 py-1 text-xs disabled:opacity-50',
+        // PRD-M12-002 AC-9（v1.19）：确认模式只在这里常驻显示，「全部放行」用警示色
+        mode === 'allow-all' ? 'border-bad text-bad' : 'border-border text-mut hover:text-ink2',
+      )}
       aria-label={tr('web.composer.mode')}
       data-permissions-mode={mode}
       disabled={busy}

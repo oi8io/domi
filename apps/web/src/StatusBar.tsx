@@ -2,6 +2,8 @@
  * 状态栏 —— PRD-M1-007 · PRD-M8-008 AC-2（原型的紧凑 pill）。
  * 与 TUI 显示同样的几段、同样的格式（formatTokens 在 client-core）。
  * 一个数都不自己算：指标由 runtime 算好，经 session.metrics 推过来。
+ *
+ * v1.19：最多一行——不折行，放不下时只截断节奏段；模型与确认模式在输入框上，主题切换在侧栏设置右边，都不进状态栏
  */
 
 import {
@@ -9,71 +11,34 @@ import {
   formatContext,
   formatElapsed,
   formatTokens,
-  permissionsModeBadge,
   type StatusSnapshot,
   VERIFY_LABEL,
 } from '@domi/client-core'
 import { tr } from '@domi/i18n'
-import { useStore } from '@nanostores/react'
-import { IconClock, IconDatabase, IconMoon, IconSun } from './icons.tsx'
+import { IconClock, IconDatabase } from './icons.tsx'
 import { STATE_LABEL } from './layout/Sidebar.tsx'
 import { cn } from './lib/cn.ts'
-import { $systemDark, $themeChoice, resolveMode, toggleTheme } from './theme/store.ts'
 
 const CTX_CLASS = { ok: '', warn: 'border-warn text-warn', danger: 'border-bad text-bad' } as const
 const VERIFY_CLASS = { unverified: 'text-warn', verified: 'text-ok', failed: 'text-bad' } as const
-
-export function ThemeToggle() {
-  const choice = useStore($themeChoice)
-  const dark = useStore($systemDark)
-  const mode = resolveMode(choice, dark)
-  return (
-    <button
-      type="button"
-      className="inline-flex items-center rounded-sm px-[9px] py-1 text-mut hover:bg-panel-h hover:text-ink2"
-      title={mode === 'dark' ? tr('web.status.toLight') : tr('web.status.toDark')}
-      aria-label={tr('web.status.toggleTheme')}
-      onClick={toggleTheme}
-    >
-      {mode === 'dark' ? <IconSun size={14} /> : <IconMoon size={14} />}
-    </button>
-  )
-}
-
-/** 确认模式（PRD-M12-002 AC-9）：常驻；「全部放行」用警示色 */
-export function ModePill({ mode }: { mode: Parameters<typeof permissionsModeBadge>[0] }) {
-  const b = permissionsModeBadge(mode)
-  return (
-    <span
-      className={cn('pill', b.danger && 'border-bad text-bad')}
-      data-pill="permissions-mode"
-      data-permissions-mode={mode}
-      title={tr('web.composer.mode')}
-    >
-      {b.label}
-    </span>
-  )
-}
 
 export function StatusBar({ status, connection }: { status: StatusSnapshot; connection?: ConnectionState }) {
   const m = status.metrics
   const level = m?.contextLevel ?? 'ok'
   return (
     <div
-      className="flex shrink-0 items-start gap-2.5 border-b border-border2 px-5 py-1.5 text-xs"
+      className="flex shrink-0 items-center gap-2.5 overflow-hidden whitespace-nowrap border-b border-border2 px-5 py-1.5 text-xs"
       data-part="statusbar"
     >
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
-        {connection !== undefined && (
-          <span className="pill">
-            <span className={cn('size-[7px] rounded-full', connection === 'open' ? 'bg-ok' : 'bg-warn')} />
-            {STATE_LABEL()[connection]}
-          </span>
-        )}
-        <span className="pill font-mono">{status.model === '' ? '—' : `${status.provider}/${status.model}`}</span>
-        {m?.permissionsMode !== undefined && <ModePill mode={m.permissionsMode} />}
-        <span className="pill" data-pill="pace">
-          <IconClock size={12} className="opacity-60" />
+      {connection !== undefined && (
+        <span className="pill shrink-0">
+          <span className={cn('size-[7px] rounded-full', connection === 'open' ? 'bg-ok' : 'bg-warn')} />
+          {STATE_LABEL()[connection]}
+        </span>
+      )}
+      <span className="pill min-w-0 truncate" data-pill="pace">
+        <IconClock size={12} className="shrink-0 opacity-60" />
+        <span className="min-w-0 truncate">
           {m?.turns !== undefined && (
             <>
               <b>{m.turns} turns</b> · {m.steps ?? 0} steps ·{' '}
@@ -87,37 +52,37 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
           {m?.turnMs !== undefined && <>{tr('web.status.turnElapsed', { formatElapsed: formatElapsed(m.turnMs) })}</>}
           {tr('web.status.toolCalls', { toolCalls: status.toolCalls })}
         </span>
-        <span className="pill" data-pill="tokens">
-          <IconDatabase size={12} className="opacity-60" />
-          <b>{m === null ? '— tok' : formatTokens(m.tokens)}</b>
-          {m?.cacheHitPercent !== undefined && m.cacheHitPercent !== null && (
-            <>
-              {' '}
-              · Cache hit <b>{m.cacheHitPercent}%</b>
-            </>
-          )}{' '}
-          · {m === null ? '—' : m.cost}
+      </span>
+      <span className="pill shrink-0" data-pill="tokens">
+        <IconDatabase size={12} className="opacity-60" />
+        <b>{m === null ? '— tok' : formatTokens(m.tokens)}</b>
+        {m?.cacheHitPercent !== undefined && m.cacheHitPercent !== null && (
+          <>
+            {' '}
+            · Cache hit <b>{m.cacheHitPercent}%</b>
+          </>
+        )}{' '}
+        · {m === null ? '—' : m.cost}
+      </span>
+      <span
+        className={cn('pill shrink-0', CTX_CLASS[level])}
+        data-pill="ctx"
+        data-ctx={level}
+        title={(m === null ? null : formatContext(m)) ?? undefined}
+      >
+        ctx {m?.contextPercent ?? 0}%
+      </span>
+      {m?.verify !== undefined && m.verify !== 'clean' && (
+        <span className={cn('pill shrink-0', VERIFY_CLASS[m.verify])} data-verify={m.verify}>
+          {VERIFY_LABEL[m.verify]}
         </span>
-        <span
-          className={cn('pill', CTX_CLASS[level])}
-          data-ctx={level}
-          title={(m === null ? null : formatContext(m)) ?? undefined}
-        >
-          ctx {m?.contextPercent ?? 0}%
+      )}
+      {status.busy && (
+        <span className="pill shrink-0 text-accent">
+          <span className="size-[7px] animate-blink rounded-full bg-accent" />
+          {tr('common.running')}
         </span>
-        {m?.verify !== undefined && m.verify !== 'clean' && (
-          <span className={cn('pill', VERIFY_CLASS[m.verify])} data-verify={m.verify}>
-            {VERIFY_LABEL[m.verify]}
-          </span>
-        )}
-        {status.busy && (
-          <span className="pill text-accent">
-            <span className="size-[7px] animate-blink rounded-full bg-accent" />
-            {tr('common.running')}
-          </span>
-        )}
-      </div>
-      <ThemeToggle />
+      )}
     </div>
   )
 }

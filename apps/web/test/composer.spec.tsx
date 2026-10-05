@@ -136,6 +136,12 @@ describe('PRD-M8-010 AC-6 / PRD-M12-002 AC-2 · Composer 工具栏的确认模�
     expect(html).toMatch(/<option value="allow-all" selected="">/)
   })
 
+  test('PRD-M12-002 AC-9（v1.19）· 确认模式从状态栏搬到这里，「全部放行」在这里用警示色', () => {
+    expect(render('allow-all')).toMatch(/<select[^>]*class="[^"]*border-bad[^"]*text-bad/)
+    expect(render('on-demand')).not.toContain('border-bad')
+    expect(render('always-ask')).not.toContain('border-bad')
+  })
+
   test('全部放行的说明写明「跳过所有确认」，不再说危险操作仍问', () => {
     const html = render('allow-all')
     expect(html).toContain('跳过所有确认')

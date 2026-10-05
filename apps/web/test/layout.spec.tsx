@@ -187,3 +187,13 @@ describe('PRD-M11-006 · 连不上 daemon 时侧栏给出启动指引', () => {
     expect(html).toContain('pnpm domid')
   })
 })
+
+describe('PRD-M8-008 AC-2（v1.19）· 主题切换在侧栏底部「设置」的右边', () => {
+  test('同一行：设置链接在前，主题切换按钮紧跟其后', () => {
+    const html = sidebar({ view: 'home' })
+    const row = html.match(/<div[^>]*data-part="sidebar-footer"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? ''
+    expect(row).toContain('设置')
+    expect(row).toContain('切换主题')
+    expect(row.indexOf('切换主题')).toBeGreaterThan(row.indexOf('设置'))
+  })
+})

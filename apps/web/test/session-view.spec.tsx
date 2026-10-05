@@ -106,7 +106,6 @@ describe('PRD-M8-008 AC-2 · 状态栏 pill：连接、turns / steps / tok/s、t
 
   test('数都来自 metrics，界面一个都不算', () => {
     expect(html).toContain('已连接')
-    expect(html).toContain('anthropic/claude-sonnet-4-5')
     expect(html).toContain('4 turns')
     expect(html).toContain('9 steps')
     expect(html).toContain('42 tok/s')
@@ -125,8 +124,22 @@ describe('PRD-M8-008 AC-2 · 状态栏 pill：连接、turns / steps / tok/s、t
     expect(html).toContain('title="108.0k / 150.0k tok"')
   })
 
-  test('主题切换按钮在状态栏上（PRD-M8-001 AC-2）', () => {
-    expect(html).toContain('切换主题')
+  test('v1.19 · 模型、确认模式、主题切换都不在状态栏：模型与确认模式在输入框，主题切换在侧栏设置右边', () => {
+    expect(html).not.toContain('anthropic/claude-sonnet-4-5')
+    expect(html).not.toContain('data-pill="permissions-mode"')
+    expect(html).not.toContain('切换主题')
+  })
+
+  test('v1.19 · 状态栏最多一行：不折行，放不下时只截断节奏段（turns / steps / tok/s / 耗时 / 工具）', () => {
+    const bar = html.match(/<div[^>]*data-part="statusbar"[^>]*>/)?.[0] ?? ''
+    expect(bar).toContain('overflow-hidden')
+    expect(html).not.toContain('flex-wrap')
+    const pace = html.match(/<span[^>]*data-pill="pace"[^>]*>/)?.[0] ?? ''
+    expect(pace).toContain('truncate')
+    for (const pill of ['tokens', 'ctx']) {
+      const tag = html.match(new RegExp(`<span[^>]*data-pill="${pill}"[^>]*>`))?.[0] ?? ''
+      expect(tag).toContain('shrink-0')
+    }
   })
 })
 
