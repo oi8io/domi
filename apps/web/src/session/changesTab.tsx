@@ -10,6 +10,7 @@ import {
   type ChangeFileView,
   type ChangesRange,
   type CheckpointDiffResult,
+  changeFileSeq,
   changesRangeSeq,
   changesView,
   type DomiClient,
@@ -203,6 +204,7 @@ export function ChangesTab({
   refs,
   onRefsChange,
   onNotice,
+  onLocate,
 }: {
   client: DomiClient
   sessionId: string
@@ -212,6 +214,8 @@ export function ChangesTab({
   refs?: readonly PendingRef[]
   onRefsChange?: ((refs: PendingRef[]) => void) | undefined
   onNotice: (m: string | null) => void
+  /** 右侧栏 → 对话：在对话里定位该文件（SPEC-M14-002 取舍-1） */
+  onLocate: ((seq: number) => void) | undefined
 }) {
   const insp = useStore(store.$inspector)
   const events = useStore(store.$events)
@@ -306,6 +310,20 @@ export function ChangesTab({
 
   const view = shown ?? seeded ?? { available: true, files: [], fallbackNames: [] }
   const fileRows = view.files
+  // 改动文件 → 对话定位：当前范围每个文件首次出现在事件流的 seq（SPEC-M14-002 取舍-1）；
+  // baseline（worktree 对比）没有事件区间 → 空表，不画定位按钮
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stepRanges 是读当前状态的闭包（同 load 的用法），events/effRange 变化即重算
+  const fileSeqs = useMemo(() => {
+    const m = new Map<string, number>()
+    if (!view.available || effRange === 'baseline') return m
+    const seq = changesRangeSeq(events, effRange, head, stepRanges())
+    if (seq === null) return m
+    for (const f of view.files) {
+      const s = changeFileSeq(events, f.path, seq.fromSeq, seq.toSeq)
+      if (s !== null) m.set(f.path, s)
+    }
+    return m
+  }, [events, head, view, effRange])
   // biome-ignore lint/correctness/useExhaustiveDependencies: fileRows 由 view 派生，shown 变化即变
   const dirGroups = useMemo(() => {
     const dirOf = (p: string): string => {
@@ -578,6 +596,8 @@ export function ChangesTab({
                           onQuote={() => quote(f.path)}
                           onCopy={() => void copy(f.path)}
                           copied={copied === f.path}
+                          fileSeq={fileSeqs.get(f.path)}
+                          onLocate={onLocate}
                         />
                       ))}
                   </div>
@@ -662,6 +682,8 @@ function FileRow({
   onQuote,
   onCopy,
   copied,
+  fileSeq,
+  onLocate,
 }: {
   file: ChangeFileView
   busy: boolean
@@ -672,6 +694,9 @@ function FileRow({
   onQuote: () => void
   onCopy: () => void
   copied: boolean
+  /** 该文件在当前范围的第一个事件 seq；没有（baseline）→ 不画定位按钮 */
+  fileSeq: number | undefined
+  onLocate: ((seq: number) => void) | undefined
 }) {
   const mark = STATUS_MARK[file.status] ?? { label: file.status, cls: 'bg-panel-h text-mut' }
   return (
@@ -688,6 +713,17 @@ function FileRow({
           </span>
         )}
       </button>
+      {fileSeq !== undefined && onLocate !== undefined && (
+        <button
+          type="button"
+          className="shrink-0 rounded px-1 py-0.5 text-[11px] text-mut transition-colors hover:bg-panel-h hover:text-accent"
+          data-action="locate-file"
+          title={tr('web.changes.locate')}
+          onClick={() => onLocate(fileSeq)}
+        >
+          ◎
+        </button>
+      )}
       {!busy && (
         <Button
           variant="danger"

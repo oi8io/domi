@@ -296,3 +296,18 @@ export function shouldFold(
   if (sizeBytes !== undefined && sizeBytes > 5 * 1024 * 1024) return true
   return file.patch.length > FOLD_MAX_PATCH_BYTES
 }
+
+/** 该范围内某文件第一次出现在 fs.snapshot 的 seq（改动条目 → 对话定位，SPEC-M14-002 取舍-1）；没出现 → null */
+export function changeFileSeq(
+  events: readonly EventEnvelope[],
+  path: string,
+  fromSeq: number,
+  toSeq: number,
+): number | null {
+  for (const e of events) {
+    if (e.seq < fromSeq || e.seq > toSeq) continue
+    if (!isKnownEvent(e.ev) || e.ev.t !== 'fs.snapshot') continue
+    if (e.ev.path === path) return e.seq
+  }
+  return null
+}

@@ -56,6 +56,7 @@ export function Inspector({
   onContinue,
   onOpenStep,
   onOpenSubsession,
+  onLocate,
 }: {
   client: DomiClient
   sessionId: string
@@ -71,6 +72,8 @@ export function Inspector({
   onContinue: () => void
   onOpenStep: (stepId: string) => void
   onOpenSubsession: (sessionId: string) => void
+  /** 右侧栏 → 对话：在对话里定位（SPEC-M14-002 取舍-1） */
+  onLocate: (seq: number) => void
 }) {
   const insp = useStore(store.$inspector)
   const changes = useStore(store.$changesDiff)
@@ -280,6 +283,7 @@ export function Inspector({
         onContinue={onContinue}
         onOpenStep={onOpenStep}
         onOpenSubsession={onOpenSubsession}
+        onLocate={onLocate}
       />
     </div>
   )
@@ -299,6 +303,7 @@ function TabBody({
   onContinue,
   onOpenStep,
   onOpenSubsession,
+  onLocate,
 }: {
   client: DomiClient
   sessionId: string
@@ -313,6 +318,7 @@ function TabBody({
   onContinue: () => void
   onOpenStep: (stepId: string) => void
   onOpenSubsession: (sessionId: string) => void
+  onLocate: (seq: number) => void
 }) {
   const insp = useStore(store.$inspector)
   if (insp.tab === 'changes') {
@@ -326,6 +332,7 @@ function TabBody({
         refs={refs}
         onRefsChange={onRefsChange}
         onNotice={onNotice}
+        onLocate={onLocate}
       />
     )
   }
@@ -338,6 +345,7 @@ function TabBody({
         onContinue={onContinue}
         onOpenStep={onOpenStep}
         onOpenSubsession={onOpenSubsession}
+        onLocate={onLocate}
       />
     )
   }

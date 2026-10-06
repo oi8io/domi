@@ -201,7 +201,15 @@ describe('PRD-M14-005 AC-2 · 改动 tab：逐文件审阅 · 丢弃 · 撤销�
     const store = createSessionStore({ kind: 'task' })
     store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
     const html = renderToStaticMarkup(
-      <ChangesTab client={client} sessionId="t1" store={store} busy={false} items={[]} onNotice={() => undefined} />,
+      <ChangesTab
+        client={client}
+        sessionId="t1"
+        store={store}
+        busy={false}
+        items={[]}
+        onNotice={() => undefined}
+        onLocate={undefined}
+      />,
     )
     expect(html).toContain('src/a.ts')
     expect(html).toContain('修改')
@@ -216,7 +224,15 @@ describe('PRD-M14-005 AC-2 · 改动 tab：逐文件审阅 · 丢弃 · 撤销�
     store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
     expect(
       renderToStaticMarkup(
-        <ChangesTab client={client} sessionId="t1" store={store} busy={false} items={[]} onNotice={() => undefined} />,
+        <ChangesTab
+          client={client}
+          sessionId="t1"
+          store={store}
+          busy={false}
+          items={[]}
+          onNotice={() => undefined}
+          onLocate={undefined}
+        />,
       ),
     ).toMatchSnapshot()
   })
@@ -225,7 +241,15 @@ describe('PRD-M14-005 AC-2 · 改动 tab：逐文件审阅 · 丢弃 · 撤销�
     const store = createSessionStore({ kind: 'task' })
     store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
     const html = renderToStaticMarkup(
-      <ChangesTab client={client} sessionId="t1" store={store} busy={false} items={[]} onNotice={() => undefined} />,
+      <ChangesTab
+        client={client}
+        sessionId="t1"
+        store={store}
+        busy={false}
+        items={[]}
+        onNotice={() => undefined}
+        onLocate={undefined}
+      />,
     )
     expect(html).not.toContain('隔离')
   })
@@ -234,7 +258,15 @@ describe('PRD-M14-005 AC-2 · 改动 tab：逐文件审阅 · 丢弃 · 撤销�
     const store = createSessionStore({ kind: 'task' })
     store.setChangesDiff({ range: 'turn', diff: null, fallbackNames: [] })
     const html = renderToStaticMarkup(
-      <ChangesTab client={client} sessionId="t1" store={store} busy={false} items={[]} onNotice={() => undefined} />,
+      <ChangesTab
+        client={client}
+        sessionId="t1"
+        store={store}
+        busy={false}
+        items={[]}
+        onNotice={() => undefined}
+        onLocate={undefined}
+      />,
     )
     expect(html).toContain('还没有改动')
   })
@@ -326,6 +358,7 @@ describe('PRD-M14-004 · 进度 tab（右侧栏）', () => {
         onContinue={() => undefined}
         onOpenStep={() => undefined}
         onOpenSubsession={() => undefined}
+        onLocate={() => undefined}
       />,
     )
 
@@ -374,6 +407,7 @@ describe('PRD-M14-004 · 进度 tab（右侧栏）', () => {
         onToggle={() => undefined}
         onOpenStep={() => undefined}
         onOpenSubsession={() => undefined}
+        onLocate={() => undefined}
       />,
     )
     expect(detail).toContain('fs.write×1')
@@ -425,5 +459,101 @@ describe('PRD-M14-004 · 进度 tab（右侧栏）', () => {
     const html = renderToStaticMarkup(<Transcript items={items} onBranch={() => undefined} onQuote={() => undefined} />)
     expect(html).toContain('data-part="plan"')
     expect(html).toContain('第一步')
+  })
+})
+describe('PRD-M14-002 · 右侧栏与对话双向联动', () => {
+  const env = (seq: number, ts: number, ev: Record<string, unknown>) => ({
+    seq,
+    sessionId: 's1',
+    parentSeq: seq > 1 ? seq - 1 : null,
+    ts,
+    schemaVersion: 16,
+    ev: ev as never,
+  })
+
+  test('AC-2 · 工具卡可点：fs.write → open-changes（带文件），shell.exec → open-changes（不带）', () => {
+    const items = [
+      { seq: 1, kind: 'tool-call' as const, text: 'fs.write', summary: '…', detail: '{"path":"src/a.ts"}' },
+      { seq: 2, kind: 'tool-result' as const, text: 'ok', ok: true },
+      { seq: 3, kind: 'tool-call' as const, text: 'shell.exec', summary: '…', detail: '{"cmd":"ls"}' },
+      { seq: 4, kind: 'tool-result' as const, text: 'ok', ok: true },
+    ]
+    const html = renderToStaticMarkup(<Transcript items={items} onOpenChanges={() => undefined} />)
+    expect(html).toContain('data-action="open-changes"')
+    expect(html).toContain('data-action="open-changes"')
+  })
+
+  test('AC-2 · 计划卡片 → open-progress；计划文本匹配已知文件 → open-file chip', () => {
+    const items = [
+      {
+        seq: 1,
+        kind: 'plan' as const,
+        text: '计划',
+        plan: [{ id: 'a', text: '改 src/a.ts 和别的', status: 'in_progress' as const }],
+      },
+    ]
+    const html = renderToStaticMarkup(
+      <Transcript
+        items={items}
+        onOpenProgress={() => undefined}
+        onOpenChanges={() => undefined}
+        knownFiles={new Set(['src/a.ts'])}
+      />,
+    )
+    expect(html).toContain('data-action="open-progress"')
+    expect(html).toContain('data-action="open-file"')
+    // 匹配不到已知文件 → 只有整卡可点，没有 chip
+    const html2 = renderToStaticMarkup(<Transcript items={items} onOpenProgress={() => undefined} />)
+    expect(html2).toContain('data-action="open-progress"')
+    expect(html2).not.toContain('data-action="open-file"')
+  })
+
+  test('AC-1 · 改动 tab 文件行定位按钮：有事件 seq 的画 ◎（data-action="locate-file"）', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({
+      range: 'turn',
+      diff: {
+        available: true,
+        files: [{ path: 'src/a.ts', status: 'modified' as const, patch: '+1\n-0', truncated: true }],
+      },
+      fallbackNames: [],
+    })
+    store.applyEvents([
+      env(1, 1000, { t: 'user.input', text: 'hi' }),
+      env(2, 2000, { t: 'fs.snapshot', path: 'src/a.ts', phase: 'before', sha256: null, bytes: 1 }),
+    ])
+    const html = renderToStaticMarkup(
+      <ChangesTab
+        client={client}
+        sessionId="t1"
+        store={store}
+        busy={false}
+        items={[]}
+        onNotice={() => undefined}
+        onLocate={() => undefined}
+      />,
+    )
+    expect(html).toContain('data-action="locate-file"')
+  })
+
+  test('AC-1 · 进度 tab 步骤行定位按钮：开始过的步骤画 ◎（data-action="locate-step"）', () => {
+    const s = createSessionStore({ kind: 'task' })
+    s.applyEvents([
+      env(1, 1000, { t: 'user.input', text: 'hi' }),
+      env(2, 2000, { t: 'plan.update', steps: [{ id: 'a', text: '第一步', status: 'in_progress' }] }),
+    ])
+    const v = planView(s.$events.get(), 2)
+    if (v.kind !== 'plan') throw new Error('应有计划')
+    const html = renderToStaticMarkup(
+      <StepRow
+        s={v.steps[0] as StepActivity}
+        open={false}
+        onToggle={() => undefined}
+        onOpenStep={() => undefined}
+        onOpenSubsession={() => undefined}
+        onLocate={() => undefined}
+      />,
+    )
+    expect(html).toContain('data-action="locate-step"')
   })
 })

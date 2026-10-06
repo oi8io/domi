@@ -38,12 +38,15 @@ export function StepRow({
   onToggle,
   onOpenStep,
   onOpenSubsession,
+  onLocate,
 }: {
   s: StepActivity
   open: boolean
   onToggle: () => void
   onOpenStep: (stepId: string) => void
   onOpenSubsession: (sessionId: string) => void
+  /** 右侧栏 → 对话：在对话里定位这一步（SPEC-M14-002 取舍-1） */
+  onLocate: (seq: number) => void
 }): ReactNode {
   const st = s.step.status
   const inProgress = st === 'in_progress'
@@ -98,6 +101,17 @@ export function StepRow({
             data-action="open-step-changes"
           >
             ⤳
+          </button>
+        )}
+        {s.started && s.startSeq !== null && (
+          <button
+            type="button"
+            onClick={() => onLocate(s.startSeq!)}
+            title={tr('web.progress.locate')}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-mut transition-colors hover:bg-panel-h hover:text-accent"
+            data-action="locate-step"
+          >
+            ◎
           </button>
         )}
         <button
@@ -242,6 +256,7 @@ export function ProgressTab({
   onContinue,
   onOpenStep,
   onOpenSubsession,
+  onLocate,
 }: {
   store: SessionStore
   status: StatusSnapshot
@@ -249,6 +264,8 @@ export function ProgressTab({
   onContinue: () => void
   onOpenStep: (stepId: string) => void
   onOpenSubsession: (sessionId: string) => void
+  /** 右侧栏 → 对话：在对话里定位（SPEC-M14-002 取舍-1） */
+  onLocate: (seq: number) => void
 }): ReactNode {
   const events = useStore(store.$events)
   const notes = useStore(store.$notes)
@@ -278,6 +295,7 @@ export function ProgressTab({
                 onToggle={() => setOpenStep((cur) => (cur === s.step.id ? null : s.step.id))}
                 onOpenStep={onOpenStep}
                 onOpenSubsession={onOpenSubsession}
+                onLocate={onLocate}
               />
             ))}
           </ul>

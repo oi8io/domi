@@ -9,13 +9,14 @@ import {
   changesView,
   continuePrompt,
   type DomiClient,
+  locateInTranscript,
   missingCredentialOf,
   patchStats,
   type SessionStore,
 } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
@@ -234,6 +235,70 @@ export function SessionView({
       // ignore
     }
   }
+
+  /** 对话 → 右侧栏：工具卡 / 路径文本可点（SPEC-M14-002 取舍-2），范围 = 本轮 + 文件详情 */
+  const openChangesTab = (path?: string): void => {
+    store.setInspector({
+      open: true,
+      tab: 'changes',
+      changesRange: 'turn',
+      ...(path === undefined ? {} : { detail: { kind: 'file' as const, id: path } }),
+    })
+    // AC-3：对话点开 = 用户手动打开
+    try {
+      localStorage.setItem(`domi.inspector.${sessionId}.open`, 'true')
+    } catch {
+      // ignore
+    }
+  }
+
+  /** 对话 → 右侧栏：计划卡片 → 进度 tab（SPEC-M14-002 取舍-2） */
+  const openProgressTab = (): void => {
+    store.setInspector({ open: true, tab: 'progress' })
+    try {
+      localStorage.setItem(`domi.inspector.${sessionId}.open`, 'true')
+    } catch {
+      // ignore
+    }
+  }
+
+  /** 右侧栏 → 对话：补拉一页并保持视觉位置（locate 的补拉循环用，同一套保持逻辑） */
+  const loadOlderSeq = useCallback(async (): Promise<void> => {
+    const prevHeight = scroller.current?.scrollHeight ?? 0
+    await client.loadOlder(sessionId)
+    requestAnimationFrame(() => {
+      const el2 = scroller.current
+      if (el2) el2.scrollTop = el2.scrollHeight - prevHeight
+    })
+  }, [client, sessionId])
+
+  /** 右侧栏 → 对话：needOlder → 循环补拉 → 滚动 + flash 高亮（SPEC-M14-002 取舍-1） */
+  const locate = useCallback(
+    async (seq: number): Promise<void> => {
+      let r = locateInTranscript(store, seq)
+      while (r.kind === 'needOlder' && store.$hasOlder.get()) {
+        await loadOlderSeq().catch(() => undefined)
+        r = locateInTranscript(store, seq)
+      }
+      if (r.kind !== 'loaded') {
+        setNotice(tr('web.session.locateOutOfWindow'))
+        return
+      }
+      const item = store.$items.get()[r.itemIndex]
+      const el = scroller.current
+      if (item === undefined || el === null) return
+      // 渲染时 tool-result 并入工具组行（data-seq=call.seq）：找不到精确 seq 就定位到最近的更早行
+      const lis = [...el.querySelectorAll<HTMLElement>('li[data-seq]')]
+      const target =
+        lis.find((x) => Number(x.dataset.seq) === item.seq) ??
+        [...lis].reverse().find((x) => Number(x.dataset.seq) <= item.seq)
+      if (target === undefined) return
+      target.scrollIntoView({ block: 'center' })
+      target.classList.add('flash')
+      target.addEventListener('animationend', () => target.classList.remove('flash'), { once: true })
+    },
+    [loadOlderSeq, store],
+  )
   const answer = (allowed: boolean, content?: Record<string, unknown>, grant?: boolean): void => {
     if (!ask?.askId) return
     client.answer(ask.askId, allowed, content, undefined, grant).then(
@@ -251,6 +316,15 @@ export function SessionView({
       (err: Error) => setNotice(err.message),
     )
   }
+
+  // 对话 → 右侧栏：计划文本里可识别的路径（匹配当前范围的已知文件，SPEC-M14-002 取舍-2）
+  const changesDiff = useStore(store.$changesDiff)
+  const knownFiles = useMemo(() => {
+    if (changesDiff === null) return undefined
+    const s = new Set<string>()
+    for (const f of changesDiff.diff !== null ? changesDiff.diff.files : []) s.add(f.path)
+    return s.size > 0 ? s : undefined
+  }, [changesDiff])
 
   const tabCls = (on: boolean): string =>
     cn(
@@ -333,6 +407,9 @@ export function SessionView({
                           onQuote: (q) =>
                             onRefsChange([...refs, { sessionId, fromSeq: q.fromSeq, toSeq: q.toSeq, label: q.label }]),
                         })}
+                    onOpenChanges={openChangesTab}
+                    onOpenProgress={openProgressTab}
+                    {...(knownFiles === undefined ? {} : { knownFiles })}
                   />
                   {review !== null && <ReviewFindings findings={review} />}
                   {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
@@ -368,6 +445,7 @@ export function SessionView({
               }
             }}
             onOpenSubsession={(childId) => navigate({ view: 'session', id: childId, tab: 'chat' })}
+            onLocate={(seq) => void locate(seq)}
           />
         </div>
         {tab === 'trajectory' && ask !== null && (

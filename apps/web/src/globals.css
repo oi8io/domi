@@ -132,6 +132,21 @@
   }
 }
 
+/* M14-005 双向联动定位高亮：1.2s 淡出（SPEC-M14-002 取舍-1） */
+@keyframes flash-fade {
+  0%,
+  55% {
+    background-color: var(--accent-d);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.flash {
+  animation: flash-fade 1.2s ease-out;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-bg2: var(--bg2);

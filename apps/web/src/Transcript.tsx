@@ -9,7 +9,7 @@
 import { formatElapsed, summarizeReason, type TranscriptItem } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import type { ReactNode } from 'react'
-import { IconBranch, IconQuote } from './icons.tsx'
+import { IconBranch, IconEye, IconQuote } from './icons.tsx'
 import { cn } from './lib/cn.ts'
 import { MarkdownView } from './session/MarkdownView.tsx'
 
@@ -98,7 +98,71 @@ function ToolStatus({ result }: { result: TranscriptItem | null }) {
 
 const PLAN_MARK = { done: '✓', in_progress: '▸', skipped: '–', pending: '○' } as const
 
-function ItemBody({ item }: { item: TranscriptItem }) {
+/** 对话 → 右侧栏：会改文件的工具卡可点（SPEC-M14-002 取舍-2） */
+const OPEN_TOOLS = new Set(['fs.write', 'fs.edit', 'shell.exec'])
+
+/** 从工具卡 detail（完整 args JSON）里取 path */
+function toolArgsPath(item: TranscriptItem): string | undefined {
+  if (item.detail === undefined) return undefined
+  try {
+    const a = JSON.parse(item.detail) as Record<string, unknown>
+    return typeof a.path === 'string' ? a.path : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const PATH_CHIP =
+  'rounded bg-accent-d px-1 font-mono text-[11px] text-accent underline decoration-dotted underline-offset-2 transition-colors hover:text-ink2'
+
+/** 计划文本里的文件路径 → 可点 chip（匹配当前范围的已知文件；匹配不到整卡只开 tab） */
+function PathChips({
+  text,
+  knownFiles,
+  onOpenChanges,
+}: {
+  text: string
+  knownFiles: ReadonlySet<string> | undefined
+  onOpenChanges: ((path?: string) => void) | undefined
+}): ReactNode {
+  if (knownFiles === undefined || onOpenChanges === undefined) return <span>{text}</span>
+  for (const f of knownFiles) {
+    if (f !== '' && text.includes(f)) {
+      const i = text.indexOf(f)
+      return (
+        <>
+          {text.slice(0, i)}
+          <button
+            type="button"
+            className={PATH_CHIP}
+            data-action="open-file"
+            title={tr('web.transcript.openInInspector')}
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenChanges(f)
+            }}
+          >
+            {f}
+          </button>
+          {text.slice(i + f.length)}
+        </>
+      )
+    }
+  }
+  return <span>{text}</span>
+}
+
+function ItemBody({
+  item,
+  onOpenChanges,
+  onOpenProgress,
+  knownFiles,
+}: {
+  item: TranscriptItem
+  onOpenChanges?: ((path?: string) => void) | undefined
+  onOpenProgress?: (() => void) | undefined
+  knownFiles?: ReadonlySet<string> | undefined
+}) {
   switch (item.kind) {
     case 'user':
       return (
@@ -159,7 +223,29 @@ function ItemBody({ item }: { item: TranscriptItem }) {
     case 'plan':
       // 计划卡片（PRD-M12-004 AC-8）：每步一行，状态用勾 / 箭头 / 划线
       return (
-        <div className="my-1 rounded-md border border-border2 px-3.5 py-2 text-[13px]" data-part="plan">
+        // biome-ignore lint/a11y/noStaticElementInteractions: 整卡可点开右侧栏（SPEC-M14-002 取舍-2），已带 role=button + onKeyDown
+        <div
+          className={cn(
+            'my-1 rounded-md border border-border2 px-3.5 py-2 text-[13px]',
+            onOpenProgress !== undefined && 'cursor-pointer hover:border-accent-b',
+          )}
+          data-part="plan"
+          data-action={onOpenProgress !== undefined ? 'open-progress' : undefined}
+          onClick={onOpenProgress}
+          role={onOpenProgress !== undefined ? 'button' : undefined}
+          tabIndex={onOpenProgress !== undefined ? 0 : undefined}
+          onKeyDown={
+            onOpenProgress !== undefined
+              ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onOpenProgress()
+                  }
+                }
+              : undefined
+          }
+          title={onOpenProgress !== undefined ? tr('web.transcript.openInInspector') : undefined}
+        >
           <div className={cn(ROLE, 'text-info')}>{item.text}</div>
           <ol className="grid gap-0.5">
             {(item.plan ?? []).map((s, i) => (
@@ -175,7 +261,9 @@ function ItemBody({ item }: { item: TranscriptItem }) {
                 )}
               >
                 <span className="font-mono">{PLAN_MARK[s.status]}</span>
-                <span>{s.text}</span>
+                <span>
+                  <PathChips text={s.text} knownFiles={knownFiles} onOpenChanges={onOpenChanges} />
+                </span>
               </li>
             ))}
           </ol>
@@ -210,12 +298,21 @@ export function Transcript({
   items,
   onBranch,
   onQuote,
+  onOpenChanges,
+  onOpenProgress,
+  knownFiles,
 }: {
   items: readonly TranscriptItem[]
   /** 不给就不画分支按钮（只读视图） */
   onBranch?: (seq: number) => void
   /** 「引用这一轮」，画在每一轮的用户输入上。不给就不画 */
   onQuote?: (q: QuoteRequest) => void
+  /** 对话 → 右侧栏：工具卡 / 路径文本可点（SPEC-M14-002 取舍-2）。不给就不画 */
+  onOpenChanges?: (path?: string) => void
+  /** 计划卡片 → 进度 tab。不给就不画 */
+  onOpenProgress?: () => void
+  /** 当前范围的已知文件（供计划文本里匹配路径） */
+  knownFiles?: ReadonlySet<string>
 }) {
   if (items.length === 0)
     return <p className="py-10 text-center text-[13px] text-mut">{tr('web.transcript.noEvents')}</p>
@@ -235,6 +332,22 @@ export function Transcript({
                 <code className="text-[12.5px] font-medium">{row.call.text}</code>
                 <ToolStatus result={row.result} />
                 <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-mut2">{row.call.summary}</span>
+                {onOpenChanges !== undefined && OPEN_TOOLS.has(row.call.text) && (
+                  <button
+                    type="button"
+                    className={ACTION_BTN}
+                    data-action="open-changes"
+                    title={tr('web.transcript.openInInspector')}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onOpenChanges(toolArgsPath(row.call))
+                    }}
+                  >
+                    <IconEye size={11} />
+                    {tr('web.transcript.openInInspector')}
+                  </button>
+                )}
                 {row.result?.ms !== undefined && (
                   <span className="shrink-0 font-mono text-[11px] text-mut2">{formatElapsed(row.result.ms)}</span>
                 )}
@@ -256,7 +369,12 @@ export function Transcript({
           </li>
         ) : (
           <li key={row.item.seq} className="group relative" data-row={row.item.kind} data-seq={row.item.seq}>
-            <ItemBody item={row.item} />
+            <ItemBody
+              item={row.item}
+              onOpenChanges={onOpenChanges}
+              onOpenProgress={onOpenProgress}
+              knownFiles={knownFiles}
+            />
             {(onBranch !== undefined || (onQuote !== undefined && row.item.kind === 'user')) &&
               row.item.note !== true && (
                 <RowActions>
