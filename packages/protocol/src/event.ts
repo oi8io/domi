@@ -34,9 +34,14 @@ import { z } from 'zod'
  * v13 → v14：M12-004 第二轮——新增 `plan.update`（整份计划 + 每步状态，任务里动手前必须有）；`plan.proposed` 不再产生，类型保留。
  * v14 → v15：M13——新增 `user.note`（运行中补充，在安全点送达，不是轮边界）；`error` 新增可选的 `stopReason` / `by`
  *          （这一轮因何停下、中断来自哪个端）；`user.input` 新增可选的 `noteIds`（由残留补充拼成的那句话）。
+ * v15 → v16：M14 右侧栏——
+ *          新增 `fs.checkpoint`（步级快照：影子仓库快照 id 落进事件流，SPEC-M14-003；daemon 接线，接手 M1-011 AC-1）；
+ *          新增 `ctx.fileref`（文件行引用：diff 行评论进输入框后随用户消息落盘，SPEC-M14-008）；
+ *          新增 `fs.discard`（非隔离会话丢弃一个文件的改动，丢弃前自动快照所以可撤销，SPEC-M14-005）；
+ *          `model.request` 新增可选的 `ctx`（上下文分段估算：层清单 + 工具 / 历史估算，SPEC-M14-006，只增不改）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 15
+export const SCHEMA_VERSION = 16
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -60,6 +65,26 @@ export const RefLinkSchema = z.object({
   toSeq: z.number().int().min(1),
 })
 export type RefLink = z.infer<typeof RefLinkSchema>
+
+/**
+ * 指向本会话工作目录里一个文件的**行区间**的引用（PRD-M14-008 AC-3）。
+ * 与 RefLink 并列：`session.submit.refs` 可同时收两种。side 是 diff 侧（新 / 旧），
+ * text 是评论文字（在引用块后原样进入用户消息）。行号从 1 起，闭区间
+ */
+export const FileRefSchema = z
+  .object({
+    kind: z.literal('file'),
+    path: z.string(),
+    lineStart: z.number().int().min(1),
+    lineEnd: z.number().int().min(1),
+    side: z.enum(['new', 'old']).optional(),
+    text: z.string().optional(),
+  })
+  .refine((r) => r.lineEnd >= r.lineStart, { message: 'lineEnd 不能小于 lineStart' })
+export type FileRef = z.infer<typeof FileRefSchema>
+
+export const SubmitRefSchema = z.union([RefLinkSchema, FileRefSchema])
+export type SubmitRef = z.infer<typeof SubmitRefSchema>
 
 /** L3 语义记忆的一条（PRD-M4-001）。sourceRefs 指回支撑它的原始事件（AC-2） */
 export const SemanticItemSchema = z.object({
@@ -126,6 +151,25 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     provider: z.string(),
     model: z.string(),
     tokensIn: z.number().int().nonnegative(),
+    /**
+     * M14：这一次请求的上下文分段估算（SPEC-M14-006）。层清单来自 prompt.assemble()，
+     * tools / history 是 kernel 对工具 schema 与历史消息的字符估算（字符 / 4）。
+     * **可选**——旧事件没有照样解析；它只是估算，真实总量以 model.usage 为准
+     */
+    ctx: z
+      .object({
+        layers: z.array(
+          z.object({
+            id: z.string(),
+            role: z.enum(['system', 'user']),
+            cacheable: z.boolean(),
+            approxTokens: z.number().int().nonnegative(),
+          }),
+        ),
+        tools: z.number().int().nonnegative(),
+        history: z.number().int().nonnegative(),
+      })
+      .optional(),
   }),
   z.looseObject({ t: z.literal('model.delta'), text: z.string() }),
   z.looseObject({ t: z.literal('model.reason'), text: z.string() }),
@@ -143,6 +187,22 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     phase: z.enum(['before', 'after']),
     sha256: z.string().nullable(),
     bytes: z.number().int().nonnegative(),
+  }),
+  /**
+   * M14：步级快照（SPEC-M14-003，daemon 接线接手 PRD-M1-011 AC-1）。
+   * 每轮第一个会改文件的工具（fs.write / fs.edit / shell.exec）执行前落一条 `phase:'baseline'`，
+   * 之后每次成功返回后落一条 `phase:'after'`；快照 id 是影子仓库里的提交 id。
+   * `id: null` + `ok:false` = 降级（git 没装 / 超时 / 失败），本轮不阻断，端上明示「这一步没有快照」。
+   * 无变化跳过：工作树与上一快照一致时复用上一快照 id（不产生空提交）
+   */
+  z.looseObject({
+    t: z.literal('fs.checkpoint'),
+    phase: z.enum(['baseline', 'after']),
+    toolCallId: z.string(),
+    id: z.string().nullable(),
+    files: z.number().int().nonnegative(),
+    ok: z.boolean(),
+    message: z.string().optional(),
   }),
   z.looseObject({
     t: z.literal('tool.result'),
@@ -262,6 +322,19 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     sessionId: z.string(),
     fromSeq: z.number().int().min(1),
     toSeq: z.number().int().min(1),
+  }),
+  /**
+   * M14：文件行引用（SPEC-M14-008，PRD-M14-008 AC-3）。
+   * diff 行评论进输入框后随用户消息提交，紧挨在 user.input 前面落盘（与 ctx.ref 同批）。
+   * path 相对会话工作目录；text 是评论文字（不是代码片段——片段在拼上下文时由本事件提供）
+   */
+  z.looseObject({
+    t: z.literal('ctx.fileref'),
+    path: z.string(),
+    lineStart: z.number().int().min(1),
+    lineEnd: z.number().int().min(1),
+    side: z.enum(['new', 'old']).optional(),
+    text: z.string().optional(),
   }),
   /**
    * M4：记忆层的写入。事件是真相，L3 表与 soul.md 的「domi 写过什么」都是它的投影（INV-01 · docs/adr/018/019）。
@@ -387,6 +460,18 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
   }),
   z.looseObject({ t: z.literal('worktree.discard'), path: z.string(), trash: z.string() }),
   z.looseObject({ t: z.literal('worktree.restore'), path: z.string(), trash: z.string() }),
+  /**
+   * M14：非隔离会话丢弃一个文件的改动（SPEC-M14-005 取舍-4 · SPEC-M14-003 取舍-7，PRD-M14-005 AC-7）。
+   * 丢弃前自动打快照（undoSnapshotId），因此可撤销；每次丢弃落一条事件、可审计（INV-03）。
+   * rangeStart = 所选范围起点的快照 id（恢复目标）；整份丢弃 = 每个文件各一条
+   */
+  z.looseObject({
+    t: z.literal('fs.discard'),
+    path: z.string(),
+    rangeStart: z.string(),
+    undoSnapshotId: z.string(),
+    reason: z.string().optional(),
+  }),
   z.looseObject({
     t: z.literal('worktree.apply'),
     mode: z.enum(['squash', 'merge', 'branch']),

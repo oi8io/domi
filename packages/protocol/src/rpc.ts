@@ -16,7 +16,13 @@
  *    客户端不轮询——轮询会把「断开期间发生了什么」这个问题变成不可解。
  */
 import { z } from 'zod'
-import { EventEnvelopeSchema, RefLinkSchema, SemanticItemSchema, SoulChangeSchema } from './event.ts'
+import {
+  EventEnvelopeSchema,
+  RefLinkSchema,
+  SemanticItemSchema,
+  SoulChangeSchema,
+  SubmitRefSchema,
+} from './event.ts'
 
 /**
  * 协议版本。**只在不兼容变更时 +1。**
@@ -764,6 +770,42 @@ export const METHODS = {
     }),
     result: z.object({ ok: z.boolean(), commit: z.string().optional(), message: z.string() }),
   },
+  'checkpoint.diff': {
+    summary:
+      '步级快照 diff（PRD-M14-003 AC-3，SPEC-M14-003）：给定事件区间 [fromSeq, toSeq]（缺省整个会话），' +
+      '返回该范围内改动的文件列表（与 worktree.diff 同形）。快照选择规则见 SPEC-M14-003 取舍-6；' +
+      '没有快照覆盖该范围（git 没装 / 该区间没触发过快照）→ available:false + reason，端上明示降级',
+    params: z.object({
+      sessionId: z.string(),
+      fromSeq: z.number().int().nonnegative().optional(),
+      toSeq: z.number().int().nonnegative().optional(),
+      path: z.string().optional(),
+    }),
+    result: z.object({
+      available: z.boolean(),
+      reason: z.string().optional(),
+      files: z.array(
+        z.object({
+          path: z.string(),
+          status: z.enum(['added', 'modified', 'deleted', 'renamed']),
+          patch: z.string(),
+          truncated: z.boolean().optional(),
+        }),
+      ),
+    }),
+  },
+  'checkpoint.discard': {
+    summary:
+      '非隔离会话丢弃一个文件的改动（PRD-M14-005 AC-7，SPEC-M14-003 取舍-7）：把文件恢复到所选范围起点的快照内容。' +
+      '丢弃前自动打快照（可撤销），落 fs.discard 事件（INV-03）。隔离会话请用 worktree.discard。运行中（busy）拒绝',
+    params: z.object({ sessionId: z.string(), path: z.string().min(1), fromSeq: z.number().int().nonnegative(), toSeq: z.number().int().nonnegative() }),
+    result: z.object({ ok: z.literal(true), eventSeq: z.number().int() }),
+  },
+  'checkpoint.discard.undo': {
+    summary: '撤销一次非隔离丢弃：按 fs.discard 事件的 undoSnapshotId 恢复该文件（对 worktree.restore）',
+    params: z.object({ sessionId: z.string(), eventSeq: z.number().int().positive() }),
+    result: z.object({ ok: z.literal(true), path: z.string() }),
+  },
   'session.read': {
     summary:
       '报告已读到哪里（PRD-M8-009 AC-2）：seq 是视图编号，只往前推。客户端在会话可见且看到底时发（节流），' +
@@ -780,7 +822,7 @@ export const METHODS = {
     params: z.object({
       sessionId: z.string(),
       text: z.string(),
-      refs: z.array(RefLinkSchema).max(20).optional(),
+      refs: z.array(SubmitRefSchema).max(20).optional(),
       /** attachment.put 返回的 id */
       uploads: z.array(z.string()).max(20).optional(),
       /** 相对工作目录的文件路径 */
@@ -812,6 +854,34 @@ export const METHODS = {
       '落 error{stopReason:"interrupted", by}；挂着的询问按 channel=interrupt 结掉。不自动续跑。会话闲 → interrupted=false，不产生事件',
     params: z.object({ sessionId: z.string() }),
     result: z.object({ interrupted: z.boolean() }),
+  },
+  'session.revertTo': {
+    summary:
+      '回到这一步之前（PRD-M14-010 · PRD-M1-011 AC-3/4，SPEC-M14-010）：toSeq 是对话截止的视图 seq，' +
+      'snapshotId 是该时点的文件快照（由 checkpoint 投影得到）。files/both 时先打回滚前快照再恢复文件（回滚可回滚）；' +
+      'conversation 只落 revert 事件（INV-01/INV-12，被作废区间标「已回滚」但可读）。运行中拒绝',
+    params: z.object({
+      sessionId: z.string(),
+      toSeq: z.number().int().positive(),
+      scope: z.enum(['files', 'conversation', 'both']),
+    }),
+    result: z.object({ ok: z.literal(true), snapshotId: z.string().nullable(), undoSnapshotId: z.string().nullable() }),
+  },
+  'session.context': {
+    summary:
+      '上下文 tab 的静态项（PRD-M14-006 AC-5，SPEC-M14-006 取舍-3）：项目规矩加载状态与路径、技能目录条数、' +
+      'MCP server 与工具、上下文策略与压缩阈值。动态项（skill.load 过的、ctx.ref、附件、读过的）在事件流里，端上投影',
+    params: z.object({ sessionId: z.string() }),
+    result: z.object({
+      trusted: z.boolean().nullable(),
+      rules: z.array(z.string()),
+      skillsTotal: z.number().int().nonnegative(),
+      mcp: z.array(z.object({ server: z.string(), tools: z.array(z.string()) })),
+      context: z.object({
+        strategy: z.string(),
+        thresholdPercent: z.number().int().nonnegative().nullable(),
+      }),
+    }),
   },
   'session.subscribe': {
     summary:

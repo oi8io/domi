@@ -1,0 +1,5 @@
+{"seq": 47, "sessionId": "legacy", "parentSeq": 46, "ts": 1758800000002, "schemaVersion": 16, "ev": {"t": "fs.checkpoint", "phase": "baseline", "toolCallId": "call-7", "id": "sha:base", "files": 120, "ok": true}}
+{"seq": 48, "sessionId": "legacy", "parentSeq": 47, "ts": 1758800000003, "schemaVersion": 16, "ev": {"t": "fs.checkpoint", "phase": "after", "toolCallId": "call-7", "id": "sha:after1", "files": 121, "ok": true}}
+{"seq": 49, "sessionId": "legacy", "parentSeq": 48, "ts": 1758800000004, "schemaVersion": 16, "ev": {"t": "ctx.fileref", "path": "src/app.ts", "lineStart": 12, "lineEnd": 20, "side": "new", "text": "这里空指针，建议判空"}}
+{"seq": 50, "sessionId": "legacy", "parentSeq": 49, "ts": 1758800000005, "schemaVersion": 16, "ev": {"t": "fs.discard", "path": "tmp/debug.log", "rangeStart": "sha:base", "undoSnapshotId": "sha:undo1", "reason": "单文件"}}
+{"seq": 51, "sessionId": "legacy", "parentSeq": 50, "ts": 1758800000006, "schemaVersion": 16, "ev": {"t": "model.request", "provider": "p", "model": "m", "tokensIn": 5, "ctx": {"layers": [{"id": "identity", "role": "system", "cacheable": true, "approxTokens": 120}], "tools": 300, "history": 900}}}

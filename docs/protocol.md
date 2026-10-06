@@ -4384,6 +4384,203 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `checkpoint.diff`
+
+步级快照 diff（PRD-M14-003 AC-3，SPEC-M14-003）：给定事件区间 [fromSeq, toSeq]（缺省整个会话），返回该范围内改动的文件列表（与 worktree.diff 同形）。快照选择规则见 SPEC-M14-003 取舍-6；没有快照覆盖该范围（git 没装 / 该区间没触发过快照）→ available:false + reason，端上明示降级
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "fromSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "toSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "path": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "available": {
+      "type": "boolean"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "added",
+              "modified",
+              "deleted",
+              "renamed"
+            ]
+          },
+          "patch": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "status",
+          "patch"
+        ]
+      }
+    }
+  },
+  "required": [
+    "available",
+    "files"
+  ]
+}
+```
+
+### `checkpoint.discard`
+
+非隔离会话丢弃一个文件的改动（PRD-M14-005 AC-7，SPEC-M14-003 取舍-7）：把文件恢复到所选范围起点的快照内容。丢弃前自动打快照（可撤销），落 fs.discard 事件（INV-03）。隔离会话请用 worktree.discard。运行中（busy）拒绝
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fromSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "toSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "sessionId",
+    "path",
+    "fromSeq",
+    "toSeq"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "eventSeq": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "ok",
+    "eventSeq"
+  ]
+}
+```
+
+### `checkpoint.discard.undo`
+
+撤销一次非隔离丢弃：按 fs.discard 事件的 undoSnapshotId 恢复该文件（对 worktree.restore）
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "eventSeq": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    }
+  },
+  "required": [
+    "sessionId",
+    "eventSeq"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "path": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "ok",
+    "path"
+  ]
+}
+```
+
 ### `session.read`
 
 报告已读到哪里（PRD-M8-009 AC-2）：seq 是视图编号，只往前推。客户端在会话可见且看到底时发（节流），推进了会给所有连接发 sessions.changed
@@ -4449,26 +4646,68 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
       "maxItems": 20,
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string"
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string"
+              },
+              "fromSeq": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "toSeq": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "sessionId",
+              "fromSeq",
+              "toSeq"
+            ]
           },
-          "fromSeq": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
-          },
-          "toSeq": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 9007199254740991
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "file"
+              },
+              "path": {
+                "type": "string"
+              },
+              "lineStart": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "lineEnd": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "side": {
+                "type": "string",
+                "enum": [
+                  "new",
+                  "old"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "path",
+              "lineStart",
+              "lineEnd"
+            ]
           }
-        },
-        "required": [
-          "sessionId",
-          "fromSeq",
-          "toSeq"
         ]
       }
     },
@@ -4660,6 +4899,175 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
   },
   "required": [
     "interrupted"
+  ]
+}
+```
+
+### `session.revertTo`
+
+回到这一步之前（PRD-M14-010 · PRD-M1-011 AC-3/4，SPEC-M14-010）：toSeq 是对话截止的视图 seq，snapshotId 是该时点的文件快照（由 checkpoint 投影得到）。files/both 时先打回滚前快照再恢复文件（回滚可回滚）；conversation 只落 revert 事件（INV-01/INV-12，被作废区间标「已回滚」但可读）。运行中拒绝
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "toSeq": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "files",
+        "conversation",
+        "both"
+      ]
+    }
+  },
+  "required": [
+    "sessionId",
+    "toSeq",
+    "scope"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "snapshotId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "undoSnapshotId": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "ok",
+    "snapshotId",
+    "undoSnapshotId"
+  ]
+}
+```
+
+### `session.context`
+
+上下文 tab 的静态项（PRD-M14-006 AC-5，SPEC-M14-006 取舍-3）：项目规矩加载状态与路径、技能目录条数、MCP server 与工具、上下文策略与压缩阈值。动态项（skill.load 过的、ctx.ref、附件、读过的）在事件流里，端上投影
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "trusted": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "skillsTotal": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "mcp": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "server": {
+            "type": "string"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "server",
+          "tools"
+        ]
+      }
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "strategy": {
+          "type": "string"
+        },
+        "thresholdPercent": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "strategy",
+        "thresholdPercent"
+      ]
+    }
+  },
+  "required": [
+    "trusted",
+    "rules",
+    "skillsTotal",
+    "mcp",
+    "context"
   ]
 }
 ```
@@ -4923,6 +5331,58 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "ctx": {
+                        "type": "object",
+                        "properties": {
+                          "layers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "enum": [
+                                    "system",
+                                    "user"
+                                  ]
+                                },
+                                "cacheable": {
+                                  "type": "boolean"
+                                },
+                                "approxTokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "role",
+                                "cacheable",
+                                "approxTokens"
+                              ]
+                            }
+                          },
+                          "tools": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "history": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "layers",
+                          "tools",
+                          "history"
+                        ]
                       }
                     },
                     "required": [
@@ -5046,6 +5506,51 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "phase",
                       "sha256",
                       "bytes"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "fs.checkpoint"
+                      },
+                      "phase": {
+                        "type": "string",
+                        "enum": [
+                          "baseline",
+                          "after"
+                        ]
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "files": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "ok": {
+                        "type": "boolean"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "phase",
+                      "toolCallId",
+                      "id",
+                      "files",
+                      "ok"
                     ],
                     "additionalProperties": {}
                   },
@@ -5466,6 +5971,45 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "sessionId",
                       "fromSeq",
                       "toSeq"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.fileref"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "lineStart": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "lineEnd": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "side": {
+                        "type": "string",
+                        "enum": [
+                          "new",
+                          "old"
+                        ]
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "lineStart",
+                      "lineEnd"
                     ],
                     "additionalProperties": {}
                   },
@@ -6171,6 +6715,34 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "t",
                       "path",
                       "trash"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "fs.discard"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "rangeStart": {
+                        "type": "string"
+                      },
+                      "undoSnapshotId": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "rangeStart",
+                      "undoSnapshotId"
                     ],
                     "additionalProperties": {}
                   },
@@ -6800,6 +7372,58 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "ctx": {
+                        "type": "object",
+                        "properties": {
+                          "layers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "enum": [
+                                    "system",
+                                    "user"
+                                  ]
+                                },
+                                "cacheable": {
+                                  "type": "boolean"
+                                },
+                                "approxTokens": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "role",
+                                "cacheable",
+                                "approxTokens"
+                              ]
+                            }
+                          },
+                          "tools": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "history": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "layers",
+                          "tools",
+                          "history"
+                        ]
                       }
                     },
                     "required": [
@@ -6923,6 +7547,51 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "phase",
                       "sha256",
                       "bytes"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "fs.checkpoint"
+                      },
+                      "phase": {
+                        "type": "string",
+                        "enum": [
+                          "baseline",
+                          "after"
+                        ]
+                      },
+                      "toolCallId": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "files": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "ok": {
+                        "type": "boolean"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "phase",
+                      "toolCallId",
+                      "id",
+                      "files",
+                      "ok"
                     ],
                     "additionalProperties": {}
                   },
@@ -7343,6 +8012,45 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "sessionId",
                       "fromSeq",
                       "toSeq"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.fileref"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "lineStart": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "lineEnd": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "side": {
+                        "type": "string",
+                        "enum": [
+                          "new",
+                          "old"
+                        ]
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "lineStart",
+                      "lineEnd"
                     ],
                     "additionalProperties": {}
                   },
@@ -8048,6 +8756,34 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "t",
                       "path",
                       "trash"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "fs.discard"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "rangeStart": {
+                        "type": "string"
+                      },
+                      "undoSnapshotId": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "path",
+                      "rangeStart",
+                      "undoSnapshotId"
                     ],
                     "additionalProperties": {}
                   },

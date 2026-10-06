@@ -11,6 +11,17 @@ import type { ModelMessages } from '@domi/protocol'
 export interface PromptParts {
   system: string
   dynamic: string
+  /**
+   * M14（SPEC-M14-006）：这一份提示词的层清单（来自 prompt.assemble()）。
+   * kernel 不认识「层」，只原样透传到 model.request.ctx 供上下文 tab 分段（纯计算，零 IO）。
+   * 可选——老实现 / 回放不填，端上按「没有分段数据」显示
+   */
+  layers?: Array<{
+    id: string
+    role: 'system' | 'user'
+    cacheable: boolean
+    approxTokens: number
+  }>
 }
 
 export function withPrompt(messages: ModelMessages, prompt: PromptParts): ModelMessages {

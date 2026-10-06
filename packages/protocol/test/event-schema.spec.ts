@@ -38,11 +38,11 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
     //   2. fixtures/events/legacy-v{n}.jsonl 补了吗？
     //   3. packages/protocol/.api.md 重新生成了吗？
     // 三个都答完再改数字。这条测试的价值就在于逼人停一下。
-    expect(SCHEMA_VERSION).toBe(15)
+    expect(SCHEMA_VERSION).toBe(16)
     const tags = DomiEventSchema.options.map(
       (o) => (o.shape.t as unknown as { _zod: { def: { values: string[] } } })._zod.def.values[0],
     )
-    expect(tags).toHaveLength(43)
+    expect(tags).toHaveLength(46)
     expect(new Set(tags).size).toBe(tags.length)
     expect(tags).toContain('fs.snapshot')
     expect(tags).toContain('revert')
@@ -58,9 +58,83 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
     expect(tags).toContain('plan.update')
     // M13：运行中补充
     expect(tags).toContain('user.note')
+    // M14：步级快照、文件行引用、非隔离丢弃
+    expect(tags).toContain('fs.checkpoint')
+    expect(tags).toContain('ctx.fileref')
+    expect(tags).toContain('fs.discard')
     for (const t of ['task.spawn', 'task.run', 'task.node', 'task.resume', 'task.retry', 'task.end']) {
       expect(tags).toContain(t)
     }
+  })
+})
+
+describe('PRD-M14-003 / PRD-M14-005 / PRD-M14-008 · 右侧栏事件形状', () => {
+  test('fs.checkpoint 是已知事件：phase + toolCallId + id/files/ok', () => {
+    const ev = parseEvent({
+      t: 'fs.checkpoint',
+      phase: 'after',
+      toolCallId: 'call-1',
+      id: 'abc123',
+      files: 42,
+      ok: true,
+    })
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect(ev).toMatchObject({ phase: 'after', toolCallId: 'call-1', id: 'abc123', files: 42, ok: true })
+    // 降级：id 为 null + ok:false + message
+    expect(
+      isUnknownEvent(
+        parseEvent({ t: 'fs.checkpoint', phase: 'baseline', toolCallId: 'c', id: null, files: 0, ok: false, message: 'git 没装' }),
+      ),
+    ).toBe(false)
+  })
+
+  test('fs.checkpoint 缺必填字段 → 降级为未知事件，不抛（INV-01）', () => {
+    for (const bad of [
+      { t: 'fs.checkpoint', phase: 'after', toolCallId: 'c' }, // 缺 id/files/ok
+      { t: 'fs.checkpoint', phase: 'mid', toolCallId: 'c', id: null, files: 0, ok: true }, // 非法 phase
+      { t: 'fs.checkpoint', id: null, files: 0, ok: true }, // 缺 phase
+    ]) {
+      expect(() => parseEvent(bad)).not.toThrow()
+      expect(isUnknownEvent(parseEvent(bad))).toBe(true)
+    }
+  })
+
+  test('ctx.fileref 是已知事件：path + lineStart/lineEnd，side/text 可选', () => {
+    expect(isUnknownEvent(parseEvent({ t: 'ctx.fileref', path: 'a.ts', lineStart: 12, lineEnd: 20 }))).toBe(false)
+    const ev = parseEvent({ t: 'ctx.fileref', path: 'a.ts', lineStart: 1, lineEnd: 3, side: 'new', text: '这里要改' })
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect(ev).toMatchObject({ side: 'new', text: '这里要改' })
+    expect(isUnknownEvent(parseEvent({ t: 'ctx.fileref', path: 'a.ts', lineStart: 0, lineEnd: 3 }))).toBe(true)
+  })
+
+  test('fs.discard 是已知事件：path + rangeStart + undoSnapshotId', () => {
+    expect(
+      isUnknownEvent(parseEvent({ t: 'fs.discard', path: 'b.md', rangeStart: 'r1', undoSnapshotId: 'u1' })),
+    ).toBe(false)
+    const ev = parseEvent({ t: 'fs.discard', path: 'b.md', rangeStart: 'r1', undoSnapshotId: 'u1', reason: '整份' })
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect(ev).toMatchObject({ reason: '整份' })
+    expect(isUnknownEvent(parseEvent({ t: 'fs.discard', path: 'b.md', rangeStart: 'r1' }))).toBe(true)
+  })
+
+  test('model.request 带 ctx 与不带 ctx 都能解析；ctx 的层清单结构正确', () => {
+    const plain = parseEvent({ t: 'model.request', provider: 'p', model: 'm', tokensIn: 5 })
+    expect(isUnknownEvent(plain)).toBe(false)
+    const ev = parseEvent({
+      t: 'model.request',
+      provider: 'p',
+      model: 'm',
+      tokensIn: 5,
+      ctx: { layers: [{ id: 'identity', role: 'system', cacheable: true, approxTokens: 120 }], tools: 300, history: 900 },
+    })
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect(ev).toMatchObject({ ctx: { layers: [{ id: 'identity', role: 'system', cacheable: true, approxTokens: 120 }], tools: 300, history: 900 } })
+    // 非法：approxTokens 为负
+    expect(
+      isUnknownEvent(
+        parseEvent({ t: 'model.request', provider: 'p', model: 'm', tokensIn: 5, ctx: { layers: [{ id: 'x', role: 'system', cacheable: true, approxTokens: -1 }], tools: 0, history: 0 } }),
+      ),
+    ).toBe(true)
   })
 })
 

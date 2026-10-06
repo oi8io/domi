@@ -46,6 +46,7 @@ const MIXED = [
   ...load('legacy-v13.jsonl'),
   ...load('legacy-v14.jsonl'),
   ...load('legacy-v15.jsonl'),
+  ...load('legacy-v16.jsonl'),
 ]
 /** v1 代码写下的 error（没有 counters）与 v2 新增的 fs.snapshot —— 新代码都得认得 */
 const V1_V2 = load('legacy-v1-error.jsonl')
@@ -54,7 +55,7 @@ const V2_V3 = load('v2-to-v3.jsonl')
 
 describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
-    expect(MIXED).toHaveLength(46)
+    expect(MIXED).toHaveLength(51)
     for (const e of MIXED) {
       expect(() => parseEvent(e.ev, e.schemaVersion)).not.toThrow()
     }
@@ -98,6 +99,17 @@ describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', (
     expect(isUnknownEvent(parseEvent(note.ev, note.schemaVersion))).toBe(false)
     const stopped = MIXED.find((e) => e.ev.t === 'error' && e.ev.stopReason === 'interrupted')!
     expect(isUnknownEvent(parseEvent(stopped.ev, stopped.schemaVersion))).toBe(false)
+  })
+
+  test('v16（M14）：步级快照 / 文件行引用 / 非隔离丢弃是已知事件；带 ctx 的 model.request 仍是已知事件', () => {
+    for (const t of ['fs.checkpoint', 'ctx.fileref', 'fs.discard']) {
+      const raw = MIXED.find((e) => e.ev.t === t)!
+      expect(isUnknownEvent(parseEvent(raw.ev, raw.schemaVersion))).toBe(false)
+    }
+    const req = MIXED.find((e) => e.ev.t === 'model.request' && 'ctx' in e.ev)!
+    const ev = parseEvent(req.ev, req.schemaVersion)
+    expect(isUnknownEvent(ev)).toBe(false)
+    expect((ev as { ctx?: { layers: Array<{ id: string }> } }).ctx?.layers[0]?.id).toBe('identity')
   })
 
   test('已知类型 + 未来新增字段：解析成功且字段必须留下来（passthrough）', () => {
