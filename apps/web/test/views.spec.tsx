@@ -368,6 +368,8 @@ describe('PRD-M14-004 · 进度 tab（右侧栏）', () => {
   const renderTab = (store: ReturnType<typeof createSessionStore>): string =>
     renderToStaticMarkup(
       <ProgressTab
+        client={undefined as never}
+        sessionId="t1"
         store={store}
         status={store.$status.get()}
         ask={null}
@@ -375,6 +377,7 @@ describe('PRD-M14-004 · 进度 tab（右侧栏）', () => {
         onOpenStep={() => undefined}
         onOpenSubsession={() => undefined}
         onLocate={() => undefined}
+        onNotice={() => undefined}
       />,
     )
 

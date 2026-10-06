@@ -372,6 +372,9 @@ importers:
 
   packages/client-core:
     dependencies:
+      '@domi/checkpoint':
+        specifier: workspace:*
+        version: link:../checkpoint
       '@domi/i18n':
         specifier: workspace:*
         version: link:../i18n

@@ -7,7 +7,7 @@
  * 无计划时的本轮动作摘要。
  */
 
-import type { SessionStore } from '@domi/client-core'
+import type { DomiClient, SessionStore } from '@domi/client-core'
 import {
   type AskSnapshot,
   planView,
@@ -21,6 +21,7 @@ import { useStore } from '@nanostores/react'
 import { type ReactNode, useMemo, useState } from 'react'
 import { IconCheck, IconChevron } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
+import { RevertDialog } from './RevertDialog.tsx'
 
 function fmtMs(ms: number): string {
   if (ms < 1000) return `${ms}ms`
@@ -39,6 +40,8 @@ export function StepRow({
   onOpenStep,
   onOpenSubsession,
   onLocate,
+  onRevert,
+  dead,
 }: {
   s: StepActivity
   open: boolean
@@ -47,6 +50,10 @@ export function StepRow({
   onOpenSubsession: (sessionId: string) => void
   /** 右侧栏 → 对话：在对话里定位这一步（SPEC-M14-002 取舍-1） */
   onLocate: (seq: number) => void
+  /** 回到这一步之前（PRD-M14-010）：给出步骤起点 seq，由上层弹确认框 */
+  onRevert?: ((toSeq: number) => void) | undefined
+  /** 该步区间被 revert 作废（AC-4：标「已回滚」但可读） */
+  dead?: boolean | undefined
 }): ReactNode {
   const st = s.step.status
   const inProgress = st === 'in_progress'
@@ -113,6 +120,22 @@ export function StepRow({
           >
             ◎
           </button>
+        )}
+        {s.started && s.startSeq !== null && onRevert !== undefined && (
+          <button
+            type="button"
+            onClick={() => onRevert(s.startSeq!)}
+            title={tr('web.revert.stepAction')}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-mut transition-colors hover:bg-bad-d hover:text-bad"
+            data-action="revert-step"
+          >
+            {tr('web.revert.stepAction')}
+          </button>
+        )}
+        {dead === true && (
+          <span className="shrink-0 rounded bg-warn-d px-1 py-px text-[10px] text-warn" data-part="step-dead">
+            {tr('web.revert.dead')}
+          </span>
         )}
         <button
           type="button"
@@ -250,6 +273,8 @@ function SummaryView({ s }: { s: TurnSummary }): ReactNode {
 }
 
 export function ProgressTab({
+  client,
+  sessionId,
   store,
   status,
   ask,
@@ -257,7 +282,10 @@ export function ProgressTab({
   onOpenStep,
   onOpenSubsession,
   onLocate,
+  onNotice,
 }: {
+  client: DomiClient
+  sessionId: string
   store: SessionStore
   status: StatusSnapshot
   ask: AskSnapshot | null
@@ -266,10 +294,30 @@ export function ProgressTab({
   onOpenSubsession: (sessionId: string) => void
   /** 右侧栏 → 对话：在对话里定位（SPEC-M14-002 取舍-1） */
   onLocate: (seq: number) => void
+  onNotice: (m: string | null) => void
 }): ReactNode {
   const events = useStore(store.$events)
   const notes = useStore(store.$notes)
+  const dead = useStore(store.$dead)
   const [openStep, setOpenStep] = useState<string | null>(null)
+  const [revertSeq, setRevertSeq] = useState<number | null>(null)
+
+  const stepDead = (startSeq: number | null, endSeq: number | null): boolean => {
+    if (startSeq === null || endSeq === null) return false
+    for (const d of dead) if (d >= startSeq && d <= endSeq) return true
+    return false
+  }
+  const doRevert = async (scope: 'files' | 'conversation' | 'both'): Promise<void> => {
+    const seq = revertSeq
+    setRevertSeq(null)
+    if (seq === null) return
+    try {
+      await client.revertTo(sessionId, seq, scope)
+      onNotice(tr('web.revert.success'))
+    } catch (e) {
+      onNotice(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   const head = events.length === 0 ? 0 : (events[events.length - 1]?.seq ?? 0)
   const view = useMemo(() => planView(events, head), [events, head])
@@ -296,6 +344,8 @@ export function ProgressTab({
                 onOpenStep={onOpenStep}
                 onOpenSubsession={onOpenSubsession}
                 onLocate={onLocate}
+                onRevert={(seq) => setRevertSeq(seq)}
+                dead={stepDead(s.startSeq, s.endSeq)}
               />
             ))}
           </ul>
@@ -331,6 +381,15 @@ export function ProgressTab({
           view.kind === 'plan' && <span data-part="remaining-none">{tr('web.progress.remainingNone')}</span>
         )}
       </div>
+      {revertSeq !== null && (
+        <RevertDialog
+          busy={status.busy}
+          onCancel={() => setRevertSeq(null)}
+          onConfirm={(scope) => {
+            void doRevert(scope)
+          }}
+        />
+      )}
     </div>
   )
 }

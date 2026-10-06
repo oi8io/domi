@@ -81,7 +81,7 @@ import {
 import { z } from 'zod'
 import { ASK_USER_CAPABILITY, makeAskUserTool } from './ask-user.ts'
 import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
-import { type CheckpointController, CheckpointError, resolveSnapshots } from './checkpoints.ts'
+import { type CheckpointController, CheckpointError, resolveSnapshots, stepStartSnapshot } from './checkpoints.ts'
 import {
   makePlanGate,
   makePlanUpdateTool,
@@ -1364,6 +1364,33 @@ export class DomiSession {
    * checkpoint.discard（PRD-M14-005 AC-7，非隔离会话）：把文件恢复到所选范围起点的快照内容。
    * 丢弃前自动打快照（可撤销），落 fs.discard 事件（INV-03）。隔离任务请走 worktree.discard
    */
+  /**
+   * 回到这一步之前（PRD-M14-010 / SPEC-M14-010 取舍-2）：toSeq 是对话截止的视图 seq，
+   * files / both 先把文件恢复到该时点快照（restore 内部先打 undo 快照，可回滚），
+   * conversation 只追加 revert 事件（INV-01 / INV-12：不删事件，声明作废区间）。
+   * busy 守卫在 daemon core（INV-03）。
+   */
+  async revertTo(
+    toSeq: number,
+    scope: 'files' | 'conversation' | 'both',
+  ): Promise<{ snapshotId: string | null; undoSnapshotId: string | null }> {
+    const c = this.opts.checkpoints
+    let snapshotId: string | null = null
+    let undoSnapshotId: string | null = null
+    if (scope !== 'conversation') {
+      if (!c) throw new CheckpointError('error.checkpoint.not_wired')
+      const events = await this.view()
+      // 目标快照 = 该步起点的 from 快照（SPEC-M14-010 取舍-1：步起点状态 = 该轮第一个 checkpoint）
+      const start = stepStartSnapshot(events, toSeq)
+      if (start === null) throw new CheckpointError('error.checkpoint.no_snapshots')
+      snapshotId = start
+      const undo = await c.repo.restore(start)
+      undoSnapshotId = undo.undoSnapshotId
+    }
+    await this.appendEvents([{ t: 'revert', toSeq, scope, snapshotId, undoSnapshotId }])
+    return { snapshotId, undoSnapshotId }
+  }
+
   async checkpointDiscard(path: string, fromSeq: number, toSeq: number): Promise<{ eventSeq: number }> {
     const c = this.opts.checkpoints
     if (!c) throw new CheckpointError('error.checkpoint.not_wired')

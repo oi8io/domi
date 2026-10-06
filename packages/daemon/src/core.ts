@@ -410,6 +410,12 @@ export interface DaemonHost {
    * 会话不存在抛 SessionNotFoundError；越界抛 BranchPointError
    */
   branch(sessionId: string, atSeq: number): Promise<string>
+  /** 回到这一步之前（PRD-M14-010）。busy 守卫由 core 做（INV-03）；测试 stub 可缺省 */
+  revertTo?(
+    sessionId: string,
+    toSeq: number,
+    scope: 'files' | 'conversation' | 'both',
+  ): Promise<{ snapshotId: string | null; undoSnapshotId: string | null }>
   memory?: HostMemory
   tasks?: HostTasks
   worktrees?: HostWorktrees
@@ -556,6 +562,10 @@ export class Daemon {
       // 错误带着文案 key（PRD-M9-004 AC-4）：放进 data，端上按自己的语言渲染
       const keyed = errorKeyData(e)
       if (e instanceof SessionNotFoundError) return fail(req.id, 'SESSION_NOT_FOUND', e.message, keyed)
+      // runtime 的 CheckpointError（跨包不引类，按名字识别）：无快照 / 未接线 = 请求的范围不可用
+      if (e instanceof Error && e.name === 'CheckpointError') {
+        return fail(req.id, 'INVALID_PARAMS', e.message, keyed)
+      }
       if (
         e instanceof BranchPointError ||
         e instanceof InvalidRefError ||
@@ -887,6 +897,13 @@ export class Daemon {
       case 'session.branch': {
         const p = params as { sessionId: string; atSeq: number }
         return ok(req.id, { sessionId: await this.host.branch(p.sessionId, p.atSeq) })
+      }
+
+      case 'session.revertTo': {
+        const p = params as { sessionId: string; toSeq: number; scope: 'files' | 'conversation' | 'both' }
+        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.revert')
+        const r = await this.host.revertTo!(p.sessionId, p.toSeq, p.scope)
+        return ok(req.id, r)
       }
 
       case 'task.start':

@@ -70,6 +70,7 @@ export function SessionView({
   onRefsChange?: (refs: PendingRef[]) => void
 }) {
   const items = useStore(store.$items)
+  const dead = useStore(store.$dead)
   const status = useStore(store.$status)
   const ask = useStore(store.$ask)
   const review = useStore(store.$review)
@@ -400,6 +401,7 @@ export function SessionView({
                   )}
                   <Transcript
                     items={items}
+                    dead={dead}
                     {...(onBranched === undefined ? {} : { onBranch: branch })}
                     {...(onRefsChange === undefined
                       ? {}

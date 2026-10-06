@@ -9,6 +9,7 @@
     "./highlight": "./src/highlight.ts"
   },
   "dependencies": {
+    "@domi/checkpoint": "workspace:*",
     "@domi/i18n": "workspace:*",
     "@domi/protocol": "workspace:*",
     "highlight.js": "^11.12.0",

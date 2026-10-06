@@ -894,6 +894,17 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
       index.sessions.softDelete(sessionId, Date.now())
     },
 
+    /** 回到这一步之前（PRD-M14-010）：busy 守卫在 daemon core，这里只做会话与快照 */
+    async revertTo(
+      sessionId: string,
+      toSeq: number,
+      scope: 'files' | 'conversation' | 'both',
+    ): Promise<{ snapshotId: string | null; undoSnapshotId: string | null }> {
+      if (!index.sessions.get(sessionId)) throw new SessionNotFoundError(sessionId)
+      const s = await live(sessionId)
+      return await s.revertTo(toSeq, scope)
+    },
+
     async review(p) {
       const from = p.fromSessionId === undefined ? undefined : index.sessions.get(p.fromSessionId)
       if (p.fromSessionId !== undefined && !from) throw new SessionNotFoundError(p.fromSessionId)

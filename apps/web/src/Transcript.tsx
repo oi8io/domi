@@ -301,6 +301,7 @@ export function Transcript({
   onOpenChanges,
   onOpenProgress,
   knownFiles,
+  dead,
 }: {
   items: readonly TranscriptItem[]
   /** 不给就不画分支按钮（只读视图） */
@@ -313,6 +314,8 @@ export function Transcript({
   onOpenProgress?: () => void
   /** 当前范围的已知文件（供计划文本里匹配路径） */
   knownFiles?: ReadonlySet<string>
+  /** PRD-M14-010 AC-4：被 revert 作废的 seq 集合；传了就在行上标「已回滚」（可读） */
+  dead?: ReadonlySet<number> | undefined
 }) {
   if (items.length === 0)
     return <p className="py-10 text-center text-[13px] text-mut">{tr('web.transcript.noEvents')}</p>
@@ -326,7 +329,16 @@ export function Transcript({
             className="group relative overflow-hidden rounded-md border border-border2"
             data-row="tool"
             data-seq={row.call.seq}
+            data-dead={dead !== undefined && dead.has(row.call.seq) ? 'true' : 'false'}
           >
+            {dead !== undefined && dead.has(row.call.seq) && (
+              <span
+                className="absolute right-2 top-1 z-10 rounded bg-warn-d px-1 py-px text-[10px] text-warn"
+                data-part="transcript-dead"
+              >
+                {tr('web.revert.dead')}
+              </span>
+            )}
             <details className="group/tool">
               <summary className="flex cursor-pointer list-none items-center gap-2 bg-panel px-3 py-1.5 text-[13px] hover:bg-panel-h [&::-webkit-details-marker]:hidden">
                 <code className="text-[12.5px] font-medium">{row.call.text}</code>
@@ -368,7 +380,21 @@ export function Transcript({
             )}
           </li>
         ) : (
-          <li key={row.item.seq} className="group relative" data-row={row.item.kind} data-seq={row.item.seq}>
+          <li
+            key={row.item.seq}
+            className="group relative"
+            data-row={row.item.kind}
+            data-seq={row.item.seq}
+            data-dead={dead !== undefined && dead.has(row.item.seq) ? 'true' : 'false'}
+          >
+            {dead !== undefined && dead.has(row.item.seq) && (
+              <span
+                className="absolute right-8 top-1 rounded bg-warn-d px-1 py-px text-[10px] text-warn"
+                data-part="transcript-dead"
+              >
+                {tr('web.revert.dead')}
+              </span>
+            )}
             <ItemBody
               item={row.item}
               onOpenChanges={onOpenChanges}

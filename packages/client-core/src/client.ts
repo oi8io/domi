@@ -290,6 +290,15 @@ export class DomiClient {
     return this.request('checkpoint.discard.undo', { sessionId, eventSeq })
   }
 
+  /** 回到这一步之前（PRD-M14-010）：scope 三选一 files / conversation / both */
+  revertTo(
+    sessionId: string,
+    toSeq: number,
+    scope: 'files' | 'conversation' | 'both',
+  ): Promise<ResultOf<'session.revertTo'>> {
+    return this.request('session.revertTo', { sessionId, toSeq, scope })
+  }
+
   /**
    * 新建会话。不给参数 = 自由会话（M8-004）；给 cwd 时由 daemon 按目录判断；
    * opts.kind / projectId 明确指定是会话还是某个项目下的任务

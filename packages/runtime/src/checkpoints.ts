@@ -166,6 +166,18 @@ function lastAtOrBefore(index: readonly CheckpointRow[], seq: number, floor: num
   return undefined
 }
 
+/**
+ * 该步起点的 from 快照（SPEC-M14-010 取舍-1：回到这一步之前 = 步起点状态）。
+ * 步起点 = 该轮第一个 checkpoint（改文件工具执行前）。没有快照 → null。
+ */
+export function stepStartSnapshot(events: readonly EventEnvelope[], toSeq: number): string | null {
+  const index = checkpointIndex(events)
+  if (index.length === 0) return null
+  const turnStart = lastUserInputSeq(events, toSeq)
+  const baseline = index.find((r) => r.seq >= turnStart) ?? index[0]
+  return baseline?.id ?? null
+}
+
 export interface SnapshotRange {
   from: string
   to: string

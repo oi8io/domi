@@ -341,6 +341,8 @@ function TabBody({
   if (insp.tab === 'progress') {
     return (
       <ProgressTab
+        client={client}
+        sessionId={sessionId}
         store={store}
         status={status}
         ask={ask}
@@ -348,6 +350,7 @@ function TabBody({
         onOpenStep={onOpenStep}
         onOpenSubsession={onOpenSubsession}
         onLocate={onLocate}
+        onNotice={onNotice}
       />
     )
   }

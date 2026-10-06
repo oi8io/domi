@@ -7,6 +7,7 @@
  * 这里做的是**投影**，不是存储：事件流是唯一真相，atom 里的东西随时可以从
  * 事件流重算出来。所以任何"只在 atom 里、事件流里没有"的状态都是 bug。
  */
+import { deadRanges, isDead } from '@domi/checkpoint'
 import { tr } from '@domi/i18n'
 import { type AnyEvent, type EventEnvelope, isKnownEvent } from '@domi/protocol'
 import { atom, computed } from 'nanostores'
@@ -324,6 +325,16 @@ export function createSessionStore(initial: Partial<StatusSnapshot> & { kind?: '
   const $events = atom<EventEnvelope[]>([])
   /** M14：右侧栏状态（SPEC-M14-001 取舍-3） */
   const $inspector = atom<InspectorState>(inspectorDefault(initial.kind))
+  /**
+   * M14-010（PRD-M14-010 AC-4）：被 revert 作废的 seq 集合（INV-01 / INV-12——事件还在，只是投影标 dead）。
+   * 端上据此在对话与右侧栏标「已回滚」但可读；liveEvents 的过滤由 kernel/daemon 侧做
+   */
+  const $dead = computed($events, (events) => {
+    const ranges = deadRanges(events)
+    const set = new Set<number>()
+    for (const e of events) if (isDead(e.seq, ranges)) set.add(e.seq)
+    return set
+  })
   /** M14：改动 tab 的 daemon 数据（Web 写入；StatusBar 徽标读同一份） */
   const $changesDiff = atom<ChangesDiffSnapshot>({ range: 'turn', diff: null, fallbackNames: [] })
   /** M14：状态栏 +N −M（SPEC-M14-001 取舍-6）：worktree 会话 = worktree.diff 合计，否则本轮 changesView 合计 */
@@ -674,6 +685,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> & { kind?: '
     $returned,
     $events,
     $inspector,
+    $dead,
     $changesDiff,
     $changesPill,
     setNotes(pending: readonly QueuedNoteView[]): void {

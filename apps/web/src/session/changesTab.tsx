@@ -40,6 +40,7 @@ import { Button } from '../components/ui/button.tsx'
 import { IconChevron, IconCopy, IconQuote, IconRestore, IconTrash } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
 import type { PendingRef } from './Composer.tsx'
+import { RevertDialog } from './RevertDialog.tsx'
 
 type WorktreeDiff = Awaited<ReturnType<DomiClient['worktreeDiff']>>
 
@@ -386,6 +387,7 @@ export function ChangesTab({
 }) {
   const insp = useStore(store.$inspector)
   const events = useStore(store.$events)
+  const dead = useStore(store.$dead)
   const status = useStore(store.$status)
   const head = events.length === 0 ? 0 : (events[events.length - 1]?.seq ?? 0)
   // 对比基线只对隔离任务开放；其他会话落到本轮
@@ -649,6 +651,34 @@ export function ChangesTab({
     ])
   }
 
+  // PRD-M14-010：step 范围条上的「回到这一步之前」入口 + 确认框
+  const [revertSeq, setRevertSeq] = useState<number | null>(null)
+  const stepStart = (): number | null => {
+    if (typeof effRange !== 'object') return null
+    const steps = stepRanges()
+    const iv = steps?.[effRange.step]
+    return iv === undefined ? null : iv.startSeq
+  }
+  const doRevert = async (scope: 'files' | 'conversation' | 'both'): Promise<void> => {
+    const seq = revertSeq
+    setRevertSeq(null)
+    if (seq === null) return
+    try {
+      await client.revertTo(sessionId, seq, scope)
+      onNotice(tr('web.revert.success'))
+    } catch (e) {
+      onNotice(e instanceof Error ? e.message : String(e))
+    }
+  }
+  // AC-4：范围区间被作废 → 顶部标「已回滚」（数据仍在，可读）
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stepRanges 是读当前状态的闭包（同 load 的用法），events/effRange/dead 变化即重算
+  const rangeDead = useMemo(() => {
+    const r = changesRangeSeq(events, effRange, head, stepRanges())
+    if (r === null) return false
+    for (const d of dead) if (d >= r.fromSeq && d <= r.toSeq) return true
+    return false
+  }, [effRange, events, head, dead])
+
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-part="changes-tab">
       {/* 范围选择（AC-1） */}
@@ -662,6 +692,16 @@ export function ChangesTab({
             data-range="step"
           >
             {tr('web.changes.rangeStep')}
+            {stepStart() !== null && (
+              <button
+                type="button"
+                onClick={() => setRevertSeq(stepStart())}
+                className="rounded px-1 text-[10px] transition-colors hover:bg-bad-d hover:text-bad"
+                data-action="revert-step-range"
+              >
+                {tr('web.revert.stepAction')}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setRange('turn')}
@@ -673,8 +713,22 @@ export function ChangesTab({
             </button>
           </span>
         )}
+        {rangeDead && (
+          <span className="rounded bg-warn-d px-1.5 py-0.5 text-[10px] text-warn" data-part="changes-dead">
+            {tr('web.revert.dead')}
+          </span>
+        )}
       </div>
 
+      {revertSeq !== null && (
+        <RevertDialog
+          busy={busy}
+          onCancel={() => setRevertSeq(null)}
+          onConfirm={(scope) => {
+            void doRevert(scope)
+          }}
+        />
+      )}
       {selected !== null ? (
         // ── 详情页 ──
         <div className="flex min-h-0 flex-1 flex-col">
