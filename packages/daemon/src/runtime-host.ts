@@ -11,6 +11,7 @@
 
 import { dirname, join } from 'node:path'
 import { SkillRegistry } from '@domi/capability'
+import { ShadowRepo } from '@domi/checkpoint'
 import {
   ConfigParseError,
   ConfigWriteError,
@@ -31,6 +32,8 @@ import {
   AttachmentError,
   applyWorktree,
   assertResolved,
+  CheckpointController,
+  CheckpointError,
   collectDiff,
   createWorktree,
   DomiSession,
@@ -409,6 +412,9 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         sessionId,
         cwd: row.cwd,
         dbPath: opts.dbPath,
+        // 步级快照（SPEC-M14-003）：影子仓库挂在会话的工作目录上。隔离会话的事件照记（无妨），
+        // 但改动 tab 的丢弃走 worktree.discard（隔离）或 checkpoint.discard（非隔离），由端上选
+        checkpoints: new CheckpointController(new ShadowRepo({ workTree: row.cwd })),
         ...(opts.provider === undefined ? {} : { provider: opts.provider }),
         ...(opts.extraTools === undefined ? {} : { extraTools: opts.extraTools }),
         ...(opts.notices === undefined ? {} : { notices: opts.notices }),
@@ -583,6 +589,28 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
           const all = await s.pumpAll()
           head = all[all.length - 1]?.seq ?? 0
           return head
+        },
+        // 步级快照（SPEC-M14-003）：CheckpointError → INVALID_PARAMS
+        async checkpointDiff(fromSeq, toSeq, path) {
+          try {
+            return await s.checkpointDiff(fromSeq, toSeq, path)
+          } catch (e) {
+            throw e instanceof CheckpointError ? HostRequestError.from(e) : e
+          }
+        },
+        async checkpointDiscard(path, fromSeq, toSeq) {
+          try {
+            return await s.checkpointDiscard(path, fromSeq, toSeq)
+          } catch (e) {
+            throw e instanceof CheckpointError ? HostRequestError.from(e) : e
+          }
+        },
+        async checkpointDiscardUndo(eventSeq) {
+          try {
+            return await s.checkpointDiscardUndo(eventSeq)
+          } catch (e) {
+            throw e instanceof CheckpointError ? HostRequestError.from(e) : e
+          }
         },
         async close() {
           sessions.delete(sessionId)

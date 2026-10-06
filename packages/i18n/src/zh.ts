@@ -1196,6 +1196,9 @@ server:
   'error.project_archived': '项目「{name}」已归档，先取消归档',
   'error.schedule_not_found': '没有这个定时任务：{id}',
   'error.not_isolated': '{sessionId} 不是隔离会话',
+  'error.checkpoint.not_wired': '这个会话没有接步级快照',
+  'error.checkpoint.no_snapshots': '该范围没有可用的步级快照（git 可能没装，或这一段没触发过快照）',
+  'error.checkpoint.discard_not_found': '找不到这次丢弃的记录',
   'error.missing_credential':
     '还没有配置 {provider} 的 API key。到「设置 › 模型供应商」填写（保存后立即生效），或设置环境变量 {envNames} 后重启 domid。',
   'error.project.dirMissing': '目录不存在：{path}',

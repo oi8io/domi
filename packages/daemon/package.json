@@ -13,6 +13,7 @@
   "dependencies": {
     "@domi/i18n": "workspace:*",
     "@domi/capability": "workspace:*",
+    "@domi/checkpoint": "workspace:*",
     "@domi/config": "workspace:*",
     "@domi/protocol": "workspace:*",
     "@domi/runtime": "workspace:*",

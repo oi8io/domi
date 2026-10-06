@@ -417,6 +417,9 @@ importers:
       '@domi/capability':
         specifier: workspace:*
         version: link:../capability
+      '@domi/checkpoint':
+        specifier: workspace:*
+        version: link:../checkpoint
       '@domi/config':
         specifier: workspace:*
         version: link:../config
@@ -618,6 +621,9 @@ importers:
       '@domi/capability':
         specifier: workspace:*
         version: link:../capability
+      '@domi/checkpoint':
+        specifier: workspace:*
+        version: link:../checkpoint
       '@domi/codeintel':
         specifier: workspace:*
         version: link:../codeintel

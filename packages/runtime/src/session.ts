@@ -11,6 +11,7 @@
 
 import { existsSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import type { FileChange } from '@domi/checkpoint'
 import {
   fsEdit,
   fsGlob,
@@ -50,6 +51,7 @@ import {
   paginateByTurns,
   recoveryEvents,
   runTurn,
+  type ToolRunner,
   type TurnResult,
   type VerifyState,
   verifyNudges,
@@ -66,10 +68,15 @@ import {
   StructuredOutputError,
 } from '@domi/model'
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
-import type { DomiEvent, EventEnvelope, RefLink, UploadRef } from '@domi/protocol'
+import { isKnownEvent, type DomiEvent, type EventEnvelope, type RefLink, type UploadRef } from '@domi/protocol'
 import { z } from 'zod'
 import { ASK_USER_CAPABILITY, makeAskUserTool } from './ask-user.ts'
 import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
+import {
+  CheckpointController,
+  CheckpointError,
+  resolveSnapshots,
+} from './checkpoints.ts'
 import {
   makePlanGate,
   makePlanUpdateTool,
@@ -245,6 +252,11 @@ export interface SessionOptions {
   startTask?: (spec: unknown, cwd: string) => Promise<string>
   /** 子 agent 会话的事件往哪推（daemon 里是这个子会话的订阅者） */
   childEvents?: (sessionId: string, envs: EventEnvelope[]) => void
+  /**
+   * 步级快照（SPEC-M14-003，PRD-M14-003）：给上就接线——每轮第一个改文件工具前取基线、
+   * 之后每次成功返回后取快照，fs.checkpoint 事件落进事件流。不给 = 没有快照（checkpoint.diff 降级）
+   */
+  checkpoints?: CheckpointController
 }
 
 /** 一轮输入里除了文字之外的东西（PRD-M8-010） */
@@ -1189,6 +1201,77 @@ export class DomiSession {
     return { files: hits.slice(0, limit), truncated: hits.length > limit }
   }
 
+  // ── 步级快照（SPEC-M14-003 · PRD-M14-003）─────────────────────────────
+
+  /** 包一层 ToolRunner：快照的 before / after 事件并入 outcome.events（顺序：基线 → 原有 → 快照） */
+  private wrapCheckpointTools(tools: ToolRunner): ToolRunner {
+    const c = this.opts.checkpoints
+    if (!c) return tools
+    return {
+      schemas: () => tools.schemas(),
+      run: async (call, signal) => {
+        const before = await c.beforeTool(call)
+        const outcome = await tools.run(call, signal)
+        const after = await c.afterTool(call, outcome.ok)
+        if (before.length > 0 || after.length > 0) {
+          outcome.events = [...before, ...(outcome.events ?? []), ...after]
+        }
+        return outcome
+      },
+    }
+  }
+
+  /**
+   * checkpoint.diff（PRD-M14-003 AC-3）：事件区间 → 快照之间的文件改动。
+   * diff 在 daemon 算；快照选择走 resolveSnapshots 的区间规则（SPEC 取舍-6）
+   */
+  async checkpointDiff(
+    fromSeq?: number,
+    toSeq?: number,
+    path?: string,
+  ): Promise<{ available: boolean; reason?: string; files: FileChange[] }> {
+    const c = this.opts.checkpoints
+    if (!c) return { available: false, reason: '这个会话没有接步级快照', files: [] }
+    const events = await this.view()
+    const range = resolveSnapshots(events, fromSeq ?? 1, toSeq ?? events.length)
+    if (range === null) {
+      return { available: false, reason: '该范围没有可用的快照（git 可能没装，或这一段没触发过快照）', files: [] }
+    }
+    return { available: true, files: await c.repo.diffFiles(range.from, range.to, path) }
+  }
+
+  /**
+   * checkpoint.discard（PRD-M14-005 AC-7，非隔离会话）：把文件恢复到所选范围起点的快照内容。
+   * 丢弃前自动打快照（可撤销），落 fs.discard 事件（INV-03）。隔离任务请走 worktree.discard
+   */
+  async checkpointDiscard(path: string, fromSeq: number, toSeq: number): Promise<{ eventSeq: number }> {
+    const c = this.opts.checkpoints
+    if (!c) throw new CheckpointError('error.checkpoint.not_wired')
+    const events = await this.view()
+    const range = resolveSnapshots(events, fromSeq, toSeq)
+    if (range === null) throw new CheckpointError('error.checkpoint.no_snapshots')
+    const undo = await c.repo.snapshot('丢弃前的自动快照')
+    await c.repo.restorePath(range.from, path)
+    const { to } = await this.log.append(this.opts.sessionId, [
+      { t: 'fs.discard', path, rangeStart: range.from, undoSnapshotId: undo.id },
+    ])
+    await this.pump()
+    return { eventSeq: to + this.offset }
+  }
+
+  /** checkpoint.discard.undo：按 fs.discard 事件的 undoSnapshotId 恢复该文件 */
+  async checkpointDiscardUndo(eventSeq: number): Promise<{ path: string }> {
+    const c = this.opts.checkpoints
+    if (!c) throw new CheckpointError('error.checkpoint.not_wired')
+    const events = await this.view()
+    const found = events.find((e) => e.seq === eventSeq)
+    if (!found) throw new CheckpointError('error.checkpoint.discard_not_found')
+    const ev = found.ev
+    if (!isKnownEvent(ev) || ev.t !== 'fs.discard') throw new CheckpointError('error.checkpoint.discard_not_found')
+    await c.repo.restorePath(ev.undoSnapshotId, ev.path)
+    return { path: ev.path }
+  }
+
   async submit(
     text: string,
     opts: {
@@ -1205,6 +1288,8 @@ export class DomiSession {
     const inputs = this.checkInputs(opts)
     this.busy = true
     this.listeners.onBusy?.(true)
+    // 步级快照（SPEC-M14-003）：每一轮（user.input）重置基线标记与降级闩
+    this.opts.checkpoints?.resetTurn()
     for (const t of this.opts.extraTools?.(this.opts.cwd) ?? []) this.tools.register(t)
     await this.deliverNotices()
     await this.loadMode()
@@ -1226,7 +1311,7 @@ export class DomiSession {
         {
           sink: this.sink,
           provider: this.provider,
-          tools: this.tools,
+          tools: this.opts.checkpoints ? this.wrapCheckpointTools(this.tools) : this.tools,
           clock: this.opts.clock ?? { now: () => Date.now() },
           policy,
           model: this.currentModel,

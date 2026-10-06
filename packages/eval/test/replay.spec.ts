@@ -245,3 +245,52 @@ describe('PRD-M13-001 AC-10 · 带补充的会话能录能放（INV-13）', () =
     expect((await replay(parse(serialize(f)))).ok).toBe(true)
   })
 })
+
+describe('PRD-M14-003 · 带 fs.checkpoint 的事件流能录能放（INV-13）', () => {
+  /** 真实形状：fs.write 前有 baseline、后有 after（与权限事件同一位置） */
+  function checkpointSession(): EventEnvelope[] {
+    seq = 0
+    return [
+      env({ t: 'user.input', text: '改文件' }),
+      env({ t: 'model.request', provider: 'anthropic', model: 'claude-sonnet-4-5', tokensIn: 3 }),
+      env({ t: 'model.delta', text: '写。' }),
+      env({ t: 'tool.call', id: 'c1', name: 'fs.write', args: { path: 'a.txt', content: '新' } }),
+      env({ t: 'fs.checkpoint', phase: 'baseline', toolCallId: 'c1', id: 'abc123', files: 3, ok: true }),
+      env({ t: 'fs.checkpoint', phase: 'after', toolCallId: 'c1', id: 'def456', files: 4, ok: true }),
+      env({ t: 'tool.result', id: 'c1', ok: true, payload: { bytes: 3 }, ms: 2 }),
+      env({ t: 'model.request', provider: 'anthropic', model: 'claude-sonnet-4-5', tokensIn: 9 }),
+      env({ t: 'model.delta', text: '好了。' }),
+    ]
+  }
+
+  test('录制照常（fs.checkpoint 作为上下文被消费）；回放照常（L1 不需要影子仓库）', async () => {
+    const f = record(checkpointSession(), 's1')
+    // fs.checkpoint 不是模型输出、也不是工具结果，不落进 turns；录制不炸、期望调用正确就说明流没被新事件类型搅乱
+    expect(f.expectedCalls.map((c) => c.name)).toEqual(['fs.write'])
+    const r = await replay(f)
+    expect(r.ok).toBe(true)
+    expect(r.actualCalls).toBe(1)
+    expect(r.divergence).toBeNull()
+  })
+
+  test('序列化往返后照放（fixture 带 checkpoint 事件不破坏解析）', async () => {
+    const f = record(checkpointSession(), 's1')
+    expect((await replay(parse(serialize(f)))).ok).toBe(true)
+  })
+
+  test('降级快照（ok:false / id:null）也一样照放', async () => {
+    seq = 0
+    const degraded = [
+      env({ t: 'user.input', text: '改' }),
+      env({ t: 'model.request', provider: 'anthropic', model: 'claude-sonnet-4-5', tokensIn: 3 }),
+      env({ t: 'model.delta', text: '写。' }),
+      env({ t: 'tool.call', id: 'c1', name: 'fs.write', args: { path: 'a.txt', content: '新' } }),
+      env({ t: 'fs.checkpoint', phase: 'baseline', toolCallId: 'c1', id: null, files: 0, ok: false, message: '系统没有可用的 git' }),
+      env({ t: 'tool.result', id: 'c1', ok: true, payload: { bytes: 3 }, ms: 2 }),
+      env({ t: 'model.request', provider: 'anthropic', model: 'claude-sonnet-4-5', tokensIn: 9 }),
+      env({ t: 'model.delta', text: '好了。' }),
+    ]
+    const r = await replay(record(degraded, 's1'))
+    expect(r.ok).toBe(true)
+  })
+})

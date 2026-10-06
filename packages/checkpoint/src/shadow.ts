@@ -12,11 +12,13 @@
  * 用户以为有安全网而实际没有，比没有安全网更危险。
  */
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, relative } from 'node:path'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 
 export const DEFAULT_MAX_FILE_BYTES = 5 * 1024 * 1024
+/** 单个文件的 patch 上限（与 worktree.diff 同口径）。超过就截断并标 truncated */
+export const PATCH_MAX = 200_000
 
 /** 内置排除表。这些目录进快照只会让每一步都慢几秒，且没人想回滚它们 */
 export const BUILTIN_EXCLUDES = [
@@ -252,7 +254,81 @@ export class ShadowRepo {
     return r.code === 0 ? Number(r.stdout.trim()) : 0
   }
 
+  /**
+   * 工作树与 HEAD 是否一致（SPEC-M14-003 取舍-3 的「无变化跳过」）。
+   * 用 `status --porcelain` 而不是 `diff --quiet HEAD`：后者不看 untracked 文件，
+   * 而快照必须捕捉 untracked 新建（shadow 仓库的立身之本）。返回非 0 = git 错误，视为「不干净」
+   */
+  async clean(): Promise<boolean> {
+    await this.ensureInit()
+    const r = await this.run(['status', '--porcelain'])
+    return r.code === 0 && r.stdout.trim() === ''
+  }
+
+  /**
+   * 两个快照之间的文件改动（带 patch 内容，checkpoint.diff RPC 用，SPEC-M14-003 取舍-6）。
+   * 与 worktree.diff 同形；大文件（contentNotSnapshotted）只列路径与状态、patch 空、标 truncated
+   */
+  async diffFiles(from: string, to: string, path?: string): Promise<FileChange[]> {
+    await this.ensureInit()
+    const diffs = await this.diff(from, to)
+    const out: FileChange[] = []
+    for (const d of diffs) {
+      if (path !== undefined && d.path !== path) continue
+      if (d.contentNotSnapshotted === true) {
+        out.push({ path: d.path, status: d.status, patch: '', truncated: true })
+        continue
+      }
+      const r = await this.run(['diff', '--no-color', from, to, '--', d.path])
+      if (r.code !== 0) throw new Error(`快照 diff 失败：${r.stderr}`)
+      out.push(clipPatch({ path: d.path, status: d.status, patch: r.stdout }))
+    }
+    return out.sort((a, b) => a.path.localeCompare(b.path))
+  }
+
+  /**
+   * 把**一个文件**恢复到某个快照的内容（SPEC-M14-003 取舍-7，非隔离丢弃）。
+   * 目标快照里有该文件 → `git checkout <id> -- <path>`（恢复内容与索引）；
+   * 没有 → 从索引与工作树移除（它在这个快照里不存在）。
+   * 只动索引与工作树，HEAD 继续往前长（与 restore() 同一立场）
+   */
+  async restorePath(id: string, path: string): Promise<void> {
+    await this.ensureInit()
+    const rel = this.safeRel(path)
+    const abs = join(this.workTree, rel)
+    const inSnapshot = (await this.run(['cat-file', '-e', `${id}:${rel}`])).code === 0
+    if (inSnapshot) {
+      const r = await this.run(['checkout', id, '--', rel])
+      if (r.code !== 0) throw new Error(`恢复 ${rel} 失败：${r.stderr}`)
+    } else {
+      await this.run(['rm', '--cached', '-q', '--ignore-unmatch', '--', rel])
+      if (existsSync(abs)) rmSync(abs)
+    }
+  }
+
+  /** 路径必须在工作目录里、且不是 .git（防止 checkout 逃逸出影子仓库的范围）。相对路径按工作目录解析 */
+  private safeRel(file: string): string {
+    const abs = resolve(this.workTree, file)
+    const rel = relative(this.workTree, abs)
+    if (rel === '' || rel.startsWith('..') || isAbsolute(rel) || rel.split(/[\\/]/)[0] === '.git') {
+      throw new Error(`路径不在工作目录里：${file}`)
+    }
+    return rel
+  }
+
   relativize(abs: string): string {
     return relative(this.workTree, abs)
   }
+}
+
+function clipPatch(c: FileChange): FileChange {
+  return c.patch.length > PATCH_MAX ? { ...c, patch: c.patch.slice(0, PATCH_MAX), truncated: true } : c
+}
+
+export interface FileChange {
+  path: string
+  status: 'added' | 'modified' | 'deleted' | 'renamed'
+  patch: string
+  /** patch 被截断（> PATCH_MAX），或该文件内容未快照（patch 为空） */
+  truncated?: boolean
 }

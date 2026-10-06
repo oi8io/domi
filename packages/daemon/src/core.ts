@@ -140,8 +140,20 @@ export interface SessionHandle {
   }>
   /** PRD-M11-009：首连尾部窗口的元信息（oldestSeq/hasOlder），readEvents(fromSeq=0) 时写入 */
   windowMeta?: { oldestSeq: number; hasOlder: boolean } | undefined
+  /** 步级快照（SPEC-M14-003）。老宿主没有 */
+  checkpointDiff?(fromSeq?: number, toSeq?: number, path?: string): Promise<CheckpointDiffResult>
+  /** 非隔离丢弃（PRD-M14-005 AC-7）。返回 fs.discard 事件的 view seq，供 undo 用 */
+  checkpointDiscard?(path: string, fromSeq: number, toSeq: number): Promise<{ eventSeq: number }>
+  checkpointDiscardUndo?(eventSeq: number): Promise<{ path: string }>
   head(): Promise<number>
   close(): Promise<void>
+}
+
+/** checkpoint.diff 的返回（与 worktree.diff 同形，SPEC-M14-003 取舍-6） */
+export interface CheckpointDiffResult {
+  available: boolean
+  reason?: string
+  files: Array<{ path: string; status: 'added' | 'modified' | 'deleted' | 'renamed'; patch: string; truncated?: boolean }>
 }
 
 /** 一条排队中的补充（PRD-M13-001） */
@@ -979,6 +991,32 @@ export class Daemon {
         if (method === 'worktree.discard') return ok(req.id, { trash: await w.discard(p.sessionId, p.path as string) })
         if (method === 'worktree.restore') return ok(req.id, { path: await w.restore(p.sessionId, p.trash as string) })
         return ok(req.id, await w.apply(p.sessionId, p.mode ?? 'squash', p.message))
+      }
+
+      case 'checkpoint.diff':
+      case 'checkpoint.discard':
+      case 'checkpoint.discard.undo': {
+        const p = params as {
+          sessionId: string
+          fromSeq?: number
+          toSeq?: number
+          path?: string
+          eventSeq?: number
+        }
+        const session = await this.session(p.sessionId)
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
+        if (method === 'checkpoint.diff') {
+          if (!session.checkpointDiff) return unsupported(req.id, 'checkpoint.diff')
+          return ok(req.id, await session.checkpointDiff(p.fromSeq, p.toSeq, p.path))
+        }
+        // 丢弃是工作区操作，和一轮互斥（与 worktree.discard 同一纪律）
+        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.operate')
+        if (method === 'checkpoint.discard') {
+          if (!session.checkpointDiscard) return unsupported(req.id, 'checkpoint.discard')
+          return ok(req.id, await session.checkpointDiscard(p.path as string, p.fromSeq as number, p.toSeq as number))
+        }
+        if (!session.checkpointDiscardUndo) return unsupported(req.id, 'checkpoint.discard.undo')
+        return ok(req.id, await session.checkpointDiscardUndo(p.eventSeq as number))
       }
 
       case 'session.subscribe': {

@@ -10,6 +10,7 @@
   "dependencies": {
     "@domi/i18n": "workspace:*",
     "@domi/capability": "workspace:*",
+    "@domi/checkpoint": "workspace:*",
     "@domi/codeintel": "workspace:*",
     "@domi/config": "workspace:*",
     "@domi/kernel": "workspace:*",

@@ -1244,6 +1244,9 @@ server:
   'error.project_archived': 'Project "{name}" is archived; unarchive it first',
   'error.schedule_not_found': 'No such scheduled task: {id}',
   'error.not_isolated': '{sessionId} is not an isolated session',
+  'error.checkpoint.not_wired': 'This session has no step checkpoints wired',
+  'error.checkpoint.no_snapshots': 'No usable step snapshots in this range (git may be missing, or nothing triggered a snapshot here)',
+  'error.checkpoint.discard_not_found': 'No such discard record found',
   'error.missing_credential':
     'No API key configured for {provider} yet. Add it under Settings › Model providers (takes effect as soon as you save), or set the environment variable {envNames} and restart domid.',
   'error.project.dirMissing': "Directory doesn't exist: {path}",
