@@ -7,15 +7,23 @@
  * 都可撤销）；带回三选一（仅对比基线范围）。
  */
 import {
+  $comments,
+  addComment,
   type ChangeFileView,
   type ChangesRange,
   type CheckpointDiffResult,
+  type CommentDraft,
   changeFileSeq,
   changesRangeSeq,
   changesView,
+  clearComments,
+  commentsToRefs,
   type DomiClient,
   keepSelection,
+  pendingCount,
   planView,
+  type ReviewFindingSnapshot,
+  removeComment,
   type SessionStore,
   type StepIntervals,
   shouldFold,
@@ -81,10 +89,57 @@ export function parsePatchLines(patch: string): PatchLine[] {
 }
 
 /** 逐行渲染统一 diff：del 后紧跟的 add 行成对做词级 diff（wordDiff） */
-function DiffLines({ patch }: { patch: string }) {
+function DiffLines({
+  patch,
+  file,
+  onComment,
+  commented,
+  findingLines,
+}: {
+  patch: string
+  file: string
+  /** M14-008：点 / 拖选 diff 行号 → 评论草稿（snippet 从 diff 数据带，SPEC 取舍-2） */
+  onComment?: ((draft: Omit<CommentDraft, 'id'>) => void) | undefined
+  /** 已评论行（范围命中即标 ✓） */
+  commented?: readonly CommentDraft[] | undefined
+  /** 审查发现锚定的新侧行号（M14-008 AC-4），行号底色高亮 */
+  findingLines?: ReadonlySet<number> | undefined
+}) {
   const lines = useMemo(() => parsePatchLines(patch), [patch])
+  // 拖选评论：anchor/focus 是 PatchLine 索引
+  const [sel, setSel] = useState<{ anchor: number; focus: number; side: 'del' | 'add' } | null>(null)
+  const marked = (side: 'new' | 'old', no: number): boolean =>
+    commented?.some((c) => (c.side ?? 'new') === side && no >= c.lineStart && no <= c.lineEnd) ?? false
   const rows: ReactNode[] = []
   let i = 0
+  const commentable = (line: PatchLine): line is PatchLine & { kind: 'del' | 'add'; oldNo: number; newNo: number } =>
+    (line.kind === 'del' || line.kind === 'add') && (line.oldNo !== undefined || line.newNo !== undefined)
+  const lineNo = (line: PatchLine & { kind: 'del' | 'add' }): number =>
+    line.kind === 'add' ? line.newNo! : line.oldNo!
+  const sideOf = (line: PatchLine & { kind: 'del' | 'add' }): 'new' | 'old' => (line.kind === 'add' ? 'new' : 'old')
+  const inSel = (idx: number): boolean =>
+    sel !== null && idx >= Math.min(sel.anchor, sel.focus) && idx <= Math.max(sel.anchor, sel.focus)
+  const finishSel = (): void => {
+    setSel((s) => {
+      if (s === null) return s
+      const lo = Math.min(s.anchor, s.focus)
+      const hi = Math.max(s.anchor, s.focus)
+      const picked = lines.slice(lo, hi + 1).filter((l): l is PatchLine & { kind: 'del' | 'add' } => commentable(l))
+      if (picked.length === 0) return null
+      const side = sideOf(picked[0]!)
+      const nos = picked.map(lineNo)
+      const text = picked.map((l) => l.text).join('\n')
+      onComment?.({
+        file,
+        lineStart: Math.min(...nos),
+        lineEnd: Math.max(...nos),
+        side,
+        snippet: text,
+        text: '',
+      })
+      return null
+    })
+  }
   while (i < lines.length) {
     const line = lines[i] as PatchLine
     if (line.kind === 'hdr') {
@@ -112,9 +167,26 @@ function DiffLines({ patch }: { patch: string }) {
         const add = adds[k]
         if (del !== undefined && add !== undefined) {
           const d = wordDiff(del.text, add.text)
+          const delIdx = lines.indexOf(del)
+          const addIdx = lines.indexOf(add)
+          const delNo = del.oldNo ?? 0
+          const addNo = add.newNo ?? 0
           rows.push(
-            <div key={`${i}-${k}-del`} className="bg-bad/20 px-3 py-px font-mono text-xs" data-diff-line="del">
-              <span className="mr-2 inline-block w-10 select-none text-right text-mut2">{del.oldNo}</span>
+            <div
+              key={`${i}-${k}-del`}
+              className={cn('px-3 py-px font-mono text-xs', inSel(delIdx) ? 'bg-bad/30' : 'bg-bad/20')}
+              data-diff-line="del"
+            >
+              <CommentLineNo
+                no={delNo}
+                side="old"
+                marked={marked('old', delNo)}
+                finding={false}
+                onStart={() => setSel({ anchor: delIdx, focus: delIdx, side: 'del' })}
+                onHover={() => sel !== null && setSel((s) => (s === null ? s : { ...s, focus: delIdx }))}
+                onEnd={finishSel}
+                disabled={onComment === undefined}
+              />
               <span className="mr-2 select-none text-bad">−</span>
               {d.old.map((t) => (
                 <span
@@ -127,8 +199,22 @@ function DiffLines({ patch }: { patch: string }) {
             </div>,
           )
           rows.push(
-            <div key={`${i}-${k}-add`} className="bg-ok/20 px-3 py-px font-mono text-xs" data-diff-line="add">
-              <span className="mr-2 inline-block w-10 select-none text-right text-mut2">{add.newNo}</span>
+            <div
+              key={`${i}-${k}-add`}
+              className={cn('px-3 py-px font-mono text-xs', inSel(addIdx) ? 'bg-ok/30' : 'bg-ok/20')}
+              data-diff-line="add"
+            >
+              <CommentLineNo
+                no={addNo}
+                side="new"
+                marked={marked('new', addNo)}
+                finding={findingLines?.has(addNo) === true}
+                dataFind={`L${addNo}`}
+                onStart={() => setSel({ anchor: addIdx, focus: addIdx, side: 'add' })}
+                onHover={() => sel !== null && setSel((s) => (s === null ? s : { ...s, focus: addIdx }))}
+                onEnd={finishSel}
+                disabled={onComment === undefined}
+              />
               <span className="mr-2 select-none text-ok">+</span>
               {d.add.map((t) => (
                 <span
@@ -141,17 +227,48 @@ function DiffLines({ patch }: { patch: string }) {
             </div>,
           )
         } else if (del !== undefined) {
+          const delIdx = lines.indexOf(del)
+          const delNo = del.oldNo ?? 0
           rows.push(
-            <div key={`${i}-${k}-del`} className="bg-bad/20 px-3 py-px font-mono text-xs" data-diff-line="del">
-              <span className="mr-2 inline-block w-10 select-none text-right text-mut2">{del.oldNo}</span>
+            <div
+              key={`${i}-${k}-del`}
+              className={cn('px-3 py-px font-mono text-xs', inSel(delIdx) ? 'bg-bad/30' : 'bg-bad/20')}
+              data-diff-line="del"
+            >
+              <CommentLineNo
+                no={delNo}
+                side="old"
+                marked={marked('old', delNo)}
+                finding={false}
+                onStart={() => setSel({ anchor: delIdx, focus: delIdx, side: 'del' })}
+                onHover={() => sel !== null && setSel((s) => (s === null ? s : { ...s, focus: delIdx }))}
+                onEnd={finishSel}
+                disabled={onComment === undefined}
+              />
               <span className="mr-2 select-none text-bad">−</span>
               {span(del, 'del')}
             </div>,
           )
         } else if (add !== undefined) {
+          const addIdx = lines.indexOf(add)
+          const addNo = add.newNo ?? 0
           rows.push(
-            <div key={`${i}-${k}-add`} className="bg-ok/20 px-3 py-px font-mono text-xs" data-diff-line="add">
-              <span className="mr-2 inline-block w-10 select-none text-right text-mut2">{add.newNo}</span>
+            <div
+              key={`${i}-${k}-add`}
+              className={cn('px-3 py-px font-mono text-xs', inSel(addIdx) ? 'bg-ok/30' : 'bg-ok/20')}
+              data-diff-line="add"
+            >
+              <CommentLineNo
+                no={addNo}
+                side="new"
+                marked={marked('new', addNo)}
+                finding={findingLines?.has(addNo) === true}
+                dataFind={`L${addNo}`}
+                onStart={() => setSel({ anchor: addIdx, focus: addIdx, side: 'add' })}
+                onHover={() => sel !== null && setSel((s) => (s === null ? s : { ...s, focus: addIdx }))}
+                onEnd={finishSel}
+                disabled={onComment === undefined}
+              />
               <span className="mr-2 select-none text-ok">+</span>
               {span(add, 'add')}
             </div>,
@@ -169,6 +286,56 @@ function DiffLines({ patch }: { patch: string }) {
     i += 1
   }
   return <>{rows}</>
+}
+
+/** diff 行号：点 / 拖选开评论；已评论标 ✓；审查发现锚行标底色 */
+function CommentLineNo({
+  no,
+  side,
+  marked,
+  finding,
+  onStart,
+  onHover,
+  onEnd,
+  disabled,
+  dataFind,
+}: {
+  no: number
+  side: 'new' | 'old'
+  marked: boolean
+  finding: boolean
+  onStart: () => void
+  onHover: () => void
+  onEnd: () => void
+  disabled: boolean
+  /** 审查发现锚行定位钩子（AC-4）：`L{n}` */
+  dataFind?: string | undefined
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onMouseDown={(e) => {
+        e.preventDefault()
+        onStart()
+      }}
+      onMouseEnter={onHover}
+      onMouseUp={onEnd}
+      title={disabled ? undefined : tr('web.comments.add')}
+      data-comment-line={side}
+      data-line-no={no}
+      {...(dataFind === undefined ? {} : { 'data-find': dataFind })}
+      className={cn(
+        'mr-2 inline-block w-10 select-none rounded text-right font-mono text-mut2',
+        marked ? 'bg-accent-d font-semibold text-accent' : '',
+        finding ? 'bg-warn/30 text-warn' : '',
+        !disabled && 'cursor-pointer hover:bg-panel-h',
+      )}
+    >
+      {no}
+      {marked ? '✓' : ''}
+    </button>
+  )
 }
 
 /** 丢弃记录里还能撤销的（按事件投影，同 ChangesBar 的 undoable 口径） */
@@ -234,6 +401,17 @@ export function ChangesTab({
   const [armedAll, setArmedAll] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const seqRef = useRef(0)
+  // M14-008：diff 行评论（攒批 / 编辑器 / 交给 domi）
+  const comments = useStore($comments)
+  const review = useStore(store.$review)
+  const [editor, setEditor] = useState<Omit<CommentDraft, 'id'> | null>(null)
+  const [commentText, setCommentText] = useState('')
+  // 审查发现锚定的新侧行号（当前文件）
+  const findingLines = useMemo(() => {
+    const out = new Set<number>()
+    for (const f of review ?? []) if (f.file === selected && f.line !== undefined) out.add(f.line)
+    return out
+  }, [review, selected])
 
   // 与改动相关的事件签名：token 流式增量不该触发重刷
   const ckSig = useMemo(
@@ -444,6 +622,33 @@ export function ChangesTab({
 
   const detailFile = selected === null ? undefined : fileRows.find((f) => f.path === selected)
 
+  // M14-008：评论编辑 / 交给 domi / 修一条发现
+  const openComment = (draft: Omit<CommentDraft, 'id'>): void => {
+    setEditor(draft)
+    setCommentText('')
+  }
+  const saveComment = (): void => {
+    if (editor === null) return
+    addComment({ ...editor, text: commentText.trim() })
+    setEditor(null)
+    setCommentText('')
+  }
+  const handOver = (): void => {
+    if (onRefsChange === undefined) return
+    const fileRefs = commentsToRefs(comments).map((r) => ({ ...r, label: `${r.path}:${r.lineStart}-${r.lineEnd}` }))
+    onRefsChange([...(refs ?? []), ...fileRefs])
+    clearComments()
+    onNotice(tr('web.comments.handOver'))
+  }
+  const fixFinding = (f: ReviewFindingSnapshot): void => {
+    if (onRefsChange === undefined) return
+    const line = f.line ?? 1
+    onRefsChange([
+      ...(refs ?? []),
+      { kind: 'file', path: f.file, lineStart: line, lineEnd: line, text: f.problem, label: `${f.file}:${line}` },
+    ])
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-part="changes-tab">
       {/* 范围选择（AC-1） */}
@@ -492,19 +697,66 @@ export function ChangesTab({
           {detailFile === undefined ? (
             <p className="px-3 py-3 text-xs text-mut">{tr('web.changes.noDiffData')}</p>
           ) : (
-            <FileDetail
-              file={detailFile}
-              folded={folded.has(detailFile.path)}
-              onToggleFold={() =>
-                setFolded((s) => {
-                  const n = new Set(s)
-                  if (n.has(detailFile.path)) n.delete(detailFile.path)
-                  else n.add(detailFile.path)
-                  return n
-                })
-              }
-              sideBySide={insp.expanded}
-            />
+            <>
+              {/* M14-008：当前文件审查发现（锚行） */}
+              <FindingsBlock
+                findings={(review ?? []).filter((f) => f.file === detailFile.path)}
+                onFix={(f) => fixFinding(f)}
+              />
+              {/* M14-008：评论编辑器（点 / 拖选行号后弹出） */}
+              {editor !== null && (
+                <div
+                  className="flex shrink-0 flex-col gap-1 border-t border-border2 px-2 py-1.5"
+                  data-part="comment-editor"
+                >
+                  <p className="font-mono text-[10.5px] text-mut2">
+                    {detailFile.path}:{editor.lineStart}-{editor.lineEnd}
+                    {/* i18n-ignore: 全角括号是排版字符，内文走 t() */}
+                    {editor.side === 'old' ? `（${tr('web.comments.sideOld')}）` : `（${tr('web.comments.sideNew')}）`}
+                  </p>
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder={tr('web.comments.placeholder')}
+                    rows={2}
+                    className="w-full resize-none rounded border border-border2 bg-panel px-2 py-1 font-mono text-xs outline-none focus:border-accent"
+                    data-part="comment-text"
+                  />
+                  <div className="flex items-center justify-end gap-1.5">
+                    <Button variant="ghost" size="xs" onClick={() => setEditor(null)} data-action="comment-cancel">
+                      {tr('common.cancel')}
+                    </Button>
+                    <Button variant="primary" size="xs" onClick={saveComment} data-action="comment-save">
+                      {tr('web.comments.submit')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <FileDetail
+                file={detailFile}
+                folded={folded.has(detailFile.path)}
+                onToggleFold={() =>
+                  setFolded((s) => {
+                    const n = new Set(s)
+                    if (n.has(detailFile.path)) n.delete(detailFile.path)
+                    else n.add(detailFile.path)
+                    return n
+                  })
+                }
+                sideBySide={insp.expanded}
+                onComment={openComment}
+                commented={comments}
+                findingLines={findingLines}
+              />
+              {/* M14-008：评论面板（待交条数 / 删除 / 交给 domi） */}
+              <CommentsPanel
+                comments={comments}
+                onRemove={removeComment}
+                onHandOver={handOver}
+                onRefsChange={onRefsChange}
+                refs={refs}
+              />
+            </>
           )}
           <div className="flex shrink-0 items-center gap-2 border-t border-border2 px-2 py-1">
             {stale && selected !== null && (
@@ -532,6 +784,33 @@ export function ChangesTab({
               {view.reason ?? tr('web.changes.noSnapshot')}
               {view.fallbackNames.length > 0 && <span className="text-mut"> {tr('web.changes.fallbackInferred')}</span>}
             </p>
+          )}
+          {/* M14-008：评论条（待交条数 + 交给 domi）+ 不在当前改动中的审查发现 */}
+          <CommentsPanel
+            comments={comments}
+            onRemove={removeComment}
+            onHandOver={handOver}
+            onRefsChange={onRefsChange}
+            refs={refs}
+          />
+          {review !== null && review.length > 0 && (
+            <div
+              className="shrink-0 border-b border-border2 px-3 py-1 text-[11.5px] text-mut"
+              data-part="findings-outside"
+            >
+              {/* i18n-ignore: 全角冒号是排版字符 */}
+              {tr('web.review.title')}：{' '}
+              {review
+                .filter((f) => !fileRows.some((r) => r.path === f.file))
+                .map((f) => f.file)
+                .filter((v, i, a) => a.indexOf(v) === i)
+                .map((p) => (
+                  <code key={p} className="mr-1 font-mono text-[10.5px] text-mut2">
+                    {p}
+                    <span className="text-warn"> {tr('web.review.notInChanges')}</span>
+                  </code>
+                ))}
+            </div>
           )}
           <div className="flex shrink-0 items-center gap-2 px-3 py-1 text-[11.5px] text-mut" data-part="changes-total">
             <span>
@@ -778,11 +1057,17 @@ function FileDetail({
   folded,
   onToggleFold,
   sideBySide,
+  onComment,
+  commented,
+  findingLines,
 }: {
   file: ChangeFileView
   folded: boolean
   onToggleFold: () => void
   sideBySide: boolean
+  onComment?: ((draft: Omit<CommentDraft, 'id'>) => void) | undefined
+  commented?: readonly CommentDraft[] | undefined
+  findingLines?: ReadonlySet<number> | undefined
 }) {
   if (isImage(file.path)) {
     return (
@@ -818,14 +1103,152 @@ function FileDetail({
     <div className={cn('min-h-0 flex-1 overflow-y-auto', sideBySide ? 'grid grid-cols-2 divide-x divide-border2' : '')}>
       {sideBySide ? (
         <>
-          <DiffLines patch={file.patch} />
+          <DiffLines
+            patch={file.patch}
+            file={file.path}
+            onComment={onComment}
+            commented={commented}
+            findingLines={findingLines}
+          />
           <div />
         </>
       ) : (
-        <DiffLines patch={file.patch} />
+        <DiffLines
+          patch={file.patch}
+          file={file.path}
+          onComment={onComment}
+          commented={commented}
+          findingLines={findingLines}
+        />
       )}
     </div>
   )
 }
 
 const isImage = (path: string): boolean => /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|heic)$/i.test(path)
+
+/** M14-008 · 评论面板：待交条数 / 删除 / 「交给 domi」（AC-1/AC-2/AC-5） */
+function CommentsPanel({
+  comments,
+  onRemove,
+  onHandOver,
+  refs,
+  onRefsChange,
+}: {
+  comments: readonly CommentDraft[]
+  onRemove: (id: string) => void
+  onHandOver: () => void
+  refs?: readonly PendingRef[] | undefined
+  onRefsChange?: ((refs: PendingRef[]) => void) | undefined
+}) {
+  const count = comments.length
+  return (
+    <div className="shrink-0 border-t border-border2 px-2 py-1" data-part="comments-panel">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[11px] font-medium text-ink2">{tr('web.comments.title')}</span>
+        <span
+          className="rounded-full bg-accent-d px-1.5 text-[9.5px] font-semibold text-accent"
+          data-part="comments-pending"
+        >
+          {tr('web.comments.pending', { length: count })}
+        </span>
+        <span className="ml-auto" />
+        <Button
+          variant="primary"
+          size="xs"
+          disabled={count === 0 || onRefsChange === undefined || onHandOver === null}
+          onClick={onHandOver}
+          data-action="hand-over-comments"
+        >
+          {tr('web.comments.handOver')}
+        </Button>
+      </div>
+      {count === 0 ? (
+        <p className="mt-0.5 text-[10.5px] text-mut">{tr('web.comments.empty')}</p>
+      ) : (
+        <ul className="mt-1 flex max-h-28 flex-col gap-1 overflow-y-auto">
+          {comments.map((c) => (
+            <li key={c.id} className="flex items-baseline gap-1.5 text-[11px]" data-comment={c.id}>
+              <code className="shrink-0 font-mono text-[10px] text-mut2">
+                {c.file}:{c.lineStart}-{c.lineEnd}
+              </code>
+              <span className="min-w-0 flex-1 truncate text-ink2">
+                {c.text === '' ? tr('web.comments.sideNew') : c.text}
+              </span>
+              <button
+                type="button"
+                onClick={() => onRemove(c.id)}
+                aria-label={tr('web.comments.remove')}
+                className="shrink-0 text-mut hover:text-bad"
+                data-action="remove-comment"
+              >
+                <IconTrash size={10} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {count > 0 && (
+        <p className="mt-0.5 text-[10px] text-mut2" data-part="comments-hint">
+          {tr('web.comments.handOverHint')}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** M14-008 · 审查发现（AC-4）：当前文件锚行；「修这一条」= 按评论格式进输入框不自动发 */
+function FindingsBlock({
+  findings,
+  onFix,
+}: {
+  findings: readonly ReviewFindingSnapshot[]
+  onFix: (f: ReviewFindingSnapshot) => void
+}) {
+  if (findings.length === 0) return null
+  const severity = (s: ReviewFindingSnapshot['severity']): [string, string] =>
+    s === 'high'
+      ? [tr('common.severity.high'), 'bg-bad-d text-bad']
+      : s === 'medium'
+        ? [tr('common.severity.medium'), 'bg-warn-d text-warn']
+        : [tr('common.severity.low'), 'bg-border2 text-mut']
+  return (
+    <div className="shrink-0 border-b border-border2 px-2 py-1" data-part="findings-block">
+      <p className="text-[11px] font-medium text-ink2">{tr('web.review.title')}</p>
+      <ul className="mt-0.5 flex max-h-24 flex-col gap-0.5 overflow-y-auto">
+        {findings.map((f, i) => {
+          const [label, cls] = severity(f.severity)
+          return (
+            <li key={`${f.line ?? 0}-${f.problem}`} className="flex items-baseline gap-1.5 text-[11px]">
+              <span className={cn('shrink-0 rounded px-1 text-[9.5px] font-semibold', cls)} data-severity={f.severity}>
+                {label}
+              </span>
+              {f.line !== undefined && (
+                <button
+                  type="button"
+                  className="shrink-0 font-mono text-[10px] text-mut2 underline decoration-dotted hover:text-ink2"
+                  onClick={() =>
+                    document.querySelector(`[data-find="L${f.line}"]`)?.scrollIntoView({ block: 'center' })
+                  }
+                  data-action="locate-finding"
+                  data-find-line={f.line}
+                >
+                  L{f.line}
+                </button>
+              )}
+              <span className="min-w-0 flex-1 truncate text-ink2">{f.problem}</span>
+              <button
+                type="button"
+                className="shrink-0 text-[10px] text-accent hover:underline"
+                onClick={() => onFix(f)}
+                data-action="fix-finding"
+              >
+                {tr('web.review.fixThis')}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}

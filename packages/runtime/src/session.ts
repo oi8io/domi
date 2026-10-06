@@ -75,6 +75,7 @@ import {
   isKnownEvent,
   type RefLink,
   type ResultOf,
+  type SubmitRef,
   type UploadRef,
 } from '@domi/protocol'
 import { z } from 'zod'
@@ -1111,16 +1112,22 @@ export class DomiSession {
    * 终点超出就截到末尾——「引用这一轮」时客户端不知道这一轮最后一条的 seq。
    * 规整后的区间就是落进事件的链接，之后不会再变
    */
-  async checkRefs(refs: readonly RefLink[]): Promise<RefLink[]> {
-    const out: RefLink[] = []
+  async checkRefs(refs: readonly SubmitRef[]): Promise<SubmitRef[]> {
+    const out: SubmitRef[] = []
     for (const r of refs) {
-      if (!this.log.sessions.get(r.sessionId)) throw new RefError('error.ref.noSession', { sessionId: r.sessionId })
-      const head = this.log.viewOffset(r.sessionId) + (await this.log.head(r.sessionId))
-      if (r.fromSeq < 1 || r.fromSeq > head) {
-        throw new RefError('error.ref.outOfRange', { sessionId: r.sessionId, head, fromSeq: r.fromSeq })
+      if (!('kind' in r)) {
+        // RefLink：校验会话存在与区间（PRD-M3-005）
+        if (!this.log.sessions.get(r.sessionId)) throw new RefError('error.ref.noSession', { sessionId: r.sessionId })
+        const head = this.log.viewOffset(r.sessionId) + (await this.log.head(r.sessionId))
+        if (r.fromSeq < 1 || r.fromSeq > head) {
+          throw new RefError('error.ref.outOfRange', { sessionId: r.sessionId, head, fromSeq: r.fromSeq })
+        }
+        if (r.toSeq < r.fromSeq) throw new RefError('error.ref.reversed', { fromSeq: r.fromSeq, toSeq: r.toSeq })
+        out.push({ sessionId: r.sessionId, fromSeq: r.fromSeq, toSeq: Math.min(r.toSeq, head) })
+        continue
       }
-      if (r.toSeq < r.fromSeq) throw new RefError('error.ref.reversed', { fromSeq: r.fromSeq, toSeq: r.toSeq })
-      out.push({ sessionId: r.sessionId, fromSeq: r.fromSeq, toSeq: Math.min(r.toSeq, head) })
+      // M14-008：文件行引用只校验形状（schema 已 refine lineEnd≥lineStart）；路径是模型要看的线索，不落文件系统
+      out.push(r)
     }
     return out
   }
@@ -1388,7 +1395,7 @@ export class DomiSession {
   async submit(
     text: string,
     opts: {
-      refs?: readonly RefLink[]
+      refs?: readonly SubmitRef[]
       /** 运行中补充的队列（PRD-M13-001）：daemon 持有，loop 在安全点来取 */
       notes?: NoteSource
       /** 中断信号（PRD-M13-002）：reason = { by: 端名 } */

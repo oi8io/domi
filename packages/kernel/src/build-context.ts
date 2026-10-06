@@ -171,6 +171,16 @@ const fullStrategy: ContextStrategy = (events, policy) => {
       case 'ctx.ref':
         quoted.push(renderRef(ev, policy.refs?.get(refKey(ev))))
         break
+      case 'ctx.fileref': {
+        // M14-008（SPEC 取舍-2）：diff 行评论的结构化引用——路径 + 行范围 + 新旧侧 + 被评代码 + 评论文字
+        const f = ev
+        const side = f.side === 'old' ? '（旧侧）' : '（新侧）'
+        let block = `[引用文件] ${f.path}:${f.lineStart}-${f.lineEnd}${side}`
+        if (f.snippet !== undefined && f.snippet !== '') block += `\n\`\`\`\n${f.snippet}\n\`\`\``
+        if (f.text !== undefined && f.text !== '') block += `\n${f.text}`
+        quoted.push(block)
+        break
+      }
       case 'model.reason':
         if (policy.includeReasoning) text += ev.text
         break

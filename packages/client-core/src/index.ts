@@ -2,6 +2,7 @@ export { authProtocols, type Question, questionsOf, type RefLink } from '@domi/p
 export * from './artifacts.ts'
 export * from './changes.ts'
 export * from './client.ts'
+export * from './comments.ts'
 export * from './context.ts'
 export * from './credentials.ts'
 export * from './locate.ts'

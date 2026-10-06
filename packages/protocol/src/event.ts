@@ -78,6 +78,9 @@ export const FileRefSchema = z
     lineStart: z.number().int().min(1),
     lineEnd: z.number().int().min(1),
     side: z.enum(['new', 'old']).optional(),
+    /** 被评论的代码片段（SPEC-M14-008 取舍-2：端上从 diff 提取，buildContext 渲染进引用块） */
+    snippet: z.string().optional(),
+    /** 评论文字 */
     text: z.string().optional(),
   })
   .refine((r) => r.lineEnd >= r.lineStart, { message: 'lineEnd 不能小于 lineStart' })
@@ -334,6 +337,7 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     lineStart: z.number().int().min(1),
     lineEnd: z.number().int().min(1),
     side: z.enum(['new', 'old']).optional(),
+    snippet: z.string().optional(),
     text: z.string().optional(),
   }),
   /**

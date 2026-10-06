@@ -3960,6 +3960,9 @@
                         "old"
                       ]
                     },
+                    "snippet": {
+                      "type": "string"
+                    },
                     "text": {
                       "type": "string"
                     }
@@ -5225,6 +5228,9 @@
                                 "new",
                                 "old"
                               ]
+                            },
+                            "snippet": {
+                              "type": "string"
                             },
                             "text": {
                               "type": "string"
@@ -7235,6 +7241,9 @@
                                 "new",
                                 "old"
                               ]
+                            },
+                            "snippet": {
+                              "type": "string"
                             },
                             "text": {
                               "type": "string"

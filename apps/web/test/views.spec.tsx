@@ -8,16 +8,22 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  $comments,
+  addComment,
+  clearComments,
+  commentsToRefs,
   createSessionStore,
   DomiClient,
   type MetricsSnapshot,
   planView,
+  type SessionStore,
   type StepActivity,
   type WireSocket,
 } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ProjectRow, SessionRow } from '../src/layout/data.ts'
 import { ArtifactsTab } from '../src/session/artifactsTab.tsx'
+import type { PendingRef } from '../src/session/Composer.tsx'
 import { CredentialNotice } from '../src/session/CredentialNotice.tsx'
 import { ChangesTab, worktreeUndoable } from '../src/session/changesTab.tsx'
 import { ContextTab } from '../src/session/contextTab.tsx'
@@ -838,5 +844,104 @@ describe('PRD-M14-007 · 产物 tab（右侧栏）', () => {
     )
     expect(html).toContain('data-part="not-taken-back"')
     expect(html).toContain('data-action="copy-artifact-path"')
+  })
+})
+
+describe('PRD-M14-008 · diff 行评论 + 审查发现锚行', () => {
+  const diff = {
+    repo: '/home/d/domi',
+    branch: 'domi/t1',
+    base: 'abcdef1234567890',
+    files: [
+      {
+        path: 'src/a.ts',
+        status: 'modified' as const,
+        patch: '@@ -1 +1 @@\n-a\n+b\n+  const x = 1',
+        added: 2,
+        removed: 1,
+        truncated: false,
+      },
+      { path: 'src/b.ts', status: 'added' as const, patch: '+new', added: 1, removed: 0, truncated: false },
+    ],
+  }
+  const renderTab = (store: SessionStore, extra?: Record<string, unknown>): string =>
+    renderToStaticMarkup(
+      <ChangesTab
+        client={client}
+        sessionId="t1"
+        store={store}
+        busy={false}
+        items={[]}
+        onNotice={() => undefined}
+        onLocate={undefined}
+        {...(extra ?? {})}
+      />,
+    )
+
+  test('AC-1 · diff 行号可点（data-comment-line）：新增行新侧、删除行旧侧', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
+    store.setInspector({ detail: { kind: 'file', id: 'src/a.ts' } })
+    const html = renderTab(store)
+    expect(html).toContain('data-comment-line="new"')
+    expect(html).toContain('data-comment-line="old"')
+  })
+
+  test('AC-1 · 待交条数徽标：攒两条评论 → 「2 条待交」', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
+    clearComments()
+    addComment({ file: 'src/a.ts', lineStart: 1, lineEnd: 1, side: 'new', snippet: 'b', text: '改个名' })
+    addComment({ file: 'src/a.ts', lineStart: 2, lineEnd: 3, side: 'new', snippet: 'x = 1', text: '抽函数' })
+    const html = renderTab(store)
+    expect(html).toContain('2 条待交')
+    expect(html).toContain('data-part="comments-pending"')
+    expect(html).toContain('data-action="hand-over-comments"')
+    expect(html).toContain('未交评论关闭会话会丢弃')
+  })
+
+  test('AC-2 · 交给 domi：onRefsChange 收到文件行引用组（不自动发送，端上自己发）', () => {
+    clearComments()
+    addComment({ file: 'src/a.ts', lineStart: 1, lineEnd: 2, side: 'new', snippet: 'b', text: '改个名' })
+    const got: PendingRef[] = []
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
+    const html = renderTab(store, { refs: [], onRefsChange: (r: PendingRef[]) => got.push(...r) })
+    // 「交给 domi」是运行时点击，SSR 只验证入口存在；转换逻辑在 client-core comments.spec 已测
+    expect(html).toContain('data-action="hand-over-comments"')
+    expect(commentsToRefs($comments.get())).toEqual([
+      { kind: 'file', path: 'src/a.ts', lineStart: 1, lineEnd: 2, side: 'new', snippet: 'b', text: '改个名' },
+    ])
+  })
+
+  test('AC-4 · 审查发现锚行：severity 配色 + L 行号可定位 +「修这一条」入口', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
+    store.setInspector({ detail: { kind: 'file', id: 'src/a.ts' } })
+    store.$review.set([{ file: 'src/a.ts', line: 2, severity: 'high', problem: '金额没校验', basis: 'spec' }])
+    const html = renderTab(store)
+    expect(html).toContain('data-part="findings-block"')
+    expect(html).toContain('data-severity="high"')
+    expect(html).toContain('data-action="locate-finding"')
+    expect(html).toContain('data-action="fix-finding"')
+    expect(html).toContain('金额没校验')
+  })
+
+  test('AC-4 · 不在当前改动中：发现指向的文件不在当前范围，列表页如实标注', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
+    store.$review.set([{ file: 'src/out.ts', line: 1, severity: 'medium', problem: '别处的问题', basis: 'spec' }])
+    const html = renderTab(store)
+    expect(html).toContain('data-part="findings-outside"')
+    expect(html).toContain('不在当前改动中')
+    expect(html).toContain('src/out.ts')
+  })
+
+  test('AC-4 · 对话流 ReviewFindings 也带「修这一条」（onFix 传入才渲染）', () => {
+    const findings = [{ file: 'src/pay.ts', line: 9, severity: 'low' as const, problem: '命名', basis: '代码事实' }]
+    const html = renderToStaticMarkup(<ReviewFindings findings={findings} onFix={() => undefined} />)
+    expect(html).toContain('data-action="fix-finding"')
+    expect(html).toContain('修这一条')
+    expect(renderToStaticMarkup(<ReviewFindings findings={findings} />)).not.toContain('data-action="fix-finding"')
   })
 })

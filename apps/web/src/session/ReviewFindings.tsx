@@ -21,7 +21,14 @@ export function groupFindings(findings: readonly ReviewFindingSnapshot[]): Array
     .map(([file, list]) => [file, [...list].sort((a, b) => (a.line ?? 0) - (b.line ?? 0))])
 }
 
-export function ReviewFindings({ findings }: { findings: readonly ReviewFindingSnapshot[] }) {
+export function ReviewFindings({
+  findings,
+  onFix,
+}: {
+  findings: readonly ReviewFindingSnapshot[]
+  /** M14-008 AC-4：「修这一条」= 该发现按评论格式进输入框（不自动发送），由端上挂 PendingRef */
+  onFix?: ((f: ReviewFindingSnapshot) => void) | undefined
+}) {
   return (
     <section className="my-3 overflow-hidden rounded-md border border-border2" data-part="review-findings">
       <header className="flex items-center gap-2 bg-panel px-3.5 py-2 text-[13px] font-semibold">
@@ -47,6 +54,16 @@ export function ReviewFindings({ findings }: { findings: readonly ReviewFindingS
                   {f.problem}
                   <span className="block text-xs text-mut">{tr('web.review.basis', { basis: f.basis })}</span>
                 </span>
+                {onFix !== undefined && (
+                  <button
+                    type="button"
+                    className="shrink-0 self-center text-[11px] text-accent hover:underline"
+                    onClick={() => onFix(f)}
+                    data-action="fix-finding"
+                  >
+                    {tr('web.review.fixThis')}
+                  </button>
+                )}
               </li>
             ))}
           </ul>

@@ -31,6 +31,7 @@ import {
   type RpcRequest,
   type RpcResponse,
   type Schedule,
+  type SubmitRef,
   versionMismatch,
 } from '@domi/protocol'
 import type { ScheduleRunRow } from '@domi/store'
@@ -114,9 +115,9 @@ export interface SessionHandle {
    * 跑一轮。run 是 daemon 给这一轮的补充队列与中断信号（PRD-M13）；返回值带 stopReason 时 daemon 据此决定
    * 残留的补充是开下一轮还是退回（SPEC-M13-001 取舍-4）。老宿主不认 run、返回别的 → 当作正常收场
    */
-  submit(text: string, refs?: readonly RefLink[], inputs?: SubmitExtras, run?: TurnRun): Promise<unknown>
-  /** 校验并规整引用；不成立时抛 InvalidRefError。在接受提交之前调 */
-  checkRefs?(refs: readonly RefLink[]): Promise<RefLink[]>
+  submit(text: string, refs?: readonly SubmitRef[], inputs?: SubmitExtras, run?: TurnRun): Promise<unknown>
+  /** 校验并规整引用（M14-008：含文件行引用）；不成立时抛 InvalidRefError。在接受提交之前调 */
+  checkRefs?(refs: readonly SubmitRef[]): Promise<SubmitRef[]>
   /** 校验附件 / 文件 / 技能（PRD-M8-010）；不成立时抛 InvalidInputError */
   checkInputs?(inputs: SubmitExtras): Promise<void>
   /** 这个会话现在能不能跑一轮（缺模型凭据 → InvalidInputError，reason = MISSING_CREDENTIAL，OPT-M8-001） */
@@ -1218,7 +1219,7 @@ export class Daemon {
     this.active.set(p.sessionId, turn)
 
     let session: SessionHandle | null
-    let refs: RefLink[] = []
+    let refs: SubmitRef[] = []
     try {
       session = await this.session(p.sessionId)
       // 缺凭据要在接受之前说：接受之后才失败的话，界面只会看到一轮莫名其妙的空转
@@ -1262,7 +1263,7 @@ export class Daemon {
     session: SessionHandle,
     turn: ActiveTurn,
     text: string,
-    refs?: readonly RefLink[],
+    refs?: readonly SubmitRef[],
     extras?: SubmitExtras,
     noteIds?: readonly string[],
   ): void {

@@ -353,6 +353,54 @@ describe('TASK-M3-012 · 跨会话引用', () => {
     await b.flushAndClose()
   })
 
+  test('M14-008 · 文件行引用（diff 评论）经 checkRefs 原样通过、落 ctx.fileref，不要求 refs 端口', async () => {
+    const db = join(tmp(), 'e.db')
+    const cwd = tmp()
+    const b = new DomiSession({
+      config,
+      sessionId: 'B',
+      cwd,
+      dbPath: db,
+      clock,
+      provider: new StubProvider([[{ type: 'delta', text: '好' }]]),
+    })
+    const refs = await b.checkRefs([
+      {
+        kind: 'file',
+        path: 'src/a.ts',
+        lineStart: 3,
+        lineEnd: 4,
+        side: 'new',
+        snippet: 'const x = 1',
+        text: '抽个函数',
+      },
+    ])
+    expect(refs).toEqual([
+      {
+        kind: 'file',
+        path: 'src/a.ts',
+        lineStart: 3,
+        lineEnd: 4,
+        side: 'new',
+        snippet: 'const x = 1',
+        text: '抽个函数',
+      },
+    ])
+    await b.submit('改这里', { refs })
+    const view = await b.pumpAll()
+    expect(view[0]?.ev).toMatchObject({
+      t: 'ctx.fileref',
+      path: 'src/a.ts',
+      lineStart: 3,
+      lineEnd: 4,
+      side: 'new',
+      snippet: 'const x = 1',
+      text: '抽个函数',
+    })
+    expect(view[1]?.ev).toMatchObject({ t: 'user.input', text: '改这里' })
+    await b.flushAndClose()
+  })
+
   test('引用不存在的会话、或起点越界：提交之前就报错', async () => {
     const db = join(tmp(), 'e.db')
     const b = new DomiSession({

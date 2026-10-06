@@ -10,7 +10,7 @@
  * 计数器本身**不进事件流**：它们是投影，能从事件流算出来。
  * 进事件流的只有终止那一刻的快照。
  */
-import type { DomiEvent, EventEnvelope, RefLink, UploadRef } from '@domi/protocol'
+import type { DomiEvent, EventEnvelope, RefLink, SubmitRef, UploadRef } from '@domi/protocol'
 import { buildContext, type ContextPolicy, type LoadedUpload } from './build-context.ts'
 import type { Clock, EventSink, ToolCallRequest, ToolRunner } from './ports.ts'
 import { type PromptParts, withPrompt } from './preamble.ts'
@@ -85,10 +85,10 @@ export interface NoteSource {
   take(): ReadonlyArray<{ id: string; text: string; from?: string }>
 }
 
-/** 一次用户输入。refs 是这句话引用的其他会话片段；uploads / files / skills 见 PRD-M8-010 */
+/** 一次用户输入。refs 是这句话引用的其他会话片段或文件行引用（SPEC-M14-008 取舍-2）；uploads / files / skills 见 PRD-M8-010 */
 export interface TurnInput {
   text: string
-  refs?: readonly RefLink[]
+  refs?: readonly SubmitRef[]
   uploads?: readonly UploadRef[]
   files?: readonly string[]
   skills?: readonly string[]
@@ -128,7 +128,7 @@ export async function runTurn(
 ): Promise<TurnResult> {
   const { text: userText, refs = [] } = typeof input === 'string' ? { text: input } : input
   const extra: TurnInput = typeof input === 'string' ? { text: input } : input
-  if (refs.length > 0 && !deps.refs) {
+  if (refs.some((r) => !('kind' in r && r.kind === 'file')) && !deps.refs) {
     throw new Error('这一轮带了跨会话引用，但 LoopDeps 没有 refs 端口，读不出引用的内容')
   }
   const limits = { ...DEFAULT_LIMITS, ...deps.limits }
@@ -181,9 +181,27 @@ export async function runTurn(
     return { stopReason: reason, counters: c }
   }
 
-  // 引用紧挨在它所属的那句话前面，同一批落盘：轨迹里看得见是哪句话引用了什么（AC-3）
+  // 引用紧挨在它所属的那句话前面，同一批落盘：轨迹里看得见是哪句话引用了什么（AC-3）。
+  // M14-008：文件行引用（diff 评论）也在这批，落 ctx.fileref（只存引用、行号、片段与评论文字）
   await deps.sink.append(sessionId, [
-    ...refs.map((r) => ({ t: 'ctx.ref' as const, sessionId: r.sessionId, fromSeq: r.fromSeq, toSeq: r.toSeq })),
+    ...refs.map((r) =>
+      'kind' in r && r.kind === 'file'
+        ? {
+            t: 'ctx.fileref' as const,
+            path: r.path,
+            lineStart: r.lineStart,
+            lineEnd: r.lineEnd,
+            ...(r.side === undefined ? {} : { side: r.side }),
+            ...(r.snippet === undefined ? {} : { snippet: r.snippet }),
+            ...(r.text === undefined ? {} : { text: r.text }),
+          }
+        : ({
+            t: 'ctx.ref' as const,
+            sessionId: (r as { sessionId: string }).sessionId,
+            fromSeq: (r as { fromSeq: number }).fromSeq,
+            toSeq: (r as { toSeq: number }).toSeq,
+          } as const),
+    ),
     {
       t: 'user.input',
       text: userText,

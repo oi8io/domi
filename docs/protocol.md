@@ -4697,6 +4697,9 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
                   "old"
                 ]
               },
+              "snippet": {
+                "type": "string"
+              },
               "text": {
                 "type": "string"
               }
@@ -6063,6 +6066,9 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                           "new",
                           "old"
                         ]
+                      },
+                      "snippet": {
+                        "type": "string"
                       },
                       "text": {
                         "type": "string"
@@ -8104,6 +8110,9 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                           "new",
                           "old"
                         ]
+                      },
+                      "snippet": {
+                        "type": "string"
                       },
                       "text": {
                         "type": "string"

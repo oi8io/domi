@@ -47,6 +47,9 @@ export function weightLines(ev: AnyEvent): number {
     case 'user.input':
     case 'user.note':
       return Math.max(1, Math.ceil((ev.text ?? '').length / 80))
+    case 'ctx.fileref':
+      // M14-008：文件行引用计行（引用头 + 代码块 + 评论文字），不归零、不切轮
+      return Math.max(2, Math.ceil(((ev.snippet ?? '') + (ev.text ?? '')).length / 80))
     case 'model.delta':
     case 'model.reason':
       return Math.max(0, Math.ceil((ev.text ?? '').length / 80))
