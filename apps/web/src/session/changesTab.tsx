@@ -1216,7 +1216,7 @@ function FindingsBlock({
     <div className="shrink-0 border-b border-border2 px-2 py-1" data-part="findings-block">
       <p className="text-[11px] font-medium text-ink2">{tr('web.review.title')}</p>
       <ul className="mt-0.5 flex max-h-24 flex-col gap-0.5 overflow-y-auto">
-        {findings.map((f, i) => {
+        {findings.map((f) => {
           const [label, cls] = severity(f.severity)
           return (
             <li key={`${f.line ?? 0}-${f.problem}`} className="flex items-baseline gap-1.5 text-[11px]">

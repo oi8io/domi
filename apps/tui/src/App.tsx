@@ -32,6 +32,7 @@ export function App({
   renderer,
   scrollBus,
   reasonsExpanded = false,
+  columnsOverride,
 }: {
   store: SessionStore
   /** 顶栏；不给就不画（测试、嵌入） */
@@ -41,6 +42,8 @@ export function App({
   children?: ReactNode
   /** 弹层（PRD-M8-015）：打开时顶替对话区；有确认框时让位给确认框 */
   overlay?: ReactNode
+  /** SPEC-M14-009：右侧分栏时主区宽度 < 终端列数，画布按主区宽度算 */
+  columnsOverride?: number | undefined
   /**
    * 渲染器（PRD-M9-005）。不给 = 老的整段渲染（测试、嵌入用）；classic = 定型条目进 Static；
    * fullscreen = 固定高度、只画可见行、输入区钉在底部
@@ -64,6 +67,7 @@ export function App({
         overlay={overlay}
         scrollBus={scrollBus}
         reasonsExpanded={reasonsExpanded}
+        columnsOverride={columnsOverride}
       >
         {children}
       </FullscreenLayout>
@@ -108,6 +112,7 @@ function FullscreenLayout({
   scrollBus,
   children,
   reasonsExpanded,
+  columnsOverride,
 }: {
   store: SessionStore
   context?: { project: string | null; title: string } | undefined
@@ -116,12 +121,15 @@ function FullscreenLayout({
   scrollBus?: ReturnType<typeof createScrollBus> | undefined
   children?: ReactNode
   reasonsExpanded: boolean
+  /** SPEC-M14-009：分栏时主区渲染宽度（缺省 = 终端列数） */
+  columnsOverride?: number | undefined
 }): React.ReactElement {
   const items = useStore(store.$items)
   const status = useStore(store.$status)
   const ask = useStore(store.$ask)
   const theme = useTheme()
-  const { columns, rows } = useWindowSize()
+  const { columns: terminalColumns, rows } = useWindowSize()
+  const columns = columnsOverride ?? terminalColumns
   const ref = useRef(null)
   const box = useBoxMetrics(ref as never)
   const height = box.hasMeasured ? box.height : 0

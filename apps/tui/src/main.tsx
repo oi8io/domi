@@ -20,6 +20,7 @@ import {
   type DomiClient,
   DomiRpcError,
   focusIdOf,
+  type InspectorTab,
   mergeDraft,
   questionsContent,
   questionsOf,
@@ -38,7 +39,7 @@ import {
 import { resolveClientToken } from '@domi/daemon'
 import { envLocaleHints, type LocaleSetting, resolveLocale, setLocale, tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
-import { Box, render, Text, useApp, useInput } from 'ink'
+import { Box, render, Text, useApp, useInput, useWindowSize } from 'ink'
 import { useCallback, useEffect, useState } from 'react'
 import { App } from './App.tsx'
 import { completeSlash, parseSlash } from './commands.ts'
@@ -46,7 +47,16 @@ import { editAction, Prompt } from './components/Prompt.tsx'
 import { SlashHints } from './components/SlashHints.tsx'
 import { dumpText } from './components/Transcript.tsx'
 import { connectChat, connectDaemon } from './connect.ts'
-import { isInterruptKey, isReasonToggle, moveOf, questionKey, routeKey } from './keys.ts'
+import { Inspector, inspectorMode } from './Inspector.tsx'
+import {
+  inspectorTabOf,
+  isInspectorKey,
+  isInterruptKey,
+  isReasonToggle,
+  moveOf,
+  questionKey,
+  routeKey,
+} from './keys.ts'
 import { notesLine } from './notes.ts'
 import { type OverlayState, Overlays } from './overlays/Overlays.tsx'
 import { $questions, questionsStateFor } from './questions-state.ts'
@@ -172,6 +182,10 @@ export function Root({
   const [overlay, setOverlay] = useState<OverlayState | null>(null)
   // PRD-M10-005 AC-2/AC-3：思考折叠是纯展示态，会话内可反复切换、不持久化
   const [reasonsExpanded, setReasonsExpanded] = useState(false)
+  // PRD-M14-009：右侧栏状态在 client-core store（001 落），默认 chat 关 / task 开，不持久化
+  const insp = useStore(store.$inspector)
+  const { columns } = useWindowSize()
+  const inspMode = inspectorMode(columns)
   const [slashSel, setSlashSel] = useState(0)
   // `@` 文件补全：候选从 daemon 的 fs.list 来；选过的路径提交时作为 files 带上（PRD-M8-010 AC-2）
   const atQuery = draft.match(/(^|\s)@([^\s@]*)$/)?.[2]
@@ -325,6 +339,23 @@ export function Root({
       return
     }
     if (overlay !== null) return
+
+    // PRD-M14-009 AC-1：`i` 开 / 关右侧栏（无弹层、输入框空时；与 p/s/t/?/e 不冲突）
+    if (isInspectorKey(input, key, draft === '', null)) {
+      store.setInspector({ open: !insp.open })
+      return
+    }
+    // 数字 1–4 切 tab（右侧栏可见且输入框空）
+    const inspTab = inspectorTabOf(input, key, draft === '', insp.open)
+    if (inspTab !== null) {
+      store.setInspector({ tab: ['progress', 'changes', 'artifacts', 'context'][inspTab] as InspectorTab })
+      return
+    }
+    // 覆盖层模式：Esc 关闭（SPEC-M14-009 取舍-1；侧栏模式 Esc 归中断 / 弹层）
+    if (insp.open && inspMode === 'overlay' && key.escape && !key.ctrl && !key.meta) {
+      store.setInspector({ open: false })
+      return
+    }
 
     // PRD-M13-002 AC-6：Esc 停下这一轮（有询问时上面已经 return，Esc 归问题框）
     if (isInterruptKey(key, { busy, overlay: false, asking: false })) {
@@ -588,29 +619,58 @@ export function Root({
       />
     )
 
+  const appChildren = (
+    <>
+      {notice !== null && <Text dimColor>{notice}</Text>}
+      {notesLine(queued) !== null && <Text dimColor>{notesLine(queued)}</Text>}
+      {/* 上下两条横线，不闭合（PRD-M9-005 AC-6） */}
+      <Box borderStyle="single" borderLeft={false} borderRight={false} borderDimColor>
+        <Prompt value={draft} disabled={false} />
+      </Box>
+      <SlashHints
+        items={slash}
+        wide={atQuery !== undefined}
+        selected={Math.min(slashSel, Math.max(slash.length - 1, 0))}
+      />
+    </>
+  )
+  // PRD-M14-009 AC-1：右侧分栏（≥140 列）时主区 = 列数 − 40，右栏取剩余；否则全屏覆盖层（对话区不渲染）
+  const inspector = <Inspector store={store} client={client} sessionId={sessionId} mode={inspMode} />
   return (
     <ThemeContext.Provider value={theme}>
-      <App
-        store={store}
-        context={context}
-        connection={connection}
-        overlay={overlayView}
-        renderer={renderer}
-        scrollBus={scrollBus}
-        reasonsExpanded={reasonsExpanded}
-      >
-        {notice !== null && <Text dimColor>{notice}</Text>}
-        {notesLine(queued) !== null && <Text dimColor>{notesLine(queued)}</Text>}
-        {/* 上下两条横线，不闭合（PRD-M9-005 AC-6） */}
-        <Box borderStyle="single" borderLeft={false} borderRight={false} borderDimColor>
-          <Prompt value={draft} disabled={false} />
+      {insp.open && inspMode === 'overlay' ? (
+        inspector
+      ) : insp.open && inspMode === 'side' ? (
+        <Box flexDirection="row">
+          <Box width={columns - 40}>
+            <App
+              store={store}
+              context={context}
+              connection={connection}
+              overlay={overlayView}
+              renderer={renderer}
+              scrollBus={scrollBus}
+              reasonsExpanded={reasonsExpanded}
+              columnsOverride={columns - 40}
+            >
+              {appChildren}
+            </App>
+          </Box>
+          {inspector}
         </Box>
-        <SlashHints
-          items={slash}
-          wide={atQuery !== undefined}
-          selected={Math.min(slashSel, Math.max(slash.length - 1, 0))}
-        />
-      </App>
+      ) : (
+        <App
+          store={store}
+          context={context}
+          connection={connection}
+          overlay={overlayView}
+          renderer={renderer}
+          scrollBus={scrollBus}
+          reasonsExpanded={reasonsExpanded}
+        >
+          {appChildren}
+        </App>
+      )}
     </ThemeContext.Provider>
   )
 }

@@ -44,3 +44,20 @@
 4. 两端 e2e 按行补齐，每补一行在这里改一格。Web 侧等 Playwright（ADR-013）；TUI 侧现在已经有假 stdin，可以直接写。
 5. M8 之后 TUI 多了三个弹层与快捷键、Web 多了项目 / 定时任务 / 设置 / 用量四块；
    这些是 Web 先行的功能，不在这张 M3 的对等表里——要不要进表是改 AC，走回写门。
+
+## 右侧栏（PRD-M14-001…009 · SPEC-M14）
+
+M14 右侧栏：Web 与 TUI 都用同一份 client-core 投影（`planView / changesView / artifactsView / contextView`），
+数据源都是 store 的原始事件镜像 `$events`（SPEC-M14-001 取舍-3）——parity 的关键（PRD-M14-009 AC-2）。
+
+| 项 | TUI（PRD-M14-009） | Web（PRD-M14-001…008） | 测试 |
+|---|---|---|---|
+| 进度 tab | ✅ Inspector 进度 tab：步骤 + 剩余 + verify（`apps/tui/test/inspector.spec.tsx`） | ✅ `progressTab.tsx` | ✅ 两端同喂 `planView`，TUI 快照断言 |
+| 改动 tab | ✅ 文件列表 + 统一 diff 着色（`+ / −` 复用 `highlightLines` 的 diff 语法） | ✅ `changesTab.tsx` | ✅ 列表 + 详情快照 |
+| 产物 tab | ✅ 清单 + 路径；Markdown 内联 | ✅ `artifactsTab.tsx` | ✅ 清单 + 上传项 |
+| 上下文 tab | ✅ 分段堆叠条文字版 + 压缩记录 | ✅ `contextTab.tsx` | ✅ 总量 + 分段 |
+| 默认开关 | ✅ chat 关 / task 开（`inspectorDefault`，不持久化） | ✅ 同 | ✅ `createSessionStore({kind})` 断言 |
+| 键位 / 布局 | ✅ `i` 开 / 关、数字 1–4 切 tab、≥140 列分栏 / 覆盖层、覆盖层 Esc 关闭 | Web 右侧栏常驻 | ✅ `inspector.spec.tsx` + `keys.ts` 纯函数 |
+
+取舍说明（SPEC-M14-009 取舍-2）：词级高亮、左右对照、图片预览、diff 行评论在 TUI 明确不做，
+不算 parity 缺口（AC-3 / AC-5）。

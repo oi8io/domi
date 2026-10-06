@@ -57,6 +57,30 @@ export function isReasonToggle(input: string, key: KeyLike, inputEmpty: boolean)
   return input === 'e' && !key.ctrl && !key.meta && inputEmpty
 }
 
+/**
+ * SPEC-M14-009 取舍-1：`i` 开 / 关右侧栏（PRD-M14-009 AC-1）。
+ * 只在输入框为空、没有弹层时生效（单键纪律，同 p/s/t/?/e；`i` 不在 SINGLE / CTRL / 思考折叠的键集里）
+ */
+export function isInspectorKey(input: string, key: KeyLike, inputEmpty: boolean, overlay: OverlayId | null): boolean {
+  return input === 'i' && !key.ctrl && !key.meta && inputEmpty && overlay === null
+}
+
+/**
+ * SPEC-M14-009 取舍-1：右侧栏可见且输入框为空时，数字 1–4 切 tab（进度 / 改动 / 产物 / 上下文）。
+ * 返回 0–3；不可见 / 非空 / 越界 → null
+ */
+export function inspectorTabOf(
+  input: string,
+  key: KeyLike,
+  inputEmpty: boolean,
+  visible: boolean,
+): 0 | 1 | 2 | 3 | null {
+  if (!visible || !inputEmpty || key.ctrl || key.meta) return null
+  const n = Number(input)
+  if (!Number.isInteger(n) || n < 1 || n > 4) return null
+  return (n - 1) as 0 | 1 | 2 | 3
+}
+
 /** 列表里的上下移动：↑↓，或 Ctrl+P / Ctrl+N */
 export function moveOf(input: string, key: { upArrow?: boolean; downArrow?: boolean; ctrl?: boolean }): -1 | 1 | 0 {
   if (key.upArrow || (key.ctrl && input === 'p')) return -1
