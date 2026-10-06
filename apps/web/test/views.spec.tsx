@@ -7,12 +7,14 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { createSessionStore, DomiClient, type WireSocket } from '@domi/client-core'
+import { createSessionStore, DomiClient, planView, type StepActivity, type WireSocket } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ProjectRow, SessionRow } from '../src/layout/data.ts'
 import { CredentialNotice } from '../src/session/CredentialNotice.tsx'
 import { ChangesTab, worktreeUndoable } from '../src/session/changesTab.tsx'
+import { ProgressTab, StepRow } from '../src/session/progressTab.tsx'
 import { groupFindings, ReviewFindings } from '../src/session/ReviewFindings.tsx'
+import { Transcript } from '../src/Transcript.tsx'
 import { ProjectsView, ProjectView } from '../src/views/ProjectsView.tsx'
 import { groupSessions, SessionsView } from '../src/views/SessionsView.tsx'
 import { SettingsView } from '../src/views/SettingsView.tsx'
@@ -301,5 +303,127 @@ describe('PRD-M7-010 AC-2 · 审阅发现在 Web 里按文件展示', () => {
     expect(html).toContain('spec 第 2 条')
     expect(html).toContain('data-severity="high"')
     expect(renderToStaticMarkup(<ReviewFindings findings={[]} />)).toContain('没有发现问题')
+  })
+})
+
+describe('PRD-M14-004 · 进度 tab（右侧栏）', () => {
+  const env = (seq: number, ts: number, ev: Record<string, unknown>) => ({
+    seq,
+    sessionId: 't1',
+    parentSeq: seq > 1 ? seq - 1 : null,
+    ts,
+    schemaVersion: 16,
+    ev: ev as never,
+  })
+  const plan = (seq: number, ts: number, steps: Array<Record<string, unknown>>) =>
+    env(seq, ts, { t: 'plan.update', steps })
+  const renderTab = (store: ReturnType<typeof createSessionStore>): string =>
+    renderToStaticMarkup(
+      <ProgressTab
+        store={store}
+        status={store.$status.get()}
+        ask={null}
+        onContinue={() => undefined}
+        onOpenStep={() => undefined}
+        onOpenSubsession={() => undefined}
+      />,
+    )
+
+  test('AC-1 · 最后一条计划的状态映射：done 划线 / in_progress 高亮 / pending 灰 / skipped 标跳过 + 缩进', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$events.set([
+      plan(1, 1000, [
+        { id: 'a', text: '第一步', status: 'done' },
+        { id: 'b', text: '第二步', status: 'in_progress', dependsOn: ['a'] },
+        { id: 'c', text: '第三步', status: 'pending', dependsOn: ['a', 'b'] },
+        { id: 'd', text: '跳过步', status: 'skipped' },
+      ]),
+    ])
+    const html = renderTab(store)
+    expect(html).toContain('第一步')
+    expect(html).toContain('第二步')
+    expect(html).toContain('跳过')
+    expect(html).toContain('data-status="done"')
+    expect(html).toContain('data-status="in_progress"')
+    expect(html).toContain('data-status="skipped"')
+    // dependsOn 缩进：c 比 b 深（style 里有更大的 paddingLeft）
+    const pad = [...html.matchAll(/padding-left:(\d+)px/g)].map((m) => Number(m[1]))
+    expect(Math.max(...pad)).toBeGreaterThan(Math.min(...pad))
+  })
+
+  test('AC-2 · 步骤区间可跳改动 tab；展开详情渲染工具 / 文件 / 子 agent', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$events.set([
+      plan(1, 1000, [{ id: 's', text: '做事', status: 'in_progress' }]),
+      env(2, 2000, { t: 'tool.call', id: 'c1', name: 'fs.write', args: { path: 'a.txt' } }),
+      env(3, 3000, { t: 'fs.snapshot', path: 'a.txt', phase: 'before', sha256: null, bytes: 1 }),
+      env(4, 4000, { t: 'task.spawn', childSessionId: 'sub1', goal: '写个测试' }),
+      plan(5, 5000, [{ id: 's', text: '做事', status: 'done' }]),
+    ])
+    const html = renderTab(store)
+    // 跑过的步骤带「查看这一步的改动」定位按钮
+    expect(html).toContain('data-action="open-step-changes"')
+
+    // 展开态详情（StepRow 直接渲染）：工具调用 / 文件 / 子 agent 都出来
+    const v = planView(store.$events.get(), 5)
+    if (v.kind !== 'plan') throw new Error('应有计划')
+    const detail = renderToStaticMarkup(
+      <StepRow
+        s={v.steps[0] as StepActivity}
+        open
+        onToggle={() => undefined}
+        onOpenStep={() => undefined}
+        onOpenSubsession={() => undefined}
+      />,
+    )
+    expect(detail).toContain('fs.write×1')
+    expect(detail).toContain('a.txt')
+    expect(detail).toContain('写个测试')
+    expect(detail).toContain('data-action="open-subsession"')
+  })
+
+  test('AC-4 · 底部固定区：verify（第几次 / 是否最后一次）+ 剩余步数 + 继续', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$events.set([
+      plan(1, 1000, [
+        { id: 'a', text: 'A', status: 'done' },
+        { id: 'b', text: 'B', status: 'pending' },
+      ]),
+      env(2, 2000, { t: 'verify.required', attempt: 2, message: '先验证', final: true }),
+    ])
+    const html = renderTab(store)
+    expect(html).toContain('验证第 2 次')
+    expect(html).toContain('最后一次')
+    expect(html).toContain('计划还剩 1 步')
+    expect(html).toContain('data-action="continue-plan"')
+  })
+
+  test('AC-5 · 没有计划 → 本轮动作摘要（类别计数 + 最近动作）', () => {
+    const store = createSessionStore()
+    store.$events.set([
+      env(1, 1000, { t: 'user.input', text: 'hi' }),
+      env(2, 2000, { t: 'tool.call', id: 'c1', name: 'shell.exec', args: { command: 'bun test' } }),
+      env(3, 3000, { t: 'tool.call', id: 'c2', name: 'fs.write', args: { path: 'a.ts' } }),
+    ])
+    const html = renderTab(store)
+    expect(html).toContain('data-part="turn-summary"')
+    expect(html).toContain('2 次工具调用')
+    expect(html).toContain('shell.exec')
+    expect(html).toContain('bun test')
+  })
+
+  test('空计划 → 如实说空态；AC-6 · 对话里的计划卡片保留（不搬走）', () => {
+    const empty = createSessionStore({ kind: 'task' })
+    empty.$events.set([plan(1, 1000, [])])
+    expect(renderTab(empty)).toContain('还没有计划')
+
+    // AC-6 回归：plan.update 仍然进对话流（Transcript 的计划卡片 data-part="plan"）
+    const s = createSessionStore({ kind: 'task' })
+    s.applyEvents([plan(1, 1000, [{ id: 'a', text: '第一步', status: 'in_progress' }])])
+    const items = s.$items.get()
+    expect(items.some((i) => i.kind === 'plan' && (i as { plan?: unknown[] }).plan?.length === 1)).toBe(true)
+    const html = renderToStaticMarkup(<Transcript items={items} onBranch={() => undefined} onQuote={() => undefined} />)
+    expect(html).toContain('data-part="plan"')
+    expect(html).toContain('第一步')
   })
 })

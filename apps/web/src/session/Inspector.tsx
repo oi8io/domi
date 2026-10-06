@@ -7,7 +7,7 @@
  * 改动 tab 本册实现（TASK-M14-003）；进度 / 上下文 / 产物 tab 后续任务填充。
  * 状态全在 store.$inspector（SPEC 取舍-3）：localStorage 只做跨重启持久化。
  */
-import type { DomiClient, InspectorTab, SessionStore } from '@domi/client-core'
+import type { AskSnapshot, DomiClient, InspectorTab, SessionStore, StatusSnapshot } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
 import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
@@ -15,6 +15,7 @@ import { Button } from '../components/ui/button.tsx'
 import { cn } from '../lib/cn.ts'
 import type { PendingRef } from './Composer.tsx'
 import { ChangesTab } from './changesTab.tsx'
+import { ProgressTab } from './progressTab.tsx'
 
 const MIN_W = 320
 const MAX_W = 720
@@ -50,6 +51,11 @@ export function Inspector({
   refs,
   onRefsChange,
   onNotice,
+  status,
+  ask,
+  onContinue,
+  onOpenStep,
+  onOpenSubsession,
 }: {
   client: DomiClient
   sessionId: string
@@ -59,6 +65,12 @@ export function Inspector({
   refs: readonly PendingRef[]
   onRefsChange?: ((refs: PendingRef[]) => void) | undefined
   onNotice: (m: string | null) => void
+  /** 进度 tab（PRD-M14-004）需要：ResumeBar 同 action 的「继续」与底部固定区数据 */
+  status: StatusSnapshot
+  ask: AskSnapshot | null
+  onContinue: () => void
+  onOpenStep: (stepId: string) => void
+  onOpenSubsession: (sessionId: string) => void
 }) {
   const insp = useStore(store.$inspector)
   const changes = useStore(store.$changesDiff)
@@ -263,6 +275,11 @@ export function Inspector({
         refs={refs}
         onRefsChange={onRefsChange}
         onNotice={onNotice}
+        status={status}
+        ask={ask}
+        onContinue={onContinue}
+        onOpenStep={onOpenStep}
+        onOpenSubsession={onOpenSubsession}
       />
     </div>
   )
@@ -277,6 +294,11 @@ function TabBody({
   refs,
   onRefsChange,
   onNotice,
+  status,
+  ask,
+  onContinue,
+  onOpenStep,
+  onOpenSubsession,
 }: {
   client: DomiClient
   sessionId: string
@@ -286,6 +308,11 @@ function TabBody({
   refs: readonly PendingRef[]
   onRefsChange?: ((refs: PendingRef[]) => void) | undefined
   onNotice: (m: string | null) => void
+  status: StatusSnapshot
+  ask: AskSnapshot | null
+  onContinue: () => void
+  onOpenStep: (stepId: string) => void
+  onOpenSubsession: (sessionId: string) => void
 }) {
   const insp = useStore(store.$inspector)
   if (insp.tab === 'changes') {
@@ -302,8 +329,20 @@ function TabBody({
       />
     )
   }
+  if (insp.tab === 'progress') {
+    return (
+      <ProgressTab
+        store={store}
+        status={status}
+        ask={ask}
+        onContinue={onContinue}
+        onOpenStep={onOpenStep}
+        onOpenSubsession={onOpenSubsession}
+      />
+    )
+  }
   const soon: Record<InspectorTab, string> = {
-    progress: tr('web.inspector.tabProgressSoon'),
+    progress: '',
     changes: '',
     artifacts: tr('web.inspector.tabArtifactsSoon'),
     context: tr('web.inspector.tabContextSoon'),

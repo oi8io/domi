@@ -14,9 +14,12 @@ import {
   changesView,
   type DomiClient,
   keepSelection,
+  planView,
   type SessionStore,
+  type StepIntervals,
   shouldFold,
   staleFiles,
+  stepIntervals,
   toFileViews,
   wordDiff,
 } from '@domi/client-core'
@@ -234,14 +237,22 @@ export function ChangesTab({
     [events],
   )
 
+  // {step} 范围：步区间表由 planView 提供（TASK-M14-004），没有计划/没有区间 → 走降级
+  const stepRanges = (): StepIntervals | undefined => {
+    if (typeof effRange !== 'object') return undefined
+    const v = planView(events, head)
+    return v.kind === 'plan' ? stepIntervals(v) : undefined
+  }
+
   const load = async (): Promise<void> => {
     const my = ++seqRef.current
     let next: Latest
+    const steps = stepRanges()
     if (effRange === 'baseline') {
       const d: WorktreeDiff = await client.worktreeDiff(sessionId)
       next = { available: true, files: toFileViews(d.files), fallbackNames: [] }
     } else {
-      const seq = changesRangeSeq(events, effRange, head)
+      const seq = changesRangeSeq(events, effRange, head, steps)
       if (seq === null) {
         next = { available: false, reason: tr('web.changes.noSnapshot'), files: [], fallbackNames: [] }
       } else {
@@ -336,7 +347,7 @@ export function ChangesTab({
       if (effRange === 'baseline') {
         await client.discardChange(sessionId, path)
       } else {
-        const seq = changesRangeSeq(events, effRange, head)
+        const seq = changesRangeSeq(events, effRange, head, stepRanges())
         if (seq !== null) await client.checkpointDiscard(sessionId, path, seq.fromSeq, seq.toSeq)
       }
       await load()
@@ -422,7 +433,23 @@ export function ChangesTab({
         {rangeBtn('turn', tr('web.changes.rangeTurn'))}
         {rangeBtn('session', tr('web.changes.rangeSession'))}
         {status.worktree !== undefined && rangeBtn('baseline', tr('web.changes.rangeBaseline'))}
-        {rangeBtn({ step: '' }, tr('web.changes.rangeStep'), true)}
+        {typeof insp.changesRange === 'object' && (
+          <span
+            className="flex items-center gap-1 rounded bg-accent-d px-2 py-0.5 text-[11px] text-accent"
+            data-range="step"
+          >
+            {tr('web.changes.rangeStep')}
+            <button
+              type="button"
+              onClick={() => setRange('turn')}
+              aria-label={tr('web.changes.clearStep')}
+              className="rounded-full px-0.5 leading-none transition-colors hover:text-ink2"
+              data-action="clear-step"
+            >
+              ×
+            </button>
+          </span>
+        )}
       </div>
 
       {selected !== null ? (

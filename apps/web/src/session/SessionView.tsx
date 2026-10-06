@@ -21,7 +21,7 @@ import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
 import { NEAR_BOTTOM_PX, nextScrollAction, shouldFetchOlder } from '../lib/scroll.ts'
-import { formatRoute } from '../router.ts'
+import { formatRoute, navigate } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
 import { Composer, ModelSwitch, type PendingRef, PermissionsModeSwitch } from './Composer.tsx'
@@ -350,6 +350,24 @@ export function SessionView({
             refs={refs}
             onRefsChange={onRefsChange}
             onNotice={(m) => setNotice(m)}
+            status={status}
+            ask={ask}
+            onContinue={() =>
+              void client.submit(sessionId, continuePrompt(), [], {}).then(
+                () => setNotice(null),
+                (err: Error) => setNotice(err.message),
+              )
+            }
+            onOpenStep={(stepId) => {
+              // 进度 tab → 改动 tab 的「某一步」范围（PRD-M14-004 AC-2）
+              store.setInspector({ open: true, tab: 'changes', changesRange: { step: stepId } })
+              try {
+                localStorage.setItem(`domi.inspector.${sessionId}.open`, 'true')
+              } catch {
+                // ignore
+              }
+            }}
+            onOpenSubsession={(childId) => navigate({ view: 'session', id: childId, tab: 'chat' })}
           />
         </div>
         {tab === 'trajectory' && ask !== null && (
