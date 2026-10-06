@@ -13,6 +13,7 @@ import { useStore } from '@nanostores/react'
 import { type MouseEvent as ReactMouseEvent, useEffect, useRef, useState } from 'react'
 import { Button } from '../components/ui/button.tsx'
 import { cn } from '../lib/cn.ts'
+import { ArtifactsTab } from './artifactsTab.tsx'
 import type { PendingRef } from './Composer.tsx'
 import { ChangesTab } from './changesTab.tsx'
 import { ContextTab } from './contextTab.tsx'
@@ -352,6 +353,9 @@ function TabBody({
   }
   if (insp.tab === 'context') {
     return <ContextTab client={client} sessionId={sessionId} store={store} onLocate={onLocate} />
+  }
+  if (insp.tab === 'artifacts') {
+    return <ArtifactsTab client={client} sessionId={sessionId} store={store} onLocate={onLocate} />
   }
   const soon: Record<InspectorTab, string> = {
     progress: '',

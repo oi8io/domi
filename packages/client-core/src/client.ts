@@ -260,6 +260,11 @@ export class DomiClient {
     return this.request('session.context', { sessionId })
   }
 
+  /** M14 产物预览内容（SPEC-M14-007 取舍-2） */
+  artifact(sessionId: string, path: string): Promise<ResultOf<'session.artifact'>> {
+    return this.request('session.artifact', { sessionId, path })
+  }
+
   checkpointDiff(
     sessionId: string,
     opts: { fromSeq?: number; toSeq?: number; path?: string } = {},

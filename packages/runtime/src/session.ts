@@ -295,6 +295,40 @@ export function fuzzyFiles(all: readonly string[], query: string): string[] {
   return scored.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])).map(([, f]) => f)
 }
 
+const MIME_BY_EXT: Record<string, string> = {
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  tsv: 'text/tab-separated-values',
+  json: 'application/json',
+  yaml: 'text/yaml',
+  yml: 'text/yaml',
+  toml: 'text/toml',
+  html: 'text/html',
+  htm: 'text/html',
+  css: 'text/css',
+  js: 'application/javascript',
+  ts: 'application/javascript',
+  tsx: 'application/javascript',
+  jsx: 'application/javascript',
+  py: 'text/x-python',
+  go: 'text/x-go',
+  rs: 'text/x-rust',
+  sh: 'text/x-sh',
+  tsq: 'text/plain',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  pdf: 'application/pdf',
+}
+function mimeOf(ext: string): string {
+  return MIME_BY_EXT[ext.replace(/^\./, '').toLowerCase()] ?? 'application/octet-stream'
+}
+
 export class DomiSession {
   private readonly log: SqliteEventLog
   private readonly tools: ToolRegistry
@@ -1095,6 +1129,44 @@ export class DomiSession {
    * 这一轮发给模型的提示词（BUG-M3-015 / BUG-M3-012）：内置层 + 配置里的层，同 id 覆盖。
    * 每轮现拼（便宜），换了模型也跟着变；cache 边界不合法时 assemble 当场抛错
    */
+  /**
+   * session.artifact RPC（PRD-M14-007 AC-3，SPEC-M14-007 取舍-2）：产物 tab 预览的文件内容。
+   * 只读会话 cwd 内的文件（resolve 后必须落在 cwd 内，防路径穿越）；文本 ≤ 512KB / 二进制 ≤ 4MB，
+   * 超出标 truncated 不给内容（端上走打开方式）
+   */
+  async artifact(path: string): Promise<ResultOf<'session.artifact'>> {
+    const { extname, isAbsolute, relative, resolve } = await import('node:path')
+    const { readFileSync, statSync } = await import('node:fs')
+    const cwd = this.opts.cwd
+    const abs = isAbsolute(path) ? resolve(path) : resolve(cwd, path)
+    const rel = relative(cwd, abs)
+    if (rel.startsWith('..') || isAbsolute(rel)) throw new CheckpointError('error.artifact.out_of_workspace')
+    const st = statSync(abs)
+    if (!st.isFile()) throw new CheckpointError('error.artifact.not_file')
+    const mime = mimeOf(extname(abs))
+    const size = st.size
+    if (
+      mime.startsWith('text/') ||
+      mime === 'application/json' ||
+      mime === 'application/xml' ||
+      mime === 'application/javascript'
+    ) {
+      const MAX = 512 * 1024
+      const truncated = size > MAX
+      const buf = readFileSync(abs)
+      const text = truncated ? buf.subarray(0, MAX).toString('utf8') : buf.toString('utf8')
+      return { ok: true, mime, size, ...(text === undefined ? {} : { text }), truncated }
+    }
+    if (mime.startsWith('image/') || mime === 'application/pdf') {
+      const MAX = 4 * 1024 * 1024
+      const truncated = size > MAX
+      const buf = readFileSync(abs)
+      const base64 = truncated ? undefined : buf.toString('base64')
+      return { ok: true, mime, size, ...(base64 === undefined ? {} : { base64 }), truncated }
+    }
+    return { ok: true, mime, size, truncated: size > 0 && size > 4 * 1024 * 1024 }
+  }
+
   /**
    * session.context RPC（PRD-M14-006 AC-5，SPEC-M14-006 取舍-3）：上下文 tab 的静态项。
    * 动态项（skill.load 过的 / ctx.ref / 附件 / 读过的）在事件流里，client-core 投影

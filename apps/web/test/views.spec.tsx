@@ -17,9 +17,11 @@ import {
 } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ProjectRow, SessionRow } from '../src/layout/data.ts'
+import { ArtifactsTab } from '../src/session/artifactsTab.tsx'
 import { CredentialNotice } from '../src/session/CredentialNotice.tsx'
 import { ChangesTab, worktreeUndoable } from '../src/session/changesTab.tsx'
 import { ContextTab } from '../src/session/contextTab.tsx'
+import { type ArtifactContent, ArtifactPreview } from '../src/session/preview.tsx'
 import { ProgressTab, StepRow } from '../src/session/progressTab.tsx'
 import { groupFindings, ReviewFindings } from '../src/session/ReviewFindings.tsx'
 import { Transcript } from '../src/Transcript.tsx'
@@ -737,5 +739,104 @@ describe('PRD-M14-006 · 上下文 tab（右侧栏）', () => {
     // 没有 tools/history 段
     expect(html).not.toContain('data-seg="tools"')
     expect(html).not.toContain('data-seg="history"')
+  })
+})
+
+describe('PRD-M14-007 · 产物 tab（右侧栏）', () => {
+  const env = (seq: number, ts: number, ev: Record<string, unknown>) => ({
+    seq,
+    sessionId: 'a1',
+    parentSeq: seq > 1 ? seq - 1 : null,
+    ts,
+    schemaVersion: 16,
+    ev: ev as never,
+  })
+  const renderPreview = (path: string, content: ArtifactContent): string =>
+    renderToStaticMarkup(<ArtifactPreview path={path} content={content} />)
+
+  test('AC-1 / AC-2 · 卡片：产物（含 renamed 新路径）+ 附件「你给的」分组 + 定位按钮', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$events.set([
+      env(1, 1000, {
+        t: 'user.input',
+        text: '做',
+        uploads: [{ id: 'u1', name: '素材.csv', mime: 'text/csv', size: 99 }],
+      }),
+      env(2, 2000, { t: 'fs.snapshot', path: 'out.md', phase: 'before', sha256: null, bytes: 0 }),
+      env(3, 3000, { t: 'fs.snapshot', path: 'out.md', phase: 'after', sha256: 'x', bytes: 42 }),
+    ])
+    const html = renderToStaticMarkup(
+      <ArtifactsTab
+        client={
+          {
+            checkpointDiff: async () => ({ available: true, files: [{ path: 'out.md', status: 'added', patch: '' }] }),
+          } as unknown as DomiClient
+        }
+        sessionId="a1"
+        store={store}
+        onLocate={() => undefined}
+      />,
+    )
+    expect(html).toContain('data-artifact="out.md"')
+    expect(html).toContain('data-artifact="素材.csv"')
+    expect(html).toContain('data-action="locate-artifact"')
+    expect(html).toContain('42B')
+  })
+
+  test('AC-3 · 预览：Markdown / 图片 / CSV 前 50 行', () => {
+    const md = renderPreview('a.md', { mime: 'text/markdown', size: 5, text: '# 标题', truncated: false })
+    expect(md).toContain('标题')
+    const img = renderPreview('p.png', { mime: 'image/png', size: 4, base64: 'abc', truncated: false })
+    expect(img).toContain('<img')
+    expect(img).toContain('data:image/png;base64,abc')
+    const csv = renderPreview('t.csv', { mime: 'text/csv', size: 30, text: 'a,b\n1,2', truncated: false })
+    expect(csv).toContain('<table')
+    expect(csv).toContain('1')
+    expect(csv).toContain('2')
+  })
+
+  test('AC-4 · HTML 预览：sandbox 无 allow-same-origin + 注入 CSP default-src none', () => {
+    const html = renderPreview('page.html', {
+      mime: 'text/html',
+      size: 10,
+      text: '<script>fetch("/x")</script>',
+      truncated: false,
+    })
+    expect(html).toContain('sandbox="allow-scripts"')
+    expect(html).not.toContain('allow-same-origin')
+    expect(html).toContain('Content-Security-Policy')
+    expect(html).toContain('default-src')
+    expect(html).toContain('data-part="html-preview"')
+  })
+
+  test('AC-5 · 未带回标注 + 复制路径动作', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({ ...store.$status.get(), worktree: { path: 'r', branch: 'b', repo: 'x' } })
+    store.$events.set([
+      env(1, 1000, { t: 'user.input', text: '做' }),
+      env(2, 2000, { t: 'fs.snapshot', path: 'a.ts', phase: 'after', sha256: 'x', bytes: 1 }),
+    ])
+    const html = renderToStaticMarkup(
+      <ArtifactsTab
+        client={
+          {
+            checkpointDiff: async () => ({ available: true, files: [{ path: 'a.ts', status: 'added', patch: '' }] }),
+            worktreeDiff: async () => ({
+              repo: 'r',
+              branch: 'b',
+              base: 'x',
+              files: [{ path: 'a.ts', status: 'added', patch: '' }],
+            }),
+            artifact: async () => ({ ok: true, mime: 'text/plain', size: 1, text: 'x', truncated: false }),
+          } as unknown as DomiClient
+        }
+        sessionId="a1"
+        store={store}
+        onLocate={() => undefined}
+        worktreeFiles={['a.ts']}
+      />,
+    )
+    expect(html).toContain('data-part="not-taken-back"')
+    expect(html).toContain('data-action="copy-artifact-path"')
   })
 })

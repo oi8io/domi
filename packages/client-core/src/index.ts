@@ -1,4 +1,5 @@
 export { authProtocols, type Question, questionsOf, type RefLink } from '@domi/protocol'
+export * from './artifacts.ts'
 export * from './changes.ts'
 export * from './client.ts'
 export * from './context.ts'

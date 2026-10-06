@@ -142,6 +142,8 @@ export interface SessionHandle {
   windowMeta?: { oldestSeq: number; hasOlder: boolean } | undefined
   /** 上下文 tab 静态项（SPEC-M14-006 取舍-3）。老宿主没有 */
   context?(): Promise<ResultOf<'session.context'>>
+  /** 产物预览内容（SPEC-M14-007 取舍-2）。老宿主没有 */
+  artifact?(path: string): Promise<ResultOf<'session.artifact'>>
   /** 步级快照（SPEC-M14-003）。老宿主没有 */
   checkpointDiff?(fromSeq?: number, toSeq?: number, path?: string): Promise<CheckpointDiffResult>
   /** 非隔离丢弃（PRD-M14-005 AC-7）。返回 fs.discard 事件的 view seq，供 undo 用 */
@@ -1024,6 +1026,14 @@ export class Daemon {
         }
         if (!session.checkpointDiscardUndo) return unsupported(req.id, 'checkpoint.discard.undo')
         return ok(req.id, await session.checkpointDiscardUndo(p.eventSeq as number))
+      }
+
+      case 'session.artifact': {
+        const p = params as { sessionId: string; path: string }
+        const session = await this.session(p.sessionId)
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
+        if (!session.artifact) return unsupported(req.id, 'session.artifact')
+        return ok(req.id, await session.artifact(p.path))
       }
 
       case 'session.context': {

@@ -866,6 +866,21 @@ export const METHODS = {
     }),
     result: z.object({ ok: z.literal(true), snapshotId: z.string().nullable(), undoSnapshotId: z.string().nullable() }),
   },
+  'session.artifact': {
+    summary:
+      '产物 tab 预览的内容通道（PRD-M14-007 AC-3，SPEC-M14-007 取舍-2）：读会话工作区里的文件，' +
+      '文本类返回 utf8（上限 512KB，超出 truncated），二进制返回 base64（上限 4MB，超出 truncated 不返回内容）。' +
+      '路径必须解析到会话 cwd 内（防穿越）；二进制与文本之外的类型只给元信息',
+    params: z.object({ sessionId: z.string(), path: z.string() }),
+    result: z.object({
+      ok: z.literal(true),
+      mime: z.string(),
+      size: z.number().int().nonnegative(),
+      text: z.string().optional(),
+      base64: z.string().optional(),
+      truncated: z.boolean(),
+    }),
+  },
   'session.context': {
     summary:
       '上下文 tab 的静态项（PRD-M14-006 AC-5，SPEC-M14-006 取舍-3）：项目规矩加载状态与路径、技能目录条数、' +

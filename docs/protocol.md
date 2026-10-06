@@ -4971,6 +4971,69 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `session.artifact`
+
+产物 tab 预览的内容通道（PRD-M14-007 AC-3，SPEC-M14-007 取舍-2）：读会话工作区里的文件，文本类返回 utf8（上限 512KB，超出 truncated），二进制返回 base64（上限 4MB，超出 truncated 不返回内容）。路径必须解析到会话 cwd 内（防穿越）；二进制与文本之外的类型只给元信息
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId",
+    "path"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "mime": {
+      "type": "string"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "text": {
+      "type": "string"
+    },
+    "base64": {
+      "type": "string"
+    },
+    "truncated": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok",
+    "mime",
+    "size",
+    "truncated"
+  ]
+}
+```
+
 ### `session.context`
 
 上下文 tab 的静态项（PRD-M14-006 AC-5，SPEC-M14-006 取舍-3）：项目规矩加载状态与路径、技能目录条数、MCP server 与工具、上下文策略与压缩阈值。动态项（skill.load 过的、ctx.ref、附件、读过的）在事件流里，端上投影
