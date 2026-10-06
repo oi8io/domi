@@ -7,11 +7,19 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { createSessionStore, DomiClient, planView, type StepActivity, type WireSocket } from '@domi/client-core'
+import {
+  createSessionStore,
+  DomiClient,
+  type MetricsSnapshot,
+  planView,
+  type StepActivity,
+  type WireSocket,
+} from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ProjectRow, SessionRow } from '../src/layout/data.ts'
 import { CredentialNotice } from '../src/session/CredentialNotice.tsx'
 import { ChangesTab, worktreeUndoable } from '../src/session/changesTab.tsx'
+import { ContextTab } from '../src/session/contextTab.tsx'
 import { ProgressTab, StepRow } from '../src/session/progressTab.tsx'
 import { groupFindings, ReviewFindings } from '../src/session/ReviewFindings.tsx'
 import { Transcript } from '../src/Transcript.tsx'
@@ -555,5 +563,179 @@ describe('PRD-M14-002 · 右侧栏与对话双向联动', () => {
       />,
     )
     expect(html).toContain('data-action="locate-step"')
+  })
+})
+
+describe('PRD-M14-006 · 上下文 tab（右侧栏）', () => {
+  const env = (seq: number, ts: number, ev: Record<string, unknown>) => ({
+    seq,
+    sessionId: 'c1',
+    parentSeq: seq > 1 ? seq - 1 : null,
+    ts,
+    schemaVersion: 16,
+    ev: ev as never,
+  })
+  const metrics = {
+    tokens: { input: 0, output: 0, cacheRead: 0 },
+    cost: '$0.01',
+    contextPercent: 6,
+    contextLevel: 'ok',
+    unpricedModels: [],
+    contextTokens: 10_000,
+    contextMaxTokens: 150_000,
+    cacheHitPercent: 40,
+  } satisfies MetricsSnapshot
+  const STATIC = {
+    trusted: false,
+    rules: [],
+    skillsTotal: 3,
+    mcp: [{ server: 'gh', tools: ['mcp.gh.search'] }],
+    strategy: 'full',
+    thresholdPercent: null,
+  }
+  const renderTab = (store: ReturnType<typeof createSessionStore>, staticProp: typeof STATIC | null = STATIC): string =>
+    renderToStaticMarkup(
+      <ContextTab
+        client={{} as DomiClient}
+        sessionId="c1"
+        store={store}
+        onLocate={() => undefined}
+        staticProp={staticProp}
+      />,
+    )
+
+  test('AC-1 · 堆叠条：model.request.ctx 的层映射到段 + 图例 + 同区数字', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({
+      ...store.$status.get(),
+      metrics: { ...metrics },
+    })
+    store.$events.set([
+      env(1, 1000, {
+        t: 'model.request',
+        provider: 'x',
+        model: 'm',
+        tokensIn: 2,
+        ctx: {
+          layers: [
+            { id: 'builtin.identity', role: 'system', cacheable: true, approxTokens: 100 },
+            { id: 'builtin.soul', role: 'system', cacheable: true, approxTokens: 50 },
+            { id: 'session.plan', role: 'user', cacheable: false, approxTokens: 30 },
+          ],
+          tools: 20,
+          history: 10,
+        },
+      }),
+    ])
+    const html = renderTab(store)
+    expect(html).toContain('data-part="ctx-stack"')
+    // 九段映射：identity 并进 builtin、soul 单独、plan 单独、tools/history 各自
+    expect(html).toContain('data-seg="builtin"')
+    expect(html).toContain('data-seg="soul"')
+    expect(html).toContain('data-seg="plan"')
+    expect(html).toContain('data-seg="tools"')
+    expect(html).toContain('data-seg="history"')
+    // 同区数字（AC-3）：总量 / 窗口 / 命中
+    expect(html).toContain('10k / 150k tok')
+    expect(html).toContain('data-metric="cache-hit"')
+    expect(html).toContain('40')
+    // 未信任 → 规则段标红
+    expect(html).toContain('data-part="rules"')
+    expect(html).toContain('未信任')
+  })
+
+  test('AC-4 · 压缩记录：compact/cleanup 一行 + 定位按钮 onLocate(c.fromSeq)', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({ ...store.$status.get(), metrics: { ...metrics } })
+    store.$events.set([
+      env(1, 1000, {
+        t: 'ctx.compact',
+        fromSeq: 1,
+        toSeq: 9,
+        keptTurns: 2,
+        tokensBefore: 900,
+        tokensAfter: 200,
+        trigger: 'threshold',
+        summary: { intent: '压一下', filesModified: [], keyDecisions: [], openQuestions: [], nextSteps: [] },
+      }),
+      env(2, 2000, {
+        t: 'ctx.cleanup',
+        fromSeq: 4,
+        toSeq: 5,
+        tokensBefore: 300,
+        tokensAfter: 100,
+        saved: {},
+        preserved: [],
+      }),
+    ])
+    const loc = [] as number[]
+    const html = renderToStaticMarkup(
+      <ContextTab
+        client={{} as DomiClient}
+        sessionId="c1"
+        store={store}
+        onLocate={(seq) => loc.push(seq)}
+        staticProp={STATIC}
+      />,
+    )
+    expect(html).toContain('data-part="compacts"')
+    expect(html).toContain('data-compact="compact"')
+    expect(html).toContain('data-compact="cleanup"')
+    expect(html).toContain('900 → 200')
+    expect(html).toContain('data-action="locate-compact"')
+    // 900→200 那条在列表第一行，点它定位到覆盖区间起点 fromSeq=1
+    const segs = [...html.matchAll(/data-action="locate-compact"/g)]
+    expect(segs.length).toBe(2)
+  })
+
+  test('AC-6 · 读过的：fs.read/glob/grep 路径 + MCP 工具按次数排序 + 定位 firstSeq', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({ ...store.$status.get(), metrics: { ...metrics } })
+    store.$events.set([
+      env(1, 1000, { t: 'tool.call', id: 't1', name: 'fs.read', args: { path: 'a.ts' } }),
+      env(2, 2000, { t: 'tool.call', id: 't2', name: 'fs.read', args: { path: 'a.ts' } }),
+      env(3, 3000, { t: 'tool.call', id: 't3', name: 'fs.glob', args: { pattern: 'src/*.ts' } }),
+      env(4, 4000, { t: 'tool.call', id: 't4', name: 'mcp.gh.search', args: { q: 'x' } }),
+    ])
+    const loc = [] as number[]
+    const html = renderToStaticMarkup(
+      <ContextTab
+        client={{} as DomiClient}
+        sessionId="c1"
+        store={store}
+        onLocate={(seq) => loc.push(seq)}
+        staticProp={STATIC}
+      />,
+    )
+    expect(html).toContain('data-read="a.ts"')
+    expect(html).toContain('×2')
+    expect(html).toContain('data-read="mcp.gh.search"')
+    expect(html).toContain('data-action="locate-read"')
+  })
+
+  test('AC-2 · 旧事件没有 ctx → hasLayers=false，不硬造段（只剩压缩/附件）', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({
+      ...store.$status.get(),
+      metrics: { ...metrics, contextTokens: 500, contextMaxTokens: 150_000 },
+    })
+    store.$events.set([
+      env(1, 1000, { t: 'model.request', provider: 'x', model: 'm', tokensIn: 1 }),
+      env(2, 2000, {
+        t: 'ctx.compact',
+        fromSeq: 1,
+        toSeq: 9,
+        keptTurns: 2,
+        tokensBefore: 900,
+        tokensAfter: 200,
+        trigger: 'manual',
+        summary: undefined,
+      }),
+    ])
+    const html = renderTab(store)
+    expect(html).toContain('data-seg="compact"')
+    // 没有 tools/history 段
+    expect(html).not.toContain('data-seg="tools"')
+    expect(html).not.toContain('data-seg="history"')
   })
 })

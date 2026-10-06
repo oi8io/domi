@@ -255,6 +255,11 @@ export class DomiClient {
   }
 
   // M14 步级快照（SPEC-M14-003 取舍-6 / 取舍-7）：非隔离会话的改动 diff 与丢弃
+  /** M14 上下文 tab 静态项（SPEC-M14-006 取舍-3） */
+  context(sessionId: string): Promise<ResultOf<'session.context'>> {
+    return this.request('session.context', { sessionId })
+  }
+
   checkpointDiff(
     sessionId: string,
     opts: { fromSeq?: number; toSeq?: number; path?: string } = {},

@@ -269,7 +269,23 @@ export async function runTurn(
     // 请求单独先落盘（BUG-M13-004）：它的 ts 才是「请求发出」那一刻。
     // 原来和这一步的输出攒成一批、共用流结束时的 ts，生成用了多久从事件流里量不出来（tok/s 靠它）
     await deps.sink.append(sessionId, [
-      { t: 'model.request', provider: deps.provider.id, model: deps.model, tokensIn: messages.length },
+      {
+        t: 'model.request',
+        provider: deps.provider.id,
+        model: deps.model,
+        tokensIn: messages.length,
+        // M14（SPEC-M14-006 取舍-1）：ctx 是纯计算的字符估算（工具 schema 与历史消息 JSON 长度 / 4），
+        // 层清单来自 prompt.assemble()（packages/prompt 已填）。真实总量以 model.usage 为准（BUG-M13-002 口径）。
+        ...(prompt?.layers !== undefined
+          ? {
+              ctx: {
+                layers: prompt.layers,
+                tools: Math.floor(JSON.stringify(deps.tools.schemas()).length / 4),
+                history: Math.floor(JSON.stringify(messages).length / 4),
+              },
+            }
+          : {}),
+      },
     ])
 
     let streamError: { message: string; recoverable: boolean } | null = null

@@ -15,6 +15,7 @@ import { Button } from '../components/ui/button.tsx'
 import { cn } from '../lib/cn.ts'
 import type { PendingRef } from './Composer.tsx'
 import { ChangesTab } from './changesTab.tsx'
+import { ContextTab } from './contextTab.tsx'
 import { ProgressTab } from './progressTab.tsx'
 
 const MIN_W = 320
@@ -348,6 +349,9 @@ function TabBody({
         onLocate={onLocate}
       />
     )
+  }
+  if (insp.tab === 'context') {
+    return <ContextTab client={client} sessionId={sessionId} store={store} onLocate={onLocate} />
   }
   const soon: Record<InspectorTab, string> = {
     progress: '',

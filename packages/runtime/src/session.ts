@@ -41,6 +41,7 @@ import {
   providerConnection,
 } from '@domi/config'
 import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
+import type { PromptParts } from '@domi/kernel'
 import {
   aggregate,
   type ContextPolicy,
@@ -68,7 +69,14 @@ import {
   StructuredOutputError,
 } from '@domi/model'
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
-import { type DomiEvent, type EventEnvelope, isKnownEvent, type RefLink, type UploadRef } from '@domi/protocol'
+import {
+  type DomiEvent,
+  type EventEnvelope,
+  isKnownEvent,
+  type RefLink,
+  type ResultOf,
+  type UploadRef,
+} from '@domi/protocol'
 import { z } from 'zod'
 import { ASK_USER_CAPABILITY, makeAskUserTool } from './ask-user.ts'
 import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
@@ -1087,7 +1095,39 @@ export class DomiSession {
    * 这一轮发给模型的提示词（BUG-M3-015 / BUG-M3-012）：内置层 + 配置里的层，同 id 覆盖。
    * 每轮现拼（便宜），换了模型也跟着变；cache 边界不合法时 assemble 当场抛错
    */
-  private prompt(): { system: string; dynamic: string } {
+  /**
+   * session.context RPC（PRD-M14-006 AC-5，SPEC-M14-006 取舍-3）：上下文 tab 的静态项。
+   * 动态项（skill.load 过的 / ctx.ref / 附件 / 读过的）在事件流里，client-core 投影
+   */
+  context(): ResultOf<'session.context'> {
+    const cfg = this.opts.config.context
+    const toolNames = this.tools.schemas().map((t) => t.name)
+    const byServer = new Map<string, string[]>()
+    for (const name of toolNames) {
+      if (!name.startsWith('mcp.')) continue
+      const dot = name.indexOf('.', 4)
+      const server = dot < 0 ? name.slice(4) : name.slice(4, dot)
+      const arr = byServer.get(server)
+      if (arr === undefined) byServer.set(server, [name])
+      else arr.push(name)
+    }
+    const mcp = [...byServer.entries()]
+      .map(([server, tools]) => ({ server, tools }))
+      .sort((a, b) => a.server.localeCompare(b.server))
+    return {
+      trusted: this.trusted,
+      // 未信任 → 空表，端上显示「未信任，未加载」
+      rules: this.trusted ? rulesFiles(this.repoRoot, this.opts.cwd).map((f) => f.slice(this.repoRoot.length + 1)) : [],
+      skillsTotal: this.opts.skills?.list().length ?? 0,
+      mcp,
+      context: {
+        strategy: cfg.strategy,
+        thresholdPercent: cfg.strategy === 'compact' ? cfg.compactAt : null,
+      },
+    }
+  }
+
+  private prompt(): PromptParts {
     const extra: PromptLayer[] = []
     const soul = this.opts.memory?.promptText() ?? ''
     // Soul 很少变，放稳定前缀里（ADR-019）；空的时候不放，免得多一段没内容的说明
@@ -1114,7 +1154,12 @@ export class DomiSession {
         .filter((m) => m.role === role)
         .map((m) => (m as { content: string }).content)
         .join('\n\n')
-    return { system: text('system'), dynamic: text('user') }
+    return {
+      system: text('system'),
+      dynamic: text('user'),
+      // M14（SPEC-M14-006 取舍-1）：层清单（id / role / cacheable / 字符估算）随请求落盘，供上下文 tab 分段
+      layers: a.layers.map((l) => ({ id: l.id, role: l.role, cacheable: l.cacheable, approxTokens: l.approxTokens })),
+    }
   }
 
   /**
