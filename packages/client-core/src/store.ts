@@ -257,7 +257,46 @@ export function permissionsModeBadge(mode: PermissionsModeName): { label: string
   return { label: tr(PERMISSIONS_MODE_LABEL[mode]), danger: mode === 'allow-all' }
 }
 
-export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
+// ── M14 右侧栏（SPEC-M14-001 取舍-3）：$inspector atom + 原始事件镜像 ──────
+
+export type InspectorTab = 'progress' | 'changes' | 'artifacts' | 'context'
+export type InspectorChangesRange = import('./changes.ts').ChangesRange
+
+export interface InspectorState {
+  /** 右侧栏是否展开（会话级默认 + 用户手动开/关，跨重启进 localStorage） */
+  open: boolean
+  tab: InspectorTab
+  /** 右列宽度 px（320–720） */
+  width: number
+  /** 详情页展开占满主区 */
+  expanded: boolean
+  /** 详情页（改动 tab 的某个文件等）；null = 列表页 */
+  detail: { kind: string; id: string } | null
+  /** 改动 tab 当前范围（SPEC-M14-005 取舍-1） */
+  changesRange: InspectorChangesRange
+}
+
+/** 默认开关规则（AC-4）：任务默认开、进度 tab；自由会话默认关、改动 tab */
+export function inspectorDefault(kind: 'chat' | 'task' | undefined): InspectorState {
+  return {
+    open: kind === 'task',
+    tab: kind === 'task' ? 'progress' : 'changes',
+    width: 400,
+    expanded: false,
+    detail: null,
+    changesRange: 'turn',
+  }
+}
+
+/** 改动 tab 的 diff 数据（daemon 拿来的，Web 层写入、StatusBar 徽标读） */
+export interface ChangesDiffSnapshot {
+  range: InspectorChangesRange
+  diff: import('./changes.ts').CheckpointDiffResult | null
+  /** 降级回退文件名（changesView 算好，徽标 / 列表直接用） */
+  fallbackNames: string[]
+}
+
+export function createSessionStore(initial: Partial<StatusSnapshot> & { kind?: 'chat' | 'task' } = {}) {
   const $items = atom<TranscriptItem[]>([])
   /** tool.result 只带 id：记下每次调用的工具名，结果行才知道怎么摘要 */
   const callNames = new Map<string, string>()
@@ -281,6 +320,14 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
   const $notes = atom<QueuedNoteView[]>([])
   /** PRD-M13-001 AC-7：退回给本端的补充文字，等输入框取走放回草稿 */
   const $returned = atom<string[]>([])
+  /** M14：原始事件镜像（与 $items 同窗口：append + prepend 同步）——投影函数的数据源 */
+  const $events = atom<EventEnvelope[]>([])
+  /** M14：右侧栏状态（SPEC-M14-001 取舍-3） */
+  const $inspector = atom<InspectorState>(inspectorDefault(initial.kind))
+  /** M14：改动 tab 的 daemon 数据（Web 写入；StatusBar 徽标读同一份） */
+  const $changesDiff = atom<ChangesDiffSnapshot>({ range: 'turn', diff: null, fallbackNames: [] })
+  /** M14：状态栏 +N −M（SPEC-M14-001 取舍-6）：worktree 会话 = worktree.diff 合计，否则本轮 changesView 合计 */
+  const $changesPill = atom<{ added: number; removed: number; count: number } | null>(null)
 
   /** 最后一条 assistant 文本，流式增量往它上面拼 */
   const $streaming = computed($items, (items) => {
@@ -625,6 +672,10 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
     $streaming,
     $notes,
     $returned,
+    $events,
+    $inspector,
+    $changesDiff,
+    $changesPill,
     setNotes(pending: readonly QueuedNoteView[]): void {
       $notes.set([...pending])
     },
@@ -638,6 +689,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
       return out
     },
     applyEvents(envelopes: EventEnvelope[]): void {
+      $events.set([...$events.get(), ...envelopes])
       for (const e of envelopes) applyEvent(e)
     },
     /** PRD-M11-009：向上翻页拿到的更早事件，插到列表前面。 */
@@ -652,6 +704,8 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
       for (const e of envelopes) applyEvent(e)
       // 旧事件重新 apply 会再次走 push——直接把旧 items 拼回去（它们已经是投影好的 TranscriptItem）
       $items.set([...$items.get(), ...oldItems])
+      // $events 与 $items 保持同一窗口（M14 投影的数据源）
+      $events.set([...envelopes, ...$events.get()])
     },
     /** 首连 subscribe 回来后，服务端告诉我们窗口边界 */
     setWindowMeta(meta: { oldestSeq: number; hasOlder: boolean } | null): void {
@@ -677,6 +731,18 @@ export function createSessionStore(initial: Partial<StatusSnapshot> = {}) {
       const cur = $status.get()
       if (cur.provider === provider && cur.model === model) return
       $status.set({ ...cur, provider, model })
+    },
+    /** M14：部分更新右侧栏状态 */
+    setInspector(partial: Partial<InspectorState>): void {
+      $inspector.set({ ...$inspector.get(), ...partial })
+    },
+    /** M14：改动 tab 数据（daemon diff + 降级回退名） */
+    setChangesDiff(snapshot: ChangesDiffSnapshot): void {
+      $changesDiff.set(snapshot)
+    },
+    /** M14：状态栏 +N −M */
+    setChangesPill(pill: { added: number; removed: number; count: number } | null): void {
+      $changesPill.set(pill)
     },
   }
 }

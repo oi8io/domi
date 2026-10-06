@@ -7,11 +7,11 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DomiClient, type WireSocket } from '@domi/client-core'
+import { createSessionStore, DomiClient, type WireSocket } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ProjectRow, SessionRow } from '../src/layout/data.ts'
-import { ChangesBar, ChangesView, undoable } from '../src/session/ChangesBar.tsx'
 import { CredentialNotice } from '../src/session/CredentialNotice.tsx'
+import { ChangesTab, worktreeUndoable } from '../src/session/changesTab.tsx'
 import { groupFindings, ReviewFindings } from '../src/session/ReviewFindings.tsx'
 import { ProjectsView, ProjectView } from '../src/views/ProjectsView.tsx'
 import { groupSessions, SessionsView } from '../src/views/SessionsView.tsx'
@@ -177,38 +177,64 @@ describe('PRD-M8-005 AC-4 · 任务页列出进行中与最近任务', () => {
   })
 })
 
-describe('PRD-M8-006 AC-2 · 改动条：N 个文件改动 · 查看 · 带回', () => {
+describe('PRD-M14-005 AC-2 · 改动 tab：逐文件审阅 · 丢弃 · 撤销投影', () => {
   const diff = {
     repo: '/home/d/domi',
     branch: 'domi/t1',
     base: 'abcdef1234567890',
     files: [
-      { path: 'src/a.ts', status: 'modified' as const, patch: '@@ -1 +1 @@\n-a\n+b', truncated: false },
-      { path: 'src/b.ts', status: 'added' as const, patch: '+new', truncated: false },
+      {
+        path: 'src/a.ts',
+        status: 'modified' as const,
+        patch: '@@ -1 +1 @@\n-a\n+b',
+        added: 1,
+        removed: 1,
+        truncated: false,
+      },
+      { path: 'src/b.ts', status: 'added' as const, patch: '+new', added: 1, removed: 0, truncated: false },
     ],
   }
 
-  test('逐文件审阅：每个文件一行，可丢弃', () => {
-    const html = renderToStaticMarkup(<ChangesView diff={diff} busy={false} onDiscard={() => undefined} />)
+  test('逐文件审阅：每个文件一行，可丢弃（改动 tab 首渲染打底数据来自 $changesDiff）', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
+    const html = renderToStaticMarkup(
+      <ChangesTab client={client} sessionId="t1" store={store} busy={false} items={[]} onNotice={() => undefined} />,
+    )
     expect(html).toContain('src/a.ts')
     expect(html).toContain('修改')
     expect(html).toContain('新增')
     expect(html).toContain('丢弃')
-    expect(html).toContain('domi/t1')
+    expect(html).toContain('+1')
+    expect(html).toContain('−1')
   })
 
   test('PRD-M7-006 AC-2 · Web 渲染快照：改动清单的结构固定下来', () => {
-    expect(renderToStaticMarkup(<ChangesView diff={diff} busy={false} onDiscard={() => undefined} />)).toMatchSnapshot()
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
+    expect(
+      renderToStaticMarkup(
+        <ChangesTab client={client} sessionId="t1" store={store} busy={false} items={[]} onNotice={() => undefined} />,
+      ),
+    ).toMatchSnapshot()
   })
 
   test('界面上没有「隔离」字样', () => {
-    const html = renderToStaticMarkup(<ChangesView diff={diff} busy={false} />)
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: { available: true, files: diff.files }, fallbackNames: [] })
+    const html = renderToStaticMarkup(
+      <ChangesTab client={client} sessionId="t1" store={store} busy={false} items={[]} onNotice={() => undefined} />,
+    )
     expect(html).not.toContain('隔离')
   })
 
-  test('没有改动、也没有可撤销的丢弃时整条不出现', () => {
-    const html = renderToStaticMarkup(<ChangesBar client={client} sessionId="t1" busy={false} items={[]} />)
-    expect(html).toBe('')
+  test('没有快照、也没有回退名时如实说空态（不再整条不出现：改动 tab 是常驻面板）', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.setChangesDiff({ range: 'turn', diff: null, fallbackNames: [] })
+    const html = renderToStaticMarkup(
+      <ChangesTab client={client} sessionId="t1" store={store} busy={false} items={[]} onNotice={() => undefined} />,
+    )
+    expect(html).toContain('还没有改动')
   })
 
   test('丢弃过的可以撤销：从事件投影出来', () => {
@@ -217,7 +243,7 @@ describe('PRD-M8-006 AC-2 · 改动条：N 个文件改动 · 查看 · 带回',
       { seq: 2, kind: 'context' as const, text: '丢弃了 src/b.ts 的改动', summary: '回收站 13' },
       { seq: 3, kind: 'context' as const, text: '恢复了 src/b.ts 的改动' },
     ]
-    expect(undoable(items)).toEqual([{ path: 'src/a.ts', trash: '12' }])
+    expect(worktreeUndoable(items)).toEqual([{ path: 'src/a.ts', trash: '12' }])
   })
 })
 

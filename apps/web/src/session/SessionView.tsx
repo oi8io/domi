@@ -5,14 +5,17 @@
 
 import {
   type ConnectionState,
+  changesRangeSeq,
+  changesView,
   continuePrompt,
   type DomiClient,
   missingCredentialOf,
+  patchStats,
   type SessionStore,
 } from '@domi/client-core'
 import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from '../ConfirmDialog.tsx'
 import { Button } from '../components/ui/button.tsx'
 import { IconEye, IconTrash } from '../icons.tsx'
@@ -21,9 +24,9 @@ import { NEAR_BOTTOM_PX, nextScrollAction, shouldFetchOlder } from '../lib/scrol
 import { formatRoute } from '../router.ts'
 import { StatusBar } from '../StatusBar.tsx'
 import { Transcript } from '../Transcript.tsx'
-import { ChangesBar } from './ChangesBar.tsx'
 import { Composer, ModelSwitch, type PendingRef, PermissionsModeSwitch } from './Composer.tsx'
 import { CredentialNotice } from './CredentialNotice.tsx'
+import { Inspector } from './Inspector.tsx'
 import { JumpBar } from './JumpBar.tsx'
 import { NotesBar } from './NotesBar.tsx'
 import { ResumeBar } from './ResumeBar.tsx'
@@ -175,6 +178,62 @@ export function SessionView({
     awayFromBottom.current = false
     setNewCount(0)
   }
+
+  // M14 · 状态栏 +N −M（SPEC-M14-001 取舍-6）：worktree 会话 = worktree.diff 合计；否则本轮 changesView 合计
+  const pill = useStore(store.$changesPill)
+  const loadPill = useCallback((): Promise<void> => {
+    const run = async (): Promise<void> => {
+      let added = 0
+      let removed = 0
+      let count = 0
+      if (status.worktree !== undefined) {
+        const d = await client.worktreeDiff(sessionId)
+        for (const f of d.files) {
+          const s = patchStats(f.patch)
+          added += s.added
+          removed += s.removed
+        }
+        count = d.files.length
+      } else {
+        const evs = store.$events.get()
+        const head = evs.length === 0 ? 0 : (evs[evs.length - 1]?.seq ?? 0)
+        const seq = changesRangeSeq(evs, 'turn', head)
+        if (seq !== null) {
+          const d = await client.checkpointDiff(sessionId, seq)
+          const v = changesView(evs, d, 'turn', head)
+          if (v.available) {
+            for (const f of v.files) {
+              added += f.added
+              removed += f.removed
+            }
+            count = v.files.length
+          } else {
+            count = v.fallbackNames.length
+          }
+        }
+      }
+      store.setChangesPill({ added, removed, count })
+    }
+    return run()
+  }, [client, sessionId, status.worktree, store])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: items.length 是刷新的触发条件（同原 ChangesBar）
+  useEffect(() => {
+    if (!status.busy) void loadPill().catch(() => undefined)
+  }, [status.busy, status.worktree, loadPill, items.length])
+
+  const openChanges = (): void => {
+    store.setInspector({
+      open: true,
+      tab: 'changes',
+      changesRange: status.worktree !== undefined ? 'baseline' : 'turn',
+    })
+    // AC-3：手动打开记进 localStorage，影响后续默认
+    try {
+      localStorage.setItem(`domi.inspector.${sessionId}.open`, 'true')
+    } catch {
+      // ignore
+    }
+  }
   const answer = (allowed: boolean, content?: Record<string, unknown>, grant?: boolean): void => {
     if (!ask?.askId) return
     client.answer(ask.askId, allowed, content, undefined, grant).then(
@@ -200,163 +259,179 @@ export function SessionView({
     )
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col" data-view="session">
-      <div className="flex shrink-0 items-center border-b border-border2 px-5">
-        <a href={formatRoute({ view: 'session', id: sessionId, tab: 'chat' })} className={tabCls(tab === 'chat')}>
-          Chat
-        </a>
-        <a
-          href={formatRoute({ view: 'session', id: sessionId, tab: 'trajectory' })}
-          className={tabCls(tab === 'trajectory')}
-        >
-          Trajectory
-        </a>
-        <SessionTitle
-          client={client}
-          sessionId={sessionId}
-          title={title ?? ''}
-          kind={kind}
-          project={project}
-          onNotice={setNotice}
-          {...(onRenamed === undefined ? {} : { onRenamed })}
+    <section className="relative flex min-h-0 flex-1" data-view="session">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center border-b border-border2 px-5">
+          <a href={formatRoute({ view: 'session', id: sessionId, tab: 'chat' })} className={tabCls(tab === 'chat')}>
+            Chat
+          </a>
+          <a
+            href={formatRoute({ view: 'session', id: sessionId, tab: 'trajectory' })}
+            className={tabCls(tab === 'trajectory')}
+          >
+            Trajectory
+          </a>
+          <SessionTitle
+            client={client}
+            sessionId={sessionId}
+            title={title ?? ''}
+            kind={kind}
+            project={project}
+            onNotice={setNotice}
+            {...(onRenamed === undefined ? {} : { onRenamed })}
+          />
+          {onToTask !== undefined && (
+            <Button variant="ghost" size="xs" className="ml-1" onClick={onToTask} data-action="to-task">
+              {tr('web.session.toTask')}
+            </Button>
+          )}
+          <SessionTools
+            client={client}
+            sessionId={sessionId}
+            busy={status.busy}
+            onNotice={setNotice}
+            {...(onDeleted === undefined ? {} : { onDeleted })}
+            {...(onBranched === undefined ? {} : { onReview: onBranched })}
+          />
+        </div>
+        <StatusBar
+          status={status}
+          {...(connection === undefined ? {} : { connection })}
+          {...(pill === null ? {} : { changes: pill, onOpenChanges: openChanges })}
         />
-        {onToTask !== undefined && (
-          <Button variant="ghost" size="xs" className="ml-1" onClick={onToTask} data-action="to-task">
-            {tr('web.session.toTask')}
-          </Button>
-        )}
-        <SessionTools
-          client={client}
-          sessionId={sessionId}
-          busy={status.busy}
-          onNotice={setNotice}
-          {...(onDeleted === undefined ? {} : { onDeleted })}
-          {...(onBranched === undefined ? {} : { onReview: onBranched })}
-        />
-      </div>
-      <StatusBar status={status} {...(connection === undefined ? {} : { connection })} />
-      {status.worktree !== undefined && (
-        <ChangesBar client={client} sessionId={sessionId} busy={status.busy} items={items} />
-      )}
-      <div className="relative min-h-0 flex-1">
-        <div ref={scroller} className="h-full overflow-y-auto" onScroll={reportRead}>
-          {tab === 'trajectory' ? (
-            <Trajectory items={items} />
-          ) : (
-            <div className="mx-auto max-w-[860px] px-6 py-5">
-              {hasOlder && (
-                // PRD-M11-009 AC-2：占位可点击兜底——没有滚动条（内容没撑满屏）时也能点它拉更早
-                <div className="mb-3 text-center text-xs">
-                  {loadingOlder ? (
-                    <span className="text-zinc-500">{tr('web.session.loadingOlder')}</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={fetchOlder}
-                      data-action="load-older"
-                      className="text-zinc-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
-                    >
-                      {tr('web.session.scrollToTopForMore')}
-                    </button>
+        {/* 主区 + 右侧栏（Inspector）：展开/抽屉盖住 Transcript，Composer 仍可用（SPEC-M14-001 取舍-1/2） */}
+        <div className="relative flex min-h-0 flex-1">
+          <div className="relative min-h-0 flex-1">
+            <div ref={scroller} className="h-full overflow-y-auto" onScroll={reportRead}>
+              {tab === 'trajectory' ? (
+                <Trajectory items={items} />
+              ) : (
+                <div className="mx-auto max-w-[860px] px-6 py-5">
+                  {hasOlder && (
+                    // PRD-M11-009 AC-2：占位可点击兜底——没有滚动条（内容没撑满屏）时也能点它拉更早
+                    <div className="mb-3 text-center text-xs">
+                      {loadingOlder ? (
+                        <span className="text-zinc-500">{tr('web.session.loadingOlder')}</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={fetchOlder}
+                          data-action="load-older"
+                          className="text-zinc-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-accent"
+                        >
+                          {tr('web.session.scrollToTopForMore')}
+                        </button>
+                      )}
+                    </div>
                   )}
+                  <Transcript
+                    items={items}
+                    {...(onBranched === undefined ? {} : { onBranch: branch })}
+                    {...(onRefsChange === undefined
+                      ? {}
+                      : {
+                          onQuote: (q) =>
+                            onRefsChange([...refs, { sessionId, fromSeq: q.fromSeq, toSeq: q.toSeq, label: q.label }]),
+                        })}
+                  />
+                  {review !== null && <ReviewFindings findings={review} />}
+                  {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
                 </div>
               )}
-              <Transcript
-                items={items}
-                {...(onBranched === undefined ? {} : { onBranch: branch })}
-                {...(onRefsChange === undefined
-                  ? {}
-                  : {
-                      onQuote: (q) =>
-                        onRefsChange([...refs, { sessionId, fromSeq: q.fromSeq, toSeq: q.toSeq, label: q.label }]),
-                    })}
-              />
-              {review !== null && <ReviewFindings findings={review} />}
-              {ask !== null && <ConfirmDialog ask={ask} onAnswer={answer} />}
             </div>
-          )}
+            <JumpBar count={newCount} onClick={jumpToBottom} />
+          </div>
+          <Inspector
+            client={client}
+            sessionId={sessionId}
+            store={store}
+            busy={status.busy}
+            items={items}
+            refs={refs}
+            onRefsChange={onRefsChange}
+            onNotice={(m) => setNotice(m)}
+          />
         </div>
-        <JumpBar count={newCount} onClick={jumpToBottom} />
-      </div>
-      {tab === 'trajectory' && ask !== null && (
-        <div className="shrink-0 px-5">
-          <ConfirmDialog ask={ask} onAnswer={answer} />
+        {tab === 'trajectory' && ask !== null && (
+          <div className="shrink-0 px-5">
+            <ConfirmDialog ask={ask} onAnswer={answer} />
+          </div>
+        )}
+        <div className="shrink-0 px-5 empty:hidden">
+          <NotesBar
+            notes={notes}
+            onWithdraw={(id) => void client.withdrawNote(sessionId, id).catch((err: Error) => setNotice(err.message))}
+          />
         </div>
-      )}
-      <div className="shrink-0 px-5 empty:hidden">
-        <NotesBar
-          notes={notes}
-          onWithdraw={(id) => void client.withdrawNote(sessionId, id).catch((err: Error) => setNotice(err.message))}
-        />
-      </div>
-      <div className="shrink-0 px-5 pb-1.5 empty:hidden">
-        <ResumeBar
-          status={status}
-          ask={ask}
-          onContinue={() =>
-            void client.submit(sessionId, continuePrompt(), [], {}).then(
-              () => setNotice(null),
-              (err: Error) => setNotice(err.message),
+        <div className="shrink-0 px-5 pb-1.5 empty:hidden">
+          <ResumeBar
+            status={status}
+            ask={ask}
+            onContinue={() =>
+              void client.submit(sessionId, continuePrompt(), [], {}).then(
+                () => setNotice(null),
+                (err: Error) => setNotice(err.message),
+              )
+            }
+          />
+        </div>
+        <Composer
+          busy={status.busy}
+          running={status.busy}
+          restore={returned}
+          onRestored={() => store.takeReturned()}
+          notice={notice}
+          refs={refs}
+          onRemoveRef={(i) => onRefsChange?.(refs.filter((_, j) => j !== i))}
+          placeholder={status.busy ? tr('web.session.notePlaceholder') : tr('web.session.placeholder')}
+          tools={{ client, sessionId }}
+          onSubmit={(text, extras) =>
+            // 跑着的时候是补充（PRD-M13-001）：排进队列，下一步送达；闲了 daemon 会当普通提交
+            (status.busy ? client.note(sessionId, text) : client.submit(sessionId, text, refs, extras)).then(
+              () => {
+                setNotice(null)
+                if (refs.length > 0) onRefsChange?.([])
+              },
+              // SESSION_BUSY 之类的结构化错误原样给人看（PRD-M3-004 AC-3）
+              // 缺凭据（OPT-M8-001）换成带链接的那段，指去设置页
+              (err: Error) => {
+                const provider = missingCredentialOf(err)
+                setNotice(provider === null ? err.message : <CredentialNotice provider={provider} />)
+                throw err
+              },
             )
           }
-        />
+        >
+          <ModelSwitch
+            client={client}
+            sessionId={sessionId}
+            busy={status.busy}
+            current={status.model}
+            provider={status.provider}
+            onNotice={setNotice}
+          />
+          <PermissionsModeSwitch
+            client={client}
+            sessionId={sessionId}
+            busy={status.busy}
+            mode={status.metrics?.permissionsMode ?? 'on-demand'}
+            onNotice={setNotice}
+          />
+          {status.busy && (
+            // PRD-M13-002 AC-6：停下这一轮
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              data-action="interrupt"
+              title={tr('web.composer.interruptHint')}
+              onClick={() => void client.interrupt(sessionId).catch((err: Error) => setNotice(err.message))}
+            >
+              {tr('web.composer.interrupt')}
+            </Button>
+          )}
+        </Composer>
       </div>
-      <Composer
-        busy={status.busy}
-        running={status.busy}
-        restore={returned}
-        onRestored={() => store.takeReturned()}
-        notice={notice}
-        refs={refs}
-        onRemoveRef={(i) => onRefsChange?.(refs.filter((_, j) => j !== i))}
-        placeholder={status.busy ? tr('web.session.notePlaceholder') : tr('web.session.placeholder')}
-        tools={{ client, sessionId }}
-        onSubmit={(text, extras) =>
-          // 跑着的时候是补充（PRD-M13-001）：排进队列，下一步送达；闲了 daemon 会当普通提交
-          (status.busy ? client.note(sessionId, text) : client.submit(sessionId, text, refs, extras)).then(
-            () => {
-              setNotice(null)
-              if (refs.length > 0) onRefsChange?.([])
-            },
-            // SESSION_BUSY 之类的结构化错误原样给人看（PRD-M3-004 AC-3）
-            // 缺凭据（OPT-M8-001）换成带链接的那段，指去设置页
-            (err: Error) => {
-              const provider = missingCredentialOf(err)
-              setNotice(provider === null ? err.message : <CredentialNotice provider={provider} />)
-              throw err
-            },
-          )
-        }
-      >
-        <ModelSwitch
-          client={client}
-          sessionId={sessionId}
-          busy={status.busy}
-          current={status.model}
-          provider={status.provider}
-          onNotice={setNotice}
-        />
-        <PermissionsModeSwitch
-          client={client}
-          sessionId={sessionId}
-          busy={status.busy}
-          mode={status.metrics?.permissionsMode ?? 'on-demand'}
-          onNotice={setNotice}
-        />
-        {status.busy && (
-          // PRD-M13-002 AC-6：停下这一轮
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            data-action="interrupt"
-            title={tr('web.composer.interruptHint')}
-            onClick={() => void client.interrupt(sessionId).catch((err: Error) => setNotice(err.message))}
-          >
-            {tr('web.composer.interrupt')}
-          </Button>
-        )}
-      </Composer>
     </section>
   )
 }

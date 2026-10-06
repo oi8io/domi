@@ -11,7 +11,6 @@
 
 import { existsSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import type { FileChange } from '@domi/checkpoint'
 import {
   fsEdit,
   fsGlob,
@@ -32,6 +31,7 @@ import {
   type Tool,
   ToolRegistry,
 } from '@domi/capability'
+import type { FileChange } from '@domi/checkpoint'
 import { DiagnosticsService, makeDiagnosticsTool, makeOutlineTool } from '@domi/codeintel'
 import {
   credentialEnvNames,
@@ -68,15 +68,11 @@ import {
   StructuredOutputError,
 } from '@domi/model'
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
-import { isKnownEvent, type DomiEvent, type EventEnvelope, type RefLink, type UploadRef } from '@domi/protocol'
+import { type DomiEvent, type EventEnvelope, isKnownEvent, type RefLink, type UploadRef } from '@domi/protocol'
 import { z } from 'zod'
 import { ASK_USER_CAPABILITY, makeAskUserTool } from './ask-user.ts'
 import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
-import {
-  CheckpointController,
-  CheckpointError,
-  resolveSnapshots,
-} from './checkpoints.ts'
+import { type CheckpointController, CheckpointError, resolveSnapshots } from './checkpoints.ts'
 import {
   makePlanGate,
   makePlanUpdateTool,

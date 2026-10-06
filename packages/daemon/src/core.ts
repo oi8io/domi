@@ -153,7 +153,12 @@ export interface SessionHandle {
 export interface CheckpointDiffResult {
   available: boolean
   reason?: string
-  files: Array<{ path: string; status: 'added' | 'modified' | 'deleted' | 'renamed'; patch: string; truncated?: boolean }>
+  files: Array<{
+    path: string
+    status: 'added' | 'modified' | 'deleted' | 'renamed'
+    patch: string
+    truncated?: boolean
+  }>
 }
 
 /** 一条排队中的补充（PRD-M13-001） */

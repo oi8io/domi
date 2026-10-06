@@ -20,10 +20,10 @@ import {
   type NotifyParamsOf,
   type ParamsOf,
   PROTOCOL_VERSION,
-  type RefLink,
   type ResultOf,
   type RpcError,
   type Schedule,
+  type SubmitRef,
 } from '@domi/protocol'
 import { atom } from 'nanostores'
 import type { SessionStore } from './store.ts'
@@ -254,6 +254,32 @@ export class DomiClient {
     return this.request('worktree.apply', message === undefined ? { sessionId, mode } : { sessionId, mode, message })
   }
 
+  // M14 步级快照（SPEC-M14-003 取舍-6 / 取舍-7）：非隔离会话的改动 diff 与丢弃
+  checkpointDiff(
+    sessionId: string,
+    opts: { fromSeq?: number; toSeq?: number; path?: string } = {},
+  ): Promise<ResultOf<'checkpoint.diff'>> {
+    return this.request('checkpoint.diff', {
+      sessionId,
+      ...(opts.fromSeq === undefined ? {} : { fromSeq: opts.fromSeq }),
+      ...(opts.toSeq === undefined ? {} : { toSeq: opts.toSeq }),
+      ...(opts.path === undefined ? {} : { path: opts.path }),
+    })
+  }
+
+  checkpointDiscard(
+    sessionId: string,
+    path: string,
+    fromSeq: number,
+    toSeq: number,
+  ): Promise<ResultOf<'checkpoint.discard'>> {
+    return this.request('checkpoint.discard', { sessionId, path, fromSeq, toSeq })
+  }
+
+  checkpointDiscardUndo(sessionId: string, eventSeq: number): Promise<ResultOf<'checkpoint.discard.undo'>> {
+    return this.request('checkpoint.discard.undo', { sessionId, eventSeq })
+  }
+
   /**
    * 新建会话。不给参数 = 自由会话（M8-004）；给 cwd 时由 daemon 按目录判断；
    * opts.kind / projectId 明确指定是会话还是某个项目下的任务
@@ -355,12 +381,12 @@ export class DomiClient {
     return this.request('project.resolve', { cwd })
   }
 
-  /** refs：引用其他会话的片段（PRD-M3-005），终点可以给得大，daemon 会截到末尾 */
+  /** refs：引用其他会话的片段（PRD-M3-005）或本会话工作目录文件的行区间（PRD-M14-008），终点可以给得大，daemon 会截到末尾 */
   /** extras：附件 id、引用的文件、指定的技能（PRD-M8-010） */
   submit(
     sessionId: string,
     text: string,
-    refs?: readonly RefLink[],
+    refs?: readonly SubmitRef[],
     extras: { uploads?: readonly string[]; files?: readonly string[]; skills?: readonly string[] } = {},
   ): Promise<ResultOf<'session.submit'>> {
     const nonEmpty = (k: 'uploads' | 'files' | 'skills') => {

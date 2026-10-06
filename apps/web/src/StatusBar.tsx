@@ -22,7 +22,18 @@ import { cn } from './lib/cn.ts'
 const CTX_CLASS = { ok: '', warn: 'border-warn text-warn', danger: 'border-bad text-bad' } as const
 const VERIFY_CLASS = { unverified: 'text-warn', verified: 'text-ok', failed: 'text-bad' } as const
 
-export function StatusBar({ status, connection }: { status: StatusSnapshot; connection?: ConnectionState }) {
+export function StatusBar({
+  status,
+  connection,
+  changes,
+  onOpenChanges,
+}: {
+  status: StatusSnapshot
+  connection?: ConnectionState
+  /** M14 · +N −M（SPEC-M14-001 取舍-6）：改动合计；点它开右侧栏改动 tab */
+  changes?: { added: number; removed: number; count: number } | undefined
+  onOpenChanges?: () => void
+}) {
   const m = status.metrics
   const level = m?.contextLevel ?? 'ok'
   return (
@@ -76,6 +87,19 @@ export function StatusBar({ status, connection }: { status: StatusSnapshot; conn
         <span className={cn('pill shrink-0', VERIFY_CLASS[m.verify])} data-verify={m.verify}>
           {VERIFY_LABEL[m.verify]}
         </span>
+      )}
+      {changes !== undefined && changes.count > 0 && (
+        <button
+          type="button"
+          className="pill shrink-0 hover:bg-panel-h"
+          data-action="open-changes"
+          title={tr('web.changes.rangeTurn')}
+          onClick={onOpenChanges}
+        >
+          <span className="text-ok">+{changes.added}</span>
+          <span className="text-bad"> −{changes.removed}</span>
+          <span className="ml-0.5 text-mut2">· {changes.count}</span>
+        </button>
       )}
       {status.busy && (
         <span className="pill shrink-0 text-accent">

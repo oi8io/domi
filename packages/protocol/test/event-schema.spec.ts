@@ -83,7 +83,15 @@ describe('PRD-M14-003 / PRD-M14-005 / PRD-M14-008 · 右侧栏事件形状', () 
     // 降级：id 为 null + ok:false + message
     expect(
       isUnknownEvent(
-        parseEvent({ t: 'fs.checkpoint', phase: 'baseline', toolCallId: 'c', id: null, files: 0, ok: false, message: 'git 没装' }),
+        parseEvent({
+          t: 'fs.checkpoint',
+          phase: 'baseline',
+          toolCallId: 'c',
+          id: null,
+          files: 0,
+          ok: false,
+          message: 'git 没装',
+        }),
       ),
     ).toBe(false)
   })
@@ -108,9 +116,9 @@ describe('PRD-M14-003 / PRD-M14-005 / PRD-M14-008 · 右侧栏事件形状', () 
   })
 
   test('fs.discard 是已知事件：path + rangeStart + undoSnapshotId', () => {
-    expect(
-      isUnknownEvent(parseEvent({ t: 'fs.discard', path: 'b.md', rangeStart: 'r1', undoSnapshotId: 'u1' })),
-    ).toBe(false)
+    expect(isUnknownEvent(parseEvent({ t: 'fs.discard', path: 'b.md', rangeStart: 'r1', undoSnapshotId: 'u1' }))).toBe(
+      false,
+    )
     const ev = parseEvent({ t: 'fs.discard', path: 'b.md', rangeStart: 'r1', undoSnapshotId: 'u1', reason: '整份' })
     expect(isUnknownEvent(ev)).toBe(false)
     expect(ev).toMatchObject({ reason: '整份' })
@@ -125,14 +133,30 @@ describe('PRD-M14-003 / PRD-M14-005 / PRD-M14-008 · 右侧栏事件形状', () 
       provider: 'p',
       model: 'm',
       tokensIn: 5,
-      ctx: { layers: [{ id: 'identity', role: 'system', cacheable: true, approxTokens: 120 }], tools: 300, history: 900 },
+      ctx: {
+        layers: [{ id: 'identity', role: 'system', cacheable: true, approxTokens: 120 }],
+        tools: 300,
+        history: 900,
+      },
     })
     expect(isUnknownEvent(ev)).toBe(false)
-    expect(ev).toMatchObject({ ctx: { layers: [{ id: 'identity', role: 'system', cacheable: true, approxTokens: 120 }], tools: 300, history: 900 } })
+    expect(ev).toMatchObject({
+      ctx: {
+        layers: [{ id: 'identity', role: 'system', cacheable: true, approxTokens: 120 }],
+        tools: 300,
+        history: 900,
+      },
+    })
     // 非法：approxTokens 为负
     expect(
       isUnknownEvent(
-        parseEvent({ t: 'model.request', provider: 'p', model: 'm', tokensIn: 5, ctx: { layers: [{ id: 'x', role: 'system', cacheable: true, approxTokens: -1 }], tools: 0, history: 0 } }),
+        parseEvent({
+          t: 'model.request',
+          provider: 'p',
+          model: 'm',
+          tokensIn: 5,
+          ctx: { layers: [{ id: 'x', role: 'system', cacheable: true, approxTokens: -1 }], tools: 0, history: 0 },
+        }),
       ),
     ).toBe(true)
   })

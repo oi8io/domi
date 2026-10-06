@@ -13,7 +13,7 @@ import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
 import { StubProvider } from '@domi/model'
 import { PROTOCOL_VERSION, type RpcNotification, type RpcRequest, type RpcResponse } from '@domi/protocol'
-import { createRuntimeHost, Daemon, type ClientConn, type RuntimeHost } from '../src/index.ts'
+import { type ClientConn, createRuntimeHost, Daemon, type RuntimeHost } from '../src/index.ts'
 
 const dirs: string[] = []
 const hosts: RuntimeHost[] = []
@@ -132,7 +132,7 @@ async function repo(): Promise<string> {
   const d = tmp('domi-ckpt-repo-')
   execSync('git init -q --initial-branch main', { cwd: d })
   writeFileSync(join(d, 'keep.txt'), 'keep\n')
-  execSync("git -c user.email=a@b -c user.name=a add -A && git -c user.email=a@b -c user.name=a commit -q -m init", {
+  execSync('git -c user.email=a@b -c user.name=a add -A && git -c user.email=a@b -c user.name=a commit -q -m init', {
     cwd: d,
   })
   return d

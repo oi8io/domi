@@ -8,6 +8,7 @@
 
 import { type DomiClient, mergeDraft, type RefLink } from '@domi/client-core'
 import { tr } from '@domi/i18n'
+import type { FileRef } from '@domi/protocol'
 import {
   type ClipboardEvent,
   type DragEvent,
@@ -22,10 +23,9 @@ import { Button } from '../components/ui/button.tsx'
 import { IconPaperclip, IconX, IconZap } from '../icons.tsx'
 import { cn } from '../lib/cn.ts'
 
-export interface PendingRef extends RefLink {
-  /** 给人看的：被引用那一轮的第一句话 */
-  label: string
-}
+/** 给人看的：跨会话引用是那一轮的第一句话；文件引用是路径（PRD-M14-008）。
+ * 必须做成可判别的联合（不能 `SubmitRef & {label}`：交叉不分配，kind/sessionId 都窄不了） */
+export type PendingRef = (RefLink & { label: string }) | (FileRef & { label: string })
 
 export interface ComposerExtras {
   uploads: string[]
@@ -98,8 +98,8 @@ export function PendingRefs({ refs, onRemove }: { refs: readonly PendingRef[]; o
     <ul className="mb-2 flex flex-wrap gap-1.5">
       {refs.map((r, i) => (
         <Chip
-          key={`${r.sessionId}#${r.fromSeq}`}
-          tone={tr('web.composer.quoteSession', { sessionId: r.sessionId })}
+          key={'kind' in r ? `file#${r.path}#${r.lineStart}` : `${r.sessionId}#${r.fromSeq}`}
+          tone={tr('web.composer.quoteSession', { sessionId: 'kind' in r ? r.path : r.sessionId })}
           label={r.label}
           onRemove={() => onRemove(i)}
         />
@@ -437,9 +437,9 @@ export function Composer({
         <ul className="mb-2 flex flex-wrap gap-1.5" data-part="chips">
           {refs.map((r, i) => (
             <Chip
-              key={`${r.sessionId}#${r.fromSeq}`}
-              tone={tr('web.composer.quoteSession', { sessionId: r.sessionId })}
-              label={r.label}
+              key={'kind' in r ? `file#${r.path}#${r.lineStart}` : `${r.sessionId}#${r.fromSeq}`}
+              tone={'kind' in r ? tr('web.composer.file') : tr('web.composer.quoteSession', { sessionId: r.sessionId })}
+              label={'kind' in r ? <span className="font-mono">{r.path}</span> : r.label}
               onRemove={() => onRemoveRef?.(i)}
             />
           ))}

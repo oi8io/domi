@@ -10,8 +10,8 @@
  * 无变化跳过：工作树与上一快照一致时复用上一快照 id，不产生空提交（SPEC 取舍-3）。
  */
 import { GitUnavailableError, type ShadowRepo } from '@domi/checkpoint'
-import { isKnownEvent, type DomiEvent, type EventEnvelope } from '@domi/protocol'
 import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
+import { type DomiEvent, type EventEnvelope, isKnownEvent } from '@domi/protocol'
 
 /** 会改文件的工具（PRD-M14-003 AC-1 原文）。其余工具不触发任何快照 */
 export const FILE_MODIFY_TOOLS = new Set(['fs.write', 'fs.edit', 'shell.exec'])

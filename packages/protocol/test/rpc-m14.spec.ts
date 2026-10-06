@@ -44,12 +44,10 @@ describe('PRD-M14-008 AC-3 · session.submit.refs 可含文件行引用', () => 
   test('refs 同时收 RefLink 与 FileRef；非法行号拒绝', () => {
     const p = METHODS['session.submit'].params
     const base = { sessionId: 's', text: 'hi' }
-    expect(
-      p.safeParse({ ...base, refs: [{ sessionId: 'other', fromSeq: 1, toSeq: 5 }] }).success,
-    ).toBe(true)
-    expect(
-      p.safeParse({ ...base, refs: [{ kind: 'file', path: 'a.ts', lineStart: 1, lineEnd: 3 }] }).success,
-    ).toBe(true)
+    expect(p.safeParse({ ...base, refs: [{ sessionId: 'other', fromSeq: 1, toSeq: 5 }] }).success).toBe(true)
+    expect(p.safeParse({ ...base, refs: [{ kind: 'file', path: 'a.ts', lineStart: 1, lineEnd: 3 }] }).success).toBe(
+      true,
+    )
     expect(
       p.safeParse({
         ...base,
@@ -63,7 +61,15 @@ describe('PRD-M14-008 AC-3 · session.submit.refs 可含文件行引用', () => 
       false,
     )
     expect(p.safeParse({ ...base, refs: [{ kind: 'chat', id: 'x' }] }).success).toBe(false)
-    expect(p.safeParse({ ...base, refs: [{ sessionId: 'o', fromSeq: 1, toSeq: 5 }, { kind: 'file', path: 'b', lineStart: 1, lineEnd: 1 }] }).success).toBe(true)
+    expect(
+      p.safeParse({
+        ...base,
+        refs: [
+          { sessionId: 'o', fromSeq: 1, toSeq: 5 },
+          { kind: 'file', path: 'b', lineStart: 1, lineEnd: 1 },
+        ],
+      }).success,
+    ).toBe(true)
   })
 })
 

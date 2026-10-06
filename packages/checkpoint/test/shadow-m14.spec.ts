@@ -142,7 +142,7 @@ describe('ShadowRepo.restorePath（SPEC-M14-003 取舍-7）', () => {
     const { work, r } = await fixture()
     const b = await r.snapshot('s1')
     writeFileSync(join(work, 'later.txt'), '后来建的\n')
-    const a = await r.snapshot('s2')
+    await r.snapshot('s2')
 
     await r.restorePath(b.id, 'later.txt')
     expect(existsSync(join(work, 'later.txt'))).toBe(false)
@@ -152,7 +152,7 @@ describe('ShadowRepo.restorePath（SPEC-M14-003 取舍-7）', () => {
   })
 
   test('路径逃逸（.. / 绝对路径 / .git）拒绝', async () => {
-    const { work, r } = await fixture()
+    const { r } = await fixture()
     const b = await r.snapshot('s1')
     await expect(r.restorePath(b.id, '../x.txt')).rejects.toThrow('不在工作目录')
     await expect(r.restorePath(b.id, '/etc/passwd')).rejects.toThrow('不在工作目录')

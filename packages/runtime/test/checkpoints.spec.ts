@@ -9,17 +9,12 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { ShadowRepo, GitUnavailableError } from '@domi/checkpoint'
+import { GitUnavailableError, ShadowRepo } from '@domi/checkpoint'
 import { ConfigSchema } from '@domi/config'
 import { StubProvider } from '@domi/model'
-import { isKnownEvent, type EventEnvelope } from '@domi/protocol'
+import { type EventEnvelope, isKnownEvent } from '@domi/protocol'
+import { CheckpointController, type CheckpointRow, lastUserInputSeq, resolveSnapshots } from '../src/checkpoints.ts'
 import { DomiSession } from '../src/index.ts'
-import {
-  CheckpointController,
-  lastUserInputSeq,
-  resolveSnapshots,
-  type CheckpointRow,
-} from '../src/checkpoints.ts'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -141,7 +136,14 @@ describe('CheckpointController · 触发时机（SPEC-M14-003 取舍-1/2）', ()
   test('git 不可用 → 落 ok:false + id:null，不抛错（AC-4 降级明示）', async () => {
     const c = new CheckpointController(missingGitRepo())
     const b = await c.beforeTool({ id: 'w1', name: 'fs.write' })
-    expect(b[0]).toMatchObject({ t: 'fs.checkpoint', phase: 'baseline', toolCallId: 'w1', ok: false, id: null, files: 0 })
+    expect(b[0]).toMatchObject({
+      t: 'fs.checkpoint',
+      phase: 'baseline',
+      toolCallId: 'w1',
+      ok: false,
+      id: null,
+      files: 0,
+    })
     expect(typeof b[0]?.message).toBe('string')
     // 降级闩：本轮后续不再尝试（不会刷一堆失败事件）
     const a = await c.afterTool({ id: 'w1', name: 'fs.write' }, true)
@@ -162,7 +164,6 @@ describe('CheckpointController · 触发时机（SPEC-M14-003 取舍-1/2）', ()
 
 // ── 区间规则纯函数（SPEC-M14-003 取舍-6）──────────────────────────────────
 
-let eseq = 0
 function env(seq: number, ev: Record<string, unknown>): EventEnvelope {
   return { seq, sessionId: 's1', parentSeq: seq > 1 ? seq - 1 : null, ts: seq, schemaVersion: 16, ev: ev as never }
 }
@@ -219,7 +220,8 @@ describe('resolveSnapshots · 区间规则（取舍-6）', () => {
     const idx: CheckpointRow[] = []
     for (const e of STREAM) {
       const ev = e.ev as { t: string; phase?: string; id?: string | null }
-      if (ev.t === 'fs.checkpoint' && ev.id !== null) idx.push({ seq: e.seq, id: ev.id as string, phase: ev.phase as 'baseline' | 'after' })
+      if (ev.t === 'fs.checkpoint' && ev.id !== null)
+        idx.push({ seq: e.seq, id: ev.id as string, phase: ev.phase as 'baseline' | 'after' })
     }
     expect(idx).toHaveLength(4)
   })
@@ -257,10 +259,7 @@ describe('DomiSession · 快照事件进事件流（SPEC-M14-003 取舍-1/2）',
       [{ type: 'delta', text: '好了' }],
     ])
     const seqs = Object.fromEntries(
-      seen.map((e) => [
-        e.ev.t + (isKnownEvent(e.ev) && e.ev.t === 'fs.checkpoint' ? `:${e.ev.phase}` : ''),
-        e.seq,
-      ]),
+      seen.map((e) => [e.ev.t + (isKnownEvent(e.ev) && e.ev.t === 'fs.checkpoint' ? `:${e.ev.phase}` : ''), e.seq]),
     ) as Record<string, number>
     const baseline = seqs['fs.checkpoint:baseline']!
     const after = seqs['fs.checkpoint:after']!
@@ -285,8 +284,8 @@ describe('DomiSession · 快照事件进事件流（SPEC-M14-003 取舍-1/2）',
     // fs.read 只读不触发；shell.exec 是第一个改文件工具 → baseline + after
     expect(ck).toHaveLength(2)
     expect(ck[0]?.ev).toMatchObject({ phase: 'baseline', toolCallId: 's1' })
-    const afterId = (ck[1]?.ev as { id: string }).id
-    const beforeId = (ck[0]?.ev as { id: string }).id
+    const afterId = (ck[1]!.ev as { id: string }).id
+    const beforeId = (ck[0]!.ev as { id: string }).id
     expect(afterId).not.toBe(beforeId)
     expect(await Bun.file(join(work, 'made.txt')).text()).toBe('h')
     await s.flushAndClose()
@@ -301,12 +300,15 @@ describe('DomiSession · 快照事件进事件流（SPEC-M14-003 取舍-1/2）',
       cwd: work,
       dbPath: db,
       clock,
-      provider: new StubProvider([
-        [{ type: 'tool-call', id: 'w1', name: 'fs.write', args: { path: 'a.txt', content: '一\n' } }],
-        [{ type: 'delta', text: '第一轮好了' }],
-        [{ type: 'tool-call', id: 'w2', name: 'fs.write', args: { path: 'a.txt', content: '二\n' } }],
-        [{ type: 'delta', text: '第二轮好了' }],
-      ] as never, { onExhausted: 'repeat-last' }),
+      provider: new StubProvider(
+        [
+          [{ type: 'tool-call', id: 'w1', name: 'fs.write', args: { path: 'a.txt', content: '一\n' } }],
+          [{ type: 'delta', text: '第一轮好了' }],
+          [{ type: 'tool-call', id: 'w2', name: 'fs.write', args: { path: 'a.txt', content: '二\n' } }],
+          [{ type: 'delta', text: '第二轮好了' }],
+        ] as never,
+        { onExhausted: 'repeat-last' },
+      ),
       checkpoints: new CheckpointController(shadowRepo(work)),
     })
     const seen: EventEnvelope[] = []
@@ -371,8 +373,8 @@ describe('DomiSession · 快照事件进事件流（SPEC-M14-003 取舍-1/2）',
     expect(await Bun.file(join(work, 'a.txt')).exists()).toBe(false)
     const discards = seen.filter((e) => e.ev.t === 'fs.discard')
     expect(discards).toHaveLength(1)
-    expect(discards[0]?.ev).toMatchObject({ path: 'a.txt' })
-    expect(typeof (discards[0]?.ev as { undoSnapshotId?: string }).undoSnapshotId).toBe('string')
+    expect(discards[0]!.ev).toMatchObject({ path: 'a.txt' })
+    expect(typeof (discards[0]!.ev as { undoSnapshotId?: string }).undoSnapshotId).toBe('string')
 
     // undo → 恢复成丢弃前的「二」
     const { path } = await s.checkpointDiscardUndo(eventSeq)

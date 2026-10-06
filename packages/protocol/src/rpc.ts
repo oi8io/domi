@@ -16,13 +16,7 @@
  *    客户端不轮询——轮询会把「断开期间发生了什么」这个问题变成不可解。
  */
 import { z } from 'zod'
-import {
-  EventEnvelopeSchema,
-  RefLinkSchema,
-  SemanticItemSchema,
-  SoulChangeSchema,
-  SubmitRefSchema,
-} from './event.ts'
+import { EventEnvelopeSchema, SemanticItemSchema, SoulChangeSchema, SubmitRefSchema } from './event.ts'
 
 /**
  * 协议版本。**只在不兼容变更时 +1。**
@@ -798,7 +792,12 @@ export const METHODS = {
     summary:
       '非隔离会话丢弃一个文件的改动（PRD-M14-005 AC-7，SPEC-M14-003 取舍-7）：把文件恢复到所选范围起点的快照内容。' +
       '丢弃前自动打快照（可撤销），落 fs.discard 事件（INV-03）。隔离会话请用 worktree.discard。运行中（busy）拒绝',
-    params: z.object({ sessionId: z.string(), path: z.string().min(1), fromSeq: z.number().int().nonnegative(), toSeq: z.number().int().nonnegative() }),
+    params: z.object({
+      sessionId: z.string(),
+      path: z.string().min(1),
+      fromSeq: z.number().int().nonnegative(),
+      toSeq: z.number().int().nonnegative(),
+    }),
     result: z.object({ ok: z.literal(true), eventSeq: z.number().int() }),
   },
   'checkpoint.discard.undo': {

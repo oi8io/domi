@@ -90,16 +90,17 @@ export function App({
     )
   }, [client, online])
 
-  // 会话订阅跟着路由走
+  // 会话订阅跟着路由走；kind 用于右侧栏默认开关（SPEC-M14-001 取舍-3）
   const sessionId = route.view === 'session' ? route.id : null
+  const sessionKind = sessions.find((s) => s.id === sessionId)?.kind
   const [active, setActive] = useState<{ id: string; store: SessionStore } | null>(null)
   useEffect(() => {
     if (sessionId === null || !online) return
-    const store = createSessionStore()
+    const store = createSessionStore(sessionKind === undefined ? {} : { kind: sessionKind })
     setActive({ id: sessionId, store })
     client.watch(sessionId, store).catch(() => undefined)
     return () => client.unwatch(sessionId)
-  }, [client, sessionId, online])
+  }, [client, sessionId, online, sessionKind])
   const activeStatus = useStore((active?.store ?? EMPTY).$status)
   // 列表由 daemon 推送变化（sessions.changed，PRD-M8-009 AC-1）；正在看的会话忙闲翻转时也刷一次（老 daemon 不推）
   const listVersion = useStore(client.$sessionsVersion)
