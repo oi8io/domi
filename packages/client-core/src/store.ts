@@ -7,7 +7,7 @@
  * 这里做的是**投影**，不是存储：事件流是唯一真相，atom 里的东西随时可以从
  * 事件流重算出来。所以任何"只在 atom 里、事件流里没有"的状态都是 bug。
  */
-import { deadRanges, isDead } from '@domi/checkpoint'
+import { deadRanges, isDead } from '@domi/checkpoint/revert'
 import { tr } from '@domi/i18n'
 import { type AnyEvent, type EventEnvelope, isKnownEvent } from '@domi/protocol'
 import { atom, computed } from 'nanostores'
