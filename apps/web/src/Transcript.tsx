@@ -333,7 +333,7 @@ export function Transcript({
           >
             {dead !== undefined && dead.has(row.call.seq) && (
               <span
-                className="absolute right-2 top-1 z-10 rounded bg-warn-d px-1 py-px text-[10px] text-warn"
+                className="absolute right-36 top-1 z-10 rounded bg-warn-d px-1 py-px text-[10px] text-warn"
                 data-part="transcript-dead"
               >
                 {tr('web.revert.dead')}
@@ -343,23 +343,13 @@ export function Transcript({
               <summary className="flex cursor-pointer list-none items-center gap-2 bg-panel px-3 py-1.5 text-[13px] hover:bg-panel-h [&::-webkit-details-marker]:hidden">
                 <code className="text-[12.5px] font-medium">{row.call.text}</code>
                 <ToolStatus result={row.result} />
-                <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-mut2">{row.call.summary}</span>
-                {onOpenChanges !== undefined && OPEN_TOOLS.has(row.call.text) && (
-                  <button
-                    type="button"
-                    className={ACTION_BTN}
-                    data-action="open-changes"
-                    title={tr('web.transcript.openInInspector')}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      onOpenChanges(toolArgsPath(row.call))
-                    }}
-                  >
-                    <IconEye size={11} />
-                    {tr('web.transcript.openInInspector')}
-                  </button>
-                )}
+                <span
+                  className={`min-w-0 flex-1 truncate font-mono text-[11px] text-mut2${
+                    onOpenChanges !== undefined && OPEN_TOOLS.has(row.call.text) ? ' pr-36' : ''
+                  }`}
+                >
+                  {row.call.summary}
+                </span>
                 {row.result?.ms !== undefined && (
                   <span className="shrink-0 font-mono text-[11px] text-mut2">{formatElapsed(row.result.ms)}</span>
                 )}
@@ -373,6 +363,22 @@ export function Transcript({
                 </pre>
               )}
             </details>
+            {onOpenChanges !== undefined && OPEN_TOOLS.has(row.call.text) && (
+              <button
+                type="button"
+                className={`${ACTION_BTN} absolute right-2 top-1 z-10`}
+                data-action="open-changes"
+                title={tr('web.transcript.openInInspector')}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onOpenChanges(toolArgsPath(row.call))
+                }}
+              >
+                <IconEye size={11} />
+                {tr('web.transcript.openInInspector')}
+              </button>
+            )}
             {onBranch !== undefined && (
               <RowActions>
                 <BranchButton seq={(row.result ?? row.call).seq} onBranch={onBranch} />
