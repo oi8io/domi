@@ -366,8 +366,8 @@ export const en: Record<keyof typeof zh, string> = {
   'web.settings.maxToolCallsHint': 'How many tool calls one turn may make (1-1000, default 100)',
   'web.settings.maxArgParseRetries': 'Max arg-parse retries',
   'web.settings.maxArgParseRetriesHint': 'Retries when tool-arg parsing fails (1-100, default 3)',
-  'web.settings.maxWallClockMs': 'Max wall-clock per turn (ms)',
-  'web.settings.maxWallClockMsHint': 'Wall-clock budget for one turn (1000-86400000, default 600000)',
+  'web.settings.maxWallClockMs': 'Max wall-clock per turn (min)',
+  'web.settings.maxWallClockMsHint': 'Wall-clock budget for one turn (1-1440 min, default 10)',
   'web.settings.language': 'Interface language',
   'web.settings.languageHint':
     "Language domi's interface is shown in; shared by Web and TUI. The page reloads after switching",

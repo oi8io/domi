@@ -26,14 +26,21 @@ export function RuntimeTab({ s }: { s: ReturnType<typeof useSettings> }) {
   const d = s.data
   const [draft, setDraft] = useState<Record<string, string>>({})
   if (d === null) return <Saved error={s.error} saved={null} />
-  const val = (k: string): string => draft[k] ?? str(d.values[k])
+  const val = (k: string): string => {
+    const dft = draft[k]
+    if (dft !== undefined) return dft
+    const n = Number(d.values[k])
+    // maxWallClockMs 配置存毫秒，界面按分钟显示（四舍五入；不改动时不提交，精度不受影响）
+    if (k === 'loop.maxWallClockMs') return String(Math.round(n / 60_000))
+    return str(d.values[k])
+  }
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
         const patch: Record<string, unknown> = {}
         for (const [k, v] of Object.entries(draft)) {
-          patch[k] = Number(v)
+          patch[k] = k === 'loop.maxWallClockMs' ? Number(v) * 60_000 : Number(v)
         }
         void s.save(patch).then((ok) => ok && setDraft({}))
       }}
