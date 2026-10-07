@@ -11,6 +11,7 @@
  */
 import {
   type EventEnvelope,
+  estimateTextTokens,
   isKnownEvent,
   type ModelMessage,
   type ModelMessages,
@@ -221,7 +222,7 @@ registerContextStrategy('full', fullStrategy)
 registerContextStrategy('incremental', incrementalPlaceholder)
 
 /**
- * 粗估 token 数：字符数 / 4。
+ * 粗估 token 数：消息 JSON 文本按 `estimateTextTokens` 口径（CJK 每字 1、其余每 4 字符 1 · BUG-M14-001）。
  * 故意粗糙——它只用来在拼完仍超长时**明确报错**，而不是让模型 400。
  * 真正的计数（状态栏、自动压缩的 70% 阈值）走 provider 返回的 usage（kernel/metrics.ts 的 aggregate）。
  */
@@ -229,17 +230,17 @@ registerContextStrategy('incremental', incrementalPlaceholder)
 const IMAGE_TOKENS = 1600
 
 function estimateTokens(msgs: ModelMessages): number {
-  let chars = 0
+  let tokens = 0
   let images = 0
   for (const m of msgs) {
     if (m.role === 'user' && m.images) {
       images += m.images.length
-      chars += JSON.stringify({ ...m, images: undefined }).length
+      tokens += estimateTextTokens(JSON.stringify({ ...m, images: undefined }))
     } else {
-      chars += JSON.stringify(m).length
+      tokens += estimateTextTokens(JSON.stringify(m))
     }
   }
-  return Math.ceil(chars / 4) + images * IMAGE_TOKENS
+  return tokens + images * IMAGE_TOKENS
 }
 
 export function buildContext(events: readonly EventEnvelope[], policy: ContextPolicy): ModelMessages {

@@ -34,7 +34,7 @@ error.cache_boundary: 层 "X"(cacheable) 排在 "Y"(非 cacheable) 之后。
 prompt cache 按前缀匹配——前面一旦有会变的内容，后面所有 cacheable 层的缓存都作废。
 ```
 
-4. 产出 `AssembledPrompt`：`messages`、`layers`（每层字符数与粗估 token，字符数 / 4，ADR-008 决定不引 tokenizer）、**`prefixText`（所有 cacheable 层拼起来的稳定前缀——cache 能不能打中，看的就是它稳不稳）**、`prefixLayerCount`（给 `domi prompt dump` 标前缀边界用）。
+4. 产出 `AssembledPrompt`：`messages`、`layers`（每层字符数与粗估 token，`estimateTextTokens` 口径：CJK 每字 1、其余每 4 字符 1，ADR-008 决定不引 tokenizer）、**`prefixText`（所有 cacheable 层拼起来的稳定前缀——cache 能不能打中，看的就是它稳不稳）**、`prefixLayerCount`（给 `domi prompt dump` 标前缀边界用）。
 
 内置层在 `builtin.ts`：identity / soul / env / capability / skill / task / guardrail 等；`layersFromConfig` 从配置合并用户自定义层；`mergeLayers` 支持按 id 覆盖（id 是覆盖的依据）。`domi prompt dump` 命令输出拼装结果与每层统计。
 

@@ -10,6 +10,7 @@
  * 所以必须在**构建期**就炸，而不是等 nightly 的趋势文件告诉你。
  */
 import type { ModelMessages } from '@domi/protocol'
+import { estimateTextTokens } from '@domi/protocol'
 
 export interface PromptCtx {
   cwd: string
@@ -56,7 +57,7 @@ export interface LayerDump {
   priority: number
   cacheable: boolean
   chars: number
-  /** 粗估，字符数 / 4。ADR-008 决定不引 tokenizer，这个数只用于人看 */
+  /** 粗估（`estimateTextTokens` 口径：CJK 每字 1、其余每 4 字符 1）。ADR-008 决定不引 tokenizer，这个数只用于人看 */
   approxTokens: number
 }
 
@@ -69,8 +70,9 @@ export interface AssembledPrompt {
   prefixLayerCount: number
 }
 
+/** 与 `@domi/protocol` 的 `estimateTextTokens` 同口径（BUG-M14-001） */
 export function approxTokens(s: string): number {
-  return Math.ceil(s.length / 4)
+  return estimateTextTokens(s)
 }
 
 /**

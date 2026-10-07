@@ -156,7 +156,7 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     tokensIn: z.number().int().nonnegative(),
     /**
      * M14：这一次请求的上下文分段估算（SPEC-M14-006）。层清单来自 prompt.assemble()，
-     * tools / history 是 kernel 对工具 schema 与历史消息的字符估算（字符 / 4）。
+     * tools / history 是 kernel 对工具 schema 与历史消息的 token 估算（estimateTextTokens 口径：CJK 每字 1、其余每 4 字符 1）。
      * **可选**——旧事件没有照样解析；它只是估算，真实总量以 model.usage 为准
      */
     ctx: z

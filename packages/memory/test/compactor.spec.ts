@@ -224,7 +224,16 @@ describe('events-immutable (AC-4)', () => {
     // 摘要本身也要花 token。会话短到一定程度，摘要比被摘的内容还长。
     // 拦住这种情况的是 AC-1 的阈值（到窗口 70% 才压），不是压缩函数自己。
     // 把它写成测试，是为了让"看起来数字不对"的那天有人能读到这段话
-    const r = await compact(conversation(), { summarize: stubSummarizer })
+    // BUG-M14-001 之后中文按每字 1 token 计，conversation() 被压的两轮已经比摘要长了；这里换一段真正「短」的前缀
+    seq = 0
+    const short = [
+      env({ t: 'user.input', text: '在吗' }),
+      env({ t: 'model.delta', text: '在。' }),
+      env({ t: 'user.input', text: '跑一下测试' }),
+      env({ t: 'model.delta', text: '通过了。' }),
+      env({ t: 'user.input', text: '好了' }),
+    ]
+    const r = await compact(short, { summarize: stubSummarizer })
     expect(r.event.tokensAfter).toBeGreaterThan(r.event.tokensBefore)
     expect(shouldCompact(r.event.tokensBefore, 150_000)).toBe(false)
   })

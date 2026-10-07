@@ -11,11 +11,11 @@
  * 「这里本来有东西」必须看得见，否则排查时人会以为那一步压根没发生。
  */
 import type { AnyEvent, EventEnvelope } from '@domi/protocol'
-import { isKnownEvent } from '@domi/protocol'
+import { estimateTextTokens, isKnownEvent } from '@domi/protocol'
 
-/** 粗略 token 估算，与 @domi/prompt 的 approxTokens 同口径（4 字符 ≈ 1 token） */
+/** 粗略 token 估算，与 @domi/prompt 的 approxTokens 同口径（`estimateTextTokens`：CJK 每字 1、其余每 4 字符 1 · BUG-M14-001） */
 export function approxTokens(s: string): number {
-  return Math.ceil(s.length / 4)
+  return estimateTextTokens(s)
 }
 
 export const RULES = ['dedupe', 'verbose', 'resolvedError', 'stack'] as const

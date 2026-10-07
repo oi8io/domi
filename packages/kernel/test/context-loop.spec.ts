@@ -1,12 +1,13 @@
 /**
  * SPEC-M14-006 取舍-1 · model.request.ctx 由 kernel 纯计算（PRD-M14-006 AC-1）
- * - 有 prompt（含 layers）→ ctx 带上层清单 + tools / history 字符估算（/4）
+ * - 有 prompt（含 layers）→ ctx 带上层清单 + tools / history 估算（estimateTextTokens 口径 · BUG-M14-001）
  * - 无 prompt（或没层）→ 不带 ctx，旧事件端上照常解析（AC-2）
  */
 import { afterEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { estimateTextTokens } from '@domi/protocol'
 import { SqliteEventLog } from '@domi/store'
 import { type Clock, type ProviderLike, runTurn } from '../src/index.ts'
 
@@ -61,13 +62,13 @@ test('有 prompt（含 layers）→ model.request 带 ctx：层清单原样 + to
   const ctx = (req.ev as { ctx?: { layers: unknown[]; tools: number; history: number } }).ctx
   expect(ctx).not.toBeUndefined()
   expect(ctx!.layers).toEqual(layers)
-  // tools = 工具 schema JSON 长度 /4（向下取整），history = 消息 JSON 长度 /4
-  expect(ctx!.tools).toBe(Math.floor(JSON.stringify(tools).length / 4))
+  // tools / history = 工具 schema、消息的 JSON 文本按 estimateTextTokens 口径估算
+  expect(ctx!.tools).toBe(estimateTextTokens(JSON.stringify(tools)))
   const messages = [
     { role: 'system', content: 'sys' },
     { role: 'user', content: 'usr\n\n你好' },
   ]
-  expect(ctx!.history).toBe(Math.floor(JSON.stringify(messages).length / 4))
+  expect(ctx!.history).toBe(estimateTextTokens(JSON.stringify(messages)))
   sink.close()
 })
 

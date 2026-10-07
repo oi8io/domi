@@ -11,6 +11,7 @@
  * 进事件流的只有终止那一刻的快照。
  */
 import type { DomiEvent, EventEnvelope, RefLink, SubmitRef, UploadRef } from '@domi/protocol'
+import { estimateTextTokens } from '@domi/protocol'
 import { buildContext, type ContextPolicy, type LoadedUpload } from './build-context.ts'
 import type { Clock, EventSink, ToolCallRequest, ToolRunner } from './ports.ts'
 import { type PromptParts, withPrompt } from './preamble.ts'
@@ -292,14 +293,14 @@ export async function runTurn(
         provider: deps.provider.id,
         model: deps.model,
         tokensIn: messages.length,
-        // M14（SPEC-M14-006 取舍-1）：ctx 是纯计算的字符估算（工具 schema 与历史消息 JSON 长度 / 4），
+        // M14（SPEC-M14-006 取舍-1）：ctx 是纯计算的估算（工具 schema 与历史消息 JSON 文本，estimateTextTokens 口径 · BUG-M14-001），
         // 层清单来自 prompt.assemble()（packages/prompt 已填）。真实总量以 model.usage 为准（BUG-M13-002 口径）。
         ...(prompt?.layers !== undefined
           ? {
               ctx: {
                 layers: prompt.layers,
-                tools: Math.floor(JSON.stringify(deps.tools.schemas()).length / 4),
-                history: Math.floor(JSON.stringify(messages).length / 4),
+                tools: estimateTextTokens(JSON.stringify(deps.tools.schemas())),
+                history: estimateTextTokens(JSON.stringify(messages)),
               },
             }
           : {}),
