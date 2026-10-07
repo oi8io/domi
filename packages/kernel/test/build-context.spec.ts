@@ -88,6 +88,17 @@ describe('PRD-M0-006 AC-3 · 输出可深比较断言', () => {
       /maxTokens[\s\S]*context\.strategy/,
     )
   })
+
+  // BUG-M14-001：原来按「字符数 / 4」估，3000 个汉字只算约 770 token，maxTokens=2000 放行，到模型侧才 400
+  test('BUG-M14-001 · 中文按 CJK 口径估算：3000 个汉字超过 maxTokens=2000 要报错', () => {
+    const big = [env({ t: 'user.input', text: '中'.repeat(3_000) })]
+    expect(() => buildContext(big, { maxTokens: 2_000, includeReasoning: false })).toThrow(/maxTokens/)
+  })
+
+  test('BUG-M14-001 · 英文口径不变：10000 个 ASCII 字符约 2.5k token，maxTokens=2600 放行', () => {
+    const big = [env({ t: 'user.input', text: 'x'.repeat(10_000) })]
+    expect(() => buildContext(big, { maxTokens: 2_600, includeReasoning: false })).not.toThrow()
+  })
 })
 
 describe('PRD-M0-006 AC-4 · 策略是可选项', () => {

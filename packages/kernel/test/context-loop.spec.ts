@@ -93,3 +93,29 @@ test('没有 prompt → 不带 ctx（旧宿主路径；端上 hasLayers=false）
   expect((req.ev as { ctx?: unknown }).ctx).toBeUndefined()
   sink.close()
 })
+
+// BUG-M14-001：history 原来是 JSON 长度 / 4，1000 个汉字只算约 260，上下文 tab 的「对话历史」偏小、「未归类」被撑大
+test('BUG-M14-001 · 中文对话历史按 CJK 口径估算：1000 个汉字 → history ≥ 1000', async () => {
+  const { clock, sink, provider } = make()
+  await runTurn(
+    {
+      sink,
+      clock,
+      provider,
+      tools: {
+        schemas: () => [],
+        run: async () => ({ ok: true, payload: {} }),
+      },
+      policy: { maxTokens: 1_000_000, includeReasoning: false },
+      model: 'm',
+      prompt: () => ({ system: 'sys', dynamic: 'usr', layers: [] }),
+    },
+    's',
+    '中'.repeat(1_000),
+  )
+  const evs = await sink.read('s')
+  const req = evs.find((e) => e.ev.t === 'model.request')!
+  const ctx = (req.ev as { ctx?: { history: number } }).ctx
+  expect(ctx!.history).toBeGreaterThanOrEqual(1_000)
+  sink.close()
+})

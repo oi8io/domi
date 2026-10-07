@@ -203,4 +203,10 @@ describe('设计不变量 · 清理只缩短投影，从不删除事件', () => 
   test('token 估算与 @domi/prompt 同口径', () => {
     expect(approxTokens('12345678')).toBe(2)
   })
+
+  // BUG-M14-001：压缩 / 清理的前后 token 与节省量原来按字符数 / 4，中文会话低估 3–4 倍
+  test('BUG-M14-001 · 中文按 CJK 口径：每字 1 token', () => {
+    expect(approxTokens('中文'.repeat(50))).toBe(100)
+    expect(approxTokens('错误已解决：x')).toBe(7)
+  })
 })
