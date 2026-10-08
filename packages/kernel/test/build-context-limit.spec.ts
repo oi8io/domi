@@ -2,7 +2,7 @@
  * PRD-M15-002 AC-4 · buildContext 超限抛 ContextLimitError（可恢复）
  * - 拼装阶段超硬顶（92% 有效窗口）→ 抛 ContextLimitError，不静默截断
  */
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -30,7 +30,7 @@ const policy = { strategy: 'full' as const, maxTokens: 1_000_000, includeReasoni
 test('超硬顶 → ContextLimitError', async () => {
   const evs = await eventsOf([{ t: 'user.input', text: 'x'.repeat(50_000), mode: 'chat' }])
   const window = { contextWindow: 30_000, maxOutput: 4_000 }
-  const effective = effectiveWindow(window.contextWindow, window.maxOutput)
+  const _effective = effectiveWindow(window.contextWindow, window.maxOutput)
   expect(() => buildContext(evs, policy, window)).toThrow(ContextLimitError)
   // 同窗口下：硬顶 × 有效窗口 < 这条消息的估算量
   expect(evs[0]!.ev.t).toBe('user.input')

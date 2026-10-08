@@ -264,8 +264,17 @@ export const ConfigSchema = z.object({
     .object({
       maxTokens: z.number().int().positive().default(150_000),
       includeReasoning: z.boolean().default(false),
-      strategy: z.string().default('full'),
-      /** 压缩时逐字保留的最近轮数（PRD-M8-012 AC-4）。只在 strategy = compact 时用 */
+      /**
+       * M15（取舍-2）：均衡 / 节省两档。老配置 full / clean / compact 读时映射为 balanced（doctor 提示，不回写）。
+       * _full 是内部参照投影名，不暴露给配置 schema（取舍-28）
+       */
+      strategy: z
+        .preprocess(
+          (v) => (v === 'full' || v === 'clean' || v === 'compact' ? 'balanced' : v),
+          z.enum(['balanced', 'economical']),
+        )
+        .default('balanced'),
+      /** 压缩时逐字保留的最近轮数（PRD-M8-012 AC-4，SPEC-M15-005 取舍-5 弃用，保留兼容字段） */
       keepTurns: z.number().int().min(0).max(50).default(2),
       /** 上下文占用到这个百分比就压缩。只在 strategy = compact 时用 */
       compactAt: z.number().int().min(30).max(95).default(70),
@@ -283,7 +292,7 @@ export const ConfigSchema = z.object({
     .default({
       maxTokens: 150_000,
       includeReasoning: false,
-      strategy: 'full',
+      strategy: 'balanced',
       keepTurns: 2,
       compactAt: 70,
       cacheTtlOverride: undefined,

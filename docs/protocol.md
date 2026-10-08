@@ -7523,6 +7523,54 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
 }
 ```
 
+### `session.pin`
+
+钉住 / 解钉某条事件（PRD-M15-004 AC-5 的 /pin）：被钉住的 seq 遮蔽与压缩均跳过。seq 不存在返回 ok:false
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "seq": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "pinned": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "sessionId",
+    "seq",
+    "pinned"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
 ## 通知（服务端 → 客户端）
 
 ### `session.events`

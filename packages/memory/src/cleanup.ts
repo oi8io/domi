@@ -22,6 +22,8 @@ export const RULES = ['dedupe', 'verbose', 'resolvedError', 'stack'] as const
 export type RuleId = (typeof RULES)[number]
 
 export interface CleanupOptions {
+  /** M15（PRD-M15-004 AC-4）：只作用于这些 seq（冷区）；传了之后其余事件原样，不再回溯改写热区 */
+  coldSeqs?: Set<number>
   /** 超过这个字符数的工具结果会被截断。默认 2000 */
   maxResultChars?: number
   /** 截断时保留的头部字符数。默认 1200 */
@@ -32,7 +34,7 @@ export interface CleanupOptions {
   stackFrames?: number
 }
 
-const DEFAULTS: Required<CleanupOptions> = {
+const DEFAULTS: Required<Omit<CleanupOptions, 'coldSeqs'>> & { coldSeqs?: Set<number> } = {
   maxResultChars: 2000,
   headChars: 1200,
   tailChars: 400,
@@ -129,7 +131,10 @@ export function truncateStack(text: string, frames: number): { text: string; sav
 }
 
 /** 截断冗长输出：头 + 尾。尾部常常是结论，只留头会把"最后失败了"截掉 */
-export function truncateVerbose(text: string, o: Required<CleanupOptions>): { text: string; saved: number } {
+export function truncateVerbose(
+  text: string,
+  o: Required<Omit<CleanupOptions, 'coldSeqs'>> & { coldSeqs?: Set<number> },
+): { text: string; saved: number } {
   if (text.length <= o.maxResultChars) return { text, saved: 0 }
   const head = text.slice(0, o.headChars)
   const tail = text.slice(-o.tailChars)
@@ -145,7 +150,7 @@ interface CallInfo {
 }
 
 export function cleanup(events: readonly EventEnvelope[], opts: CleanupOptions = {}): CleanupResult {
-  const o = { ...DEFAULTS, ...opts }
+  const o = { ...DEFAULTS, ...opts } as Required<Omit<CleanupOptions, 'coldSeqs'>> & { coldSeqs?: Set<number> }
   const preservedSet = collectReferences(events)
 
   // 第一遍：把 tool.call 的 id 映射到「调用指纹」，tool.result 才知道自己是谁的结果
@@ -183,6 +188,12 @@ export function cleanup(events: readonly EventEnvelope[], opts: CleanupOptions =
     const preserved = preservedSet.has(env.seq)
     if (preserved) {
       items.push({ seq: env.seq, text: original, appliedRules: [], preserved: true })
+      continue
+    }
+
+    // M15（PRD-M15-004 AC-4）：确定性规则只作用于冷区。热区原样，不回溯改写
+    if (o.coldSeqs !== undefined && !o.coldSeqs.has(env.seq)) {
+      items.push({ seq: env.seq, text: original, appliedRules: [], preserved: false })
       continue
     }
 

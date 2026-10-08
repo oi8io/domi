@@ -128,6 +128,8 @@ export interface SessionHandle {
   /** 用量上限（M7-009） */
   setBudget?(b: { tokens?: number; costUsd?: number; toolCalls?: number }): Promise<void>
   compactNow(trigger: 'manual' | 'threshold'): Promise<{ ok: boolean; detail: string }>
+  /** 钉住 / 解钉某条事件（PRD-M15-004 AC-5）。老宿主没有 */
+  pin?(seq: number, pinned: boolean): Promise<{ ok: boolean }>
   readEvents(fromSeq: number, opts?: { maxLines?: number }): Promise<EventEnvelope[]>
   /** PRD-M11-009：向上翻页。beforeSeq 只取 view seq < beforeSeq 的事件。 */
   history?(
@@ -1189,6 +1191,15 @@ export class Daemon {
         if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
         if (this.busy.has(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy')
         return ok(req.id, await session.compactNow('manual'))
+      }
+
+      case 'session.pin': {
+        const p = params as { sessionId: string; seq: number; pinned: boolean }
+        const session = await this.session(p.sessionId)
+        if (!session) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
+        if (!session.pin) return unsupported(req.id, 'pin')
+        if (this.busy.has(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy')
+        return ok(req.id, await session.pin(p.seq, p.pinned))
       }
 
       case 'session.answer': {

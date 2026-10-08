@@ -979,6 +979,11 @@ export const METHODS = {
     params: z.object({ sessionId: z.string() }),
     result: z.object({ ok: z.boolean(), detail: z.string() }),
   },
+  'session.pin': {
+    summary: '钉住 / 解钉某条事件（PRD-M15-004 AC-5 的 /pin）：被钉住的 seq 遮蔽与压缩均跳过。seq 不存在返回 ok:false',
+    params: z.object({ sessionId: z.string(), seq: z.number().int().positive(), pinned: z.boolean() }),
+    result: z.object({ ok: z.boolean() }),
+  },
 } as const
 
 export type MethodName = keyof typeof METHODS

@@ -64,7 +64,14 @@ import {
   verifyNudges,
   verifyState,
 } from '@domi/kernel'
-import { cleanup, compact, registerCleanStrategy, registerCompactStrategy, SummarySchema } from '@domi/memory'
+import {
+  compact,
+  computeMask,
+  registerCleanStrategy,
+  registerCompactStrategy,
+  registerMaskStrategy,
+  SummarySchema,
+} from '@domi/memory'
 import {
   capabilitiesFor,
   createProvider,
@@ -109,6 +116,8 @@ import {
  */
 registerCleanStrategy()
 registerCompactStrategy()
+// M15（取舍-2）：均衡 / 节省两档——遮蔽 + 确定性清理（只动冷区）。'balanced' 是配置默认
+registerMaskStrategy()
 
 const TitleSchema = z.object({ title: z.string() })
 
@@ -948,6 +957,18 @@ export class DomiSession {
     }
   }
 
+  /**
+   * 钉住 / 解钉某条事件（PRD-M15-004 AC-5，SPEC-M15-004 取舍-19）。
+   * 被钉住的 seq：遮蔽与压缩均跳过；解钉恢复。钉 / 解钉均落 ctx.pin 事件。
+   */
+  async pin(seq: number, pinned: boolean): Promise<{ ok: boolean }> {
+    const events = await this.view()
+    if (!events.some((e) => e.seq === seq)) return { ok: false }
+    await this.log.append(this.opts.sessionId, [{ t: 'ctx.pin', seq, pinned }])
+    await this.pump()
+    return { ok: true }
+  }
+
   // ── 给子 agent 与编排用的（M5）─────────────────────────────
 
   get id(): string {
@@ -1254,14 +1275,12 @@ export class DomiSession {
     const effective = effectiveWindow(w.contextWindow, w.maxOutput)
     const r = await degrade(m.contextTokens + increment, effective, {
       mask: async () => {
-        // 004：确定性清理当遮蔽用（005 精化为热区/冷区遮蔽）。腾不出就不落事件
-        const c = cleanup(events)
-        const freed = Math.max(0, c.tokensBefore - c.tokensAfter)
-        if (freed === 0) return { freed: 0 }
-        const seqs = c.items.filter((i) => i.appliedRules.length > 0).map((i) => i.seq)
+        // M15（PRD-M15-004）：冷区一次决定、热区不动；被钉住的 seq 跳过；已遮蔽的不再变
+        const d = computeMask(events)
+        if (d.seqs.length === 0) return { freed: 0 }
         return {
-          freed,
-          ev: { t: 'ctx.mask', seqs, reason: 'threshold', freedTokens: freed },
+          freed: d.freedTokens,
+          ev: { t: 'ctx.mask', seqs: d.seqs, reason: d.reason, freedTokens: d.freedTokens },
         }
       },
       compact: async () => {
@@ -1370,7 +1389,9 @@ export class DomiSession {
       mcp,
       context: {
         strategy: cfg.strategy,
-        thresholdPercent: cfg.strategy === 'compact' ? cfg.compactAt : null,
+        // M15（取舍-16）：预算器第一档（遮蔽阈值）随策略档位走：均衡 60% / 节省 45%。
+        // 压缩阈值不单列——守卫 / 状态栏 / 上下文 tab 全读预算器，端上提示「达到遮蔽阈值」即可
+        thresholdPercent: cfg.strategy === 'economical' ? 45 : 60,
       },
       // M15（SPEC-M15-003）：相对定格快照的待生效变化（端上提示「点刷新」）
       pending: this.pendingContextChanges(),

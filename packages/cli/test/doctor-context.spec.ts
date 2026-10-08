@@ -16,7 +16,7 @@ afterEach(() => {
   while (dirs.length) rmSync(dirs.pop()!, { recursive: true, force: true })
 })
 
-function db(): { path: string; log: SqliteEventLog } {
+function _db(): { path: string; log: SqliteEventLog } {
   const dir = mkdtempSync(join(tmpdir(), 'domi-doctor-ctx-'))
   dirs.push(dir)
   const log = new SqliteEventLog({ path: join(dir, 'e.db'), cwd: '/tmp/w' })
@@ -24,7 +24,7 @@ function db(): { path: string; log: SqliteEventLog } {
 }
 
 let seq = 0
-function env(ev: DomiEvent): EventEnvelope {
+function _env(ev: DomiEvent): EventEnvelope {
   seq += 1
   return { seq, sessionId: 's1', parentSeq: seq > 1 ? seq - 1 : null, ts: 1_000 + seq, schemaVersion: 17, ev }
 }

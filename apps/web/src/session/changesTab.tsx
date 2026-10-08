@@ -20,7 +20,6 @@ import {
   commentsToRefs,
   type DomiClient,
   keepSelection,
-  pendingCount,
   planView,
   type ReviewFindingSnapshot,
   removeComment,

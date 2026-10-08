@@ -85,6 +85,18 @@ export interface CtxStatic {
   pending: { soul: boolean; rules: boolean; catalog: boolean; skills: boolean }
 }
 
+/** 遮蔽记录（PRD-M15-004 AC-6）：哪一步、原始大小、可定位 */
+export interface MaskRecord {
+  /** ctx.mask 事件自身的 seq */
+  seq: number
+  /** 被遮蔽的 tool.result seq 列表 */
+  seqs: number[]
+  reason: string
+  freedTokens: number
+  /** 可定位明细：工具名 + 原始字符数 */
+  items: Array<{ seq: number; tool: string; chars: number }>
+}
+
 export interface ContextView {
   /** 与状态栏同源（AC-8）：直接来自 session.metrics，不另算 */
   total: number | null
@@ -102,6 +114,7 @@ export interface ContextView {
   /** 最近一次请求的层清单（含 cacheable，AC-5） */
   layers: Array<{ id: string; role: 'system' | 'user'; cacheable: boolean; approxTokens: number }> | null
   compacts: CompactRecord[]
+  masks: MaskRecord[]
   reads: ReadThing[]
   mcpCalls: McpCall[]
   skills: LoadedSkill[]
@@ -250,6 +263,7 @@ export function contextView(
     deviation,
     layers: lastCtx?.layers ?? null,
     compacts: compactRecords(events),
+    masks: maskRecords(events),
     reads,
     mcpCalls,
     skills,
@@ -287,6 +301,32 @@ export function compactRecords(events: readonly EventEnvelope[]): CompactRecord[
         tokensAfter: e.ev.tokensAfter,
       })
     }
+  }
+  return out
+}
+
+/** 遮蔽记录（PRD-M15-004 AC-6）：ctx.mask 一批一行；items 带工具名与原始大小，可定位 */
+export function maskRecords(events: readonly EventEnvelope[]): MaskRecord[] {
+  const calls = new Map<string, { name: string; seq: number }>()
+  for (const e of events) {
+    if (!isKnownEvent(e.ev)) continue
+    if (e.ev.t === 'tool.call') calls.set(e.ev.id, { name: e.ev.name, seq: e.seq })
+  }
+  const out: MaskRecord[] = []
+  for (const e of events) {
+    if (!isKnownEvent(e.ev) || e.ev.t !== 'ctx.mask') continue
+    const bySeq = new Map(e.ev.seqs.map((s) => [s, s]))
+    const items: MaskRecord['items'] = []
+    for (const env of events) {
+      if (!bySeq.has(env.seq) || !isKnownEvent(env.ev) || env.ev.t !== 'tool.result') continue
+      const raw = typeof env.ev.payload === 'string' ? env.ev.payload : JSON.stringify(env.ev.payload)
+      items.push({
+        seq: env.seq,
+        tool: calls.get(env.ev.id)?.name ?? 'tool',
+        chars: raw.length,
+      })
+    }
+    out.push({ seq: e.seq, seqs: e.ev.seqs, reason: e.ev.reason, freedTokens: e.ev.freedTokens, items })
   }
   return out
 }

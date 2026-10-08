@@ -329,9 +329,9 @@ export function Transcript({
             className="group relative overflow-hidden rounded-md border border-border2"
             data-row="tool"
             data-seq={row.call.seq}
-            data-dead={dead !== undefined && dead.has(row.call.seq) ? 'true' : 'false'}
+            data-dead={dead?.has(row.call.seq) ? 'true' : 'false'}
           >
-            {dead !== undefined && dead.has(row.call.seq) && (
+            {dead?.has(row.call.seq) && (
               <span
                 className="absolute right-36 top-1 z-10 rounded bg-warn-d px-1 py-px text-[10px] text-warn"
                 data-part="transcript-dead"
@@ -391,9 +391,9 @@ export function Transcript({
             className="group relative"
             data-row={row.item.kind}
             data-seq={row.item.seq}
-            data-dead={dead !== undefined && dead.has(row.item.seq) ? 'true' : 'false'}
+            data-dead={dead?.has(row.item.seq) ? 'true' : 'false'}
           >
-            {dead !== undefined && dead.has(row.item.seq) && (
+            {dead?.has(row.item.seq) && (
               <span
                 className="absolute right-8 top-1 rounded bg-warn-d px-1 py-px text-[10px] text-warn"
                 data-part="transcript-dead"

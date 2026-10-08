@@ -1,6 +1,7 @@
 export * from './cleanup.ts'
 export * from './compact.ts'
 export * from './episodic.ts'
+export * from './mask.ts'
 export * from './search-tool.ts'
 export * from './semantic.ts'
 export * from './soul.ts'

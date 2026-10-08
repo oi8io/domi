@@ -12,6 +12,7 @@ import type { AnyEvent, EventEnvelope, ModelMessages } from '@domi/protocol'
 import { isKnownEvent } from '@domi/protocol'
 import { type CleanupOptions, cleanup } from './cleanup.ts'
 import { renderSummary, type Summary } from './compact.ts'
+import { applyMask, collectMasked, partitionHotCold } from './mask.ts'
 
 export const STRATEGY_NAME = 'clean'
 
@@ -111,4 +112,52 @@ export function registerCompactStrategy(): void {
   if (compactRegistered) return
   registerContextStrategy(COMPACT_STRATEGY_NAME, makeCompactStrategy())
   compactRegistered = true
+}
+
+/**
+ * M15：遮蔽 + 确定性清理投影 —— PRD-M15-004（SPEC-M15-004，取舍-2）
+ *
+ * **均衡（balanced）**：遮蔽 → 确定性规则（只动冷区）→ 交给 full。
+ * 投影 = 「遮蔽 → 压缩 → 交给 full」里的前两档；'clean' 是它的前身，
+ * 现在加上了热区保护（AC-1）与「规则只动冷区」（AC-4）。
+ *
+ * 与老策略同一纪律：注册发生在 kernel 外面，kernel 不认识「遮蔽」；
+ * 结果只改投影，事件流一条不动（INV-12）。
+ */
+export const BALANCED_STRATEGY_NAME = 'balanced'
+export const ECONOMICAL_STRATEGY_NAME = 'economical'
+
+export interface MaskStrategyOptions {
+  clean?: CleanupOptions
+  /** 遮蔽单批最少腾出 token（默认 8000，clear_at_least 同理） */
+  maskMinFreed?: number
+}
+
+/**
+ * 遮蔽 → 确定性清理（只动冷区）→ 原样交 kernel full 拼装。
+ * 纯函数：computeMask / applyMask / cleanup 都不碰 IO，L1 回放照常确定。
+ *
+ * **投影按已落盘的 ctx.mask 决定（INV-12(b)「已遮蔽不再变」）**——
+ * computeMask 是「决策」用的（超阈值预检时决定一批），拼装时直接读事件流里
+ * 已落盘的遮蔽记录来替换指针；重新计算会把同一批遮蔽两次或漏掉已遮蔽的。
+ */
+export function maskAndClean(events: readonly EventEnvelope[], opts: MaskStrategyOptions = {}): EventEnvelope[] {
+  const masked = applyMask(events, [...collectMasked(events)])
+  const { cold } = partitionHotCold(masked)
+  return applyCleanup(masked, { ...opts.clean, coldSeqs: cold })
+}
+
+export function makeMaskStrategy(opts?: MaskStrategyOptions): ContextStrategy {
+  return (events: readonly EventEnvelope[], policy: ContextPolicy): ModelMessages =>
+    buildContext(maskAndClean(events, opts), { ...policy, strategy: 'full' })
+}
+
+let maskRegistered = false
+
+/** 注册 'balanced' / 'economical' 两档。幂等。economical 与 balanced 同一实现（阈值差异在预算器 45/70） */
+export function registerMaskStrategy(opts?: MaskStrategyOptions): void {
+  if (maskRegistered) return
+  registerContextStrategy(BALANCED_STRATEGY_NAME, makeMaskStrategy(opts))
+  registerContextStrategy(ECONOMICAL_STRATEGY_NAME, makeMaskStrategy(opts))
+  maskRegistered = true
 }

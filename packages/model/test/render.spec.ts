@@ -5,7 +5,6 @@
  * 测试断言请求体形状（缓存参数 / 工具结果文本 / 推理回传），不碰真实网络。
  */
 import { describe, expect, test } from 'bun:test'
-import type { ModelMessages } from '@domi/protocol'
 import { renderProviderOptions, toAiMessages } from '../src/index.ts'
 
 const ANTHROPIC = { cacheMode: 'explicit', baseUrl: 'https://api.anthropic.com', official: true } as const

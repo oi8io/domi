@@ -5,7 +5,7 @@
  * - 硬顶 → 停 + error{scope:'context', recoverable:true} + 出路
  * 动作由调用方注入；本函数只编排与落事件。
  */
-import { describe, expect, test } from 'bun:test'
+import { expect, test } from 'bun:test'
 import type { DomiEvent } from '@domi/protocol'
 import { type DegradeActions, degrade } from '../src/degrade.ts'
 

@@ -6647,6 +6647,42 @@
           "detail"
         ]
       }
+    },
+    "session.pin": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "seq": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sessionId",
+          "seq",
+          "pinned"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
     }
   },
   "notifications": {

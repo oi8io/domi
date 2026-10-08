@@ -137,7 +137,7 @@ function setup(script: Array<Array<Record<string, unknown>>> = []) {
   return { home, host, daemon, conn, call }
 }
 
-async function runTurn(ctx: ReturnType<typeof setup>, r: string, script = TURN) {
+async function runTurn(ctx: ReturnType<typeof setup>, r: string, _script = TURN) {
   const created = (await ctx.call('session.create', { cwd: r, kind: 'task' })) as { sessionId: string }
   const id = created.sessionId
   await ctx.call('session.submit', { sessionId: id, text: '改' })
@@ -240,7 +240,7 @@ describe('PRD-M14-010 AC-4 · 连续两次回滚回到初始', () => {
     // 第二轮
     await ctx.call('session.submit', { sessionId: id, text: '再改' })
     await idle(ctx, id)
-    const repoDir = (await snapshot(ctx, id)).evs
+    const _repoDir = (await snapshot(ctx, id)).evs
     const sessionMeta = (await ctx.call('session.list', { includeDeleted: false })) as {
       sessions: Array<{ id: string; cwd: string }>
     }

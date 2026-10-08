@@ -11,7 +11,6 @@ import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
 import { StubProvider } from '@domi/model'
 import type { EventEnvelope } from '@domi/protocol'
-import { SqliteEventLog } from '@domi/store'
 import { DomiSession, type PendingAsk } from '../src/index.ts'
 
 const dirs: string[] = []
