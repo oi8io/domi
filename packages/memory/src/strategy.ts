@@ -11,7 +11,15 @@ import { buildContext, type ContextPolicy, type ContextStrategy, registerContext
 import type { AnyEvent, EventEnvelope, ModelMessages } from '@domi/protocol'
 import { isKnownEvent } from '@domi/protocol'
 import { type CleanupOptions, cleanup } from './cleanup.ts'
-import { renderSummary, type Summary } from './compact.ts'
+import {
+  lastCompactEvent,
+  refillData,
+  renderSummary,
+  renderSummaryV2,
+  type CompactEvent,
+  type Summary,
+  type SummaryV2,
+} from './compact.ts'
 import { applyMask, collectMasked, partitionHotCold } from './mask.ts'
 
 export const STRATEGY_NAME = 'clean'
@@ -81,7 +89,7 @@ export const COMPACT_STRATEGY_NAME = 'compact'
 export function makeCompactStrategy(): ContextStrategy {
   return (events: readonly EventEnvelope[], policy: ContextPolicy): ModelMessages => {
     // 最后一条 ctx.compact 说了算：它覆盖的区间换成摘要，区间之外逐字保留
-    let latest: { fromSeq: number; toSeq: number; summary: Summary } | null = null
+    let latest: { fromSeq: number; toSeq: number; summary: CompactEvent['summary'] } | null = null
     for (const env of events) {
       const ev = env.ev
       if (isKnownEvent(ev) && ev.t === 'ctx.compact') {
@@ -93,14 +101,14 @@ export function makeCompactStrategy(): ContextStrategy {
     const { fromSeq, toSeq, summary } = latest
     const kept = events.filter((e) => e.seq < fromSeq || e.seq > toSeq)
     // 摘要作为一条 user.input 事件插在最前面：它要经过和别的内容一样的拼装路径，
-    // 不走特例。特例是将来出 bug 的地方
+    // 不走特例。特例是将来出 bug 的地方（M15 起主路径走 applyCompact 的 ctx.note 边界块）
     const summaryEvent: EventEnvelope = {
       seq: fromSeq,
       sessionId: events[0]?.sessionId ?? '',
       parentSeq: null,
       ts: events[0]?.ts ?? 0,
       schemaVersion: events[0]?.schemaVersion ?? 0,
-      ev: { t: 'user.input', text: renderSummary(summary) },
+      ev: { t: 'user.input', text: renderSummary(summary as Summary) },
     }
     return buildContext([summaryEvent, ...kept], { ...policy, strategy: 'full' })
   }
@@ -134,12 +142,65 @@ export interface MaskStrategyOptions {
 }
 
 /**
- * 遮蔽 → 确定性清理（只动冷区）→ 原样交 kernel full 拼装。
- * 纯函数：computeMask / applyMask / cleanup 都不碰 IO，L1 回放照常确定。
+ * 压缩投影（PRD-M15-005 取舍-7 / AC-6）：读最近 ctx.compact，把被覆盖的区间换成摘要块。
+ *
+ * 摘要以 **ctx.note** 身份插入（X1——不再以 user.input 身份冒充用户说的话），
+ * 正文是 U+E002/U+E003 边界块 + guardrail「摘要是数据」。
+ * 事件流一条不动（INV-12），这里只改投影。
+ */
+export function applyCompact(events: readonly EventEnvelope[]): EventEnvelope[] {
+  const latest = lastCompactEvent(events)
+  if (latest === null) return [...events]
+  const { fromSeq, toSeq, summary } = latest
+  const kept = events.filter((e) => e.seq < fromSeq || e.seq > toSeq)
+  const note: EventEnvelope = {
+    seq: fromSeq,
+    sessionId: events[0]?.sessionId ?? '',
+    parentSeq: null,
+    ts: events[0]?.ts ?? 0,
+    schemaVersion: events[0]?.schemaVersion ?? 0,
+    ev: { t: 'ctx.note', text: renderSummaryV2(summary as SummaryV2), reason: 'supplement' },
+  }
+  return [note, ...kept]
+}
+
+/**
+ * 补水投影（取舍-9 / AC-5）：压缩之后（存在最近 ctx.compact 时）的下一请求，
+ * 附最近读/改文件路径 +「需要时重读」提示 + 当前计划。
+ * skill 正文在压缩请求的指令模板里带（session 侧有 skillSource），这里只做事件流可得的。
+ */
+export function applyRefill(events: readonly EventEnvelope[]): EventEnvelope[] {
+  const latest = lastCompactEvent(events)
+  if (latest === null) return [...events]
+  const refill = refillData(events)
+  if (refill.files.length === 0 && refill.plan === null) return [...events]
+  const lines: string[] = []
+  if (refill.files.length > 0) {
+    lines.push(
+      `最近读/改的文件（被压缩过内容，需要时重读；改动前必须重读原始内容）：\n${refill.files.map((f) => `  - ${f}`).join('\n')}`,
+    )
+  }
+  if (refill.plan !== null) lines.push(`当前计划：\n${refill.plan}`)
+  const last = events[events.length - 1]
+  const note: EventEnvelope = {
+    seq: (last?.seq ?? 0) + 1,
+    sessionId: events[0]?.sessionId ?? '',
+    parentSeq: null,
+    ts: last?.ts ?? 0,
+    schemaVersion: events[0]?.schemaVersion ?? 0,
+    ev: { t: 'ctx.note', text: lines.join('\n\n'), reason: 'supplement' },
+  }
+  return [...events, note]
+}
+
+/**
+ * 遮蔽 → 确定性清理（只动冷区）→ 压缩 → 补水 → 原样交 kernel full 拼装。
+ * 纯函数：computeMask / applyMask / cleanup / applyCompact / applyRefill 都不碰 IO，L1 回放照常确定。
  *
  * **投影按已落盘的 ctx.mask 决定（INV-12(b)「已遮蔽不再变」）**——
  * computeMask 是「决策」用的（超阈值预检时决定一批），拼装时直接读事件流里
  * 已落盘的遮蔽记录来替换指针；重新计算会把同一批遮蔽两次或漏掉已遮蔽的。
+ * 压缩同理：只读最近已落盘的 ctx.compact（SPEC-M15 3.3 投影链）。
  */
 export function maskAndClean(events: readonly EventEnvelope[], opts: MaskStrategyOptions = {}): EventEnvelope[] {
   const masked = applyMask(events, [...collectMasked(events)])
@@ -148,8 +209,13 @@ export function maskAndClean(events: readonly EventEnvelope[], opts: MaskStrateg
 }
 
 export function makeMaskStrategy(opts?: MaskStrategyOptions): ContextStrategy {
-  return (events: readonly EventEnvelope[], policy: ContextPolicy): ModelMessages =>
-    buildContext(maskAndClean(events, opts), { ...policy, strategy: 'full' })
+  return (events: readonly EventEnvelope[], policy: ContextPolicy): ModelMessages => {
+    // 投影链（SPEC-M15 3.3）：遮蔽 → 压缩 → 补水 → full
+    let proj = maskAndClean(events, opts)
+    proj = applyCompact(proj)
+    proj = applyRefill(proj)
+    return buildContext(proj, { ...policy, strategy: 'full' })
+  }
 }
 
 let maskRegistered = false

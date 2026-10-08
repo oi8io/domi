@@ -328,11 +328,22 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
     tokensAfter: z.number().int().nonnegative(),
     trigger: z.enum(['threshold', 'manual']),
     summary: z.object({
-      intent: z.string(),
-      filesModified: z.array(z.string()),
-      keyDecisions: z.array(z.string()),
-      openQuestions: z.array(z.string()),
-      nextSteps: z.array(z.string()),
+      /** v2（PRD-M15-005 取舍-8）：目标与约束。旧摘要缺省为空，渲染时回退 intent */
+      goal: z.string().default(''),
+      /** 用户原话（原文，逐条） */
+      userQuotes: z.array(z.string()).default([]),
+      keyDecisions: z.array(z.string()).default([]),
+      /** 改过的文件与要点 */
+      files: z.array(z.object({ path: z.string(), note: z.string().default('') })).default([]),
+      /** 错误与修法 */
+      errors: z.array(z.string()).default([]),
+      /** 当前正在做的那一步的精确状态 */
+      currentStep: z.string().default(''),
+      openQuestions: z.array(z.string()).default([]),
+      nextSteps: z.array(z.string()).default([]),
+      /** 旧字段（M2-003）：保留兼容读旧会话（v17 及以前写的摘要只有这些） */
+      intent: z.string().optional(),
+      filesModified: z.array(z.string()).optional(),
     }),
   }),
   /**
