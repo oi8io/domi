@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">domi bean icon</title>
+  <desc id="desc">A single plump kidney bean, curved toward the upper right, on a square transparent canvas.</desc>
+  <defs>
+    <linearGradient id="bean" x1="0.15" y1="0.92" x2="0.88" y2="0.12">
+      <stop offset="0" stop-color="#8F263B"/>
+      <stop offset="0.52" stop-color="#B83B48"/>
+      <stop offset="1" stop-color="#D65E53"/>
+    </linearGradient>
+  </defs>
+  <path
+    d="M111 330 C79 275 95 194 151 137 C209 78 294 57 360 82 C411 101 438 148 422 190 C413 214 393 230 371 227 C348 224 330 204 309 198 C288 192 270 201 260 219 C249 240 257 258 276 266 C294 274 317 264 333 247 C330 294 306 344 263 373 C219 401 166 398 130 367 C117 356 108 343 111 330 Z"
+    fill="url(#bean)"
+  />
+  <path
+    d="M398 183 C388 171 376 162 363 156"
+    fill="none"
+    stroke="#F0A18B"
+    stroke-width="11"
+    stroke-linecap="round"
+    opacity="0.92"
+  />
+</svg>

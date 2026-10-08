@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">domi bean mark</title>
+  <desc id="desc">A single kidney bean drawn as a compact square app icon.</desc>
+  <defs>
+    <linearGradient id="bean" x1="0.16" y1="0.08" x2="0.86" y2="0.94">
+      <stop offset="0" stop-color="#D96859"/>
+      <stop offset="0.58" stop-color="#BD4849"/>
+      <stop offset="1" stop-color="#8D2B3E"/>
+    </linearGradient>
+  </defs>
+  <g transform="rotate(-36 256 256)">
+    <path
+      d="M94 263 C70 227 89 177 128 144 C177 102 249 91 314 106 C370 118 414 151 426 187 C438 220 415 244 384 237 C355 230 329 203 299 198 C270 193 250 213 230 237 C201 272 177 307 142 313 C119 317 101 295 94 263 Z"
+      fill="url(#bean)"
+    />
+    <path
+      d="M388 221 C365 200 344 183 320 172"
+      fill="none"
+      stroke="#F4B09A"
+      stroke-width="11"
+      stroke-linecap="round"
+      opacity="0.9"
+    />
+  </g>
+</svg>
