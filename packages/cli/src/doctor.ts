@@ -8,7 +8,7 @@
  * 命令行以 `$ ` 开头，AC 的断言正则就是认这个（`^\$ .+`）。
  */
 
-import { accessSync, constants, existsSync } from 'node:fs'
+import { accessSync, constants, existsSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { tr } from '@domi/i18n'
 
@@ -104,6 +104,25 @@ export function diagnose(input: DoctorInput): Finding[] {
       detail: tr('cli.doctor.loopDetail', input.loop),
       fix: null,
     })
+  }
+
+  // M15（SPEC 取舍-2）：配置文件里还写着旧策略名 → 提示已按均衡读入（不回写）
+  if (existsSync(input.configPath)) {
+    let legacyStrategy = false
+    try {
+      const text = readFileSync(input.configPath, 'utf8')
+      legacyStrategy = /strategy\s*:\s*(full|clean|compact)\b/.test(text)
+    } catch {
+      // 读不了就不提示，doctor 主流程已有 config 检查项
+    }
+    if (legacyStrategy) {
+      out.push({
+        ok: true,
+        title: tr('cli.doctor.strategyUpgradedTitle'),
+        detail: tr('cli.doctor.strategyUpgraded'),
+        fix: null,
+      })
+    }
   }
 
   if (input.staleToml) {

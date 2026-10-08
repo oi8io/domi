@@ -1458,4 +1458,17 @@ server:
   'tui.hint.dump': '回滚区',
   'tui.hint.send': '发送',
   'tui.hint.newline': '换行',
+  // M15（SPEC 取舍-2）：旧策略 full/clean/compact 已映射为 balanced
+  'settings.strategyUpgraded':
+    '旧上下文策略已升级为「均衡」：全量 / 清理 / 紧凑三档现在都走遮蔽 → 压缩 → 全量投影，行为更稳。配置文件未回写，想改可以手动编辑 context.strategy。',
+  'web.context.masks': '遮蔽记录（需要时重读）',
+  'web.context.maskBatch': '遮蔽一批 · {reason}',
+  'web.context.maskReason.cold': '冷区',
+  'web.context.maskReason.dedup': '重复',
+  'web.context.maskReason.resolvedError': '错误已解决',
+  'web.context.maskReason.truncate': '截断',
+  'web.context.maskReason.threshold': '超阈值',
+  'cli.doctor.strategyUpgradedTitle': '上下文策略已升级',
+  'cli.doctor.strategyUpgraded':
+    '配置里 context.strategy 还写着旧值（full/clean/compact），已按「均衡」读入；可手动改成 balanced / economical。',
 }

@@ -263,6 +263,12 @@ export function readSettings(opts: LoadOptions = {}): SettingsView {
     'model.name': cfg.model.name,
     'memory.extractEvery': cfg.memory.extractEvery,
     'memory.soul': cfg.memory.soul,
+    // M15（SPEC 取舍-2）：旧策略名 full/clean/compact 已在读入时映射为 balanced；
+    // 文件里还写着旧值时置 true，端上首次启动一次性提示（不回写 yaml）
+    'context.strategyUpgraded':
+      (file.context as { strategy?: unknown } | undefined)?.strategy === 'full' ||
+      (file.context as { strategy?: unknown } | undefined)?.strategy === 'clean' ||
+      (file.context as { strategy?: unknown } | undefined)?.strategy === 'compact',
     'context.strategy': cfg.context.strategy,
     'context.keepTurns': cfg.context.keepTurns,
     'context.compactAt': cfg.context.compactAt,

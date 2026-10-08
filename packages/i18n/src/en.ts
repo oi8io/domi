@@ -1520,4 +1520,17 @@ server:
   'tui.hint.dump': 'scrollback',
   'tui.hint.send': 'send',
   'tui.hint.newline': 'newline',
+  // M15 (SPEC tradeoff-2): legacy strategy full/clean/compact now maps to balanced
+  'settings.strategyUpgraded':
+    'Legacy context strategy upgraded to "balanced": full / clean / compact now all go through mask → compact → full projection. Config file not rewritten; edit context.strategy manually if you want to change it.',
+  'web.context.masks': 'Masked records (re-read on demand)',
+  'web.context.maskBatch': 'Masked a batch · {reason}',
+  'web.context.maskReason.cold': 'cold zone',
+  'web.context.maskReason.dedup': 'duplicate',
+  'web.context.maskReason.resolvedError': 'resolved error',
+  'web.context.maskReason.truncate': 'truncated',
+  'web.context.maskReason.threshold': 'over threshold',
+  'cli.doctor.strategyUpgradedTitle': 'Context strategy upgraded',
+  'cli.doctor.strategyUpgraded':
+    'context.strategy in config still uses a legacy value (full/clean/compact); it is read as "balanced". You can manually set balanced / economical.',
 }

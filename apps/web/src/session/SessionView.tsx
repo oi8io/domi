@@ -32,6 +32,7 @@ import { JumpBar } from './JumpBar.tsx'
 import { NotesBar } from './NotesBar.tsx'
 import { ResumeBar } from './ResumeBar.tsx'
 import { ReviewFindings } from './ReviewFindings.tsx'
+import { StrategyUpgradedBanner } from './StrategyUpgradedBanner.tsx'
 import { Trajectory } from './Trajectory.tsx'
 
 export function SessionView({
@@ -369,6 +370,7 @@ export function SessionView({
             {...(onBranched === undefined ? {} : { onReview: onBranched })}
           />
         </div>
+        <StrategyUpgradedBanner client={client} />
         <StatusBar
           status={status}
           {...(connection === undefined ? {} : { connection })}

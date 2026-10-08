@@ -29,6 +29,15 @@ function fmt(n: number): string {
 
 const PENDING_LABELS = ['soul', 'rules', 'catalog', 'skills'] as const
 
+/** 遮蔽原因 → i18n 键（PRD-M15-004 AC-6 展示用） */
+const MASK_REASON_KEY: Record<string, MessageKey> = {
+  cold: 'web.context.maskReason.cold',
+  dedup: 'web.context.maskReason.dedup',
+  resolved_error: 'web.context.maskReason.resolvedError',
+  truncate: 'web.context.maskReason.truncate',
+  threshold: 'web.context.maskReason.threshold',
+}
+
 export function ContextTab({
   client,
   sessionId,
@@ -246,6 +255,41 @@ export function ContextTab({
                   >
                     ◎
                   </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* 遮蔽记录（PRD-M15-004 AC-6）：一批一行，明细可定位 */}
+        {v.masks.length > 0 && (
+          <div className="mt-2 rounded-md border border-border2 p-2" data-part="masks">
+            <p className="mb-1 text-[11px] font-medium text-ink2">{tr('web.context.masks')}</p>
+            <ul className="space-y-1.5">
+              {v.masks.map((m) => (
+                <li key={m.seq} className="flex flex-col gap-0.5 text-[10.5px]" data-mask={m.reason}>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-accent">
+                      {tr('web.context.maskBatch', {
+                        reason: tr(MASK_REASON_KEY[m.reason] ?? 'web.context.maskReason.threshold'),
+                      })}
+                    </span>
+                    <span className="font-mono text-mut">−{fmt(m.freedTokens)} tok</span>
+                  </span>
+                  <span className="flex flex-wrap gap-1">
+                    {m.items.map((it) => (
+                      <button
+                        key={it.seq}
+                        type="button"
+                        onClick={() => onLocate(it.seq)}
+                        className="rounded bg-panel-h px-1 py-px font-mono text-mut transition-colors hover:text-accent"
+                        data-mask-item={it.seq}
+                        title={tr('web.context.locate')}
+                      >
+                        {it.tool} · {fmt(it.chars)}c
+                      </button>
+                    ))}
+                  </span>
                 </li>
               ))}
             </ul>
