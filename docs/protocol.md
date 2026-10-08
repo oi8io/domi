@@ -6062,6 +6062,68 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "summary": {
                         "type": "object",
                         "properties": {
+                          "goal": {
+                            "default": "",
+                            "type": "string"
+                          },
+                          "userQuotes": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "keyDecisions": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "files": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "path": {
+                                  "type": "string"
+                                },
+                                "note": {
+                                  "default": "",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "path"
+                              ]
+                            }
+                          },
+                          "errors": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "currentStep": {
+                            "default": "",
+                            "type": "string"
+                          },
+                          "openQuestions": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "nextSteps": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "intent": {
                             "type": "string"
                           },
@@ -6070,33 +6132,8 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                             "items": {
                               "type": "string"
                             }
-                          },
-                          "keyDecisions": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "openQuestions": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "nextSteps": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
                           }
-                        },
-                        "required": [
-                          "intent",
-                          "filesModified",
-                          "keyDecisions",
-                          "openQuestions",
-                          "nextSteps"
-                        ]
+                        }
                       }
                     },
                     "required": [
@@ -7483,7 +7520,7 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
 
 ### `session.compact`
 
-手动触发上下文压缩（PRD-M2-003 AC-1 的 /compact）
+手动触发上下文压缩（PRD-M2-003 AC-1 的 /compact；PRD-M15-005 AC-8 可带重点）
 
 **params**
 
@@ -7493,6 +7530,9 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
   "type": "object",
   "properties": {
     "sessionId": {
+      "type": "string"
+    },
+    "focus": {
       "type": "string"
     }
   },
@@ -8350,6 +8390,68 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "summary": {
                         "type": "object",
                         "properties": {
+                          "goal": {
+                            "default": "",
+                            "type": "string"
+                          },
+                          "userQuotes": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "keyDecisions": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "files": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "path": {
+                                  "type": "string"
+                                },
+                                "note": {
+                                  "default": "",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "path"
+                              ]
+                            }
+                          },
+                          "errors": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "currentStep": {
+                            "default": "",
+                            "type": "string"
+                          },
+                          "openQuestions": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "nextSteps": {
+                            "default": [],
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "intent": {
                             "type": "string"
                           },
@@ -8358,33 +8460,8 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                             "items": {
                               "type": "string"
                             }
-                          },
-                          "keyDecisions": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "openQuestions": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "nextSteps": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
                           }
-                        },
-                        "required": [
-                          "intent",
-                          "filesModified",
-                          "keyDecisions",
-                          "openQuestions",
-                          "nextSteps"
-                        ]
+                        }
                       }
                     },
                     "required": [

@@ -5212,6 +5212,68 @@
                             "summary": {
                               "type": "object",
                               "properties": {
+                                "goal": {
+                                  "default": "",
+                                  "type": "string"
+                                },
+                                "userQuotes": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "keyDecisions": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "files": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "path": {
+                                        "type": "string"
+                                      },
+                                      "note": {
+                                        "default": "",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "path"
+                                    ]
+                                  }
+                                },
+                                "errors": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "currentStep": {
+                                  "default": "",
+                                  "type": "string"
+                                },
+                                "openQuestions": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "nextSteps": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
                                 "intent": {
                                   "type": "string"
                                 },
@@ -5220,33 +5282,8 @@
                                   "items": {
                                     "type": "string"
                                   }
-                                },
-                                "keyDecisions": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
-                                },
-                                "openQuestions": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
-                                },
-                                "nextSteps": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
                                 }
-                              },
-                              "required": [
-                                "intent",
-                                "filesModified",
-                                "keyDecisions",
-                                "openQuestions",
-                                "nextSteps"
-                              ]
+                              }
                             }
                           },
                           "required": [
@@ -6625,6 +6662,9 @@
         "properties": {
           "sessionId": {
             "type": "string"
+          },
+          "focus": {
+            "type": "string"
           }
         },
         "required": [
@@ -7457,6 +7497,68 @@
                             "summary": {
                               "type": "object",
                               "properties": {
+                                "goal": {
+                                  "default": "",
+                                  "type": "string"
+                                },
+                                "userQuotes": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "keyDecisions": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "files": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "path": {
+                                        "type": "string"
+                                      },
+                                      "note": {
+                                        "default": "",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "path"
+                                    ]
+                                  }
+                                },
+                                "errors": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "currentStep": {
+                                  "default": "",
+                                  "type": "string"
+                                },
+                                "openQuestions": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "nextSteps": {
+                                  "default": [],
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
                                 "intent": {
                                   "type": "string"
                                 },
@@ -7465,33 +7567,8 @@
                                   "items": {
                                     "type": "string"
                                   }
-                                },
-                                "keyDecisions": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
-                                },
-                                "openQuestions": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
-                                },
-                                "nextSteps": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "string"
-                                  }
                                 }
-                              },
-                              "required": [
-                                "intent",
-                                "filesModified",
-                                "keyDecisions",
-                                "openQuestions",
-                                "nextSteps"
-                              ]
+                              }
                             }
                           },
                           "required": [
