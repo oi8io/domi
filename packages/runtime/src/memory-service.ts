@@ -37,6 +37,7 @@ import {
   searchSemantic,
   soulForPrompt,
   soulUpdatePrompt,
+  transcriptOf,
 } from '@domi/memory'
 import { createEmbedder, createProvider, generateStructured, type ModelProvider, providerConfigOf } from '@domi/model'
 import type { SemanticItem, SoulChange } from '@domi/protocol'
@@ -189,10 +190,14 @@ export class MemoryService {
     const slice = view.filter((e) => e.seq > from)
     const last = view.at(-1)?.seq ?? from
     if (slice.length === 0) return { added: [], soul: [] }
+    // SPEC-M15-008 取舍-22（E8）：不再每次带 200 条已知记忆——只带 FTS 近邻（最多 20），
+    // 用段内文本做检索词；候选只和近邻比去重。
+    const nearText = transcriptOf(slice, 4_000).slice(0, 300)
+    const known = nearText.trim() === '' ? [] : this.log.semantic.searchText(nearText, 20)
     const added = await extractItems({
       sessionId,
       events: slice,
-      known: this.log.semantic.list({ limit: 200 }),
+      known,
       rejected: this.rejected(),
       extract: (prompt) => this.structured(ExtractionSchema, prompt),
     })

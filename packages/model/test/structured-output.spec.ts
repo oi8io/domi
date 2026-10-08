@@ -43,12 +43,39 @@ describe('AC-2 · 原生通道', () => {
     expect(provider.calls[0]?.messages).toHaveLength(1)
   })
 
-  test('不支持的 provider 走降级：往消息里加约束', async () => {
+  test('不支持的 provider 走降级：第一次注入 submit_items 工具（SPEC-M15-008 取舍-22）', async () => {
     const provider = textProvider('{"title":"降级","tags":[]}')
     await generateStructured({ provider, capabilities: VENDORS.custom.capabilities }, TitleSchema, REQ)
     expect(provider.calls[0]?.providerOptions).toBeUndefined()
-    expect(provider.calls[0]?.messages).toHaveLength(2)
-    expect(JSON.stringify(provider.calls[0]?.messages)).toContain('只输出一个 JSON 对象')
+    expect(provider.calls[0]?.tools?.[0]?.name).toBe('submit_items')
+    expect(JSON.stringify(provider.calls[0]?.messages)).toContain('submit_items')
+  })
+})
+
+describe('AC-5 · 工具调用当结构化输出（SPEC-M15-008 取舍-22）', () => {
+  test('模型调 submit_items 提交 → 参数就是结果，不解析文本', async () => {
+    const provider = new StubProvider(
+      [[{ type: 'tool-call', id: 't1', name: 'submit_items', args: { title: '工具提交', tags: ['ok'] } }]],
+      { onExhausted: 'repeat-last' },
+    )
+    const r = await generateStructured({ provider, capabilities: VENDORS.custom.capabilities }, TitleSchema, REQ)
+    expect(r).toEqual({ title: '工具提交', tags: ['ok'] })
+  })
+
+  test('工具参数是数组 / 被字符串化 → 仍能解析（偏差兼容）', async () => {
+    const provider = new StubProvider(
+      [[{ type: 'tool-call', id: 't1', name: 'submit_items', args: { title: 'x', tags: ['a'] } }]],
+      { onExhausted: 'repeat-last' },
+    )
+    const r = await generateStructured({ provider, capabilities: VENDORS.custom.capabilities }, TitleSchema, REQ)
+    expect(r.title).toBe('x')
+  })
+
+  test('工具调用失败（没有 tool-call 也没有文本）→ 报错，不是静默返回', async () => {
+    const provider = new StubProvider([[{ type: 'reason', text: '思考中…' }]], { onExhausted: 'repeat-last' })
+    await expect(
+      generateStructured({ provider, capabilities: VENDORS.custom.capabilities }, TitleSchema, REQ),
+    ).rejects.toThrow(StructuredOutputError)
   })
 })
 

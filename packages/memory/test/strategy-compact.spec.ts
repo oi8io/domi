@@ -3,16 +3,8 @@
  * 策略层：balanced 投影 = 遮蔽 → 压缩 → 补水 → full
  */
 import { describe, expect, test } from 'bun:test'
-import { buildContext } from '@domi/kernel'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import {
-  applyCompact,
-  applyRefill,
-  makeMaskStrategy,
-  renderSummaryV2,
-  SUMMARY_OPEN,
-  SummarySchemaV2,
-} from '../src/index.ts'
+import { applyCompact, applyRefill, makeMaskStrategy, SUMMARY_OPEN, SummarySchemaV2 } from '../src/index.ts'
 
 let seq = 0
 function env(ev: DomiEvent): EventEnvelope {
@@ -64,7 +56,7 @@ function conversationWithCompact(): { events: EventEnvelope[]; latest: EventEnve
 
 describe('applyCompact（取舍-7）', () => {
   test('有 ctx.compact：被覆盖区间换成 U+E002 摘要块；身份 ctx.note 不是 user.input', () => {
-    const { events, latest } = conversationWithCompact()
+    const { events } = conversationWithCompact()
     const proj = applyCompact(events)
     // 事件数减少：covered 区间换 1 条
     expect(proj.length).toBeLessThan(events.length)

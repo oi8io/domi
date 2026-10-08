@@ -69,7 +69,6 @@ import {
 import {
   compactSteps,
   computeMask,
-  lastCompactEvent,
   refillData,
   registerCleanStrategy,
   registerCompactStrategy,

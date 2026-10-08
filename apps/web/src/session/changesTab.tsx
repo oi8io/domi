@@ -807,7 +807,6 @@ export function ChangesTab({
                 onRemove={removeComment}
                 onHandOver={handOver}
                 onRefsChange={onRefsChange}
-                refs={refs}
               />
             </>
           )}
@@ -1185,7 +1184,6 @@ function CommentsPanel({
   comments,
   onRemove,
   onHandOver,
-  refs,
   onRefsChange,
 }: {
   comments: readonly CommentDraft[]

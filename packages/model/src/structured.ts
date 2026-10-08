@@ -7,9 +7,9 @@
  * 失败时抛错而不是返回 null：调用方拿到 null 会当成"模型说没有"，
  * 而不是"我们没解析出来"，这两件事的处理方式完全不同。
  */
-import type { z } from 'zod'
+import { toJSONSchema, type z } from 'zod'
 import type { ModelCapabilities } from './capability.ts'
-import type { ModelEvent, ModelProvider, ModelRequest } from './provider.ts'
+import type { ModelProvider, ModelRequest } from './provider.ts'
 
 export const STRUCTURED_MAX_ATTEMPTS = 3
 
@@ -24,12 +24,6 @@ export class StructuredOutputError extends Error {
     super(`error.structured_output: ${attempts} 次都没拿到合法结构。最后一次问题：${issues.join('; ')}`)
     this.name = 'StructuredOutputError'
   }
-}
-
-async function collectText(it: AsyncIterable<ModelEvent>): Promise<string> {
-  let text = ''
-  for await (const e of it) if (e.type === 'delta') text += e.text
-  return text
 }
 
 function extractJson(text: string): string {
@@ -56,24 +50,58 @@ export async function generateStructured<T>(deps: StructuredDeps, schema: z.ZodT
 
   for (let attempt = 1; attempt <= STRUCTURED_MAX_ATTEMPTS; attempt++) {
     const messages = [...req.messages]
-    if (!native) {
-      // 降级路径：把约束写进提示词。重试时**把上一次的错误也带上**——
-      // 只说"格式不对"而不说哪里不对，模型第二次大概率还是错一样的地方。
-      const hint =
-        attempt === 1
-          ? '只输出一个 JSON 对象，不要任何解释文字、不要 markdown 代码块。'
-          : `上一次的输出无法解析：${lastIssues.join('; ')}。只输出一个合法 JSON 对象。`
-      messages.push({ role: 'user', content: hint })
+    let nextReq: ModelRequest
+    if (native) {
+      nextReq = {
+        ...req,
+        messages,
+        providerOptions: { ...req.providerOptions, responseFormat: { type: 'json_object' } },
+      }
+    } else {
+      // 降级路径（SPEC-M15-008 取舍-22）：第一次尝试把 schema 塞进 submit_items 工具的
+      // inputSchema，让模型**调用工具提交**——比「只输出 JSON」稳，厂商也认。
+      // 之后重试退到纯提示词（工具能力有问题的厂商也有救），并且把上次的错误带回去。
+      if (attempt === 1) {
+        const toolSchema = toJSONSchema(schema) as Record<string, unknown>
+        nextReq = {
+          ...req,
+          messages: [
+            ...messages,
+            { role: 'user' as const, content: '请调用 submit_items 工具提交结果，参数就是你要给出的数据。' },
+          ],
+          tools: [
+            ...(req.tools ?? []),
+            {
+              name: 'submit_items',
+              description: '提交本次任务的结果。参数就是你要给出的数据。',
+              inputSchema: toolSchema,
+            },
+          ],
+        }
+      } else {
+        const hint = `上一次的输出无法解析：${lastIssues.join('; ')}。只输出一个合法 JSON 对象。`
+        nextReq = { ...req, messages: [...messages, { role: 'user', content: hint }] }
+      }
     }
 
-    const nextReq: ModelRequest = native
-      ? { ...req, messages, providerOptions: { ...req.providerOptions, responseFormat: { type: 'json_object' } } }
-      : { ...req, messages }
+    // 收集：工具调用参数（降级路径的首选）+ 文本（提示词路径）
+    let text = ''
+    let toolArgs: unknown
+    for await (const e of deps.provider.generate(nextReq, signal)) {
+      if (e.type === 'delta') text += e.text
+      else if (e.type === 'tool-call' && e.name === 'submit_items') toolArgs = e.args
+    }
+    lastRaw = text
 
-    lastRaw = await collectText(deps.provider.generate(nextReq, signal))
-    const parsed = schema.safeParse(safeJsonParse(extractJson(lastRaw)))
-    if (parsed.success) return parsed.data
-    lastIssues = parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+    // 解析候选：工具参数优先，其次文本（兼容 markdown 包裹 / 数组外框）
+    let parsed: ReturnType<typeof schema.safeParse> | null = null
+    if (toolArgs !== undefined) parsed = schema.safeParse(toolArgs)
+    if (!(parsed?.success ?? false) && text.trim() !== '') parsed = schema.safeParse(safeJsonParse(extractJson(text)))
+    if (parsed?.success) return parsed.data
+    lastIssues =
+      parsed?.success === false
+        ? parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+        : ['没有收到工具调用，也没有可解析的文本']
   }
 
   throw new StructuredOutputError(STRUCTURED_MAX_ATTEMPTS, lastRaw, lastIssues)

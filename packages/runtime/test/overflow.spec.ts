@@ -32,9 +32,6 @@ const turn = (inputTokens: number): StubTurn => [
   { type: 'delta', text: '好' },
   { type: 'usage', raw: { usage: { inputTokens, outputTokens: 20 } } },
 ]
-/** 摘要轮给非法 JSON → generateStructured 抛错 → compactNow 失败（熔断测试用） */
-const badSummary: StubTurn = [{ type: 'delta', text: '这不是 JSON' }]
-
 function evTypes(evs: Array<{ ev: { t: string } }>): string[] {
   return evs.map((e) => e.ev.t)
 }
