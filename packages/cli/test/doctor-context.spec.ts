@@ -90,3 +90,40 @@ describe('scanContext', () => {
     expect(evs).toHaveLength(1)
   })
 })
+
+describe('PRD-M15-008 AC-2/AC-6', () => {
+  test('记忆成功率：抽取段数 /（抽取段 + 失败数），从 _memory 会话统计', async () => {
+    const { path, log } = _db()
+    seq = 0
+    // _memory：3 段成功抽取 + 1 次失败
+    await log.append('_memory', [
+      { t: 'memory.write', layer: 'L3', op: 'extracted', range: { sessionId: 's1', fromSeq: 1, toSeq: 2 }, diff: 'd1' },
+      { t: 'memory.write', layer: 'L3', op: 'extracted', range: { sessionId: 's1', fromSeq: 3, toSeq: 4 }, diff: 'd2' },
+      { t: 'error', scope: 'memory', message: '抽取失败', recoverable: true },
+      { t: 'memory.write', layer: 'L3', op: 'extracted', range: { sessionId: 's1', fromSeq: 5, toSeq: 6 }, diff: 'd3' },
+    ])
+    const r = await scanContext(path)
+    expect(r.totals.memorySuccessRate).toBe(0.75)
+    expect(r.leakedInternalSessions).toEqual([])
+  })
+
+  test('未迁移的内部会话被检测到：给出 migrate-m15 提示', async () => {
+    const { path, log } = _db()
+    seq = 0
+    await log.append('_memory', [
+      {
+        t: 'memory.write',
+        layer: 'L3',
+        op: 'add',
+        item: { id: 'm1', kind: 'preference', text: 'x', sourceRefs: [] },
+        diff: 'd',
+      },
+      // 泄漏：用户事件混进来
+      { t: 'user.input', text: 'hi' },
+    ])
+    const r = await scanContext(path)
+    expect(r.leakedInternalSessions).toContain('_memory')
+    const out = formatContextReport(r)
+    expect(out).toContain('migrate-m15')
+  })
+})

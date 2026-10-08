@@ -934,7 +934,9 @@ export const zh = {
   'cli.doctor.ctxToolShare': '工具结果占比 {pct} · 可避免损失 {loss} token · 前缀断裂 {breaks} 次',
   'cli.doctor.ctxCauses': '断裂归因：{causes}',
   'cli.doctor.ctxCausesNone': '断裂归因：无（前缀稳定或尚未产生观测）',
-  'cli.doctor.ctxMemory': '记忆成功率：—（M15-007 接线后显示）',
+  'cli.doctor.ctxMemory': '记忆成功率：{rate}（抽取段 / 抽取段 + 失败数）',
+  'cli.doctor.ctxMigrateHint':
+    '⚠ 内部会话 {sessionId} 混有用户事件，还没迁移——跑 domi migrate-m15 迁出成普通会话（PRD-M15-008 AC-2）。',
   'cli.doctor.ctxHeader': '最近会话（步骤 / 命中% / 输入 / 工具结果% / 可避免损失 / 提示词≈层+工具+历史）',
   'cli.doctor.ctxRow':
     '{id} · {steps} 步 · {hit} · {input} in · {tool} 工具 · 损失 {loss} · ≈{layers}+{tools}+{history} token',
@@ -1366,6 +1368,7 @@ server:
   'error.feature.schedules': '定时任务',
   'error.feature.refs': '跨会话引用',
   'error.session_not_found': '没有这个会话：{sessionId}',
+  'session.internal_forbidden': '这是内部会话（{sessionId}），不能提交、改名、挂项目或改类型。',
   'error.busy.delete': '这个会话正在处理，等它停下来再删',
   'error.busy.revert': '运行中不能回滚',
   'error.busy.switch': '这个会话正在处理，等这一轮结束再切',

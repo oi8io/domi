@@ -345,6 +345,11 @@ export class HostRequestError extends Error {
   }
 }
 
+/** 内部会话（PRD-M15-008 AC-1，S8）：_ 前缀只给系统自己用，客户端碰不得 */
+function isInternalSession(id: string): boolean {
+  return id.startsWith('_')
+}
+
 /** 带文案 key 的协议错误（PRD-M9-004 AC-4）：message 按 daemon 的语言，data 里带 key 与参数 */
 function failKey(
   id: string | number,
@@ -749,11 +754,15 @@ export class Daemon {
           ...(p.kind === undefined ? {} : { kind: p.kind }),
           ...(p.projectId === undefined ? {} : { projectId: p.projectId }),
         })
-        return ok(req.id, { sessions: list.map((x) => ({ ...x, busy: this.isBusy(x.id) })) })
+        // PRD-M15-008 AC-1：内部会话（_ 前缀）不进会话列表
+        const visible = list.filter((x) => !isInternalSession(x.id))
+        return ok(req.id, { sessions: visible.map((x) => ({ ...x, busy: this.isBusy(x.id) })) })
       }
 
       case 'session.rename': {
         const p = params as { sessionId: string; title: string }
+        if (isInternalSession(p.sessionId))
+          return failKey(req.id, 'INTERNAL_SESSION', 'session.internal_forbidden', { sessionId: p.sessionId })
         if (!this.host.rename) return unsupported(req.id, 'rename')
         await this.host.rename(p.sessionId, p.title.trim())
         return ok(req.id, { ok: true })
@@ -773,6 +782,8 @@ export class Daemon {
 
       case 'session.toTask': {
         const p = params as { sessionId: string; projectId: string; goal: string }
+        if (isInternalSession(p.sessionId))
+          return failKey(req.id, 'INTERNAL_SESSION', 'session.internal_forbidden', { sessionId: p.sessionId })
         const from = (await this.host.list({ includeDeleted: true })).find((x) => x.id === p.sessionId)
         if (!from) return failKey(req.id, 'SESSION_NOT_FOUND', 'error.session_not_found', { sessionId: p.sessionId })
         const id = await this.host.create(undefined, { kind: 'task', projectId: p.projectId })
@@ -1245,6 +1256,9 @@ export class Daemon {
     // 第一版把 `this.busy.add` 放在 `await this.session(...)` 之后，
     // 于是十个并发请求全都在任何一个占住之前通过了检查——十个全被接受。
     // 这是 M3-004 存在的理由本身，而它是被那条十客户端的测试抓出来的，不是想出来的。
+    if (isInternalSession(p.sessionId)) {
+      return failKey(reqId, 'INTERNAL_SESSION', 'session.internal_forbidden', { sessionId: p.sessionId })
+    }
     if (this.busy.has(p.sessionId)) {
       // 不排队也不丢弃：排队让用户以为没发出去，丢弃让他以为发出去了（AC-3）。
       // 运行中想补一句走 session.note——它的队列看得见（PRD-M13-001 AC-5）

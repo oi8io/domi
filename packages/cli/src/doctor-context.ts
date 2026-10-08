@@ -12,7 +12,7 @@ import { VENDORS } from '@domi/config'
 import { tr } from '@domi/i18n'
 import { aggregate } from '@domi/kernel'
 import { type EventEnvelope, estimateTextTokens, isKnownEvent } from '@domi/protocol'
-import { SqliteEventLog } from '@domi/store'
+import { MEMORY_SESSION_ID, SqliteEventLog } from '@domi/store'
 import { type CapabilityReportInput, capabilityLines } from './doctor-capabilities.ts'
 import type { Io } from './io.ts'
 
@@ -35,6 +35,8 @@ export interface ContextSessionRow {
 
 export interface ContextReport {
   sessions: ContextSessionRow[]
+  /** 有用户事件但还没迁移的内部会话（PRD-M15-008 AC-2） */
+  leakedInternalSessions: string[]
   totals: {
     sessions: number
     events: number
@@ -99,6 +101,29 @@ export async function scanContext(dbPath: string, limit = 20): Promise<ContextRe
       })
     }
 
+    // PRD-M15-008 AC-6：记忆成功率 = 抽取段数 /（抽取段数 + 抽取失败次数），
+    // 真相在 _memory 会话：memory.write{op:'extracted'} 是成功段，error{scope:'memory'} 是失败段
+    let extracted = 0
+    let extractFails = 0
+    const memEvents = await log.read(MEMORY_SESSION_ID).catch(() => [])
+    for (const { ev } of memEvents) {
+      if (!isKnownEvent(ev)) continue
+      if (ev.t === 'memory.write' && ev.op === 'extracted') extracted++
+      else if (ev.t === 'error' && ev.scope === 'memory') extractFails++
+    }
+    const memorySuccessRate =
+      extracted + extractFails === 0 ? null : Math.round((extracted / (extracted + extractFails)) * 100) / 100
+
+    // PRD-M15-008 AC-2：检测到未迁移的内部会话（有用户事件）→ 提示跑 domi migrate-m15
+    const leaked: string[] = []
+    for (const row of log.sessions.list({ includeDeleted: true, includeSpawned: true, idPrefix: '_' })) {
+      const evs = await log.read(row.id).catch(() => [])
+      // 用户产生的事件 = user.input / user.note（SPEC-M15-008 取舍-21 的起算点；
+      // tool.* / model.delta 链都跟着它们走，不该把它们算进来）
+      const hasUser = evs.some(({ ev }) => isKnownEvent(ev) && (ev.t === 'user.input' || ev.t === 'user.note'))
+      if (hasUser) leaked.push(row.id)
+    }
+
     return {
       sessions: rows,
       totals: {
@@ -110,8 +135,9 @@ export async function scanContext(dbPath: string, limit = 20): Promise<ContextRe
         avoidableLoss,
         breakCount,
         breakdown,
-        memorySuccessRate: null,
+        memorySuccessRate,
       },
+      leakedInternalSessions: leaked,
     }
   } finally {
     log.close()
@@ -175,7 +201,12 @@ export function formatContextReport(r: ContextReport, vendorCfg?: CapabilityRepo
       ? tr('cli.doctor.ctxCauses', { causes: causes.map(([c, n]) => `${c} ×${n}`).join(' · ') })
       : tr('cli.doctor.ctxCausesNone'),
   )
-  lines.push(tr('cli.doctor.ctxMemory'))
+  // PRD-M15-008 AC-6：记忆成功率（null = 还没有任何抽取记录）
+  const rate = r.totals.memorySuccessRate === null ? '—' : `${Math.round(r.totals.memorySuccessRate * 100)}%`
+  lines.push(tr('cli.doctor.ctxMemory', { rate }))
+  for (const id of r.leakedInternalSessions) {
+    lines.push(tr('cli.doctor.ctxMigrateHint', { sessionId: id }))
+  }
   lines.push('─'.repeat(64))
   lines.push(tr('cli.doctor.ctxHeader'))
   for (const s of r.sessions.slice(0, 15)) {

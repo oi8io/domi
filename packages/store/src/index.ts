@@ -1,5 +1,6 @@
 export * from './event-log.ts'
 export * from './migrate.ts'
+export * from './migrate-m15.ts'
 export * from './projects.ts'
 export * from './read-marks.ts'
 export * from './redact.ts'

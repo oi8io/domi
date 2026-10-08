@@ -5,6 +5,10 @@
  * grep 会被注释、文档和测试里的示例 SQL 骗到，误报多了人就会加 `-- ignore`，
  * 守卫随即失效。这里只看**字符串字面量与模板串**，注释与标识符一概不看。
  *
+ * 唯一例外（PRD-M15-008 AC-2，已拍板）：`domi migrate-m15` 要把泄漏进内部会话的
+ * 用户事件划到普通会话名下。这是对 events 表唯一允许的 UPDATE，需在违规语句的
+ * 同一行或上一行写 `append-only-exempt:` 注释，守卫见豁免才放行——漏了照样拦。
+ *
  * 用法：bun run scripts/check-append-only.ts [扫描目录...]
  * 默认扫 packages/ 与 apps/ 下的 src/（测试目录不扫——fixture 里就是要放违规 SQL）。
  */
@@ -73,6 +77,10 @@ function scan(file: string): Violation[] {
     for (const { re, what } of dynamic ? [...FORBIDDEN, ...FORBIDDEN_DYNAMIC] : FORBIDDEN) {
       if (re.test(flat)) {
         const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf))
+        // INV-01 唯一例外：PRD-M15-008 AC-2 迁移，语句上一行或同行须带豁免注释
+        const lines = src.split('\n')
+        const nearby = lines.slice(Math.max(0, line - 1), line + 2).join('\n')
+        if (/append-only-exempt/i.test(nearby)) continue
         found.push({ file, line: line + 1, what, text: flat.slice(0, 100) })
       }
     }

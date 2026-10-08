@@ -37,6 +37,7 @@ export const ErrorCode = z.enum([
   'INVALID_PARAMS',
   'SESSION_NOT_FOUND',
   'SESSION_BUSY',
+  'INTERNAL_SESSION',
   'NOT_HANDSHAKED',
   'INTERNAL',
 ])

@@ -963,7 +963,9 @@ export const en: Record<keyof typeof zh, string> = {
   'cli.doctor.ctxToolShare': 'tool-result share {pct} · avoidable loss {loss} tokens · prefix breaks {breaks}',
   'cli.doctor.ctxCauses': 'break causes: {causes}',
   'cli.doctor.ctxCausesNone': 'break causes: none (prefix stable or no observations yet)',
-  'cli.doctor.ctxMemory': 'memory success rate: — (wired in M15-007)',
+  'cli.doctor.ctxMemory': 'memory success rate: {rate} (extracted segments / extracted + failures)',
+  'cli.doctor.ctxMigrateHint':
+    '⚠ internal session {sessionId} still contains user events — run domi migrate-m15 (PRD-M15-008 AC-2).',
   'cli.doctor.ctxHeader': 'recent sessions (steps / hit% / in / tool% / avoidable loss / prompt≈layers+tools+history)',
   'cli.doctor.ctxRow':
     '{id} · {steps} steps · {hit} · {input} in · {tool} tool · loss {loss} · ≈{layers}+{tools}+{history} tokens',
@@ -1418,6 +1420,8 @@ server:
   'error.feature.schedules': 'scheduled tasks',
   'error.feature.refs': 'cross-session references',
   'error.session_not_found': 'No such session: {sessionId}',
+  'session.internal_forbidden':
+    'Internal session ({sessionId}) — cannot submit, rename, attach to a project, or change type.',
   'error.busy.delete': 'This session is busy; wait for it to stop before deleting it',
   'error.busy.revert': "Can't revert while running",
   'error.busy.switch': 'This session is busy; wait for this turn to finish before switching',

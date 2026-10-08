@@ -21,6 +21,7 @@ export const COMMANDS = [
   'eval',
   'trace',
   'migrate',
+  'migrate-m15',
   'memory',
   'soul',
   'task',

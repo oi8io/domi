@@ -15,7 +15,15 @@ import { configSource, credentialEnvNames, listProviders, loadConfig, providerCo
 import { tr } from '@domi/i18n'
 import { buildManifest, formatManifest } from '@domi/observability'
 import { assemble, BUILTIN_LAYERS, formatDump, layersFromConfig, mergeLayers } from '@domi/prompt'
-import { formatAbsolute, formatMigrate, formatRelative, migrateDatabase, SqliteEventLog } from '@domi/store'
+import {
+  formatAbsolute,
+  formatMigrate,
+  formatMigrateM15,
+  formatRelative,
+  migrateDatabase,
+  migrateM15InternalSessions,
+  SqliteEventLog,
+} from '@domi/store'
 import { CONFIG_TEMPLATE, HELP, type ParsedCli } from './args.ts'
 import { exportAll, exportableConfig, formatPurgePlan, PURGE_CONFIRM_WORD, planPurge } from './data.ts'
 import { diagnose, formatFindings } from './doctor.ts'
@@ -284,6 +292,13 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       const r = migrateDatabase({ dbPath: join(dataDir(), 'events.db') })
       io.out(formatMigrate(r))
       return r.rolledBack ? 1 : 0
+    }
+
+    // PRD-M15-008 AC-2：把泄漏的内部会话里用户事件迁出成普通会话（备份 + 幂等）
+    case 'migrate-m15': {
+      const r = migrateM15InternalSessions({ dbPath: join(dataDir(), 'events.db') })
+      io.out(formatMigrateM15(r))
+      return 0
     }
 
     case 'report-bug': {
