@@ -18,6 +18,7 @@ import {
   type ToolCall,
   type UploadRef,
 } from '@domi/protocol'
+import { ContextLimitError, effectiveWindow, HARD_CAP } from './budget.ts'
 import { refKey, renderRef } from './refs.ts'
 
 export type ContextStrategyName = 'full' | 'incremental' | (string & {})
@@ -258,7 +259,11 @@ function estimateTokens(msgs: ModelMessages): number {
   return tokens + images * IMAGE_TOKENS
 }
 
-export function buildContext(events: readonly EventEnvelope[], policy: ContextPolicy): ModelMessages {
+export function buildContext(
+  events: readonly EventEnvelope[],
+  policy: ContextPolicy,
+  window?: { contextWindow: number; maxOutput: number },
+): ModelMessages {
   const name = policy.strategy ?? 'full'
   const strategy = strategies.get(name)
   if (!strategy) {
@@ -270,6 +275,17 @@ export function buildContext(events: readonly EventEnvelope[], policy: ContextPo
 
   const msgs = strategy(events, policy)
   const tokens = estimateTokens(msgs)
+  // PRD-M15-002 AC-4：给了窗口就按硬顶（92% 有效窗口）兜底，超限抛可恢复异常——
+  // runTurn 捕获后转 error 事件落盘，不穿出（会话不会卡死在超窗状态）
+  if (window !== undefined) {
+    const effective = effectiveWindow(window.contextWindow, window.maxOutput)
+    if (tokens > effective * HARD_CAP) {
+      throw new ContextLimitError(
+        `上下文约 ${tokens} tokens，超过硬顶 ${Math.round(effective * HARD_CAP)}（有效窗口 ${effective}，策略 '${name}'）。` +
+          '拼装不会悄悄截断。可以：换一个会压缩的 context.strategy；在对话里手动压缩一次；或换一个窗口更大的模型。',
+      )
+    }
+  }
   if (tokens > policy.maxTokens) {
     throw new Error(
       `上下文约 ${tokens} tokens，超过 maxTokens=${policy.maxTokens}（策略 '${name}'）。\n` +

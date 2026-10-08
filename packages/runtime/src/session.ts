@@ -38,6 +38,7 @@ import {
   type DomiConfig,
   listProviders,
   MissingCredentialError,
+  modelWindow,
   providerConnection,
   VENDORS,
 } from '@domi/config'
@@ -47,6 +48,9 @@ import {
   aggregate,
   type ContextPolicy,
   contextLevel,
+  effectiveWindow,
+  estimateIncrement,
+  evaluate,
   type Fingerprint,
   formatCost,
   type NoteSource,
@@ -60,7 +64,7 @@ import {
   verifyNudges,
   verifyState,
 } from '@domi/kernel'
-import { compact, registerCleanStrategy, registerCompactStrategy, SummarySchema, shouldCompact } from '@domi/memory'
+import { cleanup, compact, registerCleanStrategy, registerCompactStrategy, SummarySchema } from '@domi/memory'
 import {
   capabilitiesFor,
   createProvider,
@@ -85,6 +89,7 @@ import { z } from 'zod'
 import { ASK_USER_CAPABILITY, makeAskUserTool } from './ask-user.ts'
 import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
 import { type CheckpointController, CheckpointError, resolveSnapshots, stepStartSnapshot } from './checkpoints.ts'
+import { degrade } from './degrade.ts'
 import {
   makePlanGate,
   makePlanUpdateTool,
@@ -353,9 +358,14 @@ function mimeOf(ext: string): string {
   return MIME_BY_EXT[ext.replace(/^\./, '').toLowerCase()] ?? 'application/octet-stream'
 }
 
+/** 压缩连续失败熔断上限（SPEC-M15-002 compactFailMax: 2）——之后不再每轮自动重试，手动仍可用 */
+export const COMPACT_FAIL_MAX = 2
+
 export class DomiSession {
   private readonly log: SqliteEventLog
   private readonly tools: ToolRegistry
+  /** 压缩连续失败计数（AC-6 熔断）；成功清零 */
+  private compactFailCount = 0
   private readonly permissions: PermissionEngine
   /** 类型诊断（M7-007）：每个 tsconfig 一个常驻 LanguageService */
   private readonly diagnostics = new DiagnosticsService()
@@ -746,6 +756,18 @@ export class DomiSession {
     // provider 实例在构造时就绑定了模型名，只改字符串的话请求照旧发给旧模型。
     // 跨 provider 时用那一家自己的 key / base_url（providerConnection）
     if (!this.injectedProvider) this.provider = this.buildProvider(toProvider, to)
+    // PRD-M15-002 AC-5：切到更小窗口的模型时，切换前预检——放不下就先压缩再切，并在 model.switch 旁落说明
+    const toWindow = modelWindow(to, {
+      contextWindow: this.opts.config.model.contextWindow,
+      maxOutput: this.opts.config.model.maxOutput,
+    })
+    const toEffective = effectiveWindow(toWindow.contextWindow, toWindow.maxOutput)
+    const all = await this.view()
+    const m = aggregate(all, { pricing: this.opts.pricing ?? {} })
+    if (evaluate(m.contextTokens, toEffective) !== 'ok') {
+      const c = await this.compactNow('threshold')
+      opts.reason = opts.reason ?? (c.ok ? '切换前已自动压缩' : '切换前压缩失败，可能放不下')
+    }
     await this.log.append(this.opts.sessionId, [
       {
         t: 'model.switch',
@@ -886,7 +908,9 @@ export class DomiSession {
    * 失败时什么都不做：压缩失败不该让一次正常对话看起来出错了——
    * 大不了这一轮上下文长一点。这和标题生成是同一条降级原则。
    */
-  async compactNow(trigger: 'threshold' | 'manual' = 'manual'): Promise<{ ok: boolean; detail: string }> {
+  async compactNow(
+    trigger: 'threshold' | 'manual' = 'manual',
+  ): Promise<{ ok: boolean; detail: string; freed?: number }> {
     const events = await this.view()
     try {
       const r = await compact(events, {
@@ -906,9 +930,11 @@ export class DomiSession {
       if (r.covered.length === 0) return { ok: false, detail: '轮数还不够，没什么可压的' }
       await this.log.append(this.opts.sessionId, [r.event])
       await this.pump()
+      this.compactFailCount = 0
       return {
         ok: true,
         detail: `已压缩 seq ${r.event.fromSeq}–${r.event.toSeq}，${r.event.tokensBefore} → ${r.event.tokensAfter} tokens（保留最近 ${r.event.keptTurns} 轮）`,
+        freed: Math.max(0, r.event.tokensBefore - r.event.tokensAfter),
       }
     } catch (e) {
       // 失败也要留痕，而且走**事件流**而不是侧信道：
@@ -916,6 +942,8 @@ export class DomiSession {
       const message = `上下文压缩失败，这一轮照常继续：${e instanceof Error ? e.message : String(e)}`
       await this.log.append(this.opts.sessionId, [{ t: 'error', scope: 'compact', message, recoverable: true }])
       await this.pump()
+      // AC-6 熔断：连续失败计数，成功清零
+      this.compactFailCount += 1
       return { ok: false, detail: message }
     }
   }
@@ -1208,23 +1236,44 @@ export class DomiSession {
   }
 
   /**
-   * 到窗口 70% 就自动压一次（AC-1）。只在 strategy = 'compact' 时生效。
-   * 看的是**当前占用**（最近一次请求的提示词），不是全会话累计——累计只增不减，
-   * 过了阈值以后会每轮都压（BUG-M13-002）
+   * 请求前预检（PRD-M15-002 AC-3 · SPEC-M15-002 取舍-17）：按窗口预算器走降级链。
+   * 占用 = 最近真实 usage 基准（aggregate.contextTokens）+ 本步增量估算（system / 工具定义）；
+   * 档位 → 遮蔽（确定性清理，005 精化为热区遮蔽）→ 压缩（可轮中）→ 硬顶停 + error{scope:'context'}。
+   * 熔断（AC-6）：压缩连续失败 ≥ COMPACT_FAIL_MAX 后不再自动触发，手动 /compact 仍可用。
    */
-  private async maybeAutoCompact(): Promise<void> {
-    if (this.opts.config.context.strategy !== 'compact') return
+  private async preflight(): Promise<{ stop: boolean }> {
+    if (this.compactFailCount >= COMPACT_FAIL_MAX) return { stop: false }
     const events = await this.view()
-    const { contextTokens } = aggregate(events, { maxContextTokens: this.opts.config.context.maxTokens })
-    if (
-      !shouldCompact(
-        contextTokens,
-        this.opts.config.context.maxTokens,
-        (this.opts.config.context.compactAt ?? 70) / 100,
-      )
-    )
-      return
-    await this.compactNow('threshold')
+    const m = aggregate(events, { pricing: this.opts.pricing ?? {} })
+    const sys = this.prompt()
+    const increment = estimateIncrement(sys.system, this.tools.schemas(), [])
+    const w = modelWindow(this.currentModel, {
+      contextWindow: this.opts.config.model.contextWindow,
+      maxOutput: this.opts.config.model.maxOutput,
+    })
+    const effective = effectiveWindow(w.contextWindow, w.maxOutput)
+    const r = await degrade(m.contextTokens + increment, effective, {
+      mask: async () => {
+        // 004：确定性清理当遮蔽用（005 精化为热区/冷区遮蔽）。腾不出就不落事件
+        const c = cleanup(events)
+        const freed = Math.max(0, c.tokensBefore - c.tokensAfter)
+        if (freed === 0) return { freed: 0 }
+        const seqs = c.items.filter((i) => i.appliedRules.length > 0).map((i) => i.seq)
+        return {
+          freed,
+          ev: { t: 'ctx.mask', seqs, reason: 'threshold', freedTokens: freed },
+        }
+      },
+      compact: async () => {
+        const r = await this.compactNow('threshold')
+        return { ok: r.ok, freed: r.freed ?? 0 }
+      },
+    })
+    if (r.events.length > 0) {
+      await this.log.append(this.opts.sessionId, r.events)
+      await this.pump()
+    }
+    return { stop: r.action === 'stop' }
   }
 
   /**
@@ -1582,7 +1631,11 @@ export class DomiSession {
     await this.ensureTrust()
     // M15（SPEC-M15-003 · INV-12(b)）：会话（turn）开始定格——soul/rules/catalog/计划/环境
     this.freeze()
-    await this.maybeAutoCompact()
+    const pre = await this.preflight()
+    if (pre.stop) {
+      // AC-3：仍超硬顶 → 本轮停。error{scope:'context'} 已在 preflight 落盘
+      return { stopReason: 'context', counters: { toolCalls: 0, argParseRetries: 0, elapsedMs: 0 } }
+    }
     const policy: ContextPolicy = {
       maxTokens: this.opts.config.context.maxTokens,
       includeReasoning: this.opts.config.context.includeReasoning,
@@ -1604,6 +1657,11 @@ export class DomiSession {
           clock: this.opts.clock ?? { now: () => Date.now() },
           policy,
           model: this.currentModel,
+          // M15（SPEC-M15-002 AC-4）：模型窗口给 loop 做 buildContext 硬顶兜底
+          window: modelWindow(this.currentModel, {
+            contextWindow: this.opts.config.model.contextWindow,
+            maxOutput: this.opts.config.model.maxOutput,
+          }),
           // 运行时护栏（PRD-M10-003 AC-3）：kernel 不读配置，只收 LoopLimits；缺省与 DEFAULT_LIMITS 一致
           limits: {
             maxToolCalls: this.opts.config.loop.maxToolCalls,

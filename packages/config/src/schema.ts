@@ -79,6 +79,12 @@ export const ConfigSchema = z.object({
      * 后面挂的模型其实支持工具调用的话，在 model.capabilities 里打开
      */
     capabilities: CapabilitiesSchema.optional(),
+    /**
+     * 上下文窗口与输出预留（PRD-M15-002 AC-1 · SPEC-M15-002 取舍-15）。
+     * 不填按内置窗口表（未知模型保守默认 128k / 8k）；填了覆盖内置表。
+     */
+    contextWindow: z.number().int().positive().optional(),
+    maxOutput: z.number().int().positive().optional(),
   }),
   permissions: z
     .object({

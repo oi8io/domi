@@ -84,6 +84,11 @@ export interface LoopDeps {
    */
   prevFingerprint?: Fingerprint
   prevFingerprintSeq?: number
+  /**
+   * M15（SPEC-M15-002 AC-4）：模型窗口（contextWindow / maxOutput）。
+   * 给了就传给 buildContext 做硬顶兜底（超限抛 ContextLimitError → 转 error 事件）
+   */
+  window?: { contextWindow: number; maxOutput: number }
 }
 
 /**
@@ -119,6 +124,8 @@ export type StopReason =
   | 'stream_error'
   /** 用量到顶、用户选择停止（PRD-M7-009）。工具端以 reason 'budget_stop' 报上来 */
   | 'budget'
+  /** 上下文拼装超硬顶（PRD-M15-002 AC-4）：error{scope:'context'} 已落盘，本轮安全结束 */
+  | 'context'
   /** 用户中断了这一轮（PRD-M13-002）：外部 signal 触发，signal.reason = { by: 端名 } */
   | 'interrupted'
 
@@ -287,12 +294,25 @@ export async function runTurn(
         }
       }
     }
-    const history = buildContext(events, {
-      ...deps.policy,
-      ...(resolved.size > 0 ? { refs: resolved } : {}),
-      ...(uploads.size > 0 ? { uploads } : {}),
-      ...(skills.size > 0 ? { skills } : {}),
-    })
+    let history: ReturnType<typeof buildContext>
+    try {
+      history = buildContext(
+        events,
+        {
+          ...deps.policy,
+          ...(resolved.size > 0 ? { refs: resolved } : {}),
+          ...(uploads.size > 0 ? { uploads } : {}),
+          ...(skills.size > 0 ? { skills } : {}),
+        },
+        deps.window,
+      )
+    } catch (e) {
+      // PRD-M15-002 AC-4：任何拼装阶段异常都转成事件落盘，不穿出 runTurn。
+      // 会话不会进入「每次 submit 都失败」的状态——下一步还有预检 / 压缩兜底
+      const message = e instanceof Error ? e.message : String(e)
+      await deps.sink.append(sessionId, [{ t: 'error', scope: 'context', message, recoverable: true }])
+      return { stopReason: 'context', counters: counters() }
+    }
     const prompt = typeof deps.prompt === 'function' ? deps.prompt() : deps.prompt
     const messages = prompt ? withPrompt(history, prompt) : history
 
