@@ -19,6 +19,7 @@ import { formatAbsolute, formatMigrate, formatRelative, migrateDatabase, SqliteE
 import { CONFIG_TEMPLATE, HELP, type ParsedCli } from './args.ts'
 import { exportAll, exportableConfig, formatPurgePlan, PURGE_CONFIRM_WORD, planPurge } from './data.ts'
 import { diagnose, formatFindings } from './doctor.ts'
+import { runContextDoctor } from './doctor-context.ts'
 import type { Io } from './io.ts'
 import { formatOnboarding } from './onboarding.ts'
 import { ping } from './ping.ts'
@@ -149,6 +150,9 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
 
     case 'doctor': {
       const home = userHome()
+      if (cli.flags.context) {
+        return runContextDoctor(join(dataDir(), 'events.db'), io)
+      }
       const cfg = loadConfig({ home })
       const src = configSource({ home })
       const conn = providerConnection(cfg, cfg.model.provider)

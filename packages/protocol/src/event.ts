@@ -39,9 +39,16 @@ import { z } from 'zod'
  *          新增 `ctx.fileref`（文件行引用：diff 行评论进输入框后随用户消息落盘，SPEC-M14-008）；
  *          新增 `fs.discard`（非隔离会话丢弃一个文件的改动，丢弃前自动快照所以可撤销，SPEC-M14-005）；
  *          `model.request` 新增可选的 `ctx`（上下文分段估算：层清单 + 工具 / 历史估算，SPEC-M14-006，只增不改）。
+ * v16 → v17：M15 内核上下文——
+ *          新增 `ctx.note`（会话内必须送达的动态内容以追加事件送达，INV-12(b) 落地，SPEC-M15-003）；
+ *          新增 `ctx.mask`（遮蔽决定：冷区工具结果换指针，一批一条，SPEC-M15-004）；
+ *          新增 `ctx.pin`（钉住某条事件：遮蔽与压缩跳过，SPEC-M15-004）；
+ *          新增 `ctx.refresh`（显式刷新点：INV-12(b) 白名单，SPEC-M15-003）；
+ *          新增 `ctx.prefix.break`（非预期前缀断裂的运行期观测，SPEC-M15-001）；
+ *          `model.request` 新增可选的 `fingerprint`（前缀指纹：工具 / 层 / 每条消息的 FNV-1a 哈希，只记哈希不记内容，SPEC-M15-001）。
  * 旧事件仍然可解析：新增类型不影响已知类型，新增字段是可选的（SPEC-M0-004）。
  */
-export const SCHEMA_VERSION = 16
+export const SCHEMA_VERSION = 17
 
 export const RefSchema = z.object({ kind: z.string(), id: z.string() })
 export type Ref = z.infer<typeof RefSchema>
@@ -171,6 +178,18 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
         ),
         tools: z.number().int().nonnegative(),
         history: z.number().int().nonnegative(),
+      })
+      .optional(),
+    /**
+     * M15：前缀指纹（SPEC-M15-001）。工具定义 / 各层 / 每条消息的 FNV-1a 哈希，
+     * 只记哈希不记内容——相邻请求对比定位「哪一层 / 第几条消息 / 由哪个事件引起」的缓存断裂。
+     * **可选**：旧事件没有照样解析
+     */
+    fingerprint: z
+      .object({
+        toolHash: z.string(),
+        layers: z.array(z.object({ id: z.string(), hash: z.string() })),
+        messages: z.array(z.string()),
       })
       .optional(),
   }),
@@ -315,6 +334,62 @@ export const DomiEventSchema = z.discriminatedUnion('t', [
       openQuestions: z.array(z.string()),
       nextSteps: z.array(z.string()),
     }),
+  }),
+  /**
+   * M15：会话内必须送达的动态内容（SPEC-M15-003，PRD-M15-003，INV-12(b) 追加送达）。
+   * 计划更新 / 环境变化 / 验证提示 / 运行中补充以追加事件送达，渲染成新的 user 块——
+   * 不再改写最后一条 user 消息（前缀稳定）。ref 是它所说明的那条事件 seq（可选）
+   */
+  z.looseObject({
+    t: z.literal('ctx.note'),
+    text: z.string(),
+    reason: z.enum(['plan', 'env', 'verify', 'supplement', 'model_switch']),
+    ref: z.number().int().positive().optional(),
+  }),
+  /**
+   * M15：遮蔽决定（SPEC-M15-004，PRD-M15-004，INV-12(a)）。
+   * 一批冷区工具结果换指针文本；原始事件一条不动，拼上下文时按它替换。
+   * freedTokens 是这次遮蔽预计腾出的 token（估算口径）
+   */
+  z.looseObject({
+    t: z.literal('ctx.mask'),
+    seqs: z.array(z.number().int().positive()),
+    reason: z.enum(['cold', 'dedup', 'resolved_error', 'truncate', 'threshold']),
+    freedTokens: z.number().int().nonnegative(),
+  }),
+  /**
+   * M15：钉住 / 解钉（SPEC-M15-004 AC-5）。被钉住的 seq 遮蔽与压缩均跳过
+   */
+  z.looseObject({
+    t: z.literal('ctx.pin'),
+    seq: z.number().int().positive(),
+    pinned: z.boolean(),
+  }),
+  /**
+   * M15：显式刷新点（SPEC-M15-003，INV-12(b) 白名单）。
+   * 刷新 = 重新定格前缀（soul / rules / skills / 身份层重读）；它之后的第一个请求是**预期内**断裂
+   */
+  z.looseObject({
+    t: z.literal('ctx.refresh'),
+    reason: z.enum(['manual', 'trust', 'model_switch', 'strategy', 'soul', 'rules', 'skills']),
+  }),
+  /**
+   * M15：非预期前缀断裂的运行期观测（SPEC-M15-001，PRD-M15-001 AC-2）。
+   * 相邻两次请求的前缀指纹第一个不同点被定位后，若断裂不是压缩点或显式刷新造成的，落这一条。
+   * 不删任何事件、不改任何事件——它只是把「缓存为什么掉了」记成可审计的轨迹。
+   */
+  z.looseObject({
+    t: z.literal('ctx.prefix.break'),
+    /** 上一次请求的 model.request 事件 seq */
+    prevSeq: z.number().int().positive(),
+    /** 这一次请求的 model.request 事件 seq */
+    nextSeq: z.number().int().positive(),
+    /** 归因：哪一类来源变化造成的（端上据此显示人话） */
+    cause: z.string(),
+    /** 断在哪一层（有则填层 id，如 session.plan / builtin.soul） */
+    layer: z.string().optional(),
+    /** 断在哪一条消息（消息 index，从 0 起） */
+    msgIndex: z.number().int().nonnegative(),
   }),
   /**
    * M3-005：这一轮引用了另一个会话的一段轨迹。紧挨在它引用给的那条 user.input 前面落盘。

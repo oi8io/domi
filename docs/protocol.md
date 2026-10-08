@@ -5449,6 +5449,43 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                           "tools",
                           "history"
                         ]
+                      },
+                      "fingerprint": {
+                        "type": "object",
+                        "properties": {
+                          "toolHash": {
+                            "type": "string"
+                          },
+                          "layers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "hash": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "hash"
+                              ]
+                            }
+                          },
+                          "messages": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "toolHash",
+                          "layers",
+                          "messages"
+                        ]
                       }
                     },
                     "required": [
@@ -6008,6 +6045,165 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "tokensAfter",
                       "trigger",
                       "summary"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.note"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "plan",
+                          "env",
+                          "verify",
+                          "supplement",
+                          "model_switch"
+                        ]
+                      },
+                      "ref": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "text",
+                      "reason"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.mask"
+                      },
+                      "seqs": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "cold",
+                          "dedup",
+                          "resolved_error",
+                          "truncate",
+                          "threshold"
+                        ]
+                      },
+                      "freedTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "seqs",
+                      "reason",
+                      "freedTokens"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.pin"
+                      },
+                      "seq": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "pinned": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "seq",
+                      "pinned"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.refresh"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "manual",
+                          "trust",
+                          "model_switch",
+                          "strategy",
+                          "soul",
+                          "rules",
+                          "skills"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "reason"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.prefix.break"
+                      },
+                      "prevSeq": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "nextSeq": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "cause": {
+                        "type": "string"
+                      },
+                      "layer": {
+                        "type": "string"
+                      },
+                      "msgIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "prevSeq",
+                      "nextSeq",
+                      "cause",
+                      "msgIndex"
                     ],
                     "additionalProperties": {}
                   },
@@ -7493,6 +7689,43 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                           "tools",
                           "history"
                         ]
+                      },
+                      "fingerprint": {
+                        "type": "object",
+                        "properties": {
+                          "toolHash": {
+                            "type": "string"
+                          },
+                          "layers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "hash": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "hash"
+                              ]
+                            }
+                          },
+                          "messages": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "toolHash",
+                          "layers",
+                          "messages"
+                        ]
                       }
                     },
                     "required": [
@@ -8052,6 +8285,165 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
                       "tokensAfter",
                       "trigger",
                       "summary"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.note"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "plan",
+                          "env",
+                          "verify",
+                          "supplement",
+                          "model_switch"
+                        ]
+                      },
+                      "ref": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "text",
+                      "reason"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.mask"
+                      },
+                      "seqs": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "cold",
+                          "dedup",
+                          "resolved_error",
+                          "truncate",
+                          "threshold"
+                        ]
+                      },
+                      "freedTokens": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "seqs",
+                      "reason",
+                      "freedTokens"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.pin"
+                      },
+                      "seq": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "pinned": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "seq",
+                      "pinned"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.refresh"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "manual",
+                          "trust",
+                          "model_switch",
+                          "strategy",
+                          "soul",
+                          "rules",
+                          "skills"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "reason"
+                    ],
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "t": {
+                        "type": "string",
+                        "const": "ctx.prefix.break"
+                      },
+                      "prevSeq": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "nextSeq": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "cause": {
+                        "type": "string"
+                      },
+                      "layer": {
+                        "type": "string"
+                      },
+                      "msgIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "t",
+                      "prevSeq",
+                      "nextSeq",
+                      "cause",
+                      "msgIndex"
                     ],
                     "additionalProperties": {}
                   },
@@ -9433,6 +9825,43 @@ PRD-M11-009：向上翻页——取 view seq < beforeSeq 的一个尾部窗口�
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
+        },
+        "breakCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "avoidableLoss": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "maskCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "compactCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "overflowCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "memorySuccessRate": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

@@ -10,7 +10,7 @@
  * 所以必须在**构建期**就炸，而不是等 nightly 的趋势文件告诉你。
  */
 import type { ModelMessages } from '@domi/protocol'
-import { estimateTextTokens } from '@domi/protocol'
+import { estimateTextTokens, fnv1a } from '@domi/protocol'
 
 export interface PromptCtx {
   cwd: string
@@ -68,6 +68,12 @@ export interface AssembledPrompt {
   prefixText: string
   /** 前缀到第几层为止。目前只给 `domi prompt dump` 标前缀边界用（压缩没有用它，而是整段保留 system 前缀） */
   prefixLayerCount: number
+  /**
+   * M15（SPEC-M15-001）：每层渲染文本的 FNV-1a 哈希。
+   * 只记哈希不记文本——前缀指纹（model.request.fingerprint）用它定位「断在哪一层」。
+   * 不落盘（ctx.layers 仍只带估算，不带文本与哈希）
+   */
+  layerFingerprints: Array<{ id: string; hash: string }>
 }
 
 /** 与 `@domi/protocol` 的 `estimateTextTokens` 同口径（BUG-M14-001） */
@@ -122,6 +128,7 @@ export function assemble(layers: readonly PromptLayer[], ctx: PromptCtx): Assemb
     messages,
     prefixText,
     prefixLayerCount: prefixLayers.length,
+    layerFingerprints: rendered.map((r) => ({ id: r.layer.id, hash: fnv1a(r.text) })),
     layers: rendered.map((r) => ({
       id: r.layer.id,
       role: r.layer.role,

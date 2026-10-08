@@ -13,6 +13,7 @@
 import type { DomiEvent, EventEnvelope, RefLink, SubmitRef, UploadRef } from '@domi/protocol'
 import { estimateTextTokens } from '@domi/protocol'
 import { buildContext, type ContextPolicy, type LoadedUpload } from './build-context.ts'
+import { type Fingerprint, fingerprintOf, locateBreak } from './fingerprint.ts'
 import type { Clock, EventSink, ToolCallRequest, ToolRunner } from './ports.ts'
 import { type PromptParts, withPrompt } from './preamble.ts'
 import { interruptedResult, notRunResult } from './recovery.ts'
@@ -76,6 +77,13 @@ export interface LoopDeps {
    * 收场之前（取到了就再跑一步）。不给就没有补充
    */
   notes?: NoteSource
+  /**
+   * M15（SPEC-M15-001）：上一次请求的前缀指纹（跨轮对比用）。
+   * runtime 从事件流读最后一次 model.request 的 fingerprint 传进来；回放 / 单测不填则本轮第一条不判断裂。
+   * seq 是那次 model.request 事件的 seq（ctx.prefix.break 要引用它）
+   */
+  prevFingerprint?: Fingerprint
+  prevFingerprintSeq?: number
 }
 
 /**
@@ -236,6 +244,11 @@ export async function runTurn(
     return true
   }
 
+  // M15（SPEC-M15-001）：前缀指纹跨请求对比。runtime 把上一次请求的指纹传进来（跨轮），
+  // 本轮内每步请求后更新局部变量（步间断裂也抓）
+  let lastFingerprint: Fingerprint | null = deps.prevFingerprint ?? null
+  let lastFingerprintSeq = deps.prevFingerprintSeq ?? 0
+
   for (;;) {
     // 检查点 ①：每一步开头
     if (interrupted()) return stop('interrupted', INTERRUPTED)
@@ -287,7 +300,16 @@ export async function runTurn(
     const produced: DomiEvent[] = []
     // 请求单独先落盘（BUG-M13-004）：它的 ts 才是「请求发出」那一刻。
     // 原来和这一步的输出攒成一批、共用流结束时的 ts，生成用了多久从事件流里量不出来（tok/s 靠它）
-    await deps.sink.append(sessionId, [
+    const fp = fingerprintOf({
+      toolSchemas: deps.tools.schemas(),
+      layers: prompt?.layerHashes,
+      messages,
+    })
+    // M15（SPEC-M15-001）：断裂检测。压缩点 / 显式刷新之后的第一次请求是**预期内**断裂（白名单），不落观测
+    const whitelisted =
+      lastFingerprint !== null &&
+      events.some((e) => e.seq > lastFingerprintSeq && (e.ev.t === 'ctx.compact' || e.ev.t === 'ctx.refresh'))
+    const requestSeq = await deps.sink.append(sessionId, [
       {
         t: 'model.request',
         provider: deps.provider.id,
@@ -304,8 +326,26 @@ export async function runTurn(
               },
             }
           : {}),
+        // M15（SPEC-M15-001）：前缀指纹——工具 / 层 / 每条消息的 FNV-1a 哈希。
+        // 只记哈希不记内容；相邻请求对比定位缓存断裂（runtime 落 ctx.prefix.break）
+        fingerprint: fp,
       },
     ])
+    if (lastFingerprint !== null && !whitelisted) {
+      const br = locateBreak(lastFingerprint, fp)
+      if (br !== null) {
+        produced.push({
+          t: 'ctx.prefix.break',
+          prevSeq: lastFingerprintSeq,
+          nextSeq: requestSeq.from,
+          cause: br.cause,
+          ...(br.layer === undefined ? {} : { layer: br.layer }),
+          msgIndex: br.msgIndex,
+        })
+      }
+    }
+    lastFingerprint = fp
+    lastFingerprintSeq = requestSeq.from
 
     let streamError: { message: string; recoverable: boolean } | null = null
     try {

@@ -47,6 +47,7 @@ const MIXED = [
   ...load('legacy-v14.jsonl'),
   ...load('legacy-v15.jsonl'),
   ...load('legacy-v16.jsonl'),
+  ...load('legacy-v17.jsonl'),
 ]
 /** v1 代码写下的 error（没有 counters）与 v2 新增的 fs.snapshot —— 新代码都得认得 */
 const V1_V2 = load('legacy-v1-error.jsonl')
@@ -55,7 +56,7 @@ const V2_V3 = load('v2-to-v3.jsonl')
 
 describe('PRD-M0-001 AC-5 / PRD-M2-007 AC-4 · 各历史版本混合 fixture', () => {
   test('每一条都能解析，且没有一条抛错', () => {
-    expect(MIXED).toHaveLength(52)
+    expect(MIXED).toHaveLength(58)
     for (const e of MIXED) {
       expect(() => parseEvent(e.ev, e.schemaVersion)).not.toThrow()
     }

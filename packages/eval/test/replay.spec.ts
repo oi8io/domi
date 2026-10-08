@@ -302,3 +302,62 @@ describe('PRD-M14-003 · 带 fs.checkpoint 的事件流能录能放（INV-13）'
     expect(r.ok).toBe(true)
   })
 })
+
+describe('M15 · 上下文组框架（SPEC-M15-001 · INV-13）', () => {
+  /** 上下文事件（plan.update / user.note / ctx.note / ctx.prefix.break / fingerprint）混在会话里 */
+  function contextSession(): EventEnvelope[] {
+    seq = 0
+    const base = realSession()
+    // 在第一条 user.input 后插入计划与运行中补充（轨迹事件），并给 model.request 带 fingerprint
+    const withCtx: EventEnvelope[] = []
+    let requestNo = 0
+    for (const e of base) {
+      if (e.ev.t === 'user.input') {
+        withCtx.push(
+          env({
+            t: 'plan.update',
+            steps: [{ id: 's1', text: '改减号为加号', status: 'in_progress' }],
+          }),
+        )
+        withCtx.push(env({ t: 'ctx.note', text: '计划已更新：先读文件', reason: 'plan', ref: 1 }))
+      }
+      if (e.ev.t === 'model.request') {
+        requestNo += 1
+        withCtx.push(
+          env({
+            t: 'model.request',
+            provider: 'anthropic',
+            model: 'claude-sonnet-4-5',
+            tokensIn: 3,
+            fingerprint: { toolHash: `t${requestNo}`, layers: [{ id: 'identity', hash: 'a' }], messages: ['1', '2'] },
+          }),
+        )
+        continue
+      }
+      withCtx.push(e)
+    }
+    // 收尾补一条用户补充（user.note 会在安全点送达，不影响录制）
+    withCtx.push(env({ t: 'user.note', id: 'n1', text: '顺便加个测试文件', from: 'web' }))
+    withCtx.push(
+      env({ t: 'ctx.prefix.break', prevSeq: 2, nextSeq: 8, cause: 'plan.update', layer: 'session.plan', msgIndex: 3 }),
+    )
+    return withCtx
+  }
+
+  test('上下文事件随录制保留、不影响 expectedCalls（新事件进回放，INV-13）', () => {
+    const fx = record(contextSession(), 'context-prefix-stability')
+    // 录制不受上下文事件干扰：工具调用序列与普通会话一致
+    expect(fx.expectedCalls.map((c) => c.name)).toEqual(['fs.read', 'fs.write', 'shell.exec'])
+    expect(fx.notes).toContainEqual({ beforeRequest: 4, text: '顺便加个测试文件' })
+    // 序列化往返
+    const back = parse(serialize(fx))
+    expect(back.expectedCalls).toEqual(fx.expectedCalls)
+  })
+
+  test('回放含上下文事件的会话，工具调用序列与录制一致', async () => {
+    const r = await replay(record(contextSession(), 'context-prefix-stability'))
+    expect(r.ok).toBe(true)
+    expect(r.actualCalls).toBe(3)
+    expect(r.divergence).toBeNull()
+  })
+})

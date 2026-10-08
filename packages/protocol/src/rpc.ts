@@ -224,6 +224,17 @@ const MetricsSchema = z.object({
   contextTokens: z.number().int().nonnegative().optional(),
   contextMaxTokens: z.number().int().nonnegative().optional(),
   toolCalls: z.number().int().nonnegative().optional(),
+  /**
+   * M15（SPEC-M15-001）：上下文尺子——缓存断裂观测与投影次数（老 daemon 不推）。
+   * avoidableLoss：非白名单前缀断裂时本可命中的输入 token 估算（R0 口径：断裂请求的未命中输入）。
+   * memorySuccessRate：记忆抽取成功率（008 接线后非 null）
+   */
+  breakCount: z.number().int().nonnegative().optional(),
+  avoidableLoss: z.number().int().nonnegative().optional(),
+  maskCount: z.number().int().nonnegative().optional(),
+  compactCount: z.number().int().nonnegative().optional(),
+  overflowCount: z.number().int().nonnegative().optional(),
+  memorySuccessRate: z.number().min(0).max(100).nullable().optional(),
 })
 
 const AskSchema = z.object({

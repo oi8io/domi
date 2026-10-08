@@ -10,6 +10,7 @@
  * 而"不知道成本的工具不敢常用"正是这条需求的由来。
  */
 import { type AnyEvent, type EventEnvelope, isKnownEvent } from '@domi/protocol'
+import { type Fingerprint, locateBreak } from './fingerprint.ts'
 
 export interface ModelPrice {
   /** 美元 / 百万 token */
@@ -58,6 +59,20 @@ export interface Metrics {
   tokPerSec: number | null
   /** 缓存命中（全会话）：cacheRead ÷（input + cacheRead），0–100 取整；没有输入是 null */
   cacheHitPercent: number | null
+  /**
+   * M15（SPEC-M15-001）：上下文尺子——
+   * breakCount：非白名单前缀断裂次数（相邻请求指纹对比定位到差异，SPEC-M15-001 取舍-18）
+   * avoidableLoss：这些断裂请求的未命中输入 token 合计（R0 口径：本可命中却重发的输入）
+   * maskCount / compactCount：遮蔽批次与压缩次数
+   * overflowCount：超窗降级（error scope 'context'）次数
+   * memorySuccessRate：记忆抽取成功率（008 接线后非 null；此前为 null）
+   */
+  breakCount: number
+  avoidableLoss: number
+  maskCount: number
+  compactCount: number
+  overflowCount: number
+  memorySuccessRate: number | null
 }
 
 export interface AggregateOptions {
@@ -155,6 +170,12 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
   let stepStart: number | null = null
   /** 当前上下文占用（BUG-M13-002） */
   let contextTokens = 0
+  // M15（SPEC-M15-001）：相邻请求指纹对比——白名单（压缩 / 刷新之后的第一个请求）不判断裂
+  const requests: Array<{ seq: number; fp: Fingerprint | null; whiteListed: boolean; input: number }> = []
+  let whiteListedNext = false
+  let maskCount = 0
+  let compactCount = 0
+  let overflowCount = 0
 
   for (const env of events) {
     const ev: AnyEvent = env.ev
@@ -174,6 +195,13 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
         provider = ev.provider
         steps += 1
         stepStart = env.ts
+        requests.push({
+          seq: env.seq,
+          fp: ev.fingerprint ?? null,
+          whiteListed: whiteListedNext,
+          input: 0,
+        })
+        whiteListedNext = false
         break
       case 'model.switch':
         model = ev.to
@@ -184,6 +212,16 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
       case 'ctx.compact':
         // 压缩后、下一次请求前：按压掉的量往下扣。下一次 model.usage 回来就以真实用量为准
         contextTokens = Math.max(0, contextTokens - Math.max(0, ev.tokensBefore - ev.tokensAfter))
+        compactCount += 1
+        // M15：压缩是**预期内**断裂，它之后的第一个请求不判断裂（白名单）
+        whiteListedNext = true
+        break
+      case 'ctx.mask':
+        maskCount += 1
+        whiteListedNext = true
+        break
+      case 'ctx.refresh':
+        whiteListedNext = true
         break
       case 'model.usage': {
         const t = readUsage(ev.raw)
@@ -191,6 +229,8 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
         totals.output += t.output
         totals.cacheRead += t.cacheRead
         contextTokens = t.input + t.cacheRead
+        const lastReq = requests.at(-1)
+        if (lastReq !== undefined) lastReq.input = t.input
         if (stepStart !== null) {
           turnOutput += t.output
           turnGenMs += env.ts - stepStart
@@ -205,6 +245,9 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
         }
         break
       }
+      case 'error':
+        if (ev.scope === 'context' && ev.recoverable === true) overflowCount += 1
+        break
       default:
         break
     }
@@ -212,6 +255,19 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
 
   const used = totals.input + totals.cacheRead
   const max = opts.maxContextTokens ?? 0
+  // M15：相邻请求断裂——白名单（压缩 / 刷新之后的第一个请求）跳过
+  let breakCount = 0
+  let avoidableLoss = 0
+  for (let i = 1; i < requests.length; i++) {
+    const prev = requests[i - 1]
+    const cur = requests[i]
+    if (prev === undefined || cur === undefined) continue
+    if (prev.fp === null || cur.fp === null || cur.whiteListed) continue
+    if (locateBreak(prev.fp, cur.fp) !== null) {
+      breakCount += 1
+      avoidableLoss += cur.input
+    }
+  }
   return {
     model,
     provider,
@@ -226,6 +282,12 @@ export function aggregate(events: readonly EventEnvelope[], opts: AggregateOptio
     steps,
     tokPerSec: turnGenMs > 0 && turnOutput > 0 ? Math.round((turnOutput / turnGenMs) * 1000) : null,
     cacheHitPercent: used > 0 ? Math.round((totals.cacheRead / used) * 100) : null,
+    breakCount,
+    avoidableLoss,
+    maskCount,
+    compactCount,
+    overflowCount,
+    memorySuccessRate: null,
   }
 }
 

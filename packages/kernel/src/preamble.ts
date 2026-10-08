@@ -22,6 +22,12 @@ export interface PromptParts {
     cacheable: boolean
     approxTokens: number
   }>
+  /**
+   * M15（SPEC-M15-001）：每层渲染文本的 FNV-1a 哈希（assemble().layerFingerprints）。
+   * 只用于计算 model.request.fingerprint——**不进 ctx.layers、不落盘**。
+   * 可选——老实现 / 回放不填，指纹缺层数据时按「只有消息级」计算
+   */
+  layerHashes?: Array<{ id: string; hash: string }>
 }
 
 export function withPrompt(messages: ModelMessages, prompt: PromptParts): ModelMessages {

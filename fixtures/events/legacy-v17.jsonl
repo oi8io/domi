@@ -1,0 +1,6 @@
+{"seq": 53, "sessionId": "legacy", "parentSeq": 52, "ts": 1758800001000, "schemaVersion": 17, "ev": {"t": "ctx.note", "text": "计划已更新：第 2 步改为先跑测试", "reason": "plan", "ref": 40}}
+{"seq": 54, "sessionId": "legacy", "parentSeq": 53, "ts": 1758800001001, "schemaVersion": 17, "ev": {"t": "ctx.mask", "seqs": [20, 21], "reason": "cold", "freedTokens": 9216}}
+{"seq": 55, "sessionId": "legacy", "parentSeq": 54, "ts": 1758800001002, "schemaVersion": 17, "ev": {"t": "ctx.pin", "seq": 30, "pinned": true}}
+{"seq": 56, "sessionId": "legacy", "parentSeq": 55, "ts": 1758800001003, "schemaVersion": 17, "ev": {"t": "ctx.refresh", "reason": "manual"}}
+{"seq": 57, "sessionId": "legacy", "parentSeq": 56, "ts": 1758800001004, "schemaVersion": 17, "ev": {"t": "ctx.prefix.break", "prevSeq": 55, "nextSeq": 57, "cause": "plan.update", "layer": "session.plan", "msgIndex": 3}}
+{"seq": 58, "sessionId": "legacy", "parentSeq": 57, "ts": 1758800001005, "schemaVersion": 17, "ev": {"t": "model.request", "provider": "p", "model": "m", "tokensIn": 9, "ctx": {"layers": [{"id": "identity", "role": "system", "cacheable": true, "approxTokens": 120}], "tools": 300, "history": 900}, "fingerprint": {"toolHash": "1a2b3c4d", "layers": [{"id": "identity", "hash": "aa11"}], "messages": ["bb22", "cc33"]}}}

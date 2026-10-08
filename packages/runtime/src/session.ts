@@ -46,6 +46,7 @@ import {
   aggregate,
   type ContextPolicy,
   contextLevel,
+  type Fingerprint,
   formatCost,
   type NoteSource,
   type PricingTable,
@@ -203,6 +204,13 @@ export interface MetricsSnapshot {
   contextMaxTokens?: number
   /** BUG-M13-005：全会话工具调用次数，与 steps 同源 */
   toolCalls?: number
+  /** M15（SPEC-M15-001）：上下文尺子——缓存断裂观测与投影计数（老 daemon 不推） */
+  breakCount?: number
+  avoidableLoss?: number
+  maskCount?: number
+  compactCount?: number
+  overflowCount?: number
+  memorySuccessRate?: number | null
 }
 
 export interface SessionEvents {
@@ -622,6 +630,13 @@ export class DomiSession {
       steps: m.steps,
       tokPerSec: m.tokPerSec,
       cacheHitPercent: m.cacheHitPercent,
+      // M15（SPEC-M15-001）：上下文尺子——缓存断裂观测与投影计数
+      breakCount: m.breakCount,
+      avoidableLoss: m.avoidableLoss,
+      maskCount: m.maskCount,
+      compactCount: m.compactCount,
+      overflowCount: m.overflowCount,
+      memorySuccessRate: m.memorySuccessRate,
     })
   }
 
@@ -757,6 +772,25 @@ export class DomiSession {
    */
   private view(): Promise<EventEnvelope[]> {
     return this.offset === 0 ? this.log.read(this.opts.sessionId) : this.log.readLineage(this.opts.sessionId)
+  }
+
+  /**
+   * M15（SPEC-M15-001）：上一次请求的前缀指纹（跨轮断裂观测）。
+   * 从事件流读最后一次 model.request 的 fingerprint 与 seq；
+   * 没有（空会话 / 旧事件无指纹）就返回空对象，loop 本轮第一条请求不判断裂。
+   */
+  private async lastRequestFingerprint(): Promise<{
+    prevFingerprint?: Fingerprint
+    prevFingerprintSeq?: number
+  }> {
+    const events = await this.view()
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i]
+      if (e === undefined || e.ev.t !== 'model.request') continue
+      const fp = (e.ev as { fingerprint?: Fingerprint }).fingerprint
+      return fp === undefined ? {} : { prevFingerprint: fp, prevFingerprintSeq: e.seq }
+    }
+    return {}
   }
 
   /**
@@ -1238,6 +1272,8 @@ export class DomiSession {
       dynamic: text('user'),
       // M14（SPEC-M14-006 取舍-1）：层清单（id / role / cacheable / 字符估算）随请求落盘，供上下文 tab 分段
       layers: a.layers.map((l) => ({ id: l.id, role: l.role, cacheable: l.cacheable, approxTokens: l.approxTokens })),
+      // M15（SPEC-M15-001）：层渲染文本哈希，只用于前缀指纹，不进 ctx.layers / 不落盘
+      layerHashes: a.layerFingerprints,
     }
   }
 
@@ -1453,6 +1489,8 @@ export class DomiSession {
     const timer = setInterval(() => {
       void this.pump()
     }, 30)
+    // M15（SPEC-M15-001）：上一次请求的指纹在进 loop 前先读好（deps 构造是同步的）
+    const prevFingerprint = await this.lastRequestFingerprint()
     try {
       const result = await runTurn(
         {
@@ -1476,6 +1514,8 @@ export class DomiSession {
           },
           // 每次请求模型前现拼：一轮里计划更新了，下一次请求就带上（PRD-M12-004 AC-8）
           prompt: () => this.prompt(),
+          // M15（SPEC-M15-001）：上一次请求的前缀指纹——跨轮缓存断裂观测
+          ...prevFingerprint,
           beforeComplete: (events) => this.verifyGate(events),
           ...(opts.notes === undefined ? {} : { notes: opts.notes }),
         },

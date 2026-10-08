@@ -18,6 +18,8 @@
     "@domi/prompt": "workspace:*",
     "@domi/runtime": "workspace:*",
     "@domi/store": "workspace:*",
-    "@domi/trace": "workspace:*"
+    "@domi/trace": "workspace:*",
+    "@domi/kernel": "workspace:*",
+    "@domi/protocol": "workspace:*"
   }
 }

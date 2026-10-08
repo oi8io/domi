@@ -38,11 +38,11 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
     //   2. fixtures/events/legacy-v{n}.jsonl 补了吗？
     //   3. packages/protocol/.api.md 重新生成了吗？
     // 三个都答完再改数字。这条测试的价值就在于逼人停一下。
-    expect(SCHEMA_VERSION).toBe(16)
+    expect(SCHEMA_VERSION).toBe(17)
     const tags = DomiEventSchema.options.map(
       (o) => (o.shape.t as unknown as { _zod: { def: { values: string[] } } })._zod.def.values[0],
     )
-    expect(tags).toHaveLength(46)
+    expect(tags).toHaveLength(51)
     expect(new Set(tags).size).toBe(tags.length)
     expect(tags).toContain('fs.snapshot')
     expect(tags).toContain('revert')
@@ -58,6 +58,12 @@ describe('PRD-M0-001 / SPEC-M0-004 · 事件 schema 的前向兼容', () => {
     expect(tags).toContain('plan.update')
     // M13：运行中补充
     expect(tags).toContain('user.note')
+    // M15：内核上下文新事件（note/mask/pin/refresh 本册 001 随 schema 一并落地，产生者随 002/004/005）
+    expect(tags).toContain('ctx.prefix.break')
+    expect(tags).toContain('ctx.note')
+    expect(tags).toContain('ctx.mask')
+    expect(tags).toContain('ctx.pin')
+    expect(tags).toContain('ctx.refresh')
     // M14：步级快照、文件行引用、非隔离丢弃
     expect(tags).toContain('fs.checkpoint')
     expect(tags).toContain('ctx.fileref')

@@ -348,6 +348,9 @@ importers:
       '@domi/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@domi/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@domi/model':
         specifier: workspace:*
         version: link:../model
@@ -360,6 +363,9 @@ importers:
       '@domi/prompt':
         specifier: workspace:*
         version: link:../prompt
+      '@domi/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       '@domi/runtime':
         specifier: workspace:*
         version: link:../runtime

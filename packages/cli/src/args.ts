@@ -47,6 +47,8 @@ export interface ParsedCli {
     json: boolean
     yes: boolean
     ping: boolean
+    /** `domi doctor --context`：上下文 R0 基线诊断（SPEC-M15-001） */
+    context: boolean
     /** `domi task run x.yaml --follow` */
     follow: boolean
     /** `domi memory list --all`：连删掉的也列 */
@@ -98,6 +100,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       json: { type: 'boolean' },
       yes: { type: 'boolean', short: 'y' },
       ping: { type: 'boolean' },
+      context: { type: 'boolean' },
       html: { type: 'string' },
       connect: { type: 'string' },
       all: { type: 'boolean' },
@@ -126,6 +129,7 @@ export function parseCli(argv: readonly string[]): ParsedCli {
       json: Boolean(values.json),
       yes: Boolean(values.yes),
       ping: Boolean(values.ping),
+      context: Boolean(values.context),
       project: Boolean(values.project),
       isolate: Boolean(values.isolate),
       chat: Boolean(values.chat),

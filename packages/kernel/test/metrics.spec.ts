@@ -152,3 +152,84 @@ describe('纯度', () => {
     expect(aggregate(evs, { pricing: PRICING }).tokens.input).toBe(1_000_000)
   })
 })
+
+describe('M15 · 上下文尺子（SPEC-M15-001）', () => {
+  const fpReq = (
+    fingerprint: { toolHash: string; layers: Array<{ id: string; hash: string }>; messages: string[] },
+    seqOffset = 0,
+  ): EventEnvelope =>
+    env(
+      { t: 'model.request', provider: 'anthropic', model: 'claude-sonnet-4-5', tokensIn: 3, fingerprint },
+      1_100 + seqOffset,
+    )
+
+  test('相邻请求指纹一致 → breakCount 0 / avoidableLoss 0', () => {
+    const fpA = { toolHash: 'a', layers: [], messages: ['1', '2'] }
+    const evs = [
+      env({ t: 'user.input', text: 'hi' }, 1_000),
+      fpReq(fpA, 0),
+      env({ t: 'model.usage', raw: { input_tokens: 100, output_tokens: 10 } }, 1_400),
+      fpReq(fpA, 1),
+      env({ t: 'model.usage', raw: { input_tokens: 100, output_tokens: 10 } }, 1_800),
+    ]
+    const m = aggregate(evs, { maxContextTokens: 200_000 })
+    expect(m.breakCount).toBe(0)
+    expect(m.avoidableLoss).toBe(0)
+  })
+
+  test('可避免断裂（同位置 user 内容变）→ breakCount 1、损失 = 该请求未命中输入', () => {
+    const fpA = { toolHash: 'a', layers: [], messages: ['1', '2'] }
+    const fpB = { toolHash: 'a', layers: [], messages: ['1', '3'] }
+    const evs = [
+      env({ t: 'user.input', text: 'hi' }, 1_000),
+      fpReq(fpA, 0),
+      env({ t: 'model.usage', raw: { input_tokens: 100, output_tokens: 10 } }, 1_400),
+      fpReq(fpB, 1),
+      env({ t: 'model.usage', raw: { input_tokens: 200, output_tokens: 10 } }, 1_800),
+    ]
+    const m = aggregate(evs, { maxContextTokens: 200_000 })
+    expect(m.breakCount).toBe(1)
+    expect(m.avoidableLoss).toBe(200)
+  })
+
+  test('白名单（压缩 / 刷新之后的第一个请求）断裂不算可避免', () => {
+    const fpA = { toolHash: 'a', layers: [], messages: ['1', '2'] }
+    const fpB = { toolHash: 'a', layers: [], messages: ['1', '3'] }
+    const evs = [
+      env({ t: 'user.input', text: 'hi' }, 1_000),
+      fpReq(fpA, 0),
+      env({ t: 'model.usage', raw: { input_tokens: 100, output_tokens: 10 } }, 1_400),
+      env(
+        {
+          t: 'ctx.compact',
+          fromSeq: 1,
+          toSeq: 4,
+          keptTurns: 1,
+          tokensBefore: 5000,
+          tokensAfter: 300,
+          trigger: 'threshold',
+          summary: { intent: '', filesModified: [], keyDecisions: [], openQuestions: [], nextSteps: [] },
+        },
+        1_600,
+      ),
+      fpReq(fpB, 1),
+      env({ t: 'model.usage', raw: { input_tokens: 200, output_tokens: 10 } }, 1_800),
+    ]
+    const m = aggregate(evs, { maxContextTokens: 200_000 })
+    expect(m.breakCount).toBe(0)
+    expect(m.avoidableLoss).toBe(0)
+    expect(m.compactCount).toBe(1)
+  })
+
+  test('超窗降级与遮蔽计数', () => {
+    const evs = [
+      ...session(),
+      env({ t: 'error', scope: 'context', message: '超窗', recoverable: true }, 1_500),
+      env({ t: 'ctx.mask', seqs: [3], reason: 'cold', freedTokens: 8000 }, 1_600),
+    ]
+    const m = aggregate(evs, { maxContextTokens: 200_000 })
+    expect(m.overflowCount).toBe(1)
+    expect(m.maskCount).toBe(1)
+    expect(m.memorySuccessRate).toBeNull()
+  })
+})

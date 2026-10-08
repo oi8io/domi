@@ -954,6 +954,14 @@ export const en: Record<keyof typeof zh, string> = {
   'cli.doctor.dataBadDetail': "Can't write to {dataDir}, so sessions can't be saved.",
   'cli.doctor.allGood': 'All good.',
   'cli.doctor.problems':
+  'cli.doctor.ctxTitle': 'Context diagnostics (R0 baseline · SPEC-M15-001)',
+  'cli.doctor.ctxSessions': '{sessions} sessions · {events} events · hit rate {hit} · {input} in · {output} out (1:{ratio})',
+  'cli.doctor.ctxToolShare': 'tool-result share {pct} · avoidable loss {loss} tokens · prefix breaks {breaks}',
+  'cli.doctor.ctxCauses': 'break causes: {causes}',
+  'cli.doctor.ctxCausesNone': 'break causes: none (prefix stable or no observations yet)',
+  'cli.doctor.ctxMemory': 'memory success rate: — (wired in M15-007)',
+  'cli.doctor.ctxHeader': 'recent sessions (steps / hit% / in / tool% / avoidable loss / prompt≈layers+tools+history)',
+  'cli.doctor.ctxRow': '{id} · {steps} steps · {hit} · {input} in · {tool} tools · loss {loss} · ≈{layers}+{tools}+{history} token',
     '{bad, plural, one {# item needs} other {# items need}} attention; each one above comes with a command you can paste and run.',
   'cli.args.unknown': 'Unknown command: {given}\nAvailable commands: {join}\n$ domi --help',
   'cli.plugin.usage':
