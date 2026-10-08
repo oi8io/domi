@@ -603,6 +603,7 @@ describe('PRD-M14-006 · 上下文 tab（右侧栏）', () => {
     mcp: [{ server: 'gh', tools: ['mcp.gh.search'] }],
     strategy: 'full',
     thresholdPercent: null,
+    pending: { soul: false, rules: false, catalog: false, skills: false },
   }
   const renderTab = (store: ReturnType<typeof createSessionStore>, staticProp: typeof STATIC | null = STATIC): string =>
     renderToStaticMarkup(

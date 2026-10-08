@@ -5,14 +5,14 @@
  * 必须送达的动态内容（计划更新等）落 ctx.note，渲染为追加 user 块——相邻请求前缀稳定。
  */
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ConfigSchema } from '@domi/config'
 import { StubProvider } from '@domi/model'
 import type { EventEnvelope } from '@domi/protocol'
 import { SqliteEventLog } from '@domi/store'
-import { DomiSession, TrustStore, type PendingAsk } from '../src/index.ts'
+import { DomiSession, type PendingAsk } from '../src/index.ts'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -40,6 +40,7 @@ function open(o: {
 }) {
   const cwd = o.cwd ?? tmp()
   const home = o.home ?? tmp('domi-freeze-home-')
+  mkdirSync(join(cwd, '.git'))
   if (o.rules) {
     for (const [name, text] of Object.entries(o.rules)) writeFileSync(join(cwd, name), text)
   }
@@ -52,9 +53,8 @@ function open(o: {
     config,
     sessionId: 's1',
     cwd,
-    dbPath: o.db ?? join(tmp(), 'e.db'),
+    dbPath: join(home, 'events.db'),
     provider,
-    trustStore: new TrustStore(home),
     ...(o.planRequired === undefined ? {} : { planRequired: o.planRequired }),
   })
   const asks: PendingAsk[] = []

@@ -230,6 +230,8 @@ export const en: Record<keyof typeof zh, string> = {
   'web.context.triggerThreshold': 'threshold',
   'web.context.reads': 'Read',
   'web.context.locate': 'Locate in chat',
+  'web.context.refresh': 'Refresh (re-freeze prefix)',
+  'web.context.pendingRefresh': '{n} pending · refresh',
   'web.changes.locate': 'Locate in chat',
   'web.changes.rangeTurn': 'This turn',
   'web.changes.rangeSession': 'Whole session',
@@ -956,13 +958,15 @@ export const en: Record<keyof typeof zh, string> = {
   'cli.doctor.problems':
     '{bad, plural, one {# item needs} other {# items need}} attention; each one above comes with a command you can paste and run.',
   'cli.doctor.ctxTitle': 'Context diagnostics (R0 baseline · SPEC-M15-001)',
-  'cli.doctor.ctxSessions': '{sessions} sessions · {events} events · hit rate {hit} · {input} in · {output} out (1:{ratio})',
+  'cli.doctor.ctxSessions':
+    '{sessions} sessions · {events} events · hit rate {hit} · {input} in · {output} out (1:{ratio})',
   'cli.doctor.ctxToolShare': 'tool-result share {pct} · avoidable loss {loss} tokens · prefix breaks {breaks}',
   'cli.doctor.ctxCauses': 'break causes: {causes}',
   'cli.doctor.ctxCausesNone': 'break causes: none (prefix stable or no observations yet)',
   'cli.doctor.ctxMemory': 'memory success rate: — (wired in M15-007)',
   'cli.doctor.ctxHeader': 'recent sessions (steps / hit% / in / tool% / avoidable loss / prompt≈layers+tools+history)',
-  'cli.doctor.ctxRow': '{id} · {steps} steps · {hit} · {input} in · {tool} tools · loss {loss} · ≈{layers}+{tools}+{history} token',
+  'cli.doctor.ctxRow':
+    '{id} · {steps} steps · {hit} · {input} in · {tool} tools · loss {loss} · ≈{layers}+{tools}+{history} token',
   'cli.args.unknown': 'Unknown command: {given}\nAvailable commands: {join}\n$ domi --help',
   'cli.plugin.usage':
     'Usage:\n  domi plugin list                        installed plugins, sandbox status, and why any failed to load\n  domi plugin install <dir>               install (lists every permission and installs only after you confirm; restart domid afterwards)\n  domi plugin remove <name>               uninstall\n  domi plugin scaffold <tool|skill|mcp> <dir> [name]\n                                          generate a plugin skeleton (with bun test)\n\nSee docs/site/plugin-dev.md for how to write one.',

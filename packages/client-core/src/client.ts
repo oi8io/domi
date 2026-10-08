@@ -260,6 +260,11 @@ export class DomiClient {
     return this.request('session.context', { sessionId })
   }
 
+  /** M15 显式刷新（SPEC-M15-003 · INV-12(b) 白名单）：落 ctx.refresh + 重定格 */
+  async refreshContext(sessionId: string): Promise<boolean> {
+    return (await this.request('session.refreshContext', { sessionId })).ok
+  }
+
   /** M14 产物预览内容（SPEC-M14-007 取舍-2） */
   artifact(sessionId: string, path: string): Promise<ResultOf<'session.artifact'>> {
     return this.request('session.artifact', { sessionId, path })

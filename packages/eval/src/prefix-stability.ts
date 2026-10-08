@@ -18,13 +18,15 @@ export interface PrefixStabilityIssue {
 export function assertPrefixStability(events: readonly EventEnvelope[]): PrefixStabilityIssue[] {
   const requests = events
     .map((e, i) => ({ e, i }))
-    .filter(
-      (x): x is { e: EventEnvelope; i: number } & { fp: string[] } => {
-        const ev = x.e.ev as { t?: string; fingerprint?: { messages?: string[] } }
-        return ev.t === 'model.request' && Array.isArray(ev.fingerprint?.messages)
-      },
-    )
-    .map((x) => ({ seq: x.e.seq, i: x.i, fp: (x.e.ev as { fingerprint: { messages: string[] } }).fingerprint.messages }))
+    .filter((x): x is { e: EventEnvelope; i: number } & { fp: string[] } => {
+      const ev = x.e.ev as { t?: string; fingerprint?: { messages?: string[] } }
+      return ev.t === 'model.request' && Array.isArray(ev.fingerprint?.messages)
+    })
+    .map((x) => ({
+      seq: x.e.seq,
+      i: x.i,
+      fp: (x.e.ev as { fingerprint: { messages: string[] } }).fingerprint.messages,
+    }))
 
   const issues: PrefixStabilityIssue[] = []
   for (let k = 1; k < requests.length; k++) {
@@ -37,7 +39,8 @@ export function assertPrefixStability(events: readonly EventEnvelope[]): PrefixS
       issues.push({ prevSeq: prev.seq, nextSeq: next.seq, at: -1 })
       continue
     }
-    const at = next.fp.findIndex((h, j) => j >= prev.fp.length || h !== prev.fp[j])
+    // 只比较 prev 长度内的部分：超出 prev 长度的消息是合法追加（前缀只增不改），不算违规
+    const at = next.fp.findIndex((h, j) => j < prev.fp.length && h !== prev.fp[j])
     if (at >= 0) issues.push({ prevSeq: prev.seq, nextSeq: next.seq, at })
   }
   return issues

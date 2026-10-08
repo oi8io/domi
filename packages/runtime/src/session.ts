@@ -221,6 +221,19 @@ export interface SessionEvents {
   onBusy(busy: boolean): void
 }
 
+/**
+ * M15（SPEC-M15-003）：会话开始定格快照。
+ * 只存文本与 mtime——prompt() 在 turn 内只读这份，不碰源（INV-12(b)）
+ */
+interface FrozenContext {
+  soul: string
+  rules: string
+  catalog: string
+  /** 计划文本（session.plan 层）——turn 内定格；变化走 ctx.note 追加，下一 turn 生效 */
+  planText: string
+  cwd: string
+}
+
 export interface SessionOptions {
   config: DomiConfig
   sessionId: string
@@ -376,6 +389,56 @@ export class DomiSession {
   private titleTried = false
   private currentModel: string
   private currentProvider: string
+  /**
+   * M15（SPEC-M15-003 · INV-12(b)）：会话开始定格快照。
+   * turn（一次 submit）开始时 freeze() 一次；turn 内 soul/rules/catalog/计划/环境都不再现读，
+   * 来源变化不打扰当前请求；必须送达的动态内容（计划更新）走 ctx.note 追加。
+   * 显式刷新（refreshContext）落 ctx.refresh 并重定格。
+   */
+  private frozen: FrozenContext | null = null
+
+  /** 定格快照的内容 */
+  private readFrozen(): FrozenContext {
+    const soul = this.opts.memory?.promptText() ?? ''
+    const rules = this.trusted ? rulesText(this.repoRoot, this.opts.cwd) : ''
+    const catalog = this.skillSource?.catalog() ?? ''
+    return {
+      soul,
+      rules,
+      catalog,
+      planText: planPromptText(this.planPolicy),
+      cwd: this.opts.cwd,
+    }
+  }
+
+  private frozenSkills = 0
+
+  /** 重定格：turn 开始 / 显式刷新时调用 */
+  private freeze(): void {
+    this.frozen = this.readFrozen()
+    this.frozenSkills = this.skillSource?.list().length ?? 0
+  }
+
+  /** 待生效计数：来源相对定格快照是否已变化（端上提示「点刷新」用）。plan 不走这里（变化即 ctx.note 追加） */
+  pendingContextChanges(): { soul: boolean; rules: boolean; catalog: boolean; skills: boolean } {
+    const cur = this.readFrozen()
+    const f = this.frozen
+    if (f === null) return { soul: false, rules: false, catalog: false, skills: false }
+    return {
+      soul: cur.soul !== f.soul,
+      rules: cur.rules !== f.rules,
+      catalog: cur.catalog !== f.catalog,
+      skills: (this.skillSource?.list().length ?? 0) !== (this.frozenSkills ?? 0),
+    }
+  }
+
+  /** 显式刷新（PRD-M15-003 AC-4）：落 ctx.refresh + 重定格。刷新不做预检弹窗 */
+  async refreshContext(): Promise<{ ok: true }> {
+    await this.log.append(this.opts.sessionId, [{ t: 'ctx.refresh', reason: 'manual' }])
+    this.freeze()
+    await this.pump()
+    return { ok: true }
+  }
 
   constructor(private readonly opts: SessionOptions) {
     this.log = new SqliteEventLog({ path: opts.dbPath, cwd: opts.cwd })
@@ -1237,31 +1300,38 @@ export class DomiSession {
         strategy: cfg.strategy,
         thresholdPercent: cfg.strategy === 'compact' ? cfg.compactAt : null,
       },
+      // M15（SPEC-M15-003）：相对定格快照的待生效变化（端上提示「点刷新」）
+      pending: this.pendingContextChanges(),
     }
   }
 
   private prompt(): PromptParts {
+    // M15（SPEC-M15-003 · INV-12(b)）：定格快照。turn 内 soul/rules/catalog/计划/环境只读这份——
+    // 来源变化不打扰当前请求（下一 turn 或显式刷新才生效）
+    const f = this.frozen ?? this.readFrozen()
     const extra: PromptLayer[] = []
-    const soul = this.opts.memory?.promptText() ?? ''
     // Soul 很少变，放稳定前缀里（ADR-019）；空的时候不放，免得多一段没内容的说明
-    if (soul !== '')
-      extra.push({ id: 'builtin.soul', role: 'system', priority: 400, cacheable: true, render: () => soul })
-    // 仓库自带的规矩（M7-002）：信任之后才放。每轮现读，改了下一轮生效
-    const rules = this.trusted ? rulesText(this.repoRoot, this.opts.cwd) : ''
-    if (rules !== '') {
-      extra.push(projectRulesLayer(rules))
+    if (f.soul !== '')
+      extra.push({ id: 'builtin.soul', role: 'system', priority: 400, cacheable: true, render: () => f.soul })
+    // 仓库自带的规矩（M7-002）：信任之后才放。**turn 内定格**，来源变化待生效（pendingContextChanges）
+    if (f.rules !== '') {
+      extra.push(projectRulesLayer(f.rules))
     }
-    const catalog = this.skillSource?.catalog() ?? ''
-    if (catalog !== '') {
-      extra.push({ id: 'builtin.skills', role: 'system', priority: 450, cacheable: true, render: () => catalog })
+    if (f.catalog !== '') {
+      extra.push({ id: 'builtin.skills', role: 'system', priority: 450, cacheable: true, render: () => f.catalog })
     }
-    // 计划常驻上下文（PRD-M12-004 AC-8）：动态层，不缓存；压缩时它不在被压的消息里，所以不会丢
-    const planText = planPromptText(this.planPolicy)
-    if (planText !== '') {
-      extra.push({ id: 'session.plan', role: 'user', priority: 900, cacheable: false, render: () => planText })
+    // 计划常驻上下文（PRD-M12-004 AC-8）：**turn 内定格**。计划变化不重写本 turn 已发出的层——
+    // 检测到变化时落 notes（追加送达，ctx.note 事件由 loop 落盘），下一 turn 生效
+    const notes: PromptParts['notes'] = []
+    if (f.planText !== '') {
+      extra.push({ id: 'session.plan', role: 'user', priority: 900, cacheable: false, render: () => f.planText })
+      const live = planPromptText(this.planPolicy)
+      if (live !== f.planText) {
+        notes.push({ reason: 'plan', text: live })
+      }
     }
     const layers = mergeLayers([...BUILTIN_LAYERS, ...extra], layersFromConfig(this.opts.config.prompt.layers))
-    const a = assemble(layers, { cwd: this.opts.cwd, model: this.currentModel })
+    const a = assemble(layers, { cwd: f.cwd, model: this.currentModel })
     const text = (role: 'system' | 'user'): string =>
       a.messages
         .filter((m) => m.role === role)
@@ -1269,7 +1339,9 @@ export class DomiSession {
         .join('\n\n')
     return {
       system: text('system'),
-      dynamic: text('user'),
+      // M15：user 段不再是「动态尾巴」——withPrompt 不再把它拼进最后一条 user（前缀稳定）
+      dynamic: '',
+      ...(notes.length > 0 ? { notes } : {}),
       // M14（SPEC-M14-006 取舍-1）：层清单（id / role / cacheable / 字符估算）随请求落盘，供上下文 tab 分段
       layers: a.layers.map((l) => ({ id: l.id, role: l.role, cacheable: l.cacheable, approxTokens: l.approxTokens })),
       // M15（SPEC-M15-001）：层渲染文本哈希，只用于前缀指纹，不进 ctx.layers / 不落盘
@@ -1480,6 +1552,8 @@ export class DomiSession {
     await this.loadPlan()
     this.plan.onUserInput(text)
     await this.ensureTrust()
+    // M15（SPEC-M15-003 · INV-12(b)）：会话（turn）开始定格——soul/rules/catalog/计划/环境
+    this.freeze()
     await this.maybeAutoCompact()
     const policy: ContextPolicy = {
       maxTokens: this.opts.config.context.maxTokens,

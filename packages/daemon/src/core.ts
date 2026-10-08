@@ -416,6 +416,8 @@ export interface DaemonHost {
     toSeq: number,
     scope: 'files' | 'conversation' | 'both',
   ): Promise<{ snapshotId: string | null; undoSnapshotId: string | null }>
+  /** 显式刷新（PRD-M15-003 AC-4）：落 ctx.refresh + 重定格 */
+  refreshContext?(sessionId: string): Promise<{ ok: true }>
   memory?: HostMemory
   tasks?: HostTasks
   worktrees?: HostWorktrees
@@ -1147,6 +1149,13 @@ export class Daemon {
         // 完全空闲：就是一次普通提交
         const refused = await this.acceptTurn(req.id, p)
         return refused ?? ok(req.id, { state: 'submitted' as const })
+      }
+
+      case 'session.refreshContext': {
+        const p = params as { sessionId: string }
+        if (this.isBusy(p.sessionId)) return failKey(req.id, 'SESSION_BUSY', 'error.busy.operate')
+        if (!this.host.refreshContext) return unsupported(req.id, 'refreshContext')
+        return ok(req.id, await this.host.refreshContext(p.sessionId))
       }
 
       case 'session.note.withdraw': {

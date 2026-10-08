@@ -27,6 +27,8 @@ function fmt(n: number): string {
   return n >= 10_000 ? `${Math.round(n / 1000)}k` : String(n)
 }
 
+const PENDING_LABELS = ['soul', 'rules', 'catalog', 'skills'] as const
+
 export function ContextTab({
   client,
   sessionId,
@@ -45,24 +47,39 @@ export function ContextTab({
   const events = useStore(store.$events)
   const status = useStore(store.$status)
   const [static_, setStatic] = useState<CtxStatic | null>(staticProp ?? null)
+  const [refreshing, setRefreshing] = useState(false)
+  const load = (): void => {
+    void client
+      .context(sessionId)
+      .then((r) =>
+        setStatic({
+          trusted: r.trusted,
+          rules: r.rules,
+          skillsTotal: r.skillsTotal,
+          mcp: r.mcp,
+          strategy: r.context.strategy,
+          thresholdPercent: r.context.thresholdPercent,
+          pending: r.pending,
+        }),
+      )
+      .catch(() => setStatic(null))
+  }
   // biome-ignore lint/correctness/useExhaustiveDependencies: 只拉一次；staticProp 变了由父级负责
   useEffect(() => {
-    if (staticProp === undefined) {
-      void client
-        .context(sessionId)
-        .then((r) =>
-          setStatic({
-            trusted: r.trusted,
-            rules: r.rules,
-            skillsTotal: r.skillsTotal,
-            mcp: r.mcp,
-            strategy: r.context.strategy,
-            thresholdPercent: r.context.thresholdPercent,
-          }),
-        )
-        .catch(() => setStatic(null))
-    }
+    if (staticProp === undefined) load()
   }, [sessionId])
+
+  /** M15 显式刷新（PRD-M15-003 AC-4）：落 ctx.refresh + 重定格，然后重拉静态项 */
+  const refresh = (): void => {
+    if (refreshing) return
+    setRefreshing(true)
+    void client
+      .refreshContext(sessionId)
+      .then(load)
+      .finally(() => setRefreshing(false))
+  }
+
+  const pendingCount = static_ ? PENDING_LABELS.filter((k) => static_.pending[k]).length : 0
 
   const v = contextView(events, status.metrics ?? null, static_)
   const max = Math.max(
@@ -82,6 +99,27 @@ export function ContextTab({
         <div className="rounded-md border border-border2 p-2">
           <div className="mb-1.5 flex items-baseline gap-2 text-[11px]">
             <span className="font-medium text-ink2">{tr('web.context.usage')}</span>
+            {pendingCount > 0 && (
+              <button
+                type="button"
+                onClick={refresh}
+                className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-px text-[10px] text-amber-400 hover:bg-amber-500/20"
+                data-part="ctx-refresh"
+              >
+                {tr('web.context.pendingRefresh', { n: String(pendingCount) })}
+              </button>
+            )}
+            {pendingCount === 0 && (
+              <button
+                type="button"
+                onClick={refresh}
+                disabled={refreshing}
+                className="rounded border border-border2 px-1.5 py-px text-[10px] text-mut hover:bg-ok/10 disabled:opacity-50"
+                data-part="ctx-refresh"
+              >
+                {tr('web.context.refresh')}
+              </button>
+            )}
             {v.total !== null && (
               <span className="font-mono text-mut">
                 {fmt(v.total)} / {fmt(v.window ?? 0)} tok

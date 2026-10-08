@@ -21,10 +21,24 @@ export interface Fingerprint {
   messages: string[]
 }
 
-/** 消息内容稳定序列化：数组按序、对象键按出现序（构造方保证固定顺序），images 剔除（不进提示词） */
+/** 稳定序列化：数组按序、对象键**排序**（同一 schema 不同声明顺序也逐字节一致，002 工具表稳定） */
+export function stableJson(v: unknown): string {
+  if (v === undefined) return 'null'
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`
+  if (v !== null && typeof v === 'object') {
+    const obj = v as Record<string, unknown>
+    return `{${Object.keys(obj)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableJson(obj[k])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(v)
+}
+
+/** 消息内容稳定序列化：数组按序、对象键排序，images 剔除（不进提示词） */
 export function stableMessageHash(m: ModelMessages[number]): string {
   const { images, ...rest } = m as { images?: unknown }
-  return fnv1a(JSON.stringify({ ...rest, images: undefined }))
+  return fnv1a(stableJson({ ...rest, images: undefined }))
 }
 
 export function fingerprintOf(input: {
@@ -33,7 +47,7 @@ export function fingerprintOf(input: {
   messages: ModelMessages
 }): Fingerprint {
   return {
-    toolHash: fnv1a(input.toolSchemas.map((t) => JSON.stringify(t)).join('\u0000')),
+    toolHash: fnv1a(input.toolSchemas.map((t) => stableJson(t)).join('\u0000')),
     layers: input.layers ?? [],
     // M15 口径：assistant 回复与 tool 消息是**协议必需**的回灌（永远会追加、不可避免），
     // 不参与「可避免断裂」度量——只比 system / user 段（前缀与用户侧内容）

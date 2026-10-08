@@ -18,6 +18,7 @@ const STATIC: CtxStatic = {
   mcp: [{ server: 'github', tools: ['mcp.github.create_issue'] }],
   strategy: 'compact',
   thresholdPercent: 70,
+  pending: { soul: false, rules: false, catalog: false, skills: false },
 }
 
 const METRICS = {

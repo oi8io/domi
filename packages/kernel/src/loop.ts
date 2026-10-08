@@ -331,6 +331,11 @@ export async function runTurn(
         fingerprint: fp,
       },
     ])
+    // M15（SPEC-M15-003 · INV-12(b)）：这一轮必须送达的动态变化（计划更新等）落 ctx.note 事件。
+    // withPrompt 已把 notes 渲染成追加 user 块（当轮模型可见）；事件落盘后，下一轮 buildContext 也会渲染它（追加送达，允许重复）
+    for (const n of prompt?.notes ?? []) {
+      produced.push({ t: 'ctx.note', reason: n.reason, text: n.text })
+    }
     if (lastFingerprint !== null && !whitelisted) {
       const br = locateBreak(lastFingerprint, fp)
       if (br !== null) {

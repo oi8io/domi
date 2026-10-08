@@ -858,6 +858,13 @@ export const METHODS = {
     params: z.object({ sessionId: z.string(), noteId: z.string() }),
     result: z.object({ withdrawn: z.boolean() }),
   },
+  'session.refreshContext': {
+    summary:
+      '显式刷新（PRD-M15-003 AC-4 · INV-12(b) 白名单）：落 ctx.refresh 事件并重定格——' +
+      'soul / 规矩 / 技能清单 / 计划 / 环境立即重新取值，之后的下一次请求以此为前缀。不做预检弹窗',
+    params: z.object({ sessionId: z.string() }),
+    result: z.object({ ok: z.literal(true) }),
+  },
   'session.interrupt': {
     summary:
       '中断当前轮（PRD-M13-002）：已输出的内容保留，正在跑的工具收到中止信号，没跑完的调用补 interrupted 结果，' +
@@ -905,6 +912,13 @@ export const METHODS = {
       context: z.object({
         strategy: z.string(),
         thresholdPercent: z.number().int().nonnegative().nullable(),
+      }),
+      /** M15（SPEC-M15-003）：相对定格快照的待生效变化（端上提示「点刷新」） */
+      pending: z.object({
+        soul: z.boolean(),
+        rules: z.boolean(),
+        catalog: z.boolean(),
+        skills: z.boolean(),
       }),
     }),
   },

@@ -81,6 +81,8 @@ export interface CtxStatic {
   mcp: Array<{ server: string; tools: string[] }>
   strategy: string
   thresholdPercent: number | null
+  /** M15（SPEC-M15-003）：相对定格快照的待生效变化（soul / 规矩 / 技能 / 目录） */
+  pending: { soul: boolean; rules: boolean; catalog: boolean; skills: boolean }
 }
 
 export interface ContextView {

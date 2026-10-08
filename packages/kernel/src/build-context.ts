@@ -169,6 +169,19 @@ const fullStrategy: ContextStrategy = (events, policy) => {
         }
         break
       }
+      case 'ctx.note': {
+        // M15（SPEC-M15-003 · INV-12(b) 追加送达）：动态变化（计划 / 环境 / 补充）渲染为新 user 块
+        // 与 user.note 同风格、可合并；**不改写任何已发出的消息**（前缀稳定）
+        flush()
+        const prev = out[out.length - 1]
+        if (prev !== undefined && lastNoteAt === out.length - 1) {
+          out[lastNoteAt] = { role: 'user', content: `${prev.content}\n\n${ev.text}` }
+        } else {
+          out.push({ role: 'user', content: `${NOTE_MARK} ${ev.text}` })
+          lastNoteAt = out.length - 1
+        }
+        break
+      }
       case 'ctx.ref':
         quoted.push(renderRef(ev, policy.refs?.get(refKey(ev))))
         break

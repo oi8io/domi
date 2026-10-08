@@ -6,11 +6,14 @@
  *   - dynamic：会变的内容（工作目录之类），**只**接在最后一条 user message 后面
  * 提示词不进事件流：它是每次请求时现拼的，改配置后下一轮就生效，历史不必重写。
  */
+
 import type { ModelMessages } from '@domi/protocol'
+import { NOTE_MARK } from './build-context.ts'
 
 export interface PromptParts {
   system: string
-  dynamic: string
+  /** @deprecated M15（SPEC-M15-003）：不再把动态内容拼进最后一条 user（会改写前缀）。动态内容走 notes 追加 */
+  dynamic?: string
   /**
    * M14（SPEC-M14-006）：这一份提示词的层清单（来自 prompt.assemble()）。
    * kernel 不认识「层」，只原样透传到 model.request.ctx 供上下文 tab 分段（纯计算，零 IO）。
@@ -28,17 +31,19 @@ export interface PromptParts {
    * 可选——老实现 / 回放不填，指纹缺层数据时按「只有消息级」计算
    */
   layerHashes?: Array<{ id: string; hash: string }>
+  /**
+   * M15（SPEC-M15-003 · INV-12(b)）：这一轮必须送达的动态变化（计划更新 / 环境 / 验证 / 补充）。
+   * 渲染为**追加**的 user 块（不改写已发出的消息），并随 model.request 前落盘成 ctx.note 事件。
+   * 可选——没有变化就不传
+   */
+  notes?: Array<{ reason: 'plan' | 'env' | 'verify' | 'supplement' | 'model_switch'; text: string }>
 }
 
 export function withPrompt(messages: ModelMessages, prompt: PromptParts): ModelMessages {
   const out: ModelMessages = [...messages]
-  if (prompt.dynamic !== '') {
-    for (let i = out.length - 1; i >= 0; i--) {
-      const m = out[i]
-      if (m?.role !== 'user') continue
-      out[i] = { ...m, content: `${m.content}\n\n${prompt.dynamic}` }
-      break
-    }
+  // M15（SPEC-M15-003 · INV-12(b)）：追加段只 push 新 user 块，绝不动已有消息——相邻请求前缀稳定
+  for (const note of prompt.notes ?? []) {
+    out.push({ role: 'user', content: `${NOTE_MARK} ${note.text}` })
   }
   if (prompt.system !== '') out.unshift({ role: 'system', content: prompt.system })
   return out

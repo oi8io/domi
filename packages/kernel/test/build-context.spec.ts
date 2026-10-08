@@ -144,11 +144,11 @@ describe('M15 · 前缀只增不改（SPEC-M15-003 · INV-12(b)）', () => {
     ]
     const out = buildContext(evs, P)
     const roles = out.map((m) => m.role)
-    expect(roles).toEqual(['user', 'assistant', 'user', 'user', 'assistant'])
+    expect(roles).toEqual(['user', 'assistant', 'user', 'assistant'])
     // 第一条 user 原样（未被改写）
     expect(out[0]).toEqual({ role: 'user', content: '改 README 标题' })
-    // 两条 ctx.note 追加为独立的 user 块
+    // ctx.note 追加为 user 块（连续两条合并成一条，同 user.note 风格）
     expect((out[2] as { content: string }).content).toContain('计划已更新')
-    expect((out[3] as { content: string }).content).toContain('工作目录变了')
+    expect((out[2] as { content: string }).content).toContain('工作目录变了')
   })
 })

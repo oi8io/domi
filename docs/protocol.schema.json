@@ -4101,6 +4101,33 @@
         ]
       }
     },
+    "session.refreshContext": {
+      "params": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "result": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      }
+    },
     "session.interrupt": {
       "params": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4312,6 +4339,29 @@
               "strategy",
               "thresholdPercent"
             ]
+          },
+          "pending": {
+            "type": "object",
+            "properties": {
+              "soul": {
+                "type": "boolean"
+              },
+              "rules": {
+                "type": "boolean"
+              },
+              "catalog": {
+                "type": "boolean"
+              },
+              "skills": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "soul",
+              "rules",
+              "catalog",
+              "skills"
+            ]
           }
         },
         "required": [
@@ -4319,7 +4369,8 @@
           "rules",
           "skillsTotal",
           "mcp",
-          "context"
+          "context",
+          "pending"
         ]
       }
     },

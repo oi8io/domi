@@ -4868,6 +4868,45 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
 }
 ```
 
+### `session.refreshContext`
+
+显式刷新（PRD-M15-003 AC-4 · INV-12(b) 白名单）：落 ctx.refresh 事件并重定格——soul / 规矩 / 技能清单 / 计划 / 环境立即重新取值，之后的下一次请求以此为前缀。不做预检弹窗
+
+**params**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "sessionId"
+  ]
+}
+```
+
+**result**
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    }
+  },
+  "required": [
+    "ok"
+  ]
+}
+```
+
 ### `session.interrupt`
 
 中断当前轮（PRD-M13-002）：已输出的内容保留，正在跑的工具收到中止信号，没跑完的调用补 interrupted 结果，落 error{stopReason:"interrupted", by}；挂着的询问按 channel=interrupt 结掉。不自动续跑。会话闲 → interrupted=false，不产生事件
@@ -5126,6 +5165,29 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
         "strategy",
         "thresholdPercent"
       ]
+    },
+    "pending": {
+      "type": "object",
+      "properties": {
+        "soul": {
+          "type": "boolean"
+        },
+        "rules": {
+          "type": "boolean"
+        },
+        "catalog": {
+          "type": "boolean"
+        },
+        "skills": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "soul",
+        "rules",
+        "catalog",
+        "skills"
+      ]
     }
   },
   "required": [
@@ -5133,7 +5195,8 @@ Soul 的全文（Markdown）与它在 daemon 机器上的路径（PRD-M4-002）
     "rules",
     "skillsTotal",
     "mcp",
-    "context"
+    "context",
+    "pending"
   ]
 }
 ```

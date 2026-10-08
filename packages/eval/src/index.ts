@@ -1,7 +1,7 @@
 export * from './cli.ts'
 export * from './fixture.ts'
-export { assertPrefixStability, type PrefixStabilityIssue } from './prefix-stability.ts'
 export * from './l2.ts'
 export * from './mine.ts'
 export * from './normalize.ts'
+export { assertPrefixStability, type PrefixStabilityIssue } from './prefix-stability.ts'
 export * from './replay.ts'
