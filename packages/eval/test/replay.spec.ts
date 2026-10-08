@@ -6,7 +6,7 @@
  */
 import { describe, expect, test } from 'bun:test'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { type Fixture, formatResult, normalize, parse, record, replay, serialize } from '../src/index.ts'
+import { assertPrefixStability, type Fixture, formatResult, normalize, parse, record, replay, serialize } from '../src/index.ts'
 
 let seq = 0
 function env(ev: DomiEvent, ts = ++seq): EventEnvelope {
@@ -359,5 +359,51 @@ describe('M15 · 上下文组框架（SPEC-M15-001 · INV-13）', () => {
     expect(r.ok).toBe(true)
     expect(r.actualCalls).toBe(3)
     expect(r.divergence).toBeNull()
+  })
+})
+
+describe('M15 · 前缀稳定性（SPEC-M15-003 · INV-12(b) 门禁）', () => {
+  /** 用真实拼装口径构造两轮指纹（fingerprintOf 只滤 system/user） */
+  function twoRequests(withBreak: boolean): EventEnvelope[] {
+    seq = 0
+    const first: Array<{ role: string; content: string }> = [
+      { role: 'system', content: '你是 domi' },
+      { role: 'user', content: '改 README 标题' },
+    ]
+    // 第二轮 = 同前缀 + 追加送达（ctx.note 渲染成新 user 块）
+    const second = withBreak ? first.slice(0, 1) : [...first, { role: 'user', content: '[运行中补充] 计划已更新' }]
+    const fp = (msgs: Array<{ role: string; content: string }>) => ({
+      toolHash: 'tools',
+      layers: [{ id: 'builtin.identity', hash: 'h' }],
+      messages: msgs.map((m) => `${m.role}:${m.content}`),
+    })
+    return [
+      env({ t: 'user.input', text: '改 README 标题' }),
+      env({ t: 'model.request', provider: 'stub', model: 'stub-1', tokensIn: 3, fingerprint: fp(first) }),
+      env({ t: 'model.delta', text: '好。' }),
+      env({ t: 'ctx.note', text: '计划已更新：先读 README', reason: 'plan', ref: 3 }),
+      env({ t: 'model.request', provider: 'stub', model: 'stub-1', tokensIn: 4, fingerprint: fp(second) }),
+      env({ t: 'model.delta', text: '继续。' }),
+    ]
+  }
+
+  test('ctx.note 追加送达 → 相邻请求前缀稳定，零违规', () => {
+    expect(assertPrefixStability(twoRequests(false))).toEqual([])
+  })
+
+  test('人为改写前缀（消息变短）→ 报出违规与定位', () => {
+    const issues = assertPrefixStability(twoRequests(true))
+    expect(issues).toHaveLength(1)
+    expect(issues[0]!.at).toBe(-1)
+  })
+
+  test('ctx.refresh 是白名单：之后的前缀断裂不算违规', () => {
+    seq = 0
+    const evs = [
+      env({ t: 'model.request', provider: 'stub', model: 'stub-1', tokensIn: 3, fingerprint: { toolHash: 'a', layers: [], messages: ['u1', 'u2'] } }),
+      env({ t: 'ctx.refresh', reason: 'manual' }),
+      env({ t: 'model.request', provider: 'stub', model: 'stub-1', tokensIn: 3, fingerprint: { toolHash: 'a', layers: [], messages: ['u9'] } }),
+    ]
+    expect(assertPrefixStability(evs)).toEqual([])
   })
 })

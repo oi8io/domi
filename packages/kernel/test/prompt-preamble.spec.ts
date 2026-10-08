@@ -45,6 +45,37 @@ describe('withPrompt', () => {
   })
 })
 
+describe('M15 · 前缀只增不改（SPEC-M15-003 · INV-12(b)）', () => {
+  test('追加段（notes）渲染为新 user 块，不再改最后一条 user —— 后一次请求以前一次为前缀', () => {
+    const base: ModelMessages = [
+      { role: 'system', content: '你是 domi' },
+      { role: 'user', content: '改 README 标题' },
+      { role: 'assistant', content: '', toolCalls: [{ id: 'c', name: 'fs.read', args: {} }] },
+      { role: 'tool', toolCallId: 'c', ok: true, content: 'x' },
+    ]
+    const first = withPrompt(base, { system: '你是 domi' })
+    const second = withPrompt(first, {
+      system: '你是 domi',
+      notes: [{ reason: 'plan', text: '计划已更新：先读 README' }],
+    })
+    // 追加 = 前缀稳定：第一条消息之后，第二轮只是 push 新块，旧消息一个都没动
+    expect(second.slice(0, first.length)).toEqual(first)
+    expect(second[first.length]).toEqual({ role: 'user', content: '[运行中补充] 计划已更新：先读 README' })
+    // dynamic 尾巴不再拼进最后一条 user（最后一条 user 仍是原样）
+    expect(first.filter((m) => m.role === 'user')[0]).toEqual({ role: 'user', content: '改 README 标题' })
+  })
+
+  test('系统层仍然前置；追加块跟在末尾', () => {
+    const out = withPrompt([{ role: 'user', content: 'hi' }], {
+      system: '你是 domi',
+      notes: [{ reason: 'env', text: '目录变了' }],
+    })
+    expect(out.map((m) => m.role)).toEqual(['system', 'user', 'user'])
+    expect(out[0]).toEqual({ role: 'system', content: '你是 domi' })
+    expect(out[2]).toEqual({ role: 'user', content: '[运行中补充] 目录变了' })
+  })
+})
+
 test('runTurn 带 prompt：provider 收到 system 与动态尾巴；事件流里不存提示词', async () => {
   const d = mkdtempSync(join(tmpdir(), 'domi-preamble-'))
   dirs.push(d)

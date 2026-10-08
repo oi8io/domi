@@ -129,3 +129,26 @@ describe('PRD-M0-006 AC-5 · incremental 是占位，不是第二套实现', () 
     expect(() => buildContext(conversation(), { ...P, strategy: 'incremental' })).toThrow(/adr\/005/)
   })
 })
+
+describe('M15 · 前缀只增不改（SPEC-M15-003 · INV-12(b)）', () => {
+  test('ctx.note 渲染为追加 user 块，不改已有消息', () => {
+    const evs = [
+      env({ t: 'user.input', text: '改 README 标题' }),
+      env({ t: 'model.request', provider: 'stub', model: 'stub-1', tokensIn: 8 }),
+      env({ t: 'model.delta', text: '我先看看。' }),
+      // 计划变化 → 追加送达（不重写已发出的内容）
+      env({ t: 'ctx.note', text: '计划已更新：先读 README，再改标题', reason: 'plan', ref: 3 }),
+      env({ t: 'ctx.note', text: '工作目录变了：/tmp/w2', reason: 'env' }),
+      env({ t: 'model.request', provider: 'stub', model: 'stub-1', tokensIn: 9 }),
+      env({ t: 'model.delta', text: '好。' }),
+    ]
+    const out = buildContext(evs, P)
+    const roles = out.map((m) => m.role)
+    expect(roles).toEqual(['user', 'assistant', 'user', 'user', 'assistant'])
+    // 第一条 user 原样（未被改写）
+    expect(out[0]).toEqual({ role: 'user', content: '改 README 标题' })
+    // 两条 ctx.note 追加为独立的 user 块
+    expect((out[2] as { content: string }).content).toContain('计划已更新')
+    expect((out[3] as { content: string }).content).toContain('工作目录变了')
+  })
+})
