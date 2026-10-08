@@ -150,10 +150,16 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
 
     case 'doctor': {
       const home = userHome()
-      if (cli.flags.context) {
-        return runContextDoctor(join(dataDir(), 'events.db'), io)
-      }
       const cfg = loadConfig({ home })
+      if (cli.flags.context) {
+        return runContextDoctor(join(dataDir(), 'events.db'), io, {
+          provider: cfg.model.provider,
+          modelName: cfg.model.name,
+          baseUrl: cfg.model.baseUrl,
+          ttlOverride: cfg.context.cacheTtlOverride,
+          serverSide: cfg.context.serverSide,
+        })
+      }
       const src = configSource({ home })
       const conn = providerConnection(cfg, cfg.model.provider)
       const pingResult = cli.flags.ping

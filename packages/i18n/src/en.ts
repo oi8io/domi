@@ -966,7 +966,25 @@ export const en: Record<keyof typeof zh, string> = {
   'cli.doctor.ctxMemory': 'memory success rate: — (wired in M15-007)',
   'cli.doctor.ctxHeader': 'recent sessions (steps / hit% / in / tool% / avoidable loss / prompt≈layers+tools+history)',
   'cli.doctor.ctxRow':
-    '{id} · {steps} steps · {hit} · {input} in · {tool} tools · loss {loss} · ≈{layers}+{tools}+{history} token',
+    '{id} · {steps} steps · {hit} · {input} in · {tool} tool · loss {loss} · ≈{layers}+{tools}+{history} tokens',
+  'cli.doctor.cap.vendor': 'Vendor: {provider} · Model {model} · Endpoint {baseUrl}',
+  'cli.doctor.cap.unknown':
+    'Support: unknown vendor (custom connection, capability matrix fail-closed; enable explicitly)',
+  'cli.doctor.cap.toolCall': 'tool calling',
+  'cli.doctor.cap.vision': 'vision',
+  'cli.doctor.cap.reasoning': 'reasoning',
+  'cli.doctor.cap.promptCache': 'prompt cache',
+  'cli.doctor.cap.structuredOutput': 'structured output',
+  'cli.doctor.cap.supported': 'Supports: {caps}',
+  'cli.doctor.cap.none': '(no declared capability)',
+  'cli.doctor.cap.cacheExplicit':
+    'Prompt cache: top-level cache_control, TTL {ttl}s (task tier, chat 300s, config overridable)',
+  'cli.doctor.cap.cacheGatewayKey': 'Prompt cache: prompt_cache_key (session id), gateway must support',
+  'cli.doctor.cap.cacheAuto': 'Prompt cache: vendor-managed (no params)',
+  'cli.doctor.cap.cacheNone': 'Prompt cache: unsupported / not enabled',
+  'cli.doctor.cap.serverSide': 'Server-side capabilities (compaction / clear_tool_uses): {state}',
+  'cli.doctor.cap.serverSideOn': 'on',
+  'cli.doctor.cap.serverSideOff': 'off (default, P1 skeleton)',
   'cli.args.unknown': 'Unknown command: {given}\nAvailable commands: {join}\n$ domi --help',
   'cli.plugin.usage':
     'Usage:\n  domi plugin list                        installed plugins, sandbox status, and why any failed to load\n  domi plugin install <dir>               install (lists every permission and installs only after you confirm; restart domid afterwards)\n  domi plugin remove <name>               uninstall\n  domi plugin scaffold <tool|skill|mcp> <dir> [name]\n                                          generate a plugin skeleton (with bun test)\n\nSee docs/site/plugin-dev.md for how to write one.',

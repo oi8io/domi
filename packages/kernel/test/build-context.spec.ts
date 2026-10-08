@@ -63,9 +63,9 @@ describe('PRD-M0-006 AC-3 · 输出可深比较断言', () => {
     ])
   })
 
-  test('includeReasoning 打开时思维链才进上下文', () => {
+  test('推理不进正文（M15 AC-4）：includeReasoning 打开也不拼思维链', () => {
     const msgs = buildContext(conversation(), { ...P, includeReasoning: true })
-    expect(JSON.stringify(msgs)).toContain('先读文件再改')
+    expect(JSON.stringify(msgs)).not.toContain('先读文件再改')
     expect(JSON.stringify(buildContext(conversation(), P))).not.toContain('先读文件再改')
   })
 

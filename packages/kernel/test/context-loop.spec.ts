@@ -64,9 +64,10 @@ test('有 prompt（含 layers）→ model.request 带 ctx：层清单原样 + to
   expect(ctx!.layers).toEqual(layers)
   // tools / history = 工具 schema、消息的 JSON 文本按 estimateTextTokens 口径估算
   expect(ctx!.tools).toBe(estimateTextTokens(JSON.stringify(tools)))
+  // M15（SPEC-M15-003）：dynamic 弃用后消息里没有尾巴（prompt.system unshift + history 的 user）
   const messages = [
     { role: 'system', content: 'sys' },
-    { role: 'user', content: 'usr\n\n你好' },
+    { role: 'user', content: '你好' },
   ]
   expect(ctx!.history).toBe(estimateTextTokens(JSON.stringify(messages)))
   sink.close()

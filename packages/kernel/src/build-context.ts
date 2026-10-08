@@ -195,8 +195,10 @@ const fullStrategy: ContextStrategy = (events, policy) => {
         quoted.push(block)
         break
       }
+      // M15（SPEC-M15-006 AC-4 · R0）：推理块不进正文——跨轮回传只会白占 token；
+      // 需要回传的（Anthropic 交错思考）由模型协议在本轮内自动处理，不需要我们拼。
+      // reason 事件仍落盘（轨迹可见）。config.context.includeReasoning 保留但不再使用（deprecated）
       case 'model.reason':
-        if (policy.includeReasoning) text += ev.text
         break
       case 'model.delta':
         text += ev.text

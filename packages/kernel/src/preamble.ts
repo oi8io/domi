@@ -15,6 +15,11 @@ export interface PromptParts {
   /** @deprecated M15（SPEC-M15-003）：不再把动态内容拼进最后一条 user（会改写前缀）。动态内容走 notes 追加 */
   dynamic?: string
   /**
+   * M15（SPEC-M15-003）：user 层的稳定内容（如工作区信息，cacheable:false 但会话内不变）。
+   * 作为固定 user 消息插在 system 之后、history 之前——前缀稳定，又不污染 system 前缀。
+   */
+  user?: string
+  /**
    * M14（SPEC-M14-006）：这一份提示词的层清单（来自 prompt.assemble()）。
    * kernel 不认识「层」，只原样透传到 model.request.ctx 供上下文 tab 分段（纯计算，零 IO）。
    * 可选——老实现 / 回放不填，端上按「没有分段数据」显示
@@ -46,5 +51,6 @@ export function withPrompt(messages: ModelMessages, prompt: PromptParts): ModelM
     out.push({ role: 'user', content: `${NOTE_MARK} ${note.text}` })
   }
   if (prompt.system !== '') out.unshift({ role: 'system', content: prompt.system })
+  if (prompt.user !== undefined && prompt.user !== '') out.splice(1, 0, { role: 'user', content: prompt.user })
   return out
 }

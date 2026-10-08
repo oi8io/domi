@@ -263,8 +263,26 @@ export const ConfigSchema = z.object({
       keepTurns: z.number().int().min(0).max(50).default(2),
       /** 上下文占用到这个百分比就压缩。只在 strategy = compact 时用 */
       compactAt: z.number().int().min(30).max(95).default(70),
+      /**
+       * 厂商缓存 TTL 覆盖（秒，SPEC-M15-006 取舍-12 兜底）。
+       * 缺省按会话档位：task / task.spawn 3600，自由会话 300。UI 不暴露。
+       */
+      cacheTtlOverride: z.number().int().min(1).max(86_400).optional(),
+      /**
+       * 服务端能力开关（SPEC-M15-006 AC-5，P1 骨架）：默认关。
+       * 打开时服务端改动（compaction / clear_tool_uses）视为压缩点并落事件（INV-12(a)）
+       */
+      serverSide: z.boolean().default(false),
     })
-    .default({ maxTokens: 150_000, includeReasoning: false, strategy: 'full', keepTurns: 2, compactAt: 70 }),
+    .default({
+      maxTokens: 150_000,
+      includeReasoning: false,
+      strategy: 'full',
+      keepTurns: 2,
+      compactAt: 70,
+      cacheTtlOverride: undefined,
+      serverSide: false,
+    }),
   /**
    * 运行时护栏（PRD-M10-003 AC-1）：一轮的中断条件。
    * 缺省值与 kernel 的 DEFAULT_LIMITS 一致；runtime 从配置读并传进 runTurn 的 deps.limits，

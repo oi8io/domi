@@ -9,7 +9,14 @@ import { describe, expect, test } from 'bun:test'
 import { VENDORS } from '@domi/config'
 import type { ToolSchema } from '@domi/protocol'
 import { MockLanguageModelV4, simulateReadableStream } from 'ai/test'
-import { AiSdkProvider, buildToolNameMap, encodeToolName, type ModelEvent, toAiMessages } from '../src/index.ts'
+import {
+  AiSdkProvider,
+  anthropicSystemParam,
+  buildToolNameMap,
+  encodeToolName,
+  type ModelEvent,
+  toAiMessages,
+} from '../src/index.ts'
 
 /** 这些用例不验能力拒绝，所以给一个全支持的矩阵 */
 const CAPS = VENDORS.openai.capabilities
@@ -105,9 +112,9 @@ describe('流翻译', () => {
 })
 
 describe('docs/adr/004 的红线', () => {
-  test('providerOptions 原样传到 provider，没有被适配层改写', async () => {
+  test('providerOptions 原样传到 provider（非 anthropic 键不被适配层改写）', async () => {
     let seen: Record<string, unknown> | undefined
-    const providerOptions = { anthropic: { cacheControl: { type: 'ephemeral' }, thinking: { budgetTokens: 2048 } } }
+    const providerOptions = { openai: { extraBody: { prompt_cache_key: 's-1' } } }
     const p = new AiSdkProvider({
       id: 'mock',
       capabilities: CAPS,
@@ -117,6 +124,23 @@ describe('docs/adr/004 的红线', () => {
     })
     await drain(p.generate({ model: 'm', messages: [USER], providerOptions }, new AbortController().signal))
     expect(seen?.providerOptions).toEqual(providerOptions)
+  })
+
+  test('anthropic 键存在时追加 system 末尾断点，原键保留（SPEC-M15-006 AC-1）', async () => {
+    let seen: Record<string, unknown> | undefined
+    const providerOptions = { anthropic: { cacheControl: { type: 'ephemeral', ttlSeconds: 3600 } } }
+    const p = new AiSdkProvider({
+      id: 'mock',
+      capabilities: CAPS,
+      model: mock([...START, { type: 'finish', finishReason: 'stop', usage: USAGE }], (o) => {
+        seen = o
+      }),
+    })
+    await drain(p.generate({ model: 'm', messages: [USER], providerOptions }, new AbortController().signal))
+    const anthropic = (seen!.providerOptions as { anthropic: Record<string, unknown> }).anthropic
+    expect(anthropic.cacheControl).toEqual({ type: 'ephemeral', ttlSeconds: 3600 })
+    // 本测试的 messages 无 system → 空 system 不发断点（带 system 的断点形状在 anthropicSystemParam 单测）
+    expect(anthropic.system).toEqual([])
   })
 
   test('usage 事件整块带回 providerMetadata，不挑字段', async () => {
@@ -158,6 +182,17 @@ describe('工具名编码（Anthropic 不接受带点的名字）', () => {
   })
 })
 
+describe('anthropic system 断点（SPEC-M15-006 AC-1）', () => {
+  test('末尾显式断点：soul+规矩+技能+计划整个前缀可命中缓存', () => {
+    const sys = anthropicSystemParam('你是 domi\n\n规矩：\n- 只读')
+    expect(sys).toEqual([{ type: 'text', text: '你是 domi\n\n规矩：\n- 只读', cache_control: { type: 'ephemeral' } }])
+  })
+
+  test('空 system 不发断点', () => {
+    expect(anthropicSystemParam('')).toEqual([])
+  })
+})
+
 describe('消息转换', () => {
   test('assistant 的 toolCalls 与随后的 tool 结果能对上 toolName', () => {
     const ai = toAiMessages([
@@ -166,14 +201,17 @@ describe('消息转换', () => {
       { role: 'tool', toolCallId: 'c1', ok: true, content: '{"lines":3}' },
     ])
     expect(ai).toHaveLength(3)
-    const toolMsg = ai[2] as { content: Array<{ toolName: string; output: { value: unknown } }> }
+    const toolMsg = ai[2] as { content: Array<{ toolName: string; output: { type: string; value: string } }> }
     expect(toolMsg.content[0]?.toolName).toBe('fs_read')
-    expect(toolMsg.content[0]?.output.value).toEqual({ lines: 3 })
+    // M15（SPEC-M15-006 AC-3 · R3）：工具结果纯文本通道，原文直发，不再 JSON 双层转义
+    expect(toolMsg.content[0]?.output.type).toBe('text')
+    expect(toolMsg.content[0]?.output.value).toBe('{"lines":3}')
   })
 
-  test('工具结果不是 JSON 时也不崩，包成 raw', () => {
+  test('工具结果不是 JSON 时也不崩，原文直发', () => {
     const ai = toAiMessages([{ role: 'tool', toolCallId: 'c1', ok: false, content: '这不是 JSON' }])
-    const toolMsg = ai[0] as { content: Array<{ output: { value: unknown } }> }
-    expect(toolMsg.content[0]?.output.value).toEqual({ raw: '这不是 JSON' })
+    const toolMsg = ai[0] as { content: Array<{ output: { type: string; value: string } }> }
+    expect(toolMsg.content[0]?.output.type).toBe('text')
+    expect(toolMsg.content[0]?.output.value).toBe('这不是 JSON')
   })
 })

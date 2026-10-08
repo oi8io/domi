@@ -96,6 +96,7 @@ describe('PRD-M14-006 AC-5 · session.context', () => {
         skillsTotal: 12,
         mcp: [{ server: 'github', tools: ['mcp.github.create_issue'] }],
         context: { strategy: 'compact', thresholdPercent: 70 },
+        pending: { soul: false, rules: false, catalog: false, skills: false },
       }).success,
     ).toBe(true)
     expect(
@@ -105,6 +106,7 @@ describe('PRD-M14-006 AC-5 · session.context', () => {
         skillsTotal: 0,
         mcp: [],
         context: { strategy: 'full', thresholdPercent: null },
+        pending: { soul: false, rules: false, catalog: false, skills: true },
       }).success,
     ).toBe(true)
     expect(r.safeParse({ trusted: true }).success).toBe(false)

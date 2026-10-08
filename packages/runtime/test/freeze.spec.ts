@@ -116,10 +116,7 @@ describe('TASK-M15-002 · 前缀只增不改', () => {
     const h = open({
       cwd: tmp(),
       rules: { 'AGENTS.md': 'v1：先跑测试' },
-      script: [
-        [{ type: 'tool-call', id: 'r1', name: 'fs.read', args: { path: 'a.txt' } }, done],
-        [done],
-      ],
+      script: [[{ type: 'tool-call', id: 'r1', name: 'fs.read', args: { path: 'a.txt' } }, done], [done]],
     })
     const seen: EventEnvelope[] = []
     h.s.on('onEvents', (e) => seen.push(...e))

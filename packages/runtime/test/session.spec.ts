@@ -442,9 +442,11 @@ describe('BUG-M3-015 / BUG-M3-012 · 提示词层真的发出去了，配置里�
     expect(system).toContain('回答要短，先给结论。')
     expect(system).toContain('我自己的约定。')
     expect(system).not.toContain('改文件前先读它')
-    // 工作目录是会变的那部分，只接在最后一条用户消息上
+    // 工作目录是 cacheable:false 的 user 层：不在 system（不污染缓存前缀），固定插在 system 之后、history 之前
     expect(system).not.toContain(cwd)
-    expect((sent.at(-1) as { content: string }).content).toContain(cwd)
+    expect(sent[1]?.role).toBe('user')
+    expect((sent[1] as { content: string }).content).toContain(cwd)
+    expect((sent[1] as { content: string }).content).toContain('当前工作目录')
     await s.flushAndClose()
   })
 })

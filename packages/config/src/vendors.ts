@@ -25,12 +25,22 @@ export interface VendorCapabilities {
 export const VENDOR_IDS = ['openai', 'anthropic', 'deepseek', 'gemini', 'custom'] as const
 export type VendorId = (typeof VENDOR_IDS)[number]
 
+/**
+ * 提示词缓存的接入方式（SPEC-M15-006 取舍-12/13，数据驱动：厂商名只存本表）：
+ * - explicit：需要显式缓存参数（anthropic cache_control + TTL 断点）
+ * - gateway-key：兼容网关支持 prompt_cache_key（会话 id）
+ * - auto：厂商自动缓存，无需参数（deepseek / gemini 官方）
+ * - none：不支持或未知（custom fail-closed）
+ */
+export type CacheMode = 'explicit' | 'gateway-key' | 'auto' | 'none'
+
 export interface Vendor {
   id: VendorId
   /** 界面上的厂商名（品牌名，不翻译） */
   label: string
   protocol: Protocol
   adapter: Adapter
+  cacheMode: CacheMode
   /** 没填 Base URL 时用它；custom 没有官方地址 */
   defaultBaseUrl?: string
   capabilities: VendorCapabilities
@@ -52,6 +62,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
   openai: {
     id: 'openai',
     label: 'OpenAI',
+    cacheMode: 'gateway-key',
     protocol: 'openai',
     adapter: 'openai-official',
     defaultBaseUrl: 'https://api.openai.com/v1',
@@ -62,6 +73,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
   anthropic: {
     id: 'anthropic',
     label: 'Anthropic',
+    cacheMode: 'explicit',
     protocol: 'anthropic',
     adapter: 'anthropic',
     defaultBaseUrl: 'https://api.anthropic.com',
@@ -72,16 +84,19 @@ export const VENDORS: Record<VendorId, Vendor> = {
   deepseek: {
     id: 'deepseek',
     label: 'DeepSeek',
+    cacheMode: 'auto',
     protocol: 'openai',
     adapter: 'openai-compatible',
     defaultBaseUrl: 'https://api.deepseek.com/v1',
-    capabilities: { toolCall: true, vision: false, reasoning: true, promptCache: false, structuredOutput: false },
+    // M15（SPEC-M15-006 AC-2 · R0 已验证）：自动缓存厂商，不需要请求参数；能力位按实际改 true
+    capabilities: { toolCall: true, vision: false, reasoning: true, promptCache: true, structuredOutput: false },
     envNames: ['DEEPSEEK_API_KEY'],
     keyHint: 'sk-...',
   },
   gemini: {
     id: 'gemini',
     label: 'Gemini',
+    cacheMode: 'auto',
     protocol: 'openai',
     adapter: 'openai-compatible',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
@@ -95,6 +110,7 @@ export const VENDORS: Record<VendorId, Vendor> = {
    */
   custom: {
     id: 'custom',
+    cacheMode: 'none',
     label: 'Custom',
     protocol: 'openai',
     adapter: 'openai-compatible',

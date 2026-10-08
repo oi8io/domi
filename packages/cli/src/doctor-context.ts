@@ -8,9 +8,12 @@
  * 记忆成功率在 TASK-M15-007 接线前为「—」。
  */
 
+import { VENDORS } from '@domi/config'
+import { tr } from '@domi/i18n'
 import { aggregate } from '@domi/kernel'
 import { type EventEnvelope, estimateTextTokens, isKnownEvent } from '@domi/protocol'
 import { SqliteEventLog } from '@domi/store'
+import { type CapabilityReportInput, capabilityLines } from './doctor-capabilities.ts'
 import type { Io } from './io.ts'
 
 export interface ContextSessionRow {
@@ -134,36 +137,67 @@ function pct(a: number, b: number): string {
   return b > 0 ? `${Math.round((a / b) * 100)}%` : '—'
 }
 
-export function formatContextReport(r: ContextReport): string {
+export function formatContextReport(r: ContextReport, vendorCfg?: CapabilityReportInput): string {
   const t = r.totals
   const lines: string[] = []
-  lines.push('上下文诊断（R0 基线 · SPEC-M15-001）')
+  lines.push(tr('cli.doctor.ctxTitle'))
+  if (vendorCfg) {
+    // SPEC-M15-006 AC-6：这家支持什么、开了什么
+    lines.push(...capabilityLines(vendorCfg, VENDORS[vendorCfg.provider as keyof typeof VENDORS]))
+  }
   lines.push('─'.repeat(64))
+  const hitPct = pct(
+    r.sessions.reduce((a, s) => a + (s.cacheHitPercent ?? 0), 0) /
+      Math.max(1, r.sessions.filter((s) => s.cacheHitPercent !== null).length),
+    100,
+  )
+  const ioRatio = t.output > 0 ? `1:${(t.input / t.output).toFixed(1)}` : '—'
   lines.push(
-    `会话 ${t.sessions} 个 · 事件 ${t.events} 条 · 命中率 ${pct(r.sessions.reduce((a, s) => a + (s.cacheHitPercent ?? 0), 0) / Math.max(1, r.sessions.filter((s) => s.cacheHitPercent !== null).length), 100)} · 输入 ${t.input} · 输出 ${t.output}（1:${t.output > 0 ? (t.input / t.output).toFixed(1) : '—'}）`,
+    tr('cli.doctor.ctxSessions', {
+      sessions: String(t.sessions),
+      events: String(t.events),
+      hit: hitPct,
+      input: String(t.input),
+      output: String(t.output),
+      ratio: ioRatio,
+    }),
   )
   lines.push(
-    `工具结果占比 ${pct(t.toolResultTokens, t.input)} · 可避免损失 ${t.avoidableLoss} token · 前缀断裂 ${t.breakCount} 次`,
+    tr('cli.doctor.ctxToolShare', {
+      pct: pct(t.toolResultTokens, t.input),
+      loss: String(t.avoidableLoss),
+      breaks: String(t.breakCount),
+    }),
   )
   const causes = Object.entries(t.breakdown).sort((a, b) => b[1] - a[1])
   lines.push(
     causes.length > 0
-      ? `断裂归因：${causes.map(([c, n]) => `${c} ×${n}`).join(' · ')}`
-      : '断裂归因：无（前缀稳定或尚未产生观测）',
+      ? tr('cli.doctor.ctxCauses', { causes: causes.map(([c, n]) => `${c} ×${n}`).join(' · ') })
+      : tr('cli.doctor.ctxCausesNone'),
   )
-  lines.push('记忆成功率：—（M15-007 接线后显示）')
+  lines.push(tr('cli.doctor.ctxMemory'))
   lines.push('─'.repeat(64))
-  lines.push('最近会话（步骤 / 命中% / 输入 / 工具结果% / 可避免损失 / 提示词≈层+工具+历史）')
+  lines.push(tr('cli.doctor.ctxHeader'))
   for (const s of r.sessions.slice(0, 15)) {
     lines.push(
-      `${s.sessionId.slice(0, 8)} · ${s.steps} 步 · ${s.cacheHitPercent === null ? '—' : `${s.cacheHitPercent}%`} · ${s.input} in · ${pct(s.toolResultTokens, s.input)} 工具 · 损失 ${s.avoidableLoss} · ≈${s.promptLayersTokens}+${s.promptToolsTokens}+${s.promptHistoryTokens} token`,
+      tr('cli.doctor.ctxRow', {
+        id: s.sessionId.slice(0, 8),
+        steps: String(s.steps),
+        hit: s.cacheHitPercent === null ? '—' : `${s.cacheHitPercent}%`,
+        input: String(s.input),
+        tool: pct(s.toolResultTokens, s.input),
+        loss: String(s.avoidableLoss),
+        layers: String(s.promptLayersTokens),
+        tools: String(s.promptToolsTokens),
+        history: String(s.promptHistoryTokens),
+      }),
     )
   }
   return lines.join('\n')
 }
 
-export async function runContextDoctor(dbPath: string, io: Io): Promise<number> {
+export async function runContextDoctor(dbPath: string, io: Io, vendorCfg?: CapabilityReportInput): Promise<number> {
   const report = await scanContext(dbPath)
-  io.out(formatContextReport(report))
+  io.out(formatContextReport(report, vendorCfg))
   return 0
 }

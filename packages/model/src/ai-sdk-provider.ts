@@ -85,6 +85,8 @@ export function toAiMessages(messages: ModelMessages): AiMessage[] {
         break
       }
       case 'tool':
+        // M15（SPEC-M15-006 AC-3 · R3）：纯文本通道——边界标记在文本里，结构化字段
+        // 已渲染成一行文本头 + 原文。不再 safeJson：JSON 双层转义会白白膨胀 token
         out.push({
           role: 'tool',
           content: [
@@ -92,7 +94,7 @@ export function toAiMessages(messages: ModelMessages): AiMessage[] {
               type: 'tool-result',
               toolCallId: m.toolCallId,
               toolName: encodeToolName(nameOf.get(m.toolCallId) ?? 'unknown'),
-              output: { type: 'json', value: safeJson(m.content) },
+              output: { type: 'text', value: m.content },
             },
           ],
         } as AiMessage)
@@ -102,20 +104,32 @@ export function toAiMessages(messages: ModelMessages): AiMessage[] {
   return out
 }
 
-function safeJson(s: string): unknown {
-  try {
-    return JSON.parse(s)
-  } catch {
-    return { raw: s }
-  }
-}
-
 export interface AiSdkProviderOptions {
   id: string
   model: LanguageModel
   capabilities: ModelCapabilities
+  /**
+   * SPEC-M15-006 AC-1：anthropic 需要 system 末尾断点。
+   * 判定不靠厂商名：runtime 只在 explicit 缓存模式的厂商上产出 providerOptions.anthropic，
+   * 存在即断点（数据驱动，见 render.ts）
+   */
+  vendor?: string | undefined
   /** 最近一次出站请求地址，由工厂的诊断 fetch 填。空流时用它说清楚「发到了哪」 */
   trace?: { lastUrl: string | undefined }
+}
+
+/**
+ * M15（SPEC-M15-006 AC-1）：system 末尾显式断点。
+ * Anthropic 只缓存在断点之前的部分——断点放最后一条 system 末尾，
+ * 让「soul + 规矩 + 技能 + 计划」整个前缀可命中缓存，追加的对话不占缓存。
+ */
+export function anthropicSystemParam(sys: string): Array<{
+  type: 'text'
+  text: string
+  cache_control: { type: 'ephemeral' }
+}> {
+  if (sys === '') return []
+  return [{ type: 'text', text: sys, cache_control: { type: 'ephemeral' } }]
 }
 
 /** 流里一个事件都没有时给人看的话。SDK 原文「No output generated」指不到任何一环 */
@@ -130,12 +144,14 @@ export class AiSdkProvider implements ModelProvider {
   readonly id: string
   readonly capabilities: ModelCapabilities
   private readonly model: LanguageModel
+  private readonly vendor: string | undefined
   private readonly trace: { lastUrl: string | undefined } | undefined
 
   constructor(opts: AiSdkProviderOptions) {
     this.id = opts.id
     this.model = opts.model
     this.capabilities = opts.capabilities
+    this.vendor = opts.vendor
     this.trace = opts.trace
   }
 
@@ -167,16 +183,31 @@ export class AiSdkProvider implements ModelProvider {
      * 那里才有权限引擎（INV-03）与唯一执行原语（INV-05）。
      * 交给 AI SDK 执行等于绕开权限，所以这是类型层的摩擦，不是绕过运行时约束。
      */
+    const sys = systemOf(req.messages)
+    // M15（SPEC-M15-006 AC-1）：anthropic 的 system 走 providerOptions 数组（带末尾断点），
+    // 不再给 instructions——AI SDK 会把 instructions 拼成 system，但没有断点位置
+    const po = req.providerOptions
+    // 数据驱动：providerOptions.anthropic 由 render 在 explicit 缓存模式产出，存在即需要 system 断点
+    const isAnthropicWithCache = !!po?.anthropic
+    const providerOptions = isAnthropicWithCache
+      ? {
+          ...(po ?? {}),
+          anthropic: {
+            ...(po.anthropic as Record<string, unknown>),
+            system: anthropicSystemParam(sys),
+          },
+        }
+      : po
     const opts = {
       model: this.model,
       messages: toAiMessages(req.messages),
-      ...(systemOf(req.messages) === '' ? {} : { instructions: systemOf(req.messages) }),
+      ...(sys === '' || isAnthropicWithCache ? {} : { instructions: sys }),
       abortSignal: signal,
       // SDK 默认把流里的错误 console.error 一遍。错误已经作为事件进了事件流，
       // 再打一遍只会在 domid 的终端里留一段没人看的堆栈
       onError: () => undefined,
       ...(schemas.length > 0 ? { tools } : {}),
-      ...(req.providerOptions ? { providerOptions: req.providerOptions } : {}),
+      ...(providerOptions ? { providerOptions } : {}),
     } as unknown as Parameters<typeof streamText>[0]
 
     let errored = false

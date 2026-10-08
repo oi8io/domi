@@ -39,6 +39,7 @@ import {
   listProviders,
   MissingCredentialError,
   providerConnection,
+  VENDORS,
 } from '@domi/config'
 import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import type { PromptParts } from '@domi/kernel'
@@ -67,6 +68,7 @@ import {
   lostCapabilities,
   type ModelProvider,
   providerConfigOf,
+  renderProviderOptions,
   StructuredOutputError,
 } from '@domi/model'
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
@@ -387,6 +389,27 @@ export class DomiSession {
   private planLoaded = false
   private readonly planPolicy: PlanPolicy
   private titleTried = false
+  /**
+   * M15（SPEC-M15-006）：按厂商渲染缓存参数。
+   * - anthropic：顶层 cache_control，TTL 按会话档位（task 3600 / chat 300），config.context.cacheTtlOverride 兜底
+   * - openai 兼容网关（非官方端点）：prompt_cache_key = 会话 id
+   * - deepseek 等自动缓存厂商：无参数（能力表已按实际修正）
+   */
+  private renderProviderOptions(): Record<string, unknown> | undefined {
+    const vendor = VENDORS[this.currentProvider as keyof typeof VENDORS]
+    if (!vendor) return undefined
+    const baseUrl = this.opts.config.model.baseUrl ?? vendor.defaultBaseUrl
+    return renderProviderOptions(
+      // 数据驱动（SPEC-M15-006 取舍-13）：接入方式存 VENDORS 表，runtime 不硬编码厂商名
+      { cacheMode: vendor.cacheMode, baseUrl, official: baseUrl === vendor.defaultBaseUrl },
+      {
+        sessionId: this.opts.sessionId,
+        kind: this.log.sessions.get(this.opts.sessionId)?.kind ?? 'chat',
+        ttlOverride: this.opts.config.context.cacheTtlOverride,
+      },
+    )
+  }
+
   private currentModel: string
   private currentProvider: string
   /**
@@ -1325,10 +1348,12 @@ export class DomiSession {
     const notes: PromptParts['notes'] = []
     if (f.planText !== '') {
       extra.push({ id: 'session.plan', role: 'user', priority: 900, cacheable: false, render: () => f.planText })
-      const live = planPromptText(this.planPolicy)
-      if (live !== f.planText) {
-        notes.push({ reason: 'plan', text: live })
-      }
+    }
+    // 计划提示（无计划时是「先写计划」，有计划时是推进指引）。它不在定格快照里：
+    // 与快照计划文本不一致（含「还没有计划」的状态）时走 notes 追加送达（SPEC-M15-003），当轮模型即见
+    const live = planPromptText(this.planPolicy)
+    if (live !== '' && live !== f.planText) {
+      notes.push({ reason: 'plan', text: live })
     }
     const layers = mergeLayers([...BUILTIN_LAYERS, ...extra], layersFromConfig(this.opts.config.prompt.layers))
     const a = assemble(layers, { cwd: f.cwd, model: this.currentModel })
@@ -1337,10 +1362,13 @@ export class DomiSession {
         .filter((m) => m.role === role)
         .map((m) => (m as { content: string }).content)
         .join('\n\n')
+    const userText = text('user')
     return {
       system: text('system'),
       // M15：user 段不再是「动态尾巴」——withPrompt 不再把它拼进最后一条 user（前缀稳定）
       dynamic: '',
+      // M15：user 层的稳定内容（工作区等 cacheable:false 但会话内不变的层）固定插入，不污染 system 前缀
+      ...(userText !== '' ? { user: userText } : {}),
       ...(notes.length > 0 ? { notes } : {}),
       // M14（SPEC-M14-006 取舍-1）：层清单（id / role / cacheable / 字符估算）随请求落盘，供上下文 tab 分段
       layers: a.layers.map((l) => ({ id: l.id, role: l.role, cacheable: l.cacheable, approxTokens: l.approxTokens })),
@@ -1560,6 +1588,8 @@ export class DomiSession {
       includeReasoning: this.opts.config.context.includeReasoning,
       strategy: this.opts.config.context.strategy,
     }
+    // M15（SPEC-M15-006）：按厂商渲染缓存参数（anthropic cache_control TTL / openai 网关 prompt_cache_key）
+    const providerOptions = this.renderProviderOptions()
     const timer = setInterval(() => {
       void this.pump()
     }, 30)
@@ -1588,6 +1618,8 @@ export class DomiSession {
           },
           // 每次请求模型前现拼：一轮里计划更新了，下一次请求就带上（PRD-M12-004 AC-8）
           prompt: () => this.prompt(),
+          // M15（SPEC-M15-006 AC-1/AC-2）：厂商缓存参数由 runtime 按会话档位算好，loop 原样透传
+          ...(providerOptions ? { providerOptions } : {}),
           // M15（SPEC-M15-001）：上一次请求的前缀指纹——跨轮缓存断裂观测
           ...prevFingerprint,
           beforeComplete: (events) => this.verifyGate(events),

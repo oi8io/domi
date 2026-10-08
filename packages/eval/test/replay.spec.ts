@@ -6,7 +6,16 @@
  */
 import { describe, expect, test } from 'bun:test'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { assertPrefixStability, type Fixture, formatResult, normalize, parse, record, replay, serialize } from '../src/index.ts'
+import {
+  assertPrefixStability,
+  type Fixture,
+  formatResult,
+  normalize,
+  parse,
+  record,
+  replay,
+  serialize,
+} from '../src/index.ts'
 
 let seq = 0
 function env(ev: DomiEvent, ts = ++seq): EventEnvelope {
@@ -400,9 +409,21 @@ describe('M15 · 前缀稳定性（SPEC-M15-003 · INV-12(b) 门禁）', () => {
   test('ctx.refresh 是白名单：之后的前缀断裂不算违规', () => {
     seq = 0
     const evs = [
-      env({ t: 'model.request', provider: 'stub', model: 'stub-1', tokensIn: 3, fingerprint: { toolHash: 'a', layers: [], messages: ['u1', 'u2'] } }),
+      env({
+        t: 'model.request',
+        provider: 'stub',
+        model: 'stub-1',
+        tokensIn: 3,
+        fingerprint: { toolHash: 'a', layers: [], messages: ['u1', 'u2'] },
+      }),
       env({ t: 'ctx.refresh', reason: 'manual' }),
-      env({ t: 'model.request', provider: 'stub', model: 'stub-1', tokensIn: 3, fingerprint: { toolHash: 'a', layers: [], messages: ['u9'] } }),
+      env({
+        t: 'model.request',
+        provider: 'stub',
+        model: 'stub-1',
+        tokensIn: 3,
+        fingerprint: { toolHash: 'a', layers: [], messages: ['u9'] },
+      }),
     ]
     expect(assertPrefixStability(evs)).toEqual([])
   })
