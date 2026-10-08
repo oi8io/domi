@@ -93,15 +93,28 @@ export async function generateStructured<T>(deps: StructuredDeps, schema: z.ZodT
     }
     lastRaw = text
 
-    // 解析候选：工具参数优先，其次文本（兼容 markdown 包裹 / 数组外框）
+    // 解析候选：工具参数优先，其次文本（兼容 markdown 包裹 / 数组外框）。
+    // 「直接给数组」是 RECON S9 实测最多的偏差：schema 是 { items: [...] } 时，
+    // 把数组包成 { items } 再试一轮
+    const candidates: unknown[] = []
+    if (toolArgs !== undefined) candidates.push(toolArgs)
+    if (text.trim() !== '') candidates.push(safeJsonParse(extractJson(text)))
     let parsed: ReturnType<typeof schema.safeParse> | null = null
-    if (toolArgs !== undefined) parsed = schema.safeParse(toolArgs)
-    if (!(parsed?.success ?? false) && text.trim() !== '') parsed = schema.safeParse(safeJsonParse(extractJson(text)))
-    if (parsed?.success) return parsed.data
+    for (const c of candidates) {
+      if (c === undefined) continue
+      parsed = schema.safeParse(c)
+      if (parsed.success) return parsed.data
+      if (Array.isArray(c)) {
+        const wrapped = schema.safeParse({ items: c })
+        if (wrapped.success) return wrapped.data
+      }
+    }
     lastIssues =
-      parsed?.success === false
-        ? parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
-        : ['没有收到工具调用，也没有可解析的文本']
+      parsed === null
+        ? ['没有收到工具调用，也没有可解析的文本']
+        : parsed.success === false
+          ? parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+          : []
   }
 
   throw new StructuredOutputError(STRUCTURED_MAX_ATTEMPTS, lastRaw, lastIssues)

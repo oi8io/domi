@@ -71,6 +71,16 @@ describe('AC-5 · 工具调用当结构化输出（SPEC-M15-008 取舍-22）', (
     expect(r.title).toBe('x')
   })
 
+  test('RECON S9：工具参数直接给数组（{items} schema）→ 包一层 items 也能解析', async () => {
+    const ItemsSchema = z.object({ items: z.array(z.object({ kind: z.string(), text: z.string() })) })
+    const provider = new StubProvider(
+      [[{ type: 'tool-call', id: 't1', name: 'submit_items', args: [{ kind: 'preference', text: '喜欢 bun' }] }]],
+      { onExhausted: 'repeat-last' },
+    )
+    const r = await generateStructured({ provider, capabilities: VENDORS.custom.capabilities }, ItemsSchema, REQ)
+    expect(r.items[0]?.text).toBe('喜欢 bun')
+  })
+
   test('工具调用失败（没有 tool-call 也没有文本）→ 报错，不是静默返回', async () => {
     const provider = new StubProvider([[{ type: 'reason', text: '思考中…' }]], { onExhausted: 'repeat-last' })
     await expect(
