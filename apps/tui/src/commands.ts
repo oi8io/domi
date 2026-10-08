@@ -9,7 +9,7 @@ import { tr } from '@domi/i18n'
 
 export type SlashCommand =
   | { kind: 'submit'; text: string }
-  | { kind: 'compact' }
+  | { kind: 'compact'; focus?: string }
   | { kind: 'model'; model: string }
   | { kind: 'model-picker' }
   | { kind: 'branch'; atSeq: number }
@@ -68,8 +68,11 @@ export function completeSlash(draft: string): Array<ReturnType<typeof COMMANDS>[
 export function parseSlash(text: string, lastSeq: number): SlashCommand {
   const [cmd, ...rest] = text.split(/\s+/)
   switch (cmd) {
-    case '/compact':
-      return { kind: 'compact' } // PRD-M2-003 AC-1
+    case '/compact': {
+      // PRD-M2-003 AC-1；PRD-M15-005 AC-8：/compact 重点（P1）
+      const focus = rest.join(' ').trim()
+      return focus === '' ? { kind: 'compact' } : { kind: 'compact', focus }
+    }
     case '/model': // PRD-M12-001：只开选择器，不接受手填模型名
       if (!rest[0]) return { kind: 'model-picker' }
       return { kind: 'invalid', message: tr('tui.usage.modelNoArg') }

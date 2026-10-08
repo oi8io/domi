@@ -34,12 +34,18 @@ export interface CompactRecord {
   tokensBefore: number
   tokensAfter: number
   trigger?: string
+  /** 摘要 v2（PRD-M15-005 取舍-8）：新字段为主；旧字段兼容读旧会话 */
   summary?: {
-    intent: string
-    filesModified: string[]
+    goal?: string
+    userQuotes?: string[]
     keyDecisions: string[]
+    files?: Array<{ path: string; note?: string }>
+    errors?: string[]
+    currentStep?: string
     openQuestions: string[]
     nextSteps: string[]
+    intent?: string
+    filesModified?: string[]
   }
 }
 
@@ -289,7 +295,7 @@ export function compactRecords(events: readonly EventEnvelope[]): CompactRecord[
         tokensBefore: e.ev.tokensBefore,
         tokensAfter: e.ev.tokensAfter,
         trigger: e.ev.trigger,
-        summary: e.ev.summary,
+        ...(e.ev.summary !== undefined ? { summary: e.ev.summary as NonNullable<CompactRecord['summary']> } : {}),
       })
     } else if (e.ev.t === 'ctx.cleanup') {
       out.push({

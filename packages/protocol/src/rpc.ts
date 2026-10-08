@@ -975,8 +975,8 @@ export const METHODS = {
     result: z.object({ ok: z.boolean() }),
   },
   'session.compact': {
-    summary: '手动触发上下文压缩（PRD-M2-003 AC-1 的 /compact）',
-    params: z.object({ sessionId: z.string() }),
+    summary: '手动触发上下文压缩（PRD-M2-003 AC-1 的 /compact；PRD-M15-005 AC-8 可带重点）',
+    params: z.object({ sessionId: z.string(), focus: z.string().optional() }),
     result: z.object({ ok: z.boolean(), detail: z.string() }),
   },
   'session.pin': {

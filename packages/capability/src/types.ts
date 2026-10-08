@@ -47,6 +47,8 @@ export interface StampBook {
   record(absPath: string, content: string): void
   has(absPath: string): boolean
   check(absPath: string, current: string | null, displayPath: string): void
+  /** 全清（PRD-M15-005 AC-5：压缩后凭摘要认知，改前必须重读） */
+  clearAll(): void
 }
 
 /** 后台命令表（实现见 tools/shell-jobs.ts） */

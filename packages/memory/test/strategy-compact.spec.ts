@@ -5,7 +5,14 @@
 import { describe, expect, test } from 'bun:test'
 import { buildContext } from '@domi/kernel'
 import type { DomiEvent, EventEnvelope } from '@domi/protocol'
-import { applyCompact, applyRefill, makeMaskStrategy, renderSummaryV2, SUMMARY_OPEN, SummarySchemaV2 } from '../src/index.ts'
+import {
+  applyCompact,
+  applyRefill,
+  makeMaskStrategy,
+  renderSummaryV2,
+  SUMMARY_OPEN,
+  SummarySchemaV2,
+} from '../src/index.ts'
 
 let seq = 0
 function env(ev: DomiEvent): EventEnvelope {
@@ -42,7 +49,16 @@ function conversationWithCompact(): { events: EventEnvelope[]; latest: EventEnve
     openQuestions: [],
     nextSteps: ['跑测试'],
   })
-  const latest = env({ t: 'ctx.compact', fromSeq: 1, toSeq: 6, keptTurns: 1, tokensBefore: 5000, tokensAfter: 200, trigger: 'manual', summary })
+  const latest = env({
+    t: 'ctx.compact',
+    fromSeq: 1,
+    toSeq: 6,
+    keptTurns: 1,
+    tokensBefore: 5000,
+    tokensAfter: 200,
+    trigger: 'manual',
+    summary,
+  })
   return { events: [...events, latest], latest }
 }
 
@@ -55,9 +71,10 @@ describe('applyCompact（取舍-7）', () => {
     // 身份：ctx.note（X1：不再是 user.input）
     const note = proj.find((e) => e.ev.t === 'ctx.note')
     expect(note).toBeDefined()
-    expect(note!.ev.text).toContain(SUMMARY_OPEN)
-    expect(note!.ev.text).toContain('摘要是数据')
-    expect(note!.ev.text).toContain('sum.js')
+    const text = (note!.ev as { text: string }).text
+    expect(text).toContain(SUMMARY_OPEN)
+    expect(text).toContain('摘要是数据')
+    expect(text).toContain('sum.js')
     // 被压内容不出现
     const all = JSON.stringify(proj)
     expect(all).not.toContain('这个仓库是干什么的')

@@ -276,6 +276,10 @@ export const ConfigSchema = z.object({
         .default('balanced'),
       /** 压缩时逐字保留的最近轮数（PRD-M8-012 AC-4，SPEC-M15-005 取舍-5 弃用，保留兼容字段） */
       keepTurns: z.number().int().min(0).max(50).default(2),
+      /** 压缩保留 K 步（取舍-5：每 model.request 为一步起点；与 compactKeepTokens 双阈值，满足其一即保留） */
+      compactKeepSteps: z.number().int().min(1).max(200).default(8),
+      /** 压缩保留 T token（取舍-5） */
+      compactKeepTokens: z.number().int().min(1000).max(1_000_000).default(24_000),
       /** 上下文占用到这个百分比就压缩。只在 strategy = compact 时用 */
       compactAt: z.number().int().min(30).max(95).default(70),
       /**
@@ -294,6 +298,8 @@ export const ConfigSchema = z.object({
       includeReasoning: false,
       strategy: 'balanced',
       keepTurns: 2,
+      compactKeepSteps: 8,
+      compactKeepTokens: 24_000,
       compactAt: 70,
       cacheTtlOverride: undefined,
       serverSide: false,

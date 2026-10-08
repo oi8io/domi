@@ -433,7 +433,10 @@ export function Root({
             setNotice(cmd.message)
             return
           case 'compact':
-            return client.request('session.compact', { sessionId })
+            return client.request('session.compact', {
+              sessionId,
+              ...(cmd.focus !== undefined ? { focus: cmd.focus } : {}),
+            })
           case 'model-picker':
             setOverlay({ id: 'models' })
             return

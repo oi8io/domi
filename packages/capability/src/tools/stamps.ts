@@ -47,4 +47,12 @@ export class FileStamps implements StampBook {
     if (known === undefined || current === null) return
     if (sha256(current) !== known) throw new StaleFileError(displayPath)
   }
+
+  /**
+   * 全清（PRD-M15-005 AC-5）：压缩之后模型对文件内容的认知来自摘要，
+   * 旧 stamp 校验等于放行「凭摘要改文件」——全部失效，改之前必须重读。
+   */
+  clearAll(): void {
+    this.seen.clear()
+  }
 }

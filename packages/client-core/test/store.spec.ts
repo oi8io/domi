@@ -197,6 +197,11 @@ describe('PRD-M2-002 / M2-003 · 上下文事件也在对话里看得见', () =>
         tokensAfter: 1800,
         trigger: 'manual',
         summary: {
+          goal: '',
+          userQuotes: [],
+          files: [],
+          errors: [],
+          currentStep: '',
           intent: '把 sum.js 的减号改成加号',
           filesModified: ['sum.js'],
           keyDecisions: [],

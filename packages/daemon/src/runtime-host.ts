@@ -563,7 +563,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         },
         setPermissionsMode: (mode) => s.setPermissionsMode(mode as 'always-ask' | 'on-demand' | 'allow-all'),
         setBudget: (b) => s.setBudget(b),
-        compactNow: (trigger) => s.compactNow(trigger),
+        compactNow: (trigger, focus) => s.compactNow(trigger, focus),
         async readEvents(fromSeq, opts?: { maxLines?: number | undefined }) {
           // PRD-M11-009：fromSeq=0（首连）只回尾部窗口（按轮 + 屏预算），不全量拉回。
           // fromSeq>0（断点续订）仍是增量：seq > fromSeq 的全部事件。

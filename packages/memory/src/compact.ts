@@ -278,7 +278,10 @@ export function incrementalText(events: readonly EventEnvelope[], latest: Compac
 }
 
 /** 补水数据（取舍-9）：最近读/改的 K=10 个文件路径 + 当前计划（skill 正文由 session 侧传入） */
-export function refillData(events: readonly EventEnvelope[], opts: { skills?: Array<{ name: string; text: string }> } = {}): RefillData {
+export function refillData(
+  events: readonly EventEnvelope[],
+  opts: { skills?: Array<{ name: string; text: string }> } = {},
+): RefillData {
   const files = new Map<string, number>()
   for (const env of events) {
     const e = env.ev
@@ -306,9 +309,7 @@ export function refillData(events: readonly EventEnvelope[], opts: { skills?: Ar
 
 /** 摘要指令（session.compactNow 用）：重点进指令（AC-8），补水数据一起给 */
 export function summarizeInstruction(opts: { focus?: string; refill: RefillData }): string {
-  const lines: string[] = [
-    '把下面这段对话内容压成一份固定字段的结构化摘要（JSON 对象，只输出 JSON）：',
-  ]
+  const lines: string[] = ['把下面这段对话内容压成一份固定字段的结构化摘要（JSON 对象，只输出 JSON）：']
   if (opts.focus !== undefined && opts.focus !== '') lines.push(`本次压缩重点：${opts.focus}`)
   lines.push(
     '要保留：目标与约束；用户说过的每句话（原文，逐条）；关键决定；改过的文件与要点；错误与修法；当前正在做的那一步的精确状态；未决问题；下一步。',
@@ -331,7 +332,9 @@ export function renderSummaryV2(s: SummaryV2): string {
   const files = (s.files ?? []).map((f) => `  - ${f.path}${(f.note ?? '') !== '' ? `：${f.note}` : ''}`)
   const legacyFiles = files.length > 0 ? files : (s.filesModified ?? []).map((p) => `  - ${p}`)
   const list = (title: string, items: readonly string[] | undefined): string =>
-    items === undefined || items.length === 0 ? `${title}：（无）` : `${title}：\n${items.map((x) => `  - ${x}`).join('\n')}`
+    items === undefined || items.length === 0
+      ? `${title}：（无）`
+      : `${title}：\n${items.map((x) => `  - ${x}`).join('\n')}`
   const currentStep = (s.currentStep ?? '') === '' ? '（无）' : s.currentStep
   return [
     `${SUMMARY_OPEN}上下文摘要${SUMMARY_CLOSE}`,
@@ -351,7 +354,10 @@ export function renderSummaryV2(s: SummaryV2): string {
  * 压缩 v2：按步边界 + 增量输入 + v2 模板。
  * 与旧 compact() 同一纪律：事件流一条不动，只追加 ctx.compact（INV-12）。
  */
-export async function compactSteps(events: readonly EventEnvelope[], opts: CompactStepsOptions): Promise<CompactResult> {
+export async function compactSteps(
+  events: readonly EventEnvelope[],
+  opts: CompactStepsOptions,
+): Promise<CompactResult> {
   const { covered, kept } = compactBoundary(events, opts)
   const latest = lastCompactEvent(events)
   const refill = opts.refill ?? refillData(events)

@@ -46,6 +46,7 @@ import { KeyedError, type MessageKey, type Params } from '@domi/i18n'
 import type { PromptParts } from '@domi/kernel'
 import {
   aggregate,
+  buildContext,
   type ContextPolicy,
   contextLevel,
   effectiveWindow,
@@ -63,14 +64,18 @@ import {
   type VerifyState,
   verifyNudges,
   verifyState,
+  withPrompt,
 } from '@domi/kernel'
 import {
-  compact,
+  compactSteps,
   computeMask,
+  lastCompactEvent,
+  refillData,
   registerCleanStrategy,
   registerCompactStrategy,
   registerMaskStrategy,
-  SummarySchema,
+  SummarySchemaV2,
+  summarizeInstruction,
 } from '@domi/memory'
 import {
   capabilitiesFor,
@@ -911,38 +916,62 @@ export class DomiSession {
   }
 
   /**
-   * LLM 压缩 —— PRD-M2-003 AC-1。
+   * LLM 压缩 v2 —— PRD-M2-003 AC-1 + PRD-M15-005（按步、增量、可轮中、保真）。
    *
    * 只追加一条 `ctx.compact`，**原始事件一条不动**（INV-12）。
+   * 摘要请求 = 主会话投影后 messages + 末尾摘要指令（取舍-10，吃主前缀缓存 E7）；
+   * 输入是增量（上一份摘要 + 压缩点后事件，取舍-6）。
    * 失败时什么都不做：压缩失败不该让一次正常对话看起来出错了——
-   * 大不了这一轮上下文长一点。这和标题生成是同一条降级原则。
+   * 大不了这一轮上下文长一点。熔断 COMPACT_FAIL_MAX 后自动不再触发，手动仍可用。
    */
   async compactNow(
     trigger: 'threshold' | 'manual' = 'manual',
+    focus?: string,
   ): Promise<{ ok: boolean; detail: string; freed?: number }> {
     const events = await this.view()
     try {
-      const r = await compact(events, {
+      const r = await compactSteps(events, {
         trigger,
-        keepTurns: this.opts.config.context.keepTurns ?? 2,
-        summarize: async ({ text }) =>
-          generateStructured({ provider: this.provider, capabilities: this.provider.capabilities }, SummarySchema, {
-            model: this.currentModel,
-            messages: [
-              {
-                role: 'user',
-                content: `把下面这段对话历史压成结构化摘要。只保留后面还用得上的信息，不要复述每一步。\n\n${text}`,
-              },
-            ],
-          }),
+        ...(focus !== undefined ? { focus } : {}),
+        keepSteps: this.opts.config.context.compactKeepSteps,
+        keepTokens: this.opts.config.context.compactKeepTokens,
+        refill: {
+          ...refillData(events),
+          skills: this.loadedSkillBodies(),
+        },
+        summarize: async ({ focus: f, refill: rf }) => {
+          // 主前缀：同一套策略链投影（遮蔽 → 压缩 → 补水 → full，SPEC-M15 3.3）
+          // + prompt 层（system / 稳定 user 块）——与主会话请求同一前缀，吃主前缀缓存（E7）
+          const history = buildContext(events, {
+            maxTokens: this.opts.config.context.maxTokens,
+            includeReasoning: this.opts.config.context.includeReasoning,
+            strategy: this.opts.config.context.strategy,
+          })
+          const prompt = this.prompt()
+          const msgs = prompt ? withPrompt(history, prompt) : history
+          const instruction = summarizeInstruction({
+            ...(f !== undefined ? { focus: f } : {}),
+            refill: rf,
+          })
+          return generateStructured(
+            { provider: this.provider, capabilities: this.provider.capabilities },
+            SummarySchemaV2,
+            {
+              model: this.currentModel,
+              messages: [...msgs, { role: 'user', content: instruction }],
+            },
+          )
+        },
       })
-      if (r.covered.length === 0) return { ok: false, detail: '轮数还不够，没什么可压的' }
+      if (r.covered.length === 0) return { ok: false, detail: '步数还不够，没什么可压的' }
       await this.log.append(this.opts.sessionId, [r.event])
       await this.pump()
       this.compactFailCount = 0
+      // PRD-M15-005 AC-5：编辑守卫失效——模型现在只见过摘要，改文件前必须重读
+      this.tools.stamps.clearAll()
       return {
         ok: true,
-        detail: `已压缩 seq ${r.event.fromSeq}–${r.event.toSeq}，${r.event.tokensBefore} → ${r.event.tokensAfter} tokens（保留最近 ${r.event.keptTurns} 轮）`,
+        detail: `已压缩 seq ${r.event.fromSeq}–${r.event.toSeq}，${r.event.tokensBefore} → ${r.event.tokensAfter} tokens（保留最近 ${r.event.keptTurns} 步）`,
         freed: Math.max(0, r.event.tokensBefore - r.event.tokensAfter),
       }
     } catch (e) {
@@ -955,6 +984,16 @@ export class DomiSession {
       this.compactFailCount += 1
       return { ok: false, detail: message }
     }
+  }
+
+  /** 补水用的已加载技能正文（取舍-9：skill.load 的技能正文） */
+  private loadedSkillBodies(): Array<{ name: string; text: string }> {
+    const out: Array<{ name: string; text: string }> = []
+    for (const s of this.skillSource?.list() ?? []) {
+      const body = this.skillSource?.get(s.name)
+      if (body !== undefined) out.push({ name: s.name, text: body.prompt })
+    }
+    return out
   }
 
   /**

@@ -438,7 +438,7 @@ export function createSessionStore(initial: Partial<StatusSnapshot> & { kind?: '
             tokensAfter: ev.tokensAfter,
             keptTurns: ev.keptTurns,
           }),
-          summary: ev.summary.intent,
+          summary: ev.summary.goal !== '' ? ev.summary.goal : (ev.summary.intent ?? ''),
         })
         break
       // 编排（M5）：运行与节点的进展都是事件，投影成对话里的一行

@@ -12,11 +12,11 @@ import type { AnyEvent, EventEnvelope, ModelMessages } from '@domi/protocol'
 import { isKnownEvent } from '@domi/protocol'
 import { type CleanupOptions, cleanup } from './cleanup.ts'
 import {
+  type CompactEvent,
   lastCompactEvent,
   refillData,
   renderSummary,
   renderSummaryV2,
-  type CompactEvent,
   type Summary,
   type SummaryV2,
 } from './compact.ts'

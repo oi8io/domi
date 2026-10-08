@@ -21,8 +21,9 @@ import {
   SUMMARY_CLOSE,
   SUMMARY_OPEN,
   SummarySchemaV2,
-  summarizeInstruction,
   SummaryShapeError,
+  type SummaryV2,
+  summarizeInstruction,
 } from '../src/index.ts'
 
 let seq = 0
@@ -82,9 +83,7 @@ describe('step-boundary (AC-1)', () => {
     expect(kept[kept.length - 1]).toBe(events[events.length - 1])
     // 步内完整：边界不把一步的 tool.call/result 切开（kept 里 call/result 成对）
     const keptCalls = new Set(kept.filter((e) => e.ev.t === 'tool.call').map((e) => (e.ev as { id: string }).id))
-    expect(
-      kept.every((e) => e.ev.t !== 'tool.result' || keptCalls.has((e.ev as { id: string }).id)),
-    ).toBe(true)
+    expect(kept.every((e) => e.ev.t !== 'tool.result' || keptCalls.has((e.ev as { id: string }).id))).toBe(true)
     expect(kept.some((e) => e.ev.t === 'model.request')).toBe(true)
   })
 
@@ -145,20 +144,20 @@ describe('incremental-input (AC-2)', () => {
 describe('input-whitelist (AC-3)', () => {
   test('白名单内的事件进输入', () => {
     expect(projectForCompact({ t: 'user.input', text: 'hi' })).toContain('[用户]')
-    expect(projectForCompact({ t: 'user.note', text: '补充' })).toContain('[补充]')
-    expect(projectForCompact({ t: 'ctx.note', text: '动态' })).toContain('[补充]')
+    expect(projectForCompact({ t: 'user.note', id: 'n1', text: '补充' })).toContain('[补充]')
+    expect(projectForCompact({ t: 'ctx.note', text: '动态', reason: 'supplement' })).toContain('[补充]')
     expect(projectForCompact({ t: 'model.delta', text: 'd' })).toBe('d')
     expect(projectForCompact({ t: 'tool.call', id: 'x', name: 'fs.read', args: { path: 'a' } })).toContain('[调用]')
     expect(projectForCompact({ t: 'tool.result', id: 'x', ok: true, payload: 'p', ms: 1 })).toContain('[结果]')
-    expect(projectForCompact({ t: 'verify.required', message: 'v', scope: 'x' })).toContain('[验证]')
-    expect(
-      projectForCompact({ t: 'plan.update', steps: [{ id: '1', text: 't', status: 'pending' }] }),
-    ).toContain('[计划]')
+    expect(projectForCompact({ t: 'verify.required', attempt: 1, message: 'v' })).toContain('[验证]')
+    expect(projectForCompact({ t: 'plan.update', steps: [{ id: '1', text: 't', status: 'pending' }] })).toContain(
+      '[计划]',
+    )
   })
 
   test('轨迹事件不进（usage / request / permission / 快照 / ctx.mask / ctx.pin / error / 未知）', () => {
-    expect(projectForCompact({ t: 'usage', usage: { input: 1, output: 1 } })).toBeNull()
-    expect(projectForCompact({ t: 'model.request', model: 's', usage: { input: 1, output: 1 } })).toBeNull()
+    expect(projectForCompact({ t: 'model.usage', raw: { usage: { inputTokens: 1, outputTokens: 1 } } })).toBeNull()
+    expect(projectForCompact({ t: 'model.request', provider: 'stub', model: 's', tokensIn: 1 })).toBeNull()
     expect(projectForCompact({ t: 'ctx.mask', seqs: [], reason: 'threshold', freedTokens: 1 })).toBeNull()
     expect(projectForCompact({ t: 'ctx.pin', seq: 1, pinned: true })).toBeNull()
     expect(projectForCompact({ t: 'error', scope: 'compact', message: 'x', recoverable: true })).toBeNull()
@@ -191,7 +190,7 @@ describe('summary-schema-v2 (AC-4)', () => {
 
   test('缺新字段时用默认值兜底，不抛（模板允许留白）', async () => {
     const r = await compactSteps(longConversation(), { summarize: async () => ({ goal: '只留目标' }) })
-    expect(r.summary.goal).toBe('只留目标')
+    expect((r.summary as SummaryV2).goal).toBe('只留目标')
   })
 })
 
@@ -265,7 +264,10 @@ describe('l1-fidelity-fixture（压缩保真）', () => {
   })
 
   test('指令模板：重点（AC-8 P1）与补水数据都进指令', () => {
-    const text = summarizeInstruction({ focus: '上线前必须改完的错误', refill: { files: ['a.ts'], skills: [{ name: 's', text: 't' }], plan: '[in_progress] 改' } })
+    const text = summarizeInstruction({
+      focus: '上线前必须改完的错误',
+      refill: { files: ['a.ts'], skills: [{ name: 's', text: 't' }], plan: '[in_progress] 改' },
+    })
     expect(text).toContain('上线前必须改完的错误')
     expect(text).toContain('a.ts')
     expect(text).toContain('技能 s')
@@ -284,8 +286,26 @@ describe('immutability (INV-12)', () => {
 
   test('lastCompactEvent 取最近一条', () => {
     const events = longConversation()
-    const c1 = env({ t: 'ctx.compact', fromSeq: 1, toSeq: 2, keptTurns: 1, tokensBefore: 1, tokensAfter: 1, trigger: 'manual', summary: V2_SUMMARY })
-    const c2 = env({ t: 'ctx.compact', fromSeq: 3, toSeq: 4, keptTurns: 1, tokensBefore: 1, tokensAfter: 1, trigger: 'manual', summary: V2_SUMMARY })
+    const c1 = env({
+      t: 'ctx.compact',
+      fromSeq: 1,
+      toSeq: 2,
+      keptTurns: 1,
+      tokensBefore: 1,
+      tokensAfter: 1,
+      trigger: 'manual',
+      summary: V2_SUMMARY,
+    })
+    const c2 = env({
+      t: 'ctx.compact',
+      fromSeq: 3,
+      toSeq: 4,
+      keptTurns: 1,
+      tokensBefore: 1,
+      tokensAfter: 1,
+      trigger: 'manual',
+      summary: V2_SUMMARY,
+    })
     const latest = lastCompactEvent([...events, c1, c2])
     expect(latest?.toSeq).toBe(4)
   })
