@@ -170,6 +170,8 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
     config: opts.config,
     dbPath: opts.dbPath,
     soulDir: opts.soulDir ?? join(home, 'soul'),
+    // 项目记忆在 ~/.domi/projects/<id>/memory/（PRD-M15-009 AC-1）
+    home,
     ...(memoryProvider === undefined ? {} : { provider: memoryProvider }),
   })
   const skills = opts.config.skills.enabled

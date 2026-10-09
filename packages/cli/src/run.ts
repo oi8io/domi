@@ -104,7 +104,7 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
     case 'memory':
     case 'soul': {
       const { runMemory, runSoul } = await import('./soul.ts')
-      const deps = { dataDir: dataDir(), home: userHome() }
+      const deps = { dataDir: dataDir(), home: userHome(), cwd: process.cwd() }
       return cli.command === 'memory'
         ? runMemory(cli.sub, cli.args, io, deps, { all: cli.flags.all })
         : runSoul(cli.sub, cli.args, io, deps)

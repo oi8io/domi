@@ -8,8 +8,9 @@
  * soul.md 是人也会改的文件，所以每次都现读现写，domi 写过什么由 L4 事件记着（INV-09）。
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { Tool } from '@domi/capability'
 import { type DomiConfig, providerConnection } from '@domi/config'
 import { KeyedError } from '@domi/i18n'
@@ -24,6 +25,8 @@ import {
   extractItems,
   type ImportPlan,
   itemDiff,
+  itemId,
+  normalizeText,
   ownedLines,
   parseSoul,
   planImport,
@@ -41,6 +44,7 @@ import {
 } from '@domi/memory'
 import { createEmbedder, createProvider, generateStructured, type ModelProvider, providerConfigOf } from '@domi/model'
 import type { SemanticItem, SoulChange } from '@domi/protocol'
+import { estimateTextTokens, fnv1a } from '@domi/protocol'
 import { MEMORY_SESSION_ID, SqliteEventLog, type StoredItem } from '@domi/store'
 import { type ZodType, z } from 'zod'
 
@@ -49,6 +53,8 @@ export interface MemoryServiceOptions {
   dbPath: string
   /** ~/.domi/soul */
   soulDir: string
+  /** ~/.domi：项目记忆在它下面的 projects/<id>/memory/（PRD-M15-009 AC-1） */
+  home: string
   /** 测试注入；不给就按 config.model 建 */
   provider?: ModelProvider
   /** 测试注入；不给就按 config.memory.embedding 建（没配就没有） */
@@ -72,28 +78,89 @@ export interface PendingChange extends SoulChange {
 export const MemoryRecallArgs = z.object({
   query: z.string().min(1).describe('想确认的关于用户的信息，例如「用户偏好的测试框架」'),
   limit: z.number().int().positive().max(20).optional(),
+  key: z.string().optional().describe('索引进提示词时给出的条目键：按键直接取该条正文（PRD-M15-009 AC-3）'),
 })
 
 /**
  * L3 的读接口给模型用（PRD-M4-001 AC-3）。和 memory.search 共用一个能力 id：
  * 都是「翻用户的记录」，用户开一条规则就够了
  */
-export function makeMemoryRecallTool(memory: MemoryService): Tool<z.infer<typeof MemoryRecallArgs>, unknown> {
+export function makeMemoryRecallTool(
+  memory: MemoryService,
+  projectKey?: () => string | null,
+): Tool<z.infer<typeof MemoryRecallArgs>, unknown> {
   return {
     name: 'memory.recall',
     capability: 'memory.search',
     description:
-      '查关于用户的长期记忆（事实、偏好、常提到的人和项目），每条带来源。' +
-      '没有相关的就返回空列表——那就当作不知道，不要猜。',
+      '查长期记忆（用户事实 / 偏好 / 当前项目的约定与踩坑）。索引进提示词时给了 recall <key> 就带 key 直接取那一条；' +
+      '否则按 query 查全局记忆与当前项目记忆。没有相关的就返回空列表——那就当作不知道，不要猜。',
     schema: MemoryRecallArgs,
     async execute(args) {
-      const r = await memory.search(args.query, args.limit ?? 8)
+      const limit = args.limit ?? 8
+      if (args.key !== undefined) {
+        return { mode: 'key', items: await memory.recallByKey(args.key) }
+      }
+      const r = await memory.search(args.query, limit)
+      const items: Array<{ id: string; kind: string; text: string; source?: 'global' | 'project'; sources: unknown }> =
+        r.items.map((i) => ({ id: i.id, kind: i.kind, text: i.text, sources: i.sourceRefs }))
+      const pk = projectKey?.() ?? null
+      if (pk !== null) {
+        for (const i of memory.projectRecall(pk, args.query, limit)) {
+          items.push({ id: i.key, kind: i.kind, text: i.text, sources: [] })
+        }
+      }
       return {
         mode: r.mode === 'keyword' ? '只按关键词匹配（没有配置 embedding）' : '关键词 + 语义',
-        items: r.items.map((i) => ({ id: i.id, kind: i.kind, text: i.text, sources: i.sourceRefs })),
+        items,
       }
     },
   }
+}
+
+// ── 项目 id（PRD-M15-009 AC-1）──────────────────────────────
+
+/** `git remote origin` 的 URL 解析成 host/owner/repo slug（如 github.com-domi-domi） */
+export function remoteSlugOf(remoteUrl: string): string | null {
+  let u = remoteUrl.trim()
+  // scp 风格 git@github.com:domi/domi.git
+  u = u.replace(/^[^@]+@/, '').replace(/^ssh:\/\//, '')
+  u = u.replace(/^https?:\/\//, '').replace(/^git:\/\//, '')
+  u = u.replace(/\.git$/, '')
+  const [host, ...rest] = u.split(/[/:]/).filter((x) => x !== '')
+  if (!host || rest.length === 0) return null
+  return [host, ...rest.slice(0, 2)].join('-')
+}
+
+/**
+ * 项目记忆的稳定 id：git remote slug 优先；无 remote 用 cwd 的 stable hash（path + inode）。
+ * 不用 basename(cwd)：同名目录换位置会串味（PRD-M15-009 AC-1）。
+ */
+export function projectKeyOf(cwd: string): string {
+  const r = spawnSync('git', ['-C', cwd, 'config', '--get', 'remote.origin.url'], {
+    encoding: 'utf8',
+    timeout: 3000,
+  })
+  const remote = r.status === 0 && r.stdout ? r.stdout.trim() : ''
+  if (remote !== '') {
+    const slug = remoteSlugOf(remote)
+    if (slug) return slug
+  }
+  let ino = 0
+  try {
+    ino = statSync(cwd).ino
+  } catch {
+    // 目录不存在：只用 path 也能得到稳定 id
+  }
+  return `hash-${fnv1a(`${cwd}:${ino}`)}`
+}
+
+/** 项目记忆目录（~/.domi/projects/<id>/memory/）与正文文件 */
+export function projectMemoryDir(home: string, key: string): string {
+  return join(home, 'projects', key, 'memory')
+}
+export function projectMemoryPath(home: string, key: string): string {
+  return join(projectMemoryDir(home, key), 'memory.md')
 }
 
 export class MemoryService {
@@ -152,8 +219,11 @@ export class MemoryService {
 
   // ── L3 ──────────────────────────────────────────────────
 
-  /** 一轮结束后调：攒够 extractEvery 轮就抽一次，然后更新 Soul。失败落一条 error，不抛 */
-  afterTurn(sessionId: string): Promise<void> {
+  /**
+   * 一轮结束后调：攒够 extractEvery 轮就抽一次，然后分流到全局 Soul / 项目记忆（PRD-M15-009 AC-2）。
+   * cwd 为空或非任务会话 = 自由会话：只用全局记忆（AC-5）。失败落一条 error，不抛
+   */
+  afterTurn(sessionId: string, cwd?: string): Promise<void> {
     const every = this.opts.config.memory.extractEvery
     if (every <= 0 || sessionId.startsWith('_')) return Promise.resolve()
     return this.serial(async () => {
@@ -161,7 +231,7 @@ export class MemoryService {
       const from = this.log.semantic.extractedSeq(sessionId)
       const turns = view.filter((e) => e.seq > from && e.ev.t === 'user.input').length
       if (turns < every) return
-      await this.extractNow(sessionId, view, from)
+      await this.extractNow(sessionId, view, from, cwd)
     }).catch(async (e) => {
       await this.log.append(MEMORY_SESSION_ID, [
         {
@@ -175,10 +245,19 @@ export class MemoryService {
   }
 
   /** 手动抽取（`domi memory extract`）：不看轮数 */
-  extract(sessionId: string): Promise<{ added: SemanticItem[]; soul: SoulChange[] }> {
+  extract(sessionId: string, cwd?: string): Promise<{ added: SemanticItem[]; soul: SoulChange[] }> {
     return this.serial(async () => {
       const view = await this.log.readLineage(sessionId)
-      return this.extractNow(sessionId, view, this.log.semantic.extractedSeq(sessionId))
+      return this.extractNow(sessionId, view, this.log.semantic.extractedSeq(sessionId), cwd)
+    })
+  }
+
+  /** 压缩前冲刷（PRD-M15-009 AC-4）：强制把增量交给抽取，与压缩共用同一段增量输入，不重复读历史 */
+  flush(sessionId: string, cwd?: string): Promise<{ added: SemanticItem[]; soul: SoulChange[] }> {
+    if (sessionId.startsWith('_')) return Promise.resolve({ added: [], soul: [] })
+    return this.serial(async () => {
+      const view = await this.log.readLineage(sessionId)
+      return this.extractNow(sessionId, view, this.log.semantic.extractedSeq(sessionId), cwd)
     })
   }
 
@@ -186,6 +265,7 @@ export class MemoryService {
     sessionId: string,
     view: Awaited<ReturnType<SqliteEventLog['readLineage']>>,
     from: number,
+    cwd?: string,
   ): Promise<{ added: SemanticItem[]; soul: SoulChange[] }> {
     const slice = view.filter((e) => e.seq > from)
     const last = view.at(-1)?.seq ?? from
@@ -218,7 +298,17 @@ export class MemoryService {
       },
     ])
     await this.embedPending()
-    const soul = added.length > 0 && this.opts.config.memory.soul ? await this.updateSoulNow(added) : []
+    // PRD-M15-009 AC-2 分流：偏好 → 全局 Soul；fact / entity → 项目记忆（任务会话）。
+    // 自由会话（没给 cwd / 非项目）全部走全局（AC-5）
+    if (cwd === undefined) {
+      const soul = added.length > 0 && this.opts.config.memory.soul ? await this.updateSoulNow(added) : []
+      return { added, soul }
+    }
+    const projectKey = projectKeyOf(cwd)
+    const prefs = added.filter((i) => i.kind === 'preference')
+    const facts = added.filter((i) => i.kind !== 'preference')
+    const soul = prefs.length > 0 && this.opts.config.memory.soul ? await this.updateSoulNow(prefs) : []
+    if (facts.length > 0) this.appendProjectMemory(projectKey, cwd, facts)
     return { added, soul }
   }
 
@@ -228,6 +318,29 @@ export class MemoryService {
 
   async search(query: string, limit = 10): Promise<SemanticSearchResult> {
     return searchSemantic(this.log.semantic, query, { limit, ...(this.embed ? { embed: this.embed } : {}) })
+  }
+
+  /** 按键取正文：全局 L3 命中优先；否则扫所有项目记忆文件（recall <key>，PRD-M15-009 AC-3） */
+  async recallByKey(
+    key: string,
+  ): Promise<Array<{ id: string; kind: string; text: string; source: 'global' | 'project' }>> {
+    const g = this.log.semantic.get(key)
+    const out: Array<{ id: string; kind: string; text: string; source: 'global' | 'project' }> = []
+    if (g) out.push({ id: g.id, kind: g.kind, text: g.text, source: 'global' })
+    const root = join(this.opts.home, 'projects')
+    if (existsSync(root)) {
+      for (const keyDir of readdirSync(root)) {
+        const p = join(root, keyDir, 'memory', 'memory.md')
+        if (!existsSync(p)) continue
+        for (const raw of readFileSync(p, 'utf8').split('\n')) {
+          const { kind, text } = this.parseProjectLine(raw)
+          if (text === '' || itemId(kind, text) !== key) continue
+          out.push({ id: key, kind, text, source: 'project' })
+          break
+        }
+      }
+    }
+    return out
   }
 
   /** 删一条（AC-3）。不存在或已删返回 false */
@@ -421,8 +534,112 @@ export class MemoryService {
   }
 
   /** 进提示词的 Soul 文本；空档案时是空串 */
-  promptText(): string {
-    return this.opts.config.memory.soul ? soulForPrompt(this.readSoul()) : ''
+  promptText(projectKey?: string | null): string {
+    const soul = this.opts.config.memory.soul ? soulForPrompt(this.readSoul()) : ''
+    if (!projectKey) return soul
+    const idx = this.projectIndexText(projectKey)
+    return idx === ''
+      ? soul
+      : `${soul}
+
+## 项目记忆（只属于当前项目；全文用 memory.recall 取，键是每行末尾的 recall <key>）
+${idx}`
+  }
+
+  // ── 项目记忆（PRD-M15-009）────────────────────────────────
+
+  /** 项目记忆正文文件；文件头带 project id 与 root，方便手动迁移 */
+  private projectMemoryPathOf(key: string): string {
+    return projectMemoryPath(this.opts.home, key)
+  }
+
+  /** 索引：每条一行 `[kind] text · recall <key>`，上限 4k token（PRD-M15-009 AC-3） */
+  projectIndexText(key: string, maxTokens = 4_000): string {
+    const p = this.projectMemoryPathOf(key)
+    if (!existsSync(p)) return ''
+    const lines: string[] = []
+    let tokens = 0
+    for (const raw of readFileSync(p, 'utf8').split('\n')) {
+      const line = raw.trim()
+      if (line === '' || line.startsWith('#')) continue
+      const { kind, text } = this.parseProjectLine(line)
+      if (text === '') continue
+      const idx = `[${kind}] ${text} · recall ${itemId(kind, text)}`
+      const t = estimateTextTokens(idx)
+      if (tokens + t > maxTokens) break
+      lines.push(idx)
+      tokens += t
+    }
+    return lines.join('\n')
+  }
+
+  /** 项目 recall：按键直接取正文（AC-3），否则按 query 关键词过滤 */
+  projectRecall(key: string, query: string, limit: number): Array<{ key: string; kind: string; text: string }> {
+    const p = this.projectMemoryPathOf(key)
+    if (!existsSync(p)) return []
+    const terms = query
+      .split(/[\s，。、\s]+/)
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t !== '')
+    const out: Array<{ key: string; kind: string; text: string }> = []
+    for (const raw of readFileSync(p, 'utf8').split('\n')) {
+      const { kind, text } = this.parseProjectLine(raw)
+      if (text === '') continue
+      const itemKey = itemId(kind, text)
+      if (itemKey === key) return [{ key: itemKey, kind, text }]
+      if (terms.length > 0 && terms.some((t) => text.toLowerCase().includes(t))) {
+        out.push({ key: itemKey, kind, text })
+        if (out.length >= limit) break
+      }
+    }
+    return out
+  }
+
+  /**
+   * 追加项目记忆：人可手改 / 删改过的行 domi 不动（按文本去重；文件头写 project id · root）。
+   * 可否决同 Soul（INV-09）：把条目从 memory.md 删掉并写进项目 .rejected，domi 不再加回
+   */
+  appendProjectMemory(key: string, root: string, items: readonly SemanticItem[]): void {
+    const p = this.projectMemoryPathOf(key)
+    mkdirSync(dirname(p), { recursive: true })
+    const existing = new Set(
+      existsSync(p)
+        ? readFileSync(p, 'utf8')
+            .split('\n')
+            .map((l) => l.replace(/^[-*]\s*/, '').trim())
+            .filter((l) => l !== '')
+        : [],
+    )
+    const rejected = new Set(this.projectRejected(key))
+    const head = existsSync(p)
+      ? ''
+      : `# project id: ${key} · root: ${root}\n# domi 在这个项目里学到的（构建命令、约定、踩过的坑）。每行一条，手改 / 删行即否决：删掉一行并写进同目录 .rejected，domi 不再加回\n`
+    const add = items
+      .filter((i) => !existing.has(i.text))
+      .filter((i) => !rejected.has(normalizeText(i.text)))
+      .map((i) => `- [${i.kind}] ${i.text}`)
+    if (add.length === 0) return
+    writeFileSync(p, head + (existing.size > 0 ? '\n' : '') + add.join('\n') + '\n', { flag: 'a' })
+  }
+
+  /** 项目 .rejected：与全局同款，行尾文本去重。写进这里的条目 domi 不再写回项目记忆 */
+  private projectRejected(key: string): string[] {
+    const p = join(projectMemoryDir(this.opts.home, key), '.rejected')
+    if (!existsSync(p)) return []
+    return readFileSync(p, 'utf8')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l !== '' && !l.startsWith('#'))
+  }
+
+  /** 项目文件行：`- [kind] text`；手改后没 kind 前缀时按 fact 兜底 */
+  private parseProjectLine(raw: string): { kind: string; text: string } {
+    const line = raw.trim()
+    if (line === '' || line.startsWith('#')) return { kind: 'fact', text: '' }
+    const m = line.match(/^[-*]\s*\[(\w+)\]\s*(.+)$/)
+    if (m) return { kind: m[1]!, text: m[2]!.trim() }
+    const text = line.replace(/^[-*]\s*/, '').trim()
+    return { kind: 'fact', text }
   }
 
   exportText(): { text: string; findings: ExportFinding[] } {

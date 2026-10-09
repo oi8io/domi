@@ -15,6 +15,8 @@ import type { Io } from './io.ts'
 export interface SoulCliDeps {
   dataDir: string
   home: string
+  /** 当前工作目录：手动 extract 时按它分流到项目记忆（PRD-M15-009 AC-2） */
+  cwd: string
 }
 
 function service(deps: SoulCliDeps): MemoryService {
@@ -22,6 +24,7 @@ function service(deps: SoulCliDeps): MemoryService {
     config: loadConfig({ home: deps.home }),
     dbPath: join(deps.dataDir, 'events.db'),
     soulDir: join(deps.dataDir, 'soul'),
+    home: deps.dataDir,
   })
 }
 
@@ -81,7 +84,7 @@ export async function runMemory(
           io.err(MEMORY_USAGE())
           return 2
         }
-        const r = await m.extract(args[0])
+        const r = await m.extract(args[0], deps.cwd)
         io.out(tr('cli.memory.extracted', { length: r.added.length, length2: r.soul.length }))
         for (const i of r.added) io.out(`+ [${i.kind}] ${i.text}`)
         return 0

@@ -131,7 +131,7 @@ import { SqliteEventLog } from '@domi/store'
 import { BUDGET_DECISION_SCHEMA, type BudgetLimits, makeBudgetGate } from './budget.ts'
 import { memorySearchPlugin } from './builtin-plugins.ts'
 import { HookRunner } from './hooks.ts'
-import { type MemoryService, makeMemoryRecallTool } from './memory-service.ts'
+import { type MemoryService, makeMemoryRecallTool, projectKeyOf } from './memory-service.ts'
 import {
   findRepoRoot,
   hasProjectContent,
@@ -256,6 +256,8 @@ interface FrozenContext {
   cwd: string
   /** M15（SPEC-M15-010 AC-2）：环境定格快照（会话生命周期内采集一次） */
   env: PromptEnv | null
+  /** M15（PRD-M15-009 AC-3）：项目记忆索引（task 会话；自由会话为空串），随会话冻结 */
+  projectMemory: string
 }
 
 export interface SessionOptions {
@@ -458,12 +460,15 @@ export class DomiSession {
    * git 探测是子进程 IO，不该每轮 freeze 都跑
    */
   private frozenEnv: PromptEnv | null = null
+  /** M15（PRD-M15-009 AC-1）：项目记忆 key（task 会话定格一次；自由会话空串） */
+  private frozenProjectKey: string | undefined = undefined
   /** M15（SPEC-M15-010 AC-2）：会变一半（日期/分支/改动数）上次送达的文本，变了才追加 */
   private lastEnvNote: string | null = null
 
   /** 定格快照的内容 */
   private readFrozen(): FrozenContext {
-    const soul = this.opts.memory?.promptText() ?? ''
+    // soul + 项目记忆索引一次取齐（自由会话 projectKey='' 时只有 soul，PRD-M15-009 AC-5）
+    const soul = this.opts.memory?.promptText(this.frozenProjectKey ?? '') ?? ''
     const rules = this.trusted ? rulesText(this.repoRoot, this.opts.cwd) : ''
     const catalog = this.skillSource?.catalog() ?? ''
     return {
@@ -473,6 +478,8 @@ export class DomiSession {
       planText: planPromptText(this.planPolicy),
       cwd: this.opts.cwd,
       env: this.frozenEnv,
+      // projectMemory 与 soul 同源：索引部分单独留一份给上下文 tab 投影（随冻结）
+      projectMemory: this.opts.memory?.promptText(this.frozenProjectKey ?? '') ?? '',
     }
   }
 
@@ -481,6 +488,10 @@ export class DomiSession {
   /** 重定格：turn 开始 / 显式刷新时调用 */
   private freeze(): void {
     if (this.frozenEnv === null) this.frozenEnv = collectEnv(this.opts.cwd)
+    if (this.frozenProjectKey === undefined) {
+      // 任务会话才有项目记忆；自由会话只用全局（PRD-M15-009 AC-5）
+      this.frozenProjectKey = this.promptMode() === 'task' ? projectKeyOf(this.opts.cwd) : ''
+    }
     this.frozen = this.readFrozen()
     this.frozenSkills = this.skillSource?.list().length ?? 0
   }
@@ -594,7 +605,10 @@ export class DomiSession {
       )
     // PRD-M2-004 AC-2：检索是工具，由模型决定何时调用。以插件形态注册（PRD-M6-001 AC-3）
     for (const t of memorySearchPlugin.tools?.({ search: this.log.search }) ?? []) this.tools.register(t)
-    if (opts.memory) this.tools.register(makeMemoryRecallTool(opts.memory))
+    if (opts.memory) {
+      // 项目记忆 recall：工具调用发生在 turn 内（已 freeze），此时 frozenProjectKey 已定格（PRD-M15-009 AC-3）
+      this.tools.register(makeMemoryRecallTool(opts.memory, () => this.frozenProjectKey ?? ''))
+    }
     this.repoRoot = findRepoRoot(opts.cwd)
     this.trustStore = new TrustStore(join(dirname(opts.dbPath), 'trust.json'))
     this.skillSource = opts.skills
@@ -948,6 +962,8 @@ export class DomiSession {
     trigger: 'threshold' | 'manual' = 'manual',
     focus?: string,
   ): Promise<{ ok: boolean; detail: string; freed?: number }> {
+    // PRD-M15-009 AC-4 冲刷：压缩前把增量交给抽取（与压缩共用同一段增量输入，不重复读历史）
+    await this.opts.memory?.flush(this.opts.sessionId, this.promptMode() === 'task' ? this.opts.cwd : undefined)
     const events = await this.view()
     try {
       const r = await compactSteps(events, {
@@ -1803,7 +1819,7 @@ export class DomiSession {
       // 第一轮结束后自动生成标题。不等它：LLM 调用不该拖住这一轮的结束（PRD-M10-001 AC-1）
       void this.maybeAutoTitle()
       // 攒够轮数就抽取记忆、更新 Soul。不等它：抽取要调一次模型，不该拖住这一轮的结束
-      void this.opts.memory?.afterTurn(this.opts.sessionId)
+      void this.opts.memory?.afterTurn(this.opts.sessionId, this.promptMode() === 'task' ? this.opts.cwd : undefined)
     }
   }
 
