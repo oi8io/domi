@@ -36,7 +36,7 @@ describe('定格一半：collectEnv', () => {
     const dir = makeRepo()
     try {
       const env = collectEnv(dir)
-      expect(env.os).toContain('darwin')
+      expect(env.os).toBe(`${process.platform} ${process.arch}`)
       expect(env.shell.length).toBeGreaterThan(0)
       expect(env.projectRoot).toBe(dir)
       expect(env.projectType).toBe('node')
