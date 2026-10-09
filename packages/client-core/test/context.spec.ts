@@ -26,6 +26,7 @@ const METRICS = {
   contextMaxTokens: 150_000,
   cacheHitPercent: 55,
   cost: '¥0.32',
+  contextPercent: 40,
 } as const satisfies Partial<MetricsSnapshot>
 
 const LAYERS = [
@@ -211,5 +212,66 @@ describe('contextView · 读过的（AC-6）', () => {
     expect(v.mcpCalls).toHaveLength(1)
     expect(v.mcpCalls[0]?.server).toBe('github')
     expect(v.mcpCalls[0]?.tools[0]).toMatchObject({ name: 'mcp.github.create_issue', count: 1, firstSeq: 9 })
+  })
+})
+
+describe('contextView · M15 上下文 tab 补全（PRD-M15-011）', () => {
+  const EVENTS = [
+    req(2, 100),
+    env(3, 101, { t: 'ctx.mask', seqs: [1], reason: 'budget', freedTokens: 12_000 }),
+    env(4, 102, {
+      t: 'ctx.prefix.break',
+      prevSeq: 2,
+      nextSeq: 8,
+      cause: 'plan.update',
+      layer: 'session.plan',
+      msgIndex: 3,
+    }),
+    env(5, 103, { t: 'ctx.mask', seqs: [1], reason: 'budget', freedTokens: 3_000 }),
+    env(6, 104, { t: 'ctx.pin', seq: 3, pinned: true }),
+    env(7, 105, { t: 'ctx.pin', seq: 3, pinned: false }),
+    env(9, 106, { t: 'ctx.pin', seq: 5, pinned: true }),
+  ]
+
+  test('AC-1 · maskedTokens = ctx.mask.freedTokens 累计（用量条「已遮蔽」行）', () => {
+    const v = contextView(EVENTS, METRICS, STATIC)
+    expect(v.maskedTokens).toBe(15_000)
+  })
+
+  test('AC-2 · ctx.prefix.break 收集为列表（cause / layer / msgIndex 可定位）', () => {
+    const v = contextView(EVENTS, METRICS, STATIC)
+    expect(v.breaks).toHaveLength(1)
+    expect(v.breaks[0]).toMatchObject({
+      prevSeq: 2,
+      nextSeq: 8,
+      cause: 'plan.update',
+      layer: 'session.plan',
+      msgIndex: 3,
+    })
+  })
+
+  test('AC-2 · avoidableLoss 透传 metrics（老 daemon 无字段 → null）', () => {
+    const v = contextView(EVENTS, { ...METRICS, avoidableLoss: 799_000 }, STATIC)
+    expect(v.avoidableLoss).toBe(799_000)
+    const legacy = contextView(EVENTS, METRICS, STATIC)
+    expect(legacy.avoidableLoss).toBeNull()
+  })
+
+  test('AC-4 · pinned 取最近状态（解钉后移除，升序）', () => {
+    const v = contextView(EVENTS, METRICS, STATIC)
+    expect(v.pinned).toEqual([5])
+  })
+
+  test('AC-4 · thresholdGap = 压缩阈值 − 当前占用百分比（负 = 已过阈值）', () => {
+    const v = contextView(EVENTS, { ...METRICS, contextPercent: 40 }, STATIC)
+    expect(v.thresholdGap).toBe(30)
+    const over = contextView(EVENTS, { ...METRICS, contextPercent: 80 }, STATIC)
+    expect(over.thresholdGap).toBe(-10)
+    const none = contextView(
+      EVENTS,
+      { contextTokens: 40_000, contextMaxTokens: 150_000, cacheHitPercent: 55, cost: '¥0.32' },
+      STATIC,
+    )
+    expect(none.thresholdGap).toBeNull()
   })
 })

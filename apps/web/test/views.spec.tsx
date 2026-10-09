@@ -10,6 +10,7 @@ import { join } from 'node:path'
 import {
   $comments,
   addComment,
+  type CtxStatic,
   clearComments,
   commentsToRefs,
   createSessionStore,
@@ -605,7 +606,7 @@ describe('PRD-M14-006 · 上下文 tab（右侧栏）', () => {
     thresholdPercent: null,
     pending: { soul: false, rules: false, catalog: false, skills: false },
   }
-  const renderTab = (store: ReturnType<typeof createSessionStore>, staticProp: typeof STATIC | null = STATIC): string =>
+  const renderTab = (store: ReturnType<typeof createSessionStore>, staticProp: CtxStatic | null = STATIC): string =>
     renderToStaticMarkup(
       <ContextTab
         client={{} as DomiClient}
@@ -749,6 +750,84 @@ describe('PRD-M14-006 · 上下文 tab（右侧栏）', () => {
     // 没有 tools/history 段
     expect(html).not.toContain('data-seg="tools"')
     expect(html).not.toContain('data-seg="history"')
+  })
+
+  // M15（PRD-M15-011）· 上下文 tab 补全
+  test('AC-1 · 累计遮蔽释放量显示为「已遮蔽」（data-metric=masked）', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({
+      ...store.$status.get(),
+      metrics: {
+        ...metrics,
+        contextTokens: 10_000,
+        contextMaxTokens: 150_000,
+        contextPercent: 6,
+        avoidableLoss: 799_000,
+      },
+    })
+    store.$events.set([
+      env(1, 1000, { t: 'ctx.mask', seqs: [1], reason: 'threshold', freedTokens: 12_000 }),
+      env(2, 2000, { t: 'ctx.mask', seqs: [1], reason: 'truncate', freedTokens: 3_000 }),
+    ])
+    const html = renderTab(store)
+    expect(html).toContain('data-metric="masked"')
+    expect(html).toContain('已遮蔽')
+  })
+
+  test('AC-2 · 前缀断裂列在缓存区：cause 人话 + layer + 定位；可避免损失透传', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({
+      ...store.$status.get(),
+      metrics: {
+        ...metrics,
+        contextTokens: 10_000,
+        contextMaxTokens: 150_000,
+        contextPercent: 6,
+        avoidableLoss: 799_000,
+      },
+    })
+    store.$events.set([
+      env(1, 1000, {
+        t: 'ctx.prefix.break',
+        prevSeq: 1,
+        nextSeq: 3,
+        cause: 'plan.update',
+        layer: 'session.plan',
+        msgIndex: 2,
+      }),
+    ])
+    const html = renderTab(store)
+    expect(html).toContain('data-part="cache"')
+    expect(html).toContain('data-break="plan.update"')
+    expect(html).toContain('session.plan')
+    expect(html).toContain('计划更新')
+    expect(html).toContain('data-metric="avoidable-loss"')
+    expect(html).toContain('data-action="locate-break"')
+  })
+
+  test('AC-4 · 阈值距离（thresholdGap）：没过阈值显示差距，过了显示超限', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({
+      ...store.$status.get(),
+      metrics: { ...metrics, contextTokens: 10_000, contextMaxTokens: 150_000, contextPercent: 50 },
+    })
+    store.$events.set([])
+    const html = renderTab(store, { ...STATIC, thresholdPercent: 80 })
+    expect(html).toContain('data-metric="threshold"')
+    expect(html).toContain('距压缩阈值还差')
+  })
+
+  test('AC-5 · 遮蔽记录行有 📌 钉住按钮（data-action=pin）', () => {
+    const store = createSessionStore({ kind: 'task' })
+    store.$status.set({
+      ...store.$status.get(),
+      metrics: { ...metrics, contextTokens: 10_000, contextMaxTokens: 150_000, contextPercent: 6 },
+    })
+    store.$events.set([env(1, 1000, { t: 'ctx.mask', seqs: [8], reason: 'threshold', freedTokens: 12_000 })])
+    const html = renderTab(store)
+    expect(html).toContain('data-part="masks"')
+    expect(html).toContain('data-action="pin"')
+    expect(html).toContain('📌')
   })
 })
 

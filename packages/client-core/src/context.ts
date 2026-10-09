@@ -129,6 +129,27 @@ export interface ContextView {
   trusted: boolean | null
   refs: ContextRef[]
   uploads: UploadItem[]
+  /** M15（SPEC-M15-011）：累计遮蔽释放量（ctx.mask.freedTokens 汇总）——用量条「已遮蔽」行 */
+  maskedTokens: number
+  /** M15（SPEC-M15-011）：非预期前缀断裂列表（ctx.prefix.break，可定位 prevSeq/nextSeq + 归因） */
+  breaks: BreakRecord[]
+  /** M15（SPEC-M15-011）：可避免缓存损失（token，001 session.metrics 扩展） */
+  avoidableLoss: number | null
+  /** M15（SPEC-M15-011）：当前被钉住的 seq（ctx.pin 最近状态，升序）——遮蔽/压缩跳过 */
+  pinned: number[]
+  /** M15（SPEC-M15-011）：当前占用离压缩阈值还差多少（百分比点，负 = 已过阈值） */
+  thresholdGap: number | null
+}
+
+/** 前缀断裂记录（PRD-M15-001 AC-2 / SPEC-M15-011）：断在哪一层、因为什么 */
+export interface BreakRecord {
+  /** ctx.prefix.break 事件自身的 seq */
+  seq: number
+  prevSeq: number
+  nextSeq: number
+  cause: string
+  layer?: string | undefined
+  msgIndex: number
 }
 
 /** 内置四层的 id（SPEC-M14-006 取舍-2） */
@@ -165,10 +186,15 @@ function uploadTokens(events: readonly EventEnvelope[]): number {
 
 export function contextView(
   events: readonly EventEnvelope[],
-  metrics: Pick<MetricsSnapshot, 'contextTokens' | 'contextMaxTokens' | 'cacheHitPercent' | 'cost'> | null,
+  metrics: Partial<
+    Pick<
+      MetricsSnapshot,
+      'contextTokens' | 'contextMaxTokens' | 'cacheHitPercent' | 'cost' | 'avoidableLoss' | 'contextPercent'
+    >
+  > | null,
   static_?: CtxStatic | null,
 ): ContextView {
-  const m = metrics ?? ({} as Pick<MetricsSnapshot, 'contextTokens' | 'contextMaxTokens' | 'cacheHitPercent' | 'cost'>)
+  const m = metrics ?? {}
   // 最近一次带 ctx 的 model.request（旧事件没有 ctx 照常解析，AC-2）
   let lastCtx: {
     layers: Array<{ id: string; role: 'system' | 'user'; cacheable: boolean; approxTokens: number }>
@@ -256,6 +282,29 @@ export function contextView(
     }
   }
 
+  // M15（SPEC-M15-011）：累计遮蔽释放量、前缀断裂列表、钉住状态
+  let maskedTokens = 0
+  const breaks: BreakRecord[] = []
+  const pinnedSet = new Map<number, boolean>()
+  for (const e of events) {
+    if (!isKnownEvent(e.ev)) continue
+    if (e.ev.t === 'ctx.mask') maskedTokens += e.ev.freedTokens
+    else if (e.ev.t === 'ctx.prefix.break') {
+      breaks.push({
+        seq: e.seq,
+        prevSeq: e.ev.prevSeq,
+        nextSeq: e.ev.nextSeq,
+        cause: e.ev.cause,
+        ...(e.ev.layer === undefined ? {} : { layer: e.ev.layer }),
+        msgIndex: e.ev.msgIndex,
+      })
+    } else if (e.ev.t === 'ctx.pin') pinnedSet.set(e.ev.seq, e.ev.pinned)
+  }
+  const pinned = [...pinnedSet.entries()]
+    .filter(([, v]) => v)
+    .map(([seq]) => seq)
+    .sort((a, b) => a - b)
+
   return {
     total,
     window: m.contextMaxTokens ?? null,
@@ -278,6 +327,15 @@ export function contextView(
     trusted: static_?.trusted ?? null,
     refs,
     uploads: uploadItems,
+    maskedTokens,
+    breaks,
+    avoidableLoss: m.avoidableLoss ?? null,
+    pinned,
+    // 离压缩阈值还差多少：阈值百分比 − 当前占用百分比（负 = 已过阈值）
+    thresholdGap:
+      static_?.thresholdPercent != null && m.contextPercent != null
+        ? static_.thresholdPercent - m.contextPercent
+        : null,
   }
 }
 

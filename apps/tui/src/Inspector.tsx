@@ -19,6 +19,24 @@ import {
   planView,
   stepIntervals,
 } from '@domi/client-core'
+import type { MessageKey } from '@domi/i18n'
+
+/** 前缀断裂归因 → i18n 键（SPEC-M15-011，与 Web 同一份投影） */
+const BREAK_CAUSE_KEY: Record<string, MessageKey> = {
+  tools: 'web.context.breakCause.tools',
+  identity: 'web.context.breakCause.identity',
+  guardrail: 'web.context.breakCause.guardrail',
+  conventions: 'web.context.breakCause.conventions',
+  soul: 'web.context.breakCause.soul',
+  skills: 'web.context.breakCause.skills',
+  env: 'web.context.breakCause.env',
+  'plan.update': 'web.context.breakCause.plan.update',
+  'session.identity': 'web.context.breakCause.session.identity',
+  rules: 'web.context.breakCause.rules',
+  message: 'web.context.breakCause.message',
+  'messages.length': 'web.context.breakCause.messages.length',
+}
+
 import { highlightLines } from '@domi/client-core/highlight'
 import { tr } from '@domi/i18n'
 import { useStore } from '@nanostores/react'
@@ -266,6 +284,34 @@ function ContextTab({ store }: { store: SessionStore }): ReactElement {
               seq {c.seq}{' '}
               {c.kind === 'compact' ? tr('tui.inspector.context.compactKind') : tr('tui.inspector.context.cleanupKind')}{' '}
               {c.tokensBefore}→{c.tokensAfter}
+            </Text>
+          ))}
+        </>
+      ) : null}
+      {ctx.maskedTokens > 0 ? (
+        <Text {...t.fg('mut')}>{tr('web.context.masked', { n: String(ctx.maskedTokens) })}</Text>
+      ) : null}
+      {ctx.thresholdGap !== null ? (
+        <Text {...t.fg('mut')}>
+          {ctx.thresholdGap >= 0
+            ? tr('web.context.toThreshold', { pct: String(Math.round(ctx.thresholdGap)) })
+            : tr('web.context.overThreshold', { pct: String(Math.round(-ctx.thresholdGap)) })}
+        </Text>
+      ) : null}
+      {ctx.avoidableLoss !== null ? (
+        <Text {...t.fg('mut')}>{tr('web.context.avoidableLoss', { n: String(ctx.avoidableLoss) })}</Text>
+      ) : null}
+      {ctx.breaks.length > 0 ? (
+        <>
+          <Text {...t.fg('mut2')}>{tr('web.context.breaks')}</Text>
+          {ctx.breaks.map((b) => (
+            <Text key={b.seq} {...t.fg('mut')}>
+              {tr('web.context.break', {
+                prev: String(b.prevSeq),
+                next: String(b.nextSeq),
+                cause: tr(BREAK_CAUSE_KEY[b.cause] ?? 'web.context.breakCause.message'),
+              })}
+              {b.layer !== undefined ? ` · ${b.layer}` : ''}
             </Text>
           ))}
         </>

@@ -265,6 +265,11 @@ export class DomiClient {
     return (await this.request('session.refreshContext', { sessionId })).ok
   }
 
+  /** M15 钉住 / 解钉（SPEC-M15-004 AC-5）：被钉 seq 遮蔽与压缩均跳过 */
+  async pin(sessionId: string, seq: number, pinned: boolean): Promise<boolean> {
+    return (await this.request('session.pin', { sessionId, seq, pinned })).ok
+  }
+
   /** M14 产物预览内容（SPEC-M14-007 取舍-2） */
   artifact(sessionId: string, path: string): Promise<ResultOf<'session.artifact'>> {
     return this.request('session.artifact', { sessionId, path })

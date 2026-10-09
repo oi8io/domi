@@ -38,6 +38,22 @@ const MASK_REASON_KEY: Record<string, MessageKey> = {
   threshold: 'web.context.maskReason.threshold',
 }
 
+/** 前缀断裂归因 → i18n 键（PRD-M15-001 AC-2 / SPEC-M15-011） */
+const BREAK_CAUSE_KEY: Record<string, MessageKey> = {
+  tools: 'web.context.breakCause.tools',
+  identity: 'web.context.breakCause.identity',
+  guardrail: 'web.context.breakCause.guardrail',
+  conventions: 'web.context.breakCause.conventions',
+  soul: 'web.context.breakCause.soul',
+  skills: 'web.context.breakCause.skills',
+  env: 'web.context.breakCause.env',
+  'plan.update': 'web.context.breakCause.plan.update',
+  'session.identity': 'web.context.breakCause.session.identity',
+  rules: 'web.context.breakCause.rules',
+  message: 'web.context.breakCause.message',
+  'messages.length': 'web.context.breakCause.messages.length',
+}
+
 export function ContextTab({
   client,
   sessionId,
@@ -97,9 +113,6 @@ export function ContextTab({
     v.segments.reduce((n, s) => n + s.tokens, 0),
   )
   const pct = (t: number): string => `${Math.round((t / max) * 100)}%`
-  const distance = v.total !== null && v.window !== null ? Math.max(0, v.window - v.total) : null
-  const distancePct =
-    distance !== null && v.window !== null && v.window > 0 ? Math.round((distance / v.window) * 100) : null
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-part="context-tab">
@@ -168,15 +181,59 @@ export function ContextTab({
             )}
           </div>
           <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-0.5 border-t border-border2 pt-1.5 text-[10.5px] text-mut">
-            {distancePct !== null && v.thresholdPercent !== null && (
-              <span data-metric="threshold">{tr('web.context.toThreshold', { pct: String(distancePct) })}</span>
+            {v.thresholdGap !== null && (
+              <span data-metric="threshold">
+                {v.thresholdGap >= 0
+                  ? tr('web.context.toThreshold', { pct: String(Math.round(v.thresholdGap)) })
+                  : tr('web.context.overThreshold', { pct: String(Math.round(-v.thresholdGap)) })}
+              </span>
             )}
-            {v.thresholdPercent === null && v.strategy !== null && (
+            {v.thresholdGap === null && v.strategy !== null && (
               <span data-metric="no-threshold">{tr('web.context.noAutoCompact')}</span>
+            )}
+            {v.maskedTokens > 0 && (
+              <span data-metric="masked">{tr('web.context.masked', { n: fmt(v.maskedTokens) })}</span>
             )}
             {v.cost !== undefined && <span data-metric="cost">{tr('web.context.cost', { cost: v.cost })}</span>}
           </div>
         </div>
+
+        {/* M15 缓存（SPEC-M15-011 AC-2）：可避免损失 + 前缀断裂归因 */}
+        {(v.avoidableLoss !== null || v.breaks.length > 0) && (
+          <div className="mt-2 rounded-md border border-border2 p-2" data-part="cache">
+            <p className="mb-1 text-[11px] font-medium text-ink2">{tr('web.context.breaks')}</p>
+            {v.avoidableLoss !== null && (
+              <p className="text-[10.5px] text-mut" data-metric="avoidable-loss">
+                {tr('web.context.avoidableLoss', { n: fmt(v.avoidableLoss) })}
+              </p>
+            )}
+            {v.breaks.length > 0 && (
+              <ul className="space-y-0.5">
+                {v.breaks.map((b) => (
+                  <li key={b.seq} className="flex items-center gap-1.5 text-[10.5px] text-mut" data-break={b.cause}>
+                    <span>
+                      {tr('web.context.break', {
+                        prev: String(b.prevSeq),
+                        next: String(b.nextSeq),
+                        cause: tr(BREAK_CAUSE_KEY[b.cause] ?? 'web.context.breakCause.message'),
+                      })}
+                    </span>
+                    {b.layer !== undefined && <code className="truncate font-mono">{b.layer}</code>}
+                    <button
+                      type="button"
+                      className="ml-auto shrink-0 rounded px-1 py-0.5 text-mut transition-colors hover:bg-panel-h hover:text-accent"
+                      data-action="locate-break"
+                      title={tr('web.context.locate')}
+                      onClick={() => onLocate(b.nextSeq)}
+                    >
+                      ◎
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {/* 加载了什么（AC-5） */}
         <div className="mt-2 rounded-md border border-border2 p-2" data-part="loaded">
@@ -275,6 +332,15 @@ export function ContextTab({
                       })}
                     </span>
                     <span className="font-mono text-mut">−{fmt(m.freedTokens)} tok</span>
+                    <button
+                      type="button"
+                      className={v.pinned.includes(m.seqs[0]!) ? 'text-accent' : 'text-mut hover:text-accent'}
+                      data-action={v.pinned.includes(m.seqs[0]!) ? 'unpin' : 'pin'}
+                      title={tr(v.pinned.includes(m.seqs[0]!) ? 'web.context.unpin' : 'web.context.pin')}
+                      onClick={() => void client.pin(sessionId, m.seqs[0]!, !v.pinned.includes(m.seqs[0]!))}
+                    >
+                      📌
+                    </button>
                   </span>
                   <span className="flex flex-wrap gap-1">
                     {m.items.map((it) => (

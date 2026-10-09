@@ -91,6 +91,8 @@ export interface MetricsSnapshot {
   contextMaxTokens?: number | undefined
   /** BUG-M13-005：全会话工具调用次数（daemon 从事件流全量聚合）。老 daemon 不推 */
   toolCalls?: number | undefined
+  /** M15（SPEC-M15-001 / 011）：可避免的缓存损失（token，RECON R0 口径）。老 daemon 不推 */
+  avoidableLoss?: number | undefined
 }
 
 export interface StatusSnapshot {
