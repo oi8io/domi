@@ -11,6 +11,8 @@ export interface SessionRow {
   eventCount: number
   deleted: boolean
   updatedAt?: number
+  /** SPEC-M16-001：最后一条消息时间（无消息回退创建时间）。老 daemon 不给，缺省回退 updatedAt */
+  lastMessageAt?: number
   parentId?: string | undefined
   kind?: 'chat' | 'task' | undefined
   projectId?: string | undefined

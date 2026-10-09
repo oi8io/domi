@@ -58,6 +58,8 @@ const SessionSummarySchema = z.object({
   title: z.string(),
   model: z.string(),
   updatedAt: z.number().int(),
+  /** SPEC-M16-001：排序键 = 最后一条消息时间（user.input/user.note/model.delta 最新落盘）；无消息回退创建时间。老 daemon 不给 */
+  lastMessageAt: z.number().int().optional(),
   eventCount: z.number().int().nonnegative(),
   /** 软删除的会话只在 includeDeleted 时出现，并标上这个 */
   deleted: z.boolean(),

@@ -657,6 +657,7 @@ export function createRuntimeHost(opts: RuntimeHostOptions): RuntimeHost {
         title: r.title.trim() !== '' ? r.title : (r.firstInput ?? tr('daemon.sessions.untitled')),
         model: r.model,
         updatedAt: r.updatedAt,
+        ...(r.lastMessageAt === undefined ? {} : { lastMessageAt: r.lastMessageAt }),
         eventCount: r.eventCount,
         deleted: r.deletedAt !== null,
         cwd: r.cwd,

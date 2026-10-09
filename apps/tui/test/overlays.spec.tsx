@@ -188,8 +188,26 @@ describe('PRD-M8-015 AC-2 / AC-3 / AC-4 · 三个弹层的内容', () => {
 
   test('SPEC-M16-001 · 组内按最后一条消息排序，相对时间显示 lastMessageAt（回退 updatedAt）', () => {
     const same = [
-      { id: 'x1', title: '新消息晚', model: 'm', updatedAt: now, lastMessageAt: now - 86_400_000, eventCount: 3, deleted: false, kind: 'chat' as const },
-      { id: 'x2', title: '新消息早', model: 'm', updatedAt: now - 7 * 86_400_000, lastMessageAt: now - 7 * 86_400_000, eventCount: 3, deleted: false, kind: 'chat' as const },
+      {
+        id: 'x1',
+        title: '新消息晚',
+        model: 'm',
+        updatedAt: now,
+        lastMessageAt: now - 86_400_000,
+        eventCount: 3,
+        deleted: false,
+        kind: 'chat' as const,
+      },
+      {
+        id: 'x2',
+        title: '新消息早',
+        model: 'm',
+        updatedAt: now - 7 * 86_400_000,
+        lastMessageAt: now - 7 * 86_400_000,
+        eventCount: 3,
+        deleted: false,
+        kind: 'chat' as const,
+      },
     ]
     const items = sessionItems(same as never, projects as never, now)
     expect(items.map((i) => i.key)).toEqual(['x1', 'x2'])

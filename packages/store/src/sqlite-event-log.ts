@@ -187,7 +187,8 @@ export class SqliteEventLog implements EventLog {
   }
 
   get sessions(): SessionRepo {
-    return new SessionRepo(this.db)
+    // SPEC-M16-001 取舍-3：把时钟传给 SessionRepo，upsert 不带时间戳时写真实时间（此前写 0）
+    return new SessionRepo(this.db, this.clock)
   }
 
   /** L3 语义记忆的投影（PRD-M4-001）。派生数据，可从 _memory 会话重放 */

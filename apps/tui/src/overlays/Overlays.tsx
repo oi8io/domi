@@ -77,7 +77,9 @@ export function sessionItems(sessions: readonly Session[], projects: readonly Pr
     .filter((s) => !s.deleted && s.parentId === undefined)
     .sort(
       (a, b) =>
-        order(groupOf(a)) - order(groupOf(b)) || groupOf(a).localeCompare(groupOf(b)) || b.updatedAt - a.updatedAt,
+        order(groupOf(a)) - order(groupOf(b)) ||
+        groupOf(a).localeCompare(groupOf(b)) ||
+        (b.lastMessageAt ?? b.updatedAt) - (a.lastMessageAt ?? a.updatedAt),
     )
     .map((s) => ({
       key: s.id,
@@ -86,8 +88,8 @@ export function sessionItems(sessions: readonly Session[], projects: readonly Pr
       meta: s.busy
         ? tr('common.running')
         : s.unread
-          ? tr('tui.sessions.unread', { ago: ago(s.updatedAt, now) })
-          : ago(s.updatedAt, now),
+          ? tr('tui.sessions.unread', { ago: ago(s.lastMessageAt ?? s.updatedAt, now) })
+          : ago(s.lastMessageAt ?? s.updatedAt, now),
       dot: s.busy ? 'running' : s.unread ? 'warn' : 'off',
       search: s.id,
     }))

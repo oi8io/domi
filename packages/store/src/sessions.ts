@@ -12,6 +12,7 @@
  */
 import type { Database } from 'bun:sqlite'
 import type { EventEnvelope } from '@domi/protocol'
+import { type Clock, systemClock } from './event-log.ts'
 
 export interface SessionRow {
   id: string
@@ -35,6 +36,12 @@ export type SessionKind = 'chat' | 'task'
 export interface SessionSummary extends SessionRow {
   messageCount: number
   eventCount: number
+  /**
+   * SPEC-M16-001：会话列表排序键 = 最后一条消息时间。
+   * 消息事件 = user.input / user.note / model.delta；无消息会话回退创建时间
+   * （created_at=0 的存量行读时用首事件时间兜底）。列表按它倒序。
+   */
+  lastMessageAt: number
   /** 本会话首条 user.input 前 40 字（列表空标题 fallback，SPEC-M10 取舍-2）。事件流是真相，这是读时算的派生值 */
   firstInput?: string
 }
@@ -53,6 +60,7 @@ interface RawRow {
   kind?: string | null
   project_id?: string | null
   first_input?: string | null
+  last_message_at: number
 }
 
 function toRow(r: RawRow): SessionRow {
@@ -74,11 +82,19 @@ function toRow(r: RawRow): SessionRow {
 
 export class SessionStoreError extends Error {}
 
+/** SPEC-M16-001：会话列表排序的"消息"事件。其余事件（tool/permission/ctx 等）不算，避免工具活动把会话顶上去 */
+export const MESSAGE_TYPES = ['user.input', 'user.note', 'model.delta'] as const
+const MESSAGE_TYPES_SQL = MESSAGE_TYPES.map((t) => `'${t}'`).join(', ')
+
 export class SessionRepo {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    /** SPEC-M16-001 取舍-3：upsert 不带时间戳时用真实时钟（此前会写 0，把 created_at/updated_at 清零） */
+    private readonly clock: Clock = systemClock,
+  ) {}
 
   upsert(s: Pick<SessionRow, 'id' | 'cwd'> & Partial<SessionRow>): void {
-    const now = s.updatedAt ?? s.createdAt ?? 0
+    const now = s.updatedAt ?? s.createdAt ?? this.clock.now()
     this.db
       .query(
         `INSERT INTO sessions (id, created_at, updated_at, cwd, title, model, parent_session_id, parent_seq, spawned_by, kind, project_id)
@@ -133,10 +149,21 @@ export class SessionRepo {
              (SELECT COUNT(*) FROM events e WHERE e.session_id = s.id) AS event_count,
              (SELECT COUNT(*) FROM events e WHERE e.session_id = s.id AND e.type = 'user.input') AS message_count,
              (SELECT substr(json_extract(e.payload, '$.text'), 1, 40) FROM events e
-              WHERE e.session_id = s.id AND e.type = 'user.input' ORDER BY e.seq LIMIT 1) AS first_input
+              WHERE e.session_id = s.id AND e.type = 'user.input' ORDER BY e.seq LIMIT 1) AS first_input,
+             COALESCE(
+               (SELECT e.ts FROM events e
+                WHERE e.session_id = s.id AND e.type IN (${MESSAGE_TYPES_SQL})
+                ORDER BY e.seq DESC LIMIT 1),
+               CASE WHEN s.created_at = 0
+                    THEN (SELECT MIN(e.ts) FROM events e WHERE e.session_id = s.id)
+                    ELSE s.created_at END
+             ) AS last_message_at,
+             CASE WHEN s.created_at = 0
+                  THEN (SELECT MIN(e.ts) FROM events e WHERE e.session_id = s.id)
+                  ELSE s.created_at END AS created_for_sort
       FROM sessions s
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY s.updated_at DESC, s.created_at DESC
+      ORDER BY last_message_at DESC, created_for_sort DESC
       LIMIT ?`
     const params: (string | number)[] = []
     if (opts.idPrefix) params.push(opts.idPrefix)
@@ -151,6 +178,7 @@ export class SessionRepo {
       ...toRow(r),
       eventCount: r.event_count,
       messageCount: r.message_count,
+      lastMessageAt: r.last_message_at,
       ...(r.first_input ? { firstInput: r.first_input } : {}),
     }))
   }
