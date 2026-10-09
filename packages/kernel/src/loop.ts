@@ -36,6 +36,9 @@ export const DEFAULT_LIMITS: LoopLimits = {
   maxWallClockMs: 10 * 60_000,
 }
 
+/** M15（SPEC-M15-012-AC1 取舍-26）：model.reason / model.delta 单段上限，超出即切条 */
+export const SEGMENT_MAX_CHARS = 2048
+
 export interface ModelEventLike {
   type: string
   [k: string]: unknown
@@ -372,7 +375,24 @@ export async function runTurn(
     lastFingerprint = fp
     lastFingerprintSeq = requestSeq.from
 
+    // M15（SPEC-M15-012-AC1 取舍-26）：model.reason / model.delta 按段合并落盘。
+    // 每个 chunk 一条会让事件量随流式粒度爆炸（千级 chunk = 千条事件）。
+    // 攒段规则：单段 ≥2048 字符即时切条；流式段边界（工具调用开始 / usage 到达 / 流结束）先 flush。
+    // 事件形状不变（{t, text}），旧事件照常解析（INV-01）；reason 与 delta 各攒各的段，
+    // flush 顺序 = reason 段先、delta 段后（交错思考场景轨迹里推理块在正文前，取舍-26 授权段级合并）
     let streamError: { message: string; recoverable: boolean } | null = null
+    let reasonBuf = ''
+    let deltaBuf = ''
+    const flushSegments = (): void => {
+      if (reasonBuf !== '') {
+        produced.push({ t: 'model.reason', text: reasonBuf })
+        reasonBuf = ''
+      }
+      if (deltaBuf !== '') {
+        produced.push({ t: 'model.delta', text: deltaBuf })
+        deltaBuf = ''
+      }
+    }
     try {
       for await (const ev of deps.provider.generate(
         { model: deps.model, messages, tools: deps.tools.schemas(), providerOptions: deps.providerOptions },
@@ -380,15 +400,27 @@ export async function runTurn(
       )) {
         switch (ev.type) {
           case 'delta':
-            produced.push({ t: 'model.delta', text: String(ev.text) })
+            deltaBuf += String(ev.text)
+            while (deltaBuf.length >= SEGMENT_MAX_CHARS) {
+              produced.push({ t: 'model.delta', text: deltaBuf.slice(0, SEGMENT_MAX_CHARS) })
+              deltaBuf = deltaBuf.slice(SEGMENT_MAX_CHARS)
+            }
             break
           case 'reason':
-            produced.push({ t: 'model.reason', text: String(ev.text) })
+            reasonBuf += String(ev.text)
+            while (reasonBuf.length >= SEGMENT_MAX_CHARS) {
+              produced.push({ t: 'model.reason', text: reasonBuf.slice(0, SEGMENT_MAX_CHARS) })
+              reasonBuf = reasonBuf.slice(SEGMENT_MAX_CHARS)
+            }
             break
           case 'usage':
+            // 元数据到达 = 生成进入尾声：先落已攒的推理/正文，保持「推理→正文→用量」顺序
+            flushSegments()
             produced.push({ t: 'model.usage', raw: (ev.raw ?? {}) as Record<string, unknown> })
             break
           case 'tool-call': {
+            // 段边界：工具调用开始前把已攒的推理/正文落盘，轨迹顺序不被打乱
+            flushSegments()
             const call = { id: String(ev.id), name: String(ev.name), args: ev.args }
             pending.push(call)
             produced.push({ t: 'tool.call', ...call })
@@ -407,6 +439,9 @@ export async function runTurn(
       // recoverable：会话本身没坏，改完配置可以接着用
       streamError = { message: e instanceof Error ? e.message : String(e), recoverable: true }
     }
+
+    // 流式段边界：generate 结束（正常 / 报错 / 中断）后 flush 剩余段（取舍-26）
+    flushSegments()
 
     await deps.sink.append(sessionId, produced)
 

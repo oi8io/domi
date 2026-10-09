@@ -260,3 +260,69 @@ describe('provider 在出流之前就抛错（2026-09-15 现场）', () => {
     expect(JSON.stringify(events.at(-1)?.ev)).toContain('unsupported_capability')
   })
 })
+
+describe('PRD-M15-012 AC-1 · 推理合并（取舍-26）', () => {
+  test('多个 delta chunk 攒成一条落盘（流结束 flush）', async () => {
+    const provider = new StubProvider([
+      [
+        { type: 'delta', text: '好' },
+        { type: 'delta', text: '的' },
+        { type: 'delta', text: '，我看看' },
+      ],
+    ])
+    const d = deps({ provider, tools: runner(() => ({ ok: true, payload: 1 })) })
+    await runTurn(d, 's1', '你好')
+    const deltas = (await d.sink.read('s1')).filter((e) => e.ev.t === 'model.delta')
+    expect(deltas).toHaveLength(1)
+    expect((deltas[0]!.ev as { text: string }).text).toBe('好的，我看看')
+  })
+
+  test('多个 reason chunk 攒成一条 model.reason', async () => {
+    const provider = new StubProvider([
+      [
+        { type: 'reason', text: '用户' },
+        { type: 'reason', text: '要读文件' },
+        { type: 'delta', text: '读完了' },
+      ],
+    ])
+    const d = deps({ provider, tools: runner(() => ({ ok: true, payload: 1 })) })
+    await runTurn(d, 's1', '读文件')
+    const reasons = (await d.sink.read('s1')).filter((e) => e.ev.t === 'model.reason')
+    expect(reasons).toHaveLength(1)
+    expect((reasons[0]!.ev as { text: string }).text).toBe('用户要读文件')
+  })
+
+  test('累计 ≥2048 字符切段：3000 字符 → 2 条（2048 + 952）', async () => {
+    const big = 'a'.repeat(3000)
+    const provider = new StubProvider([[{ type: 'delta', text: big }]])
+    const d = deps({ provider, tools: runner(() => ({ ok: true, payload: 1 })) })
+    await runTurn(d, 's1', '长输出')
+    const deltas = (await d.sink.read('s1')).filter((e) => e.ev.t === 'model.delta')
+    expect(deltas).toHaveLength(2)
+    expect((deltas[0]!.ev as { text: string }).text).toHaveLength(2048)
+    expect((deltas[1]!.ev as { text: string }).text).toHaveLength(952)
+  })
+
+  test('tool-call 是段边界：已攒的推理/正文先落盘，再落工具调用', async () => {
+    const provider = new StubProvider([
+      [
+        { type: 'reason', text: '先想' },
+        { type: 'reason', text: '一下' },
+        { type: 'tool-call', id: 'c1', name: 'fs.read', args: { path: 'README.md' } },
+      ],
+      [{ type: 'delta', text: '读完了' }],
+    ])
+    const d = deps({ provider, tools: runner(() => ({ ok: true, payload: { lines: 3 } })) })
+    const r = await runTurn(d, 's1', '读 README')
+    expect(r.stopReason).toBe('completed')
+    const types = (await d.sink.read('s1')).map((e) => e.ev.t)
+    const deltaIdx = types.indexOf('model.delta')
+    const callIdx = types.indexOf('tool.call')
+    const reasonIdx = types.indexOf('model.reason')
+    // 推理段在工具调用前、正文段在工具调用后——流式段边界不被破坏
+    expect(reasonIdx).toBeLessThan(callIdx)
+    expect(callIdx).toBeLessThan(deltaIdx)
+    // 推理合并成一条
+    expect(types.filter((t) => t === 'model.reason')).toHaveLength(1)
+  })
+})
