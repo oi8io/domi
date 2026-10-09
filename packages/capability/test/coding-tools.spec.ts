@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DomiEvent } from '@domi/protocol'
+import { estimateTextTokens } from '@domi/protocol'
 import {
   fsEdit,
   fsGlob,
@@ -22,7 +23,7 @@ import {
   makeShellKillTool,
   makeShellOutputTool,
   PermissionEngine,
-  SHELL_MAX_OUTPUT_BYTES,
+  SHELL_MAX_INLINE_TOKENS,
   shellExec,
   ToolRegistry,
   truncateOutput,
@@ -291,7 +292,7 @@ describe('PRD-M7-001 AC-4 · 后台命令与输出上限', () => {
   test('前台输出超过上限：截断，全文落到文件并在结果里给出路径', async () => {
     const d = tmp()
     const { run } = registry(d)
-    const bytes = SHELL_MAX_OUTPUT_BYTES + 50_000
+    const bytes = SHELL_MAX_INLINE_TOKENS + 50_000
     const r = payload<{ stdout?: string; fullOutput?: string; truncated?: unknown }>(
       await run('shell.exec', { cmd: `head -c ${bytes} /dev/zero | tr '\\0' 'x'` }),
     )
@@ -305,7 +306,7 @@ describe('PRD-M7-001 AC-4 · 后台命令与输出上限', () => {
   test('后台输出超过上限：同样截断，全文在 job 日志里', async () => {
     const d = tmp()
     const { run } = registry(d)
-    const bytes = SHELL_MAX_OUTPUT_BYTES + 50_000
+    const bytes = SHELL_MAX_INLINE_TOKENS + 50_000
     const { jobId } = payload<{ jobId: string }>(
       await run('shell.exec', { cmd: `head -c ${bytes} /dev/zero | tr '\\0' 'y'`, background: true }),
     )
@@ -391,14 +392,14 @@ describe('BUG-M7-003 · 截断时把中段里的失败 / 报错行摘出来（PR
   })
 
   test('中段的失败行进结果；没有失败行时与原来一样只有头尾；超长单行不拖慢', () => {
-    const pad = 'p'.repeat(SHELL_MAX_OUTPUT_BYTES)
+    const pad = 'p'.repeat(SHELL_MAX_INLINE_TOKENS)
     const r = truncateOutput(`${pad}\n(fail) 中间挂了\n    at src/x.ts:1:2\n${pad}`)
     expect(r.text).toContain('(fail) 中间挂了')
     expect(r.text).toContain('src/x.ts:1:2')
-    expect(Buffer.byteLength(r.text)).toBeLessThan(SHELL_MAX_OUTPUT_BYTES)
+    expect(estimateTextTokens(r.text)).toBeLessThan(SHELL_MAX_INLINE_TOKENS)
     expect(truncateOutput(`${pad}${pad}`).text).not.toContain('像失败')
     const t0 = performance.now()
-    truncateOutput('a'.repeat(SHELL_MAX_OUTPUT_BYTES * 5))
+    truncateOutput('a'.repeat(SHELL_MAX_INLINE_TOKENS * 5))
     expect(performance.now() - t0).toBeLessThan(500)
   })
 })

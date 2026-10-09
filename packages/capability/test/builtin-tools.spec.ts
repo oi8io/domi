@@ -5,12 +5,12 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { DomiEvent } from '@domi/protocol'
+import { type DomiEvent, estimateTextTokens } from '@domi/protocol'
 import {
-  FS_READ_MAX_BYTES,
+  FS_READ_DEFAULT_MAX_LINES,
   fsRead,
   fsWrite,
-  SHELL_MAX_OUTPUT_BYTES,
+  SHELL_MAX_INLINE_TOKENS,
   shellExec,
   type ToolCtx,
   truncateOutput,
@@ -29,6 +29,7 @@ function ctx(): ToolCtx & { events: DomiEvent[] } {
     cwd: d,
     signal: new AbortController().signal,
     events,
+    outputDir: join(d, 'out'),
     emit: (e) => {
       events.push(e)
     },
@@ -46,19 +47,37 @@ describe('PRD-M0-004 AC-1 · fs.read', () => {
     expect(r.truncated).toBeUndefined()
   })
 
-  test('超过 1MB 不返回全文，给出总行数与已返回范围', async () => {
+  test('M15-009 AC-2 · 不带行范围时默认最多 2000 行，给「共几行 / fromLine/toLine 继续」', async () => {
     const c = ctx()
-    const line = 'x'.repeat(100)
-    const lines = Math.ceil((FS_READ_MAX_BYTES + 1000) / (line.length + 1))
-    writeFileSync(join(c.cwd, 'big.txt'), Array.from({ length: lines }, () => line).join('\n'))
+    const lines = 2500
+    writeFileSync(join(c.cwd, 'big.txt'), Array.from({ length: lines }, () => 'x').join('\n'))
 
     const r = await fsRead.execute({ path: 'big.txt' }, c)
     expect(r.truncated).toBeDefined()
-    expect(r.truncated?.reason).toBe('file_too_large')
-    expect(r.truncated?.totalBytes).toBeGreaterThan(FS_READ_MAX_BYTES)
+    expect(r.truncated?.reason).toBe('line_limit')
     expect(r.totalLines).toBe(lines)
-    expect(r.returnedRange.to).toBeLessThan(lines)
-    expect(Buffer.byteLength(r.content)).toBeLessThan(FS_READ_MAX_BYTES)
+    expect(r.returnedRange.to).toBe(FS_READ_DEFAULT_MAX_LINES)
+    expect(r.content.split('\n').length).toBe(FS_READ_DEFAULT_MAX_LINES)
+    expect(r.truncated?.hint).toContain('fromLine/toLine 继续')
+  })
+
+  test('M15-009 AC-2 · 带行范围时按范围精确返回，不再整篇 1MB', async () => {
+    const c = ctx()
+    const lines = 2500
+    writeFileSync(join(c.cwd, 'big.txt'), Array.from({ length: lines }, (_, i) => `行${i + 1}`).join('\n'))
+
+    const r = await fsRead.execute({ path: 'big.txt', fromLine: 2000, toLine: 2500 }, c)
+    expect(r.truncated).toBeUndefined()
+    expect(r.content.split('\n').length).toBe(501)
+    expect(r.returnedRange).toEqual({ from: 2000, to: 2500 })
+  })
+
+  test('M15-009 AC-2 · 小文件不带范围仍返回全文，无 truncated', async () => {
+    const c = ctx()
+    writeFileSync(join(c.cwd, 'small.txt'), '一\n二\n三')
+    const r = await fsRead.execute({ path: 'small.txt' }, c)
+    expect(r.truncated).toBeUndefined()
+    expect(r.content).toBe('一\n二\n三')
   })
 
   test('越界路径被拒（走的是同一个 resolveWithinRoot）', async () => {
@@ -128,15 +147,14 @@ describe('PRD-M0-004 AC-3 · shell.exec 超时杀掉整个进程组', () => {
   }, 10_000)
 })
 
-describe('PRD-M0-004 AC-4 · 输出超 100KB 头尾截断', () => {
-  test('保留头 20KB + 尾 20KB，标记含被省略字节数', () => {
-    const total = SHELL_MAX_OUTPUT_BYTES * 3
-    const s = 'a'.repeat(total)
+describe('PRD-M0-004 AC-4 · 输出截断（M15-009 AC-1：内联上限按 token，默认 8k）', () => {
+  test('超过 8k token 保留头尾，标记省略量与总量（token 口径）', () => {
+    const s = 'a'.repeat(SHELL_MAX_INLINE_TOKENS * 20)
     const r = truncateOutput(s)
-    expect(r.total).toBe(total)
-    expect(r.omitted).toBe(total - 40 * 1024)
-    expect(r.text).toContain(`已省略 ${r.omitted} 字节`)
-    expect(Buffer.byteLength(r.text)).toBeLessThan(SHELL_MAX_OUTPUT_BYTES)
+    expect(r.totalTokens).toBeGreaterThan(SHELL_MAX_INLINE_TOKENS)
+    expect(r.omitted).toBeGreaterThan(0)
+    expect(r.text).toContain('已省略')
+    expect(estimateTextTokens(r.text)).toBeLessThan(SHELL_MAX_INLINE_TOKENS)
   })
 
   test('不超阈值时原样返回', () => {
@@ -147,9 +165,10 @@ describe('PRD-M0-004 AC-4 · 输出超 100KB 头尾截断', () => {
 
   test('真实命令的大输出会被标记 truncated', async () => {
     const c = ctx()
-    const r = await shellExec.execute({ cmd: `head -c ${SHELL_MAX_OUTPUT_BYTES * 2} /dev/zero | tr '\\0' 'a'` }, c)
+    const r = await shellExec.execute({ cmd: `head -c 200000 /dev/zero | tr '\\0' 'a'` }, c)
     expect(r.truncated).toBeDefined()
     expect(r.truncated?.omittedBytes).toBeGreaterThan(0)
+    expect(r.fullOutput).toBeDefined()
   }, 10_000)
 })
 

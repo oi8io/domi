@@ -5,8 +5,10 @@
  * 用父会话收窄后的权限跑一轮，把最后一段回答当作工具结果交回去。
  * 子会话的中间过程只在子会话里；父会话里留下的是 `task.spawn` 事件与这段结论（AC-1）。
  */
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { PARENT_SCOPE_RULE, type Tool } from '@domi/capability'
-import type { EventEnvelope } from '@domi/protocol'
+import { type EventEnvelope, estimateTextTokens } from '@domi/protocol'
 import { z } from 'zod'
 
 /** 子 agent 最多嵌两层，再深就不给 task.spawn 了 */
@@ -46,6 +48,8 @@ export interface ChildSession {
   submit(text: string, opts?: { signal?: AbortSignal }): Promise<{ stopReason: string }>
   lastAnswer(): Promise<string>
   flushAndClose(): Promise<void>
+  /** M15（PRD-M15-007 AC-3）：结论超限写文件的落盘目录 */
+  readonly outputDir: string
 }
 
 export interface PendingAskLike {
@@ -66,6 +70,21 @@ export interface SpawnParent {
 }
 
 let counter = 0
+
+/** 子 agent 结论上限（token，PRD-M15-007 AC-3）。超出写文件给路径，内联只留提示 */
+export const SUBAGENT_CONCLUSION_MAX_TOKENS = 2000
+
+/**
+ * 结论超限时写会话输出目录，返回带路径的提示。
+ * 不超限原样返回。纯函数 + 落盘，可单测（subagent-conclusion.spec）
+ */
+export function truncateConclusion(conclusion: string, outputDir: string): string {
+  if (estimateTextTokens(conclusion) <= SUBAGENT_CONCLUSION_MAX_TOKENS) return conclusion
+  mkdirSync(outputDir, { recursive: true })
+  const file = join(outputDir, `subagent-${Date.now().toString(36)}.md`)
+  writeFileSync(file, conclusion)
+  return `（子 agent 结论 ${estimateTextTokens(conclusion)} token，超过 ${SUBAGENT_CONCLUSION_MAX_TOKENS} 上限，全文在 ${file}）`
+}
 
 /** 开一个子会话跑到结束。编排的 sub-agent 节点也用它 */
 export async function runSubAgent(
@@ -88,13 +107,13 @@ export async function runSubAgent(
     if (r.stopReason === 'interrupted') {
       return { childSessionId, ok: false, conclusion: '子 agent 被用户中断，没有做完。' }
     }
-    const conclusion = await child.lastAnswer()
+    const raw = await child.lastAnswer()
+    const conclusion =
+      raw || (r.stopReason === 'completed' ? '（子 agent 没有给出结论）' : `子 agent 中途停止：${r.stopReason}`)
     return {
       childSessionId,
       ok: r.stopReason === 'completed',
-      conclusion:
-        conclusion ||
-        (r.stopReason === 'completed' ? '（子 agent 没有给出结论）' : `子 agent 中途停止：${r.stopReason}`),
+      conclusion: truncateConclusion(conclusion, child.outputDir),
     }
   } finally {
     await child.flushAndClose()

@@ -7,9 +7,10 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { SHELL_MAX_OUTPUT_BYTES } from '@domi/capability'
+import { SHELL_MAX_INLINE_TOKENS } from '@domi/capability'
 import { ConfigSchema } from '@domi/config'
 import { isTitleRequest, StubProvider, type StubTurn } from '@domi/model'
+import { estimateTextTokens } from '@domi/protocol'
 import { DomiSession } from '../src/index.ts'
 
 /** onMetrics 推出来的快照里这里只关心 verify */
@@ -197,7 +198,8 @@ describe('PRD-M7-004 AC-3 · 三态只来自事件投影', () => {
 describe('PRD-M7-004 AC-4 · 失败输出截断后回灌，保留失败的测试名与首个错误位置', () => {
   test('失败信息在超长输出的中间：回灌给模型的结果里仍有测试名与报错位置', async () => {
     const cwd = tmp()
-    const lines = Math.ceil(SHELL_MAX_OUTPUT_BYTES / 90)
+    // 上下两段各 ~2×8k token，确保总输出超过 8k 内联上限触发截断（PRD-M15-007 AC-1 后阈值按 token）
+    const lines = Math.ceil((SHELL_MAX_INLINE_TOKENS * 2) / 90)
     writeFileSync(
       join(cwd, 'fake-test.sh'),
       [
@@ -216,7 +218,8 @@ describe('PRD-M7-004 AC-4 · 失败输出截断后回灌，保留失败的测试
     expect(r.verify).toBe('failed')
     const fed = JSON.stringify(stub.calls[2]?.messages)
     expect(fed).toContain('已省略')
-    expect(fed.length).toBeLessThan(SHELL_MAX_OUTPUT_BYTES * 2)
+    // JSON 序列化有结构开销：按 token 断言内联仍在预算内
+    expect(estimateTextTokens(fed)).toBeLessThan(SHELL_MAX_INLINE_TOKENS * 2)
     expect(fed).toContain('(fail) 加法 > 进位')
     expect(fed).toContain('src/add.ts:12:5')
     expect(fed).toContain(' 1 fail')

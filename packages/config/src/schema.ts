@@ -280,6 +280,8 @@ export const ConfigSchema = z.object({
       compactKeepSteps: z.number().int().min(1).max(200).default(8),
       /** 压缩保留 T token（取舍-5） */
       compactKeepTokens: z.number().int().min(1000).max(1_000_000).default(24_000),
+      /** 工具输出内联上限（token，PRD-M15-007 AC-1）。超出写会话输出目录，内联只留头尾+路径+总量 */
+      inlineMaxTokens: z.number().int().min(500).max(100_000).default(8000),
       /** 上下文占用到这个百分比就压缩。只在 strategy = compact 时用 */
       compactAt: z.number().int().min(30).max(95).default(70),
       /**
@@ -298,6 +300,7 @@ export const ConfigSchema = z.object({
       includeReasoning: false,
       strategy: 'balanced',
       keepTurns: 2,
+      inlineMaxTokens: 8000,
       compactKeepSteps: 8,
       compactKeepTokens: 24_000,
       compactAt: 70,

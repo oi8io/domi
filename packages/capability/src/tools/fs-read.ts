@@ -19,9 +19,11 @@ export function resolveReadable(ctx: Pick<ToolCtx, 'cwd' | 'outputDir'>, p: stri
   }
 }
 
-/** 超过这个大小就不返回全文，只给结构化提示（PRD-M0-004 AC-1） */
-export const FS_READ_MAX_BYTES = 1024 * 1024
-const DEFAULT_HEAD_LINES = 200
+/**
+ * 不带行范围时默认最多返回这么多行（PRD-M15-007 AC-2）。
+ * 超过时给「共几行、用 fromLine/toLine 继续」——不再整篇 1MB 返回
+ */
+export const FS_READ_DEFAULT_MAX_LINES = 2000
 
 export const FsReadArgs = z.object({
   path: z.string(),
@@ -36,13 +38,14 @@ export interface FsReadResult {
   returnedRange: { from: number; to: number }
   content: string
   /** 只有被截断时才出现。给模型一个明确的「还有更多」信号，而不是让它以为读完了 */
-  truncated?: { totalBytes: number; reason: 'file_too_large'; hint: string }
+  truncated?: { totalBytes: number; reason: 'line_limit'; hint: string }
 }
 
 export const fsRead: Tool<FsReadArgs, FsReadResult> = {
   name: 'fs.read',
   capability: 'fs.read',
-  description: '读取工作目录内的文件，支持行范围。超过 1MB 的文件只返回片段与总行数。',
+  description:
+    '读取工作目录内的文件，支持行范围。不带行范围时默认最多返回 2000 行；大文件按范围读（fromLine/toLine）或先用 fs.grep。',
   schema: FsReadArgs,
   async execute(args, ctx) {
     const abs = resolveReadable(ctx, args.path)
@@ -52,9 +55,10 @@ export const fsRead: Tool<FsReadArgs, FsReadResult> = {
     const lines = raw.split('\n')
     const total = lines.length
 
-    const tooBig = size > FS_READ_MAX_BYTES
+    // PRD-M15-007 AC-2：不带行范围默认最多 2000 行；带范围精确返回（按范围读大文件正是工作方法）
+    const hasRange = args.fromLine !== undefined || args.toLine !== undefined
     const from = args.fromLine ?? 1
-    const to = args.toLine ?? (tooBig ? Math.min(total, from + DEFAULT_HEAD_LINES - 1) : total)
+    const to = args.toLine ?? (hasRange ? total : Math.min(total, FS_READ_DEFAULT_MAX_LINES))
     const slice = lines.slice(from - 1, to)
 
     const base: FsReadResult = {
@@ -63,13 +67,14 @@ export const fsRead: Tool<FsReadArgs, FsReadResult> = {
       returnedRange: { from, to: Math.min(to, total) },
       content: slice.join('\n'),
     }
-    if (!tooBig) return base
+    // 带范围 = 用户明确只要这一段，永不标 truncated；不带范围没读全才提示继续
+    if (hasRange || to >= total) return base
     return {
       ...base,
       truncated: {
         totalBytes: size,
-        reason: 'file_too_large',
-        hint: `文件 ${size} 字节，超过 ${FS_READ_MAX_BYTES}。已返回第 ${from}–${base.returnedRange.to} 行，共 ${total} 行；用 fromLine/toLine 继续读。`,
+        reason: 'line_limit',
+        hint: `文件共 ${total} 行。已返回第 ${from}–${base.returnedRange.to} 行；用 fromLine/toLine 继续读。`,
       },
     }
   },

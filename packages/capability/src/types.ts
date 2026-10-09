@@ -74,6 +74,8 @@ export interface ToolCtx {
   jobs?: JobStarter
   /** 超长输出落盘的目录（~/.domi/outputs/<会话>）。fs.read 对它单独放行只读 */
   outputDir?: string
+  /** M15（PRD-M15-007 AC-1）：工具输出内联上限（token）。不传用默认 8k */
+  inlineMaxTokens?: number
   /** 这次调用的 id（落盘文件名用） */
   callId?: string
 }

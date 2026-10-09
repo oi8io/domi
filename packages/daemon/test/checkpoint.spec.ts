@@ -17,8 +17,11 @@ import { type ClientConn, createRuntimeHost, Daemon, type RuntimeHost } from '..
 
 const dirs: string[] = []
 const hosts: RuntimeHost[] = []
-afterEach(() => {
+afterEach(async () => {
   for (const h of hosts.splice(0)) h.close()
+  // session 的 flushAndClose 是异步收尾，close 不等待；让事件循环落地一轮再删目录，
+  // 否则 pending 写库会撞上已删除的 db 文件（SQLITE_IOERR_VNODE，全量并行下稳定复现）
+  await new Promise((r) => setTimeout(r, 25))
   for (const d of dirs.splice(0)) {
     try {
       rmSync(d, { recursive: true, force: true })

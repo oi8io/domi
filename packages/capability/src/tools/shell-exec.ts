@@ -1,13 +1,18 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { estimateTextTokens } from '@domi/protocol'
 import { z } from 'zod'
-import type { Tool } from '../types.ts'
+import type { Tool, ToolCtx } from '../types.ts'
 
 export const SHELL_DEFAULT_TIMEOUT_MS = 120_000
-export const SHELL_MAX_OUTPUT_BYTES = 100 * 1024
-const KEEP_HEAD_BYTES = 20 * 1024
-const KEEP_TAIL_BYTES = 20 * 1024
+/**
+ * M15（PRD-M15-007 AC-1）：内联上限按 token，默认约 8k。可配（config.context.inlineMaxTokens）。
+ * 旧字节口径 SHELL_MAX_OUTPUT_BYTES 退役——token 估算对 CJK 每字 1、其余每 4 字符 1，超预算先触发
+ */
+export const SHELL_MAX_INLINE_TOKENS = 8000
+/** 头尾各留预算的比例（合计 = 预算 × KEEP_RATIO × 2，留余量给模板与摘出的失败行） */
+const KEEP_RATIO = 0.4
 
 export const ShellExecArgs = z.object({
   cmd: z.string(),
@@ -34,25 +39,31 @@ export interface ShellExecResult {
 }
 
 /**
- * 头尾各留一段，中间标明省了多少字节。
+ * 头尾各留一段，中间标明省了多少。按 token 预算判断与切分（约预算一半给头、一半给尾）。
  * 只留头部会丢掉报错（错误通常在末尾），只留尾部会丢掉命令上下文——两头都要。
  */
-export function truncateOutput(s: string): { text: string; omitted: number; total: number } {
-  const buf = Buffer.from(s, 'utf8')
-  if (buf.byteLength <= SHELL_MAX_OUTPUT_BYTES) return { text: s, omitted: 0, total: buf.byteLength }
-  const omitted = buf.byteLength - KEEP_HEAD_BYTES - KEEP_TAIL_BYTES
-  const head = buf.subarray(0, KEEP_HEAD_BYTES).toString('utf8')
-  const tail = buf.subarray(buf.byteLength - KEEP_TAIL_BYTES).toString('utf8')
-  const middle = buf.subarray(KEEP_HEAD_BYTES, buf.byteLength - KEEP_TAIL_BYTES).toString('utf8')
+export function truncateOutput(
+  s: string,
+  inlineTokens: number = SHELL_MAX_INLINE_TOKENS,
+): { text: string; omitted: number; total: number; totalTokens: number } {
+  const totalTokens = estimateTextTokens(s)
+  if (totalTokens <= inlineTokens) return { text: s, omitted: 0, total: Buffer.byteLength(s), totalTokens }
+  // 估算 token 与字符近似线性：按比例切字符，头尾各占预算一半
+  const keepChars = Math.floor(s.length * (inlineTokens / totalTokens) * KEEP_RATIO)
+  const head = s.slice(0, keepChars)
+  const tail = s.slice(s.length - keepChars)
+  const middle = s.slice(keepChars, s.length - keepChars)
   const keys = keyLines(middle)
   const picked =
     keys.length === 0
       ? ''
       : `\n… [省略的部分里像失败 / 报错的行，按原顺序摘出 ${keys.length} 行（全文见 fullOutput）] …\n${keys.join('\n')}`
   return {
-    text: `${head}\n… [已省略 ${omitted} 字节，共 ${buf.byteLength} 字节] …${picked}\n${tail}`,
-    omitted,
-    total: buf.byteLength,
+    text: `${head}\n… [已省略 ${middle.length} 字符 / 约 ${totalTokens - inlineTokens} token，共 ${totalTokens} token] …${picked}\n${tail}`,
+    // 字段名叫 omittedBytes：返回字节口径（字符数只用于展示）
+    omitted: Buffer.byteLength(middle),
+    total: Buffer.byteLength(s),
+    totalTokens,
   }
 }
 
@@ -84,7 +95,7 @@ export const shellExec: Tool<ShellExecArgs, ShellExecResult> = {
   name: 'shell.exec',
   capability: 'shell.exec',
   description:
-    '在工作目录内执行 shell 命令。默认 120 秒超时，超时会杀掉整个进程组。输出超过 100KB 时只返回头尾，全文落盘。' +
+    '在工作目录内执行 shell 命令。默认 120 秒超时，超时会杀掉整个进程组。输出超过内联上限（约 8k token）时只返回头尾，全文落盘。' +
     '长时间运行的命令用 background: true。找文件、搜代码请用 fs.glob / fs.grep。',
   schema: ShellExecArgs,
   execute(args, ctx) {
@@ -147,8 +158,9 @@ export const shellExec: Tool<ShellExecArgs, ShellExecResult> = {
         settled = true
         clearTimeout(timer)
         ctx.signal.removeEventListener('abort', onAbort)
-        const o = truncateOutput(out)
-        const e = truncateOutput(err)
+        const budget = ctx.inlineMaxTokens ?? SHELL_MAX_INLINE_TOKENS
+        const o = truncateOutput(out, budget)
+        const e = truncateOutput(err, budget)
         const omitted = o.omitted + e.omitted
         const res: ShellExecResult = {
           cmd: args.cmd,

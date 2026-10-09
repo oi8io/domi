@@ -401,6 +401,8 @@ export class DomiSession {
   private readonly skillSource: SkillOverlay | undefined
   /** 用户配置的钩子（M7-003）。只从 config 来 */
   private readonly hooks: HookRunner
+  /** M15（PRD-M15-007 AC-3）：子 agent 结论超限写文件的落盘目录（~/.domi/outputs/<会话>） */
+  readonly outputDir: string
   /** 上传的附件（M8-010） */
   readonly attachments: AttachmentStore
   private provider: ModelProvider
@@ -529,19 +531,20 @@ export class DomiSession {
       mode: () => this.permissionsMode,
     }
     const planGate = makePlanGate(this.planPolicy)
-    const outputDir = join(dirname(opts.dbPath), 'outputs', opts.sessionId)
+    this.outputDir = join(dirname(opts.dbPath), 'outputs', opts.sessionId)
     this.attachments = new AttachmentStore(
       dirname(opts.dbPath),
       (opts.config.attachments?.maxMB ?? DEFAULT_ATTACHMENT_MAX_BYTES / 1024 / 1024) * 1024 * 1024,
     )
     this.hooks = new HookRunner(opts.config.hooks ?? [], { sessionId: opts.sessionId, cwd: opts.cwd })
-    this.jobs = new JobTable({ outputDir })
+    this.jobs = new JobTable({ outputDir: this.outputDir })
     this.tools = new ToolRegistry({
       cwd: opts.cwd,
       permissions,
       elicit: (tool, req) => this.askInput(tool.capability, req),
       jobs: this.jobs,
-      outputDir,
+      outputDir: this.outputDir,
+      inlineMaxTokens: opts.config.context.inlineMaxTokens,
       ...(this.hooks.empty ? {} : { hooks: this.hooks.toolHooks() }),
       // 闸门：先看计划（PRD-M12-004 AC-8 / AC-9，拦下不结束这一轮），再看预算（M7-009，到顶问人）
       gate: withPlanGate(

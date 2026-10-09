@@ -73,6 +73,8 @@ export interface ToolRegistryOptions {
   outputDir?: string
   hooks?: ToolHooks
   gate?: ToolGate
+  /** M15（PRD-M15-007 AC-1）：工具输出内联上限（token）。不传用默认 8k */
+  inlineMaxTokens?: number
 }
 
 export class ToolRegistry {
@@ -200,6 +202,7 @@ export class ToolRegistry {
       callId: call.id,
       ...(this.opts.jobs ? { jobs: this.opts.jobs } : {}),
       ...(this.opts.outputDir ? { outputDir: this.opts.outputDir } : {}),
+      ...(this.opts.inlineMaxTokens ? { inlineMaxTokens: this.opts.inlineMaxTokens } : {}),
       ...(elicit
         ? { elicit: (req: ElicitRequest) => elicit({ name: tool.name, capability: tool.capability }, req) }
         : {}),
