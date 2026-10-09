@@ -211,3 +211,111 @@ describe('PRD-M10-001 AC-2 · 列表空标题 fallback（first_input 派生列�
     l.close()
   })
 })
+
+describe('PRD-M8-002/009 · 会话列表排序（SPEC-M16-001）', () => {
+  // log() 的 clock 每次调用 +1000，从 1_756_000_000_000 起：第一次 clock.now() = 1_756_000_001_000
+
+  test('按最后一条消息倒序；lastMessageAt 值正确', async () => {
+    const l = log()
+    await l.append('a', [{ t: 'user.input', text: '一' }])
+    await l.append('b', [{ t: 'user.input', text: '二' }])
+    expect(l.sessions.list().map((s) => s.id)).toEqual(['b', 'a'])
+    const a = l.sessions.list().find((x) => x.id === 'a')!
+    const b = l.sessions.list().find((x) => x.id === 'b')!
+    expect(a.lastMessageAt).toBe(1_756_000_001_000)
+    expect(b.lastMessageAt).toBe(1_756_000_002_000)
+    l.close()
+  })
+
+  test('非消息事件不改变排序与 lastMessageAt', async () => {
+    const l = log()
+    await l.append('a', [{ t: 'user.input', text: '一' }]) // t1
+    await l.append('b', [{ t: 'user.input', text: '二' }]) // t2 → b 在前
+    await l.append('a', [
+      { t: 'tool.call', id: 'r1', name: 'fs.read', args: { path: 'x' } },
+      { t: 'session.kind', kind: 'chat', cwd: '/tmp/work' },
+      { t: 'model.request', provider: 'p', model: 'm', tokensIn: 1 },
+    ]) // t3 全是非消息事件 → a 不应上升
+    expect(l.sessions.list().map((s) => s.id)).toEqual(['b', 'a'])
+    expect(l.sessions.list().find((x) => x.id === 'a')!.lastMessageAt).toBe(1_756_000_001_000)
+    l.close()
+  })
+
+  test('user.note 与 model.delta 都算消息；多条 delta 取最后一条的落盘时间', async () => {
+    const l = log()
+    await l.append('a', [{ t: 'user.input', text: '一' }]) // t1
+    await l.append('b', [{ t: 'user.input', text: '二' }]) // t2 → b 在前
+    await l.append('a', [{ t: 'user.note', id: 'n1', text: '补一句' }]) // t3 → a 在前
+    expect(l.sessions.list().map((s) => s.id)).toEqual(['a', 'b'])
+    expect(l.sessions.list().find((x) => x.id === 'a')!.lastMessageAt).toBe(1_756_000_003_000)
+    await l.append('b', [
+      { t: 'model.delta', text: '片1' },
+      { t: 'model.delta', text: '片2' },
+    ]) // t4 → b 在前；取最后一条 delta 的落盘时间
+    expect(l.sessions.list().map((s) => s.id)).toEqual(['b', 'a'])
+    expect(l.sessions.list().find((x) => x.id === 'b')!.lastMessageAt).toBe(1_756_000_004_000)
+    l.close()
+  })
+
+  test('同刻（相同 ts）按创建时间倒序', async () => {
+    const d = mkdtempSync(join(tmpdir(), 'domi-sess-'))
+    dirs.push(d)
+    const l = new SqliteEventLog({ path: join(d, 'e.db'), cwd: '/tmp/work', clock: { now: () => 500 } })
+    l.sessions.upsert({ id: 'a', cwd: '/tmp/work', createdAt: 100 })
+    l.sessions.upsert({ id: 'b', cwd: '/tmp/work', createdAt: 200 })
+    await l.append('a', [{ t: 'user.input', text: '一' }]) // ts=500
+    await l.append('b', [{ t: 'user.input', text: '二' }]) // ts=500，同刻
+    const rows = l.sessions.list().map((s) => ({ id: s.id, lm: s.lastMessageAt, created: s.createdAt }))
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a']) // 同 ts → 创建晚的在前
+    expect(rows[0]!.lm).toBe(500)
+    expect(rows[0]!.created).toBe(200)
+    l.close()
+  })
+
+  test('无消息会话按创建时间（lastMessageAt 回退创建时间）', async () => {
+    const l = log()
+    await l.append('a', [{ t: 'user.input', text: '早' }]) // t1
+    await l.append('b', [{ t: 'session.kind', kind: 'chat', cwd: '/tmp/work' }]) // t2，无消息
+    const rows = l.sessions.list().map((s) => ({ id: s.id, lm: s.lastMessageAt }))
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a'])
+    expect(rows[0]!.lm).toBe(1_756_000_002_000) // b：lastMessageAt === 创建时间
+    expect(rows[1]!.lm).toBe(1_756_000_001_000)
+    l.close()
+  })
+
+  test('存量 created_at=0 行：无消息时读时按首事件时间兜底（取舍-3）', async () => {
+    const l = log()
+    await l.append('a', [{ t: 'session.kind', kind: 'chat', cwd: '/tmp/work' }]) // t1
+    ;(l as unknown as { db: { query(sql: string): { run(...a: unknown[]): void } } }).db
+      .query('UPDATE sessions SET created_at = 0 WHERE id = ?')
+      .run('a') // 模拟旧 daemon 创建（created_at=0）
+    await l.append('b', [{ t: 'user.input', text: '二' }]) // t2
+    const rows = l.sessions.list().map((s) => ({ id: s.id, lm: s.lastMessageAt }))
+    expect(rows.find((r) => r.id === 'a')!.lm).toBe(1_756_000_001_000) // 兜底首事件时间
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a'])
+    l.close()
+  })
+
+  test('upsert 不带时间戳：created_at/updated_at 是真实时钟（回归取舍-3）', async () => {
+    const l = log()
+    l.sessions.upsert({ id: 'b', cwd: '/tmp/b' })
+    const row = l.sessions.get('b')!
+    expect(row.createdAt).toBe(1_756_000_001_000)
+    expect(row.updatedAt).toBe(1_756_000_001_000)
+    l.close()
+  })
+
+  test('起标题/切模型的 upsert 不改变排序，也不再清零 updated_at（回归）', async () => {
+    const l = log()
+    await l.append('a', [{ t: 'user.input', text: '一' }]) // t1
+    await l.append('b', [{ t: 'user.input', text: '二' }]) // t2 → b 在前
+    l.sessions.upsert({ id: 'a', cwd: '/tmp/work', title: '标题' }) // t3
+    l.sessions.upsert({ id: 'a', cwd: '/tmp/work', model: 'm2' }) // t4
+    const rows = l.sessions.list()
+    expect(rows.map((s) => s.id)).toEqual(['b', 'a'])
+    const a = rows.find((x) => x.id === 'a')!
+    expect(a.lastMessageAt).toBe(1_756_000_001_000)
+    expect(a.updatedAt).toBeGreaterThan(0) // 此前 bug：updated_at 被清零
+    l.close()
+  })
+})

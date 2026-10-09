@@ -186,6 +186,18 @@ describe('PRD-M8-015 AC-2 / AC-3 / AC-4 · 三个弹层的内容', () => {
     expect(items.find((i) => i.key === 's3')?.group).toBe('iCleaner')
   })
 
+  test('SPEC-M16-001 · 组内按最后一条消息排序，相对时间显示 lastMessageAt（回退 updatedAt）', () => {
+    const same = [
+      { id: 'x1', title: '新消息晚', model: 'm', updatedAt: now, lastMessageAt: now - 86_400_000, eventCount: 3, deleted: false, kind: 'chat' as const },
+      { id: 'x2', title: '新消息早', model: 'm', updatedAt: now - 7 * 86_400_000, lastMessageAt: now - 7 * 86_400_000, eventCount: 3, deleted: false, kind: 'chat' as const },
+    ]
+    const items = sessionItems(same as never, projects as never, now)
+    expect(items.map((i) => i.key)).toEqual(['x1', 'x2'])
+    // x1 的 updatedAt 是「刚刚」，但 lastMessageAt 是 1 天前 → 显示与排序都用 lastMessageAt
+    expect(items[0]?.meta).toBe('昨天')
+    expect(items[1]?.meta).toBe('7 天前')
+  })
+
   test('任务：进行中与定时两组；cron 说人话', () => {
     const items = taskItems(sessions as never, schedules as never, now)
     expect(items[0]).toMatchObject({ group: '进行中', dot: 'running' })
