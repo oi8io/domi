@@ -9,7 +9,7 @@
 
 ```
 chat · doctor · init · session · data · prompt · report-bug · eval · trace · migrate
-memory · soul · task · bridge · plugin · trust · hook · review
+memory · soul · task · plugin · trust · hook · review
 ```
 
 常用全局旗标：`--help` / `--version` / `--json` / `--yes` / `--ping` / `--follow`（`task run`）/ `--all`（`memory list`）/ `--connect ws://host:port`（连远程 domid，PRD-M3-006）/ `--isolate`（隔离工作区）/ `--chat` / `-p <项目>` / `--project`（`init`）/ `--revoke`（`trust`）/ `--html <路径>`（`trace`）。带值的选项必须在 `flags` 里声明，否则 `strict:false` 会把它当布尔、值掉进 positionals 里（踩过的坑）。

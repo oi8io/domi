@@ -8,7 +8,6 @@
     "domi": "./src/main.tsx"
   },
   "dependencies": {
-    "@domi/bridge-telegram": "workspace:*",
     "@domi/cli": "workspace:*",
     "@domi/client-core": "workspace:*",
     "@domi/config": "workspace:*",

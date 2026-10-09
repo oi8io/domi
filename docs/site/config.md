@@ -25,7 +25,7 @@ key 也可以用各家惯用的环境变量（`DOMI_<ID>_API_KEY` + 厂商模板
 - `providers`：每家一段（vendor / protocol / base_url / models / enabled / capabilities 覆盖）。
 - `permissions.rules`：见[工具与权限运行时](tools-runtime.md)。
 - `mcp`：servers / allowedHosts / timeoutMs，见[MCP 接入](mcp-internals.md)。
-- `memory` / `notify` / `bridge.telegram` / `plugins`（enabled / allowUnsandboxed / disabled）/ `ui.locale`（auto | zh | en）/ `tui.renderer`（fullscreen | classic）/ `hooks` / `verify` / `pricing`（内置定价表 `BUILTIN_PRICING`；用量成本只统计有定价表的模型）/ `budget` / `skills.enabled` / `prompt`（自定义提示词层）/ `server`（port / host / token）/ `context` / `loop`（上限，默认 100）/ `attachments.maxMB`（默认 20）。
+- `memory` / `notify` / `plugins`（enabled / allowUnsandboxed / disabled）/ `ui.locale`（auto | zh | en）/ `tui.renderer`（fullscreen | classic）/ `hooks` / `verify` / `pricing`（内置定价表 `BUILTIN_PRICING`；用量成本只统计有定价表的模型）/ `budget` / `skills.enabled` / `prompt`（自定义提示词层）/ `server`（port / host / token）/ `context` / `loop`（上限，默认 100）/ `attachments.maxMB`（默认 20）。
 
 ## 加载与写回
 

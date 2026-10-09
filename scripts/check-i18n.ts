@@ -18,7 +18,6 @@ import { en, paramNames, zh } from '../packages/i18n/src/index.ts'
 export const SCANNED = process.env.I18N_SCAN?.split(',') ?? [
   'apps/web/src',
   'apps/tui/src',
-  'apps/bridge-telegram/src',
   'packages/client-core/src',
   'packages/cli/src',
   'packages/trace/src',

@@ -354,7 +354,6 @@ export const zh = {
   'web.project.archive': '归档项目',
   'web.settings.general': '通用',
   'web.settings.models': '模型供应商',
-  'web.settings.messaging': '通讯工具',
   'web.settings.memory': '记忆管理',
   'web.settings.soul': 'Soul 与人格',
   'web.settings.plugins': '插件',
@@ -393,11 +392,6 @@ export const zh = {
   'web.settings.dark': '深色',
   'web.settings.light': '浅色',
   'web.settings.accent': '主题色',
-  'web.settings.messagingSoon': '通讯工具即将支持。',
-  'web.settings.telegram': 'Telegram 桥接',
-  'web.settings.telegramHint': '只读轨迹 + 远程审批（即将支持）',
-  'web.settings.wechat': '微信桥接',
-  'web.settings.wechatHint': '仅只读通知（即将支持）',
   'web.settings.strategyFull': '不处理（整段历史原样发给模型）',
   'web.settings.strategyClean': '结构化清理（去重工具结果、清错误、截断堆栈）',
   'web.settings.strategyCompact': '清理 + 自动压缩（到阈值时摘要旧的轮次）',
@@ -840,7 +834,7 @@ export const zh = {
   'tui.task.attempt': ' 第 {attempt} 次',
   'tui.task.started': '已开始 {name}（{runId}），{length} 个节点：{join}',
   'tui.task.progress': '看进度：domi task status {runId}',
-  'tui.task.waitingAsk': '  ⏸ 在等确认：{capabilityId}（去 TUI / Web / Telegram 回答）',
+  'tui.task.waitingAsk': '  ⏸ 在等确认：{capabilityId}（去 TUI / Web 回答）',
   'tui.task.none': '还没有运行过任务。',
   'tui.task.retrying': '已开始重跑 {v}',
   'tui.task.alreadyEnded': '这次运行已经结束了',
@@ -881,11 +875,6 @@ export const zh = {
   'tui.connect.unreachable': '连不上 {url}{v}。确认对面的 domid 在跑、监听的是这个地址和端口。',
   'tui.connect.ambiguous': '有 {length} 个项目都叫「{arg}」，请改用路径：{join}',
   'tui.connect.noProject': '没有叫「{arg}」的项目。{v}也可以直接给路径：domi -p ./路径',
-  'tui.bridge.usage':
-    '用法：\n  domi bridge pair        生成配对码（5 分钟有效），然后在 Telegram 里给你的 bot 发 /pair <码>\n  domi bridge telegram    启动桥接（token 放 DOMI_TELEGRAM_TOKEN 或 config.yaml 的 bridge.telegram.token）\n\n桥接只推送长任务的进展与审批，不能从 Telegram 发起或修改任务；不发送任何文件内容。',
-  'tui.bridge.code': '配对码：{code}（{v} 分钟内有效，用一次作废）\n在 Telegram 里给你的 bot 发：/pair {code2}',
-  'tui.bridge.noToken': '没有 Telegram bot token。先找 @BotFather 建一个 bot，再设 DOMI_TELEGRAM_TOKEN。',
-  'tui.bridge.started': '桥接已启动，Ctrl-C 退出。',
   'tui.review.lastPart': '\n最后一段：{slice}',
   'common.untitledParen': '（无标题）',
   'tui.models.failedItem': '{name}（{v}）',
@@ -1078,7 +1067,6 @@ export const zh = {
   domi memory list|search|delete|extract   记下的关于你的条目（L3）
   domi soul show|review|update|export|import   Soul：审阅改动、导出分享、导入别人的
   domi task run|list|status|retry|cancel      长任务编排（DAG，跑在 domid 里）
-  domi bridge pair|telegram                   Telegram 桥接：生成配对码 / 启动桥接
   domi plugin list|install|remove|scaffold    插件：安装时逐条确认权限，代码跑在沙箱里
   domi review [--base 提交] [--spec 需求文档]...  派一个只读的审阅者对照需求审改动（看不到对话历史）
   domi hook commit-msg|secrets                示例钩子（在 config.yaml 的 hooks 里引用）
@@ -1217,11 +1205,6 @@ mcp:
 #   webhook:
 #     url: https://example.com/hook      # POST JSON；失败不影响任务
 
-# Telegram 桥接：domi bridge pair 配对，domi bridge telegram 启动。token 更推荐放 DOMI_TELEGRAM_TOKEN
-# bridge:
-#   telegram:
-#     token: "123456:ABC..."
-
 # 插件（docs/adr/022、023）。domi plugin install <目录> 安装，domi plugin list 查看
 # plugins:
 #   enabled: true            # false = 一个插件都不加载
@@ -1347,24 +1330,6 @@ server:
   'eval.expected': '  期望：{v}',
   'eval.actual': '  实际：{v}',
   'eval.jump': '  跳转：轨迹面板 seq {v}',
-  'bridge.paired': '绑定好了。长任务的进展与审批会推到这里。',
-  'bridge.alreadyPaired': '这个聊天已经绑定过了。',
-  'bridge.codeExpired': '配对码过期了，在电脑上重新运行 domi bridge pair。',
-  'bridge.codeWrong': '配对码不对。',
-  'bridge.noCode': '还没有配对码：在电脑上运行 domi bridge pair。',
-  'bridge.readOnly': '这里只推送进展和审批，不能发起或修改任务。',
-  'bridge.ask': '⏸ 需要确认：{capabilityId}',
-  'bridge.file': '文件：{basename}',
-  'bridge.writeLines': '写入 {length} 行',
-  'bridge.program': '程序：{v}',
-  'bridge.formAsk': '（这是一个要填表的询问，Telegram 里只能拒绝；要填请去 TUI / Web）',
-  'bridge.seeFull': '完整内容请在 TUI 或 Web 里看',
-  'bridge.notPaired': '这个聊天没有绑定',
-  'bridge.badButton': '看不懂这个按钮',
-  'bridge.expired': '这个询问已经过期了',
-  'bridge.allowed': '已允许',
-  'bridge.denied': '已拒绝',
-  'bridge.answeredElsewhere': '已经在别处回答过了',
   'trace.rule': '，规则：{matchedRule}',
   'trace.tools': '\n能力：{join}',
   'common.none': '无',

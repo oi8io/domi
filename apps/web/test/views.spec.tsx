@@ -1,6 +1,6 @@
 /**
  * 页面渲染 —— PRD-M8-003 AC-5（项目详情与全部项目）· PRD-M8-004 AC-6（全部会话）·
- * PRD-M8-005 AC-4（任务页）· PRD-M8-006 AC-2（改动条）· PRD-M8-012 AC-1 / AC-3（设置页 tab）
+ * PRD-M8-005 AC-4（任务页）· PRD-M8-006 AC-2（改动条）· PRD-M8-012 AC-8（设置页 tab）
  *
  * 都是 SSR 成字符串来断言（不起浏览器）。客户端只连不上的替身：这些视图首屏不需要 daemon。
  */
@@ -23,6 +23,7 @@ import {
 } from '@domi/client-core'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ProjectRow, SessionRow } from '../src/layout/data.ts'
+import { parseHash } from '../src/router.ts'
 import { ArtifactsTab } from '../src/session/artifactsTab.tsx'
 import type { PendingRef } from '../src/session/Composer.tsx'
 import { CredentialNotice } from '../src/session/CredentialNotice.tsx'
@@ -298,21 +299,20 @@ describe('PRD-M14-005 AC-2 · 改动 tab：逐文件审阅 · 丢弃 · 撤销�
   })
 })
 
-describe('PRD-M8-012 AC-1 / AC-3 · 设置页 8 个 tab（M10-003 加运行时），通讯工具是「即将支持」', () => {
-  test('左侧 8 个 tab，地址里带 tab', () => {
+describe('PRD-M8-012 AC-8 · 设置页 7 个 tab（通讯工具已随桥接移除，ADR-030）', () => {
+  test('左侧 7 个 tab，地址里带 tab；没有通讯工具', () => {
     const html = renderToStaticMarkup(<SettingsView client={client} tab="general" online={false} />)
-    for (const label of ['通用', '模型供应商', '通讯工具', '记忆管理', 'Soul 与人格', '插件', '用量统计', '运行时']) {
+    for (const label of ['通用', '模型供应商', '记忆管理', 'Soul 与人格', '插件', '用量统计', '运行时']) {
       expect(html).toContain(label)
     }
+    expect(html).not.toContain('通讯工具')
+    expect(html).not.toContain('#/settings/messaging')
     expect(html).toContain('href="#/settings/plugins"')
     expect(html).toContain('aria-current="page"')
   })
 
-  test('通讯工具：两项不可操作', () => {
-    const html = renderToStaticMarkup(<SettingsView client={client} tab="messaging" online />)
-    expect(html).toContain('即将支持')
-    expect(html).toContain('Telegram')
-    expect(html).toContain('微信')
+  test('旧地址 #/settings/messaging 落回「通用」', () => {
+    expect(parseHash('#/settings/messaging')).toEqual({ view: 'settings', tab: 'general' })
   })
 
   test('没连上 daemon 的 tab 说清楚要先连上', () => {

@@ -60,7 +60,7 @@
 
 ## 客户端侧（`packages/client-core`）
 
-三端（TUI / Web / 桥接）共用 `DomiClient`（`client-core/src/client.ts`）：
+三端（TUI / Web / Desktop）共用 `DomiClient`（`client-core/src/client.ts`）：
 
 1. **握手**：版本不匹配停在 `incompatible`，不重连、不降级——重连只会一遍遍撞同一堵墙，而用户看到的是「一直在连接中」。
 2. **断线重连 + 断点续订**：每个会话记着最后收到的 seq，重连后用它续订，断开期间 daemon 上发生的事一条不漏地补回来。

@@ -2,7 +2,7 @@
  * 三端共享的状态投影 —— docs/adr/009
  *
  * **本包不 import react**（由 depcruise 规则 `no-react-in-client-core` 守）。
- * 理由见 ADR-009：消费方有四类，Telegram 桥接与 L1 回放评估都不是 React。
+ * 理由见 ADR-009：消费方里 L1 回放评估不是 React（另一类非 React 消费方 Telegram 桥接已随 ADR-030 移除）。
  *
  * 这里做的是**投影**，不是存储：事件流是唯一真相，atom 里的东西随时可以从
  * 事件流重算出来。所以任何"只在 atom 里、事件流里没有"的状态都是 bug。

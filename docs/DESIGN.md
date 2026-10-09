@@ -273,7 +273,7 @@ interface PermissionSpec {
 | 包管理 | **pnpm workspace**（**不用 Turborepo**，见 `docs/adr/008`） | 5 个包、全量检查 10 秒内，任务编排与缓存是纯负担 |
 | Lint / 格式化 | **Biome 2.5.13**（`docs/adr/007`） | 单二进制管 lint + format，零 native 依赖，毫秒级全仓检查 |
 | 契约校验 | **zod 4.6.5**（`docs/adr/006`） | 事件类型会一直增长，类型实例化开销比解析性能更要紧；现在迁移面最小 |
-| 共享状态 | **nanostores 1.5.3** + `@nanostores/react`（`docs/adr/009`） | 消费方有四类，其中桥接进程与评估回放**不是 React**；核心与框架解耦才能让 `client-core` 不依赖 react |
+| 共享状态 | **nanostores 1.5.3** + `@nanostores/react`（`docs/adr/009`） | 消费方里评估回放**不是 React**（另一类非 React 消费方 Telegram 桥接已随 ADR-030 移除）；核心与框架解耦才能让 `client-core` 不依赖 react |
 | 模型层 | **自研薄 `ModelProvider` 抽象**，底下默认接 Vercel AI SDK（`ai@7.x`，见 `docs/adr/004`）；同时提供 OpenAI-compatible 直连 provider | 不要把 AI SDK 直接暴露给内核。自研一层薄抽象（约 300 行）保留切换自由，且能表达 AI SDK 覆盖不到的能力（本地 llama.cpp、自定义思维链解析） |
 | 网关（可选） | 用户可配置指向 **LiteLLM / OpenRouter** | LiteLLM 可自托管、覆盖 100+ provider、支持本地模型，最契合本地优先定位。但只作为**可选后端**，不作为依赖 |
 | 存储 | **SQLite**（WAL + FTS5 + sqlite-vec） | 单文件零运维；全文与向量检索一站解决 |
@@ -311,8 +311,7 @@ domi/
 │  ├─ domid/           # daemon
 │  ├─ tui/             # OpenTUI
 │  ├─ web/             # React + Vite
-│  ├─ desktop/         # Tauri v2 壳
-│  └─ bridge-telegram/ # 聊天端桥接：只读轨迹 + 远程审批（M5 / PRD-M5-007）
+│  └─ desktop/         # Tauri v2 壳（bridge-telegram 已于 2026-10-09 移除，ADR-030）
 ├─ plugins/            # 官方示例插件（M6）
 └─ docs/
 ```

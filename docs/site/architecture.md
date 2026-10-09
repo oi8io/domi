@@ -8,7 +8,7 @@
 ```text
 ┌─────────────────────────────────────────────────────────────┐
 │                        视图层（零业务逻辑）                    │
-│  TUI (Ink)   Web (React)   Desktop (Tauri)   Telegram 桥接   │
+│  TUI (Ink)   Web (React)   Desktop (Tauri)                 │
 └──────────────────────────────┬──────────────────────────────┘
                                │  Domi Protocol
                                │  JSON-RPC 2.0 over stdio / WebSocket
@@ -76,8 +76,7 @@ packages/
 apps/
 ├── tui           终端 UI（Ink 7）；同一二进制经 DOMI_INTERNAL_ROLE=daemon 也可当 domid
 ├── web           Vite + React + Tailwind v4
-├── desktop       Tauri 套壳（Web 的一个打包目标）
-└── bridge-telegram  Telegram 桥接：只读轨迹 + 远程审批（PRD-M5 范围）
+└── desktop       Tauri 套壳（Web 的一个打包目标）
 ```
 
 依赖方向：`protocol ← kernel ← runtime ← daemon ← apps`；`capability / store / memory / model / prompt` 从旁注入，`runtime` 是装配点。SDK 包名只允许出现在 `packages/model/src/factory.ts`，厂商知识只在 `packages/config/src/vendors.ts`（`guard:providers` 扫全仓）。

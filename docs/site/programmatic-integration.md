@@ -12,7 +12,7 @@
 
 ## 方式 2：协议客户端（推荐）
 
-三端（TUI / Web / Telegram 桥接）就是这么做的，你可以直接复用同一层：
+三端（TUI / Web / Desktop）就是这么做的，你可以直接复用同一层：
 
 ```ts
 import { createSessionStore, DomiClient, PROTOCOL_VERSION } from '@domi/client-core'
@@ -58,5 +58,5 @@ await session.submit({ text: '你好' })
 ## 相关
 
 - 协议方法 / 通知 / 事件全量：[Domi Protocol](protocol.md)。
-- 端怎么做（TUI / Web / Telegram 的接线实例）：[三端与桥接](clients.md)。
+- 端怎么做（TUI / Web 的接线实例）：[三端](clients.md)。
 - 协议版本演进规则：改 `PROTOCOL_VERSION` 必须两端同步，不降级。

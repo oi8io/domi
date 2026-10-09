@@ -119,8 +119,6 @@ export const ConfigSchema = z.object({
       webhook: z.object({ url: z.string().url(), headers: z.record(z.string(), z.string()).optional() }).optional(),
     })
     .default({ system: false }),
-  /** Telegram 桥接（PRD-M5-007）。token 更推荐放 DOMI_TELEGRAM_TOKEN */
-  bridge: z.object({ telegram: z.object({ token: z.string().optional() }).optional() }).default({}),
   /** 插件（PRD-M6）。allowUnsandboxed：没有系统级沙箱时也运行插件代码——不推荐，doctor 会标红 */
   plugins: z
     .object({

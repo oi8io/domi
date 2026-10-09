@@ -1,8 +1,8 @@
 # domi — 产品愿景与不变量
 
 > 全项目唯一的"不准违反"清单。非重大决策不得修改。
-> v1.2 · 2026-10-08 · 修改需走 ADR
-> 变更history：v1.0 (2026-08-24) → v1.1 回写自 `docs/adr/003-revert-to-self-built-runtime.md` → v1.2 INV-12 加强为两款，回写自 `docs/adr/029-context-invariants.md`
+> v1.3 · 2026-10-09 · 修改需走 ADR
+> 变更history：v1.0 (2026-08-24) → v1.1 回写自 `docs/adr/003-revert-to-self-built-runtime.md` → v1.2 INV-12 加强为两款，回写自 `docs/adr/029-context-invariants.md` → v1.3 §4 去掉聊天工具桥接的例外，回写自 `docs/adr/030-remove-telegram-bridge.md`
 
 ---
 
@@ -51,7 +51,7 @@
 - 不做可视化流程编辑器
 - 不做协商式多 agent（辩论/投票），只做上下文隔离的 sub-agent
 - 不做模型微调、不做自研模型
-- **不做原生移动端**。唯一例外：**聊天工具桥接**（Telegram，M5+），且只做两种交互——**只读查看轨迹** 与 **远程审批权限请求**。不做移动端发起任务、不做移动端编辑。桥接进程与 daemon 同机，不引入云端中转（守 INV-11）
+- **不做原生移动端**。~~唯一例外：聊天工具桥接（Telegram，M5+）~~——v1.3 起没有例外：M5 的 Telegram 桥接已整块移除（ADR-030）。以后若重新接聊天工具，仍然只做「只读查看轨迹」与「远程审批权限请求」两种交互、进程与 daemon 同机、不引入云端中转（守 INV-11），并另立 ADR
 - 不做 Windows 原生 TUI 优化（WSL 可用即可，v1 后再说）
 
 ## 5. 不变量（Invariants）

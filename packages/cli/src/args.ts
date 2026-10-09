@@ -25,7 +25,6 @@ export const COMMANDS = [
   'memory',
   'soul',
   'task',
-  'bridge',
   'plugin',
   'trust',
   'hook',

@@ -13,7 +13,7 @@
 |---|---|
 | Ink TUI（`apps/tui`） | ✅ |
 | Web / Desktop（`apps/web`、Tauri 壳） | ✅ |
-| Telegram 桥接（`apps/bridge-telegram`，PRD-M5-007） | ❌ 纯 Node 进程 |
+| ~~Telegram 桥接（`apps/bridge-telegram`，PRD-M5-007）~~（2026-10-09 移除，ADR-030） | ❌ 纯 Node 进程 |
 | 单元测试与 L1 回放评估（PRD-M2-008） | ❌ 无渲染层 |
 
 nanostores 的核心与框架解耦，React 绑定是单独的包；`client-core` 因此可以**完全不依赖 React**——这正好是 INV-02 想要的形状（三端零业务逻辑，业务在共享层）。Zustand 也有 `zustand/vanilla`，但那是在 React 库上补出来的出口；nanostores 从设计上就是这个方向。

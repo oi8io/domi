@@ -30,14 +30,14 @@ module.exports = {
       severity: 'error',
       // 允许的只有 runtime / client-core / config / protocol：
       // 前两个是门面与投影，后两个是配置与契约。业务实现一律不许直接 import。
-      from: { path: '^apps/(tui|web|desktop|bridge-telegram)/' },
+      from: { path: '^apps/(tui|web|desktop)/' },
       to: { path: '^packages/(kernel|store|capability|model|mcp|memory|orchestrator)/' },
     },
     {
       name: 'no-react-in-client-core',
       comment:
-        'ADR-009：client-core 的消费方有四类，其中 Telegram 桥接与 L1 回放评估不是 React。' +
-        '共享层一旦依赖 react，这两类就用不了它——这是 INV-02 的形状问题，不是洁癖。',
+        'ADR-009：client-core 的消费方里，L1 回放评估不是 React（Telegram 桥接已随 ADR-030 移除）。' +
+        '共享层一旦依赖 react，它就用不了——这是 INV-02 的形状问题，不是洁癖。',
       severity: 'error',
       from: { path: '^packages/client-core/src' },
       to: { path: '^(react|react-dom|ink|@nanostores/react)' },

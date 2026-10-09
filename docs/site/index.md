@@ -30,7 +30,7 @@
 | 定时任务 | [定时任务](scheduling.md) | `packages/daemon/src/{cron,scheduler}.ts` |
 | 配置 | [配置与厂商](config.md) | `packages/config` |
 | 命令行 | [CLI 与命令](cli.md) | `packages/cli` |
-| 客户端 | [三端与桥接](clients.md) | `apps/tui` · `apps/web` · `apps/desktop` · `apps/bridge-telegram` · `packages/client-core` |
+| 客户端 | [三端](clients.md) | `apps/tui` · `apps/web` · `apps/desktop` · `packages/client-core` |
 | 评估 | [评估体系 L1 / L2](eval.md) | `packages/eval` |
 
 ## 扩展（基于 domi 做东西）

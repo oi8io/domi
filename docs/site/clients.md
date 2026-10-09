@@ -1,6 +1,6 @@
-# 三端与桥接
+# 三端
 
-> `apps/tui` · `apps/web` · `apps/desktop` · `apps/bridge-telegram` + `packages/client-core`
+> `apps/tui` · `apps/web` · `apps/desktop` + `packages/client-core`
 > 对应 hermes 的 adding-platform-adapters + 各端用户指南。domi 的端规约一句话：**端上没有业务逻辑（INV-02），全是事件流的视图**。
 
 ## 共享层：client-core
@@ -32,14 +32,7 @@
 
 Web 的一个打包目标（DESIGN 的端顺序：TUI → Web → Desktop 套壳）。`src-tauri` + 一个 README。
 
-## Telegram 桥接（apps/bridge-telegram，grammY）
-
-PRD-VISION 的唯二交互，不引入云端中转（守 INV-11）：
-
-- **只读查看轨迹**：把事件流渲染成可读消息。
-- **远程审批权限请求**：daemon 的询问推到 Telegram，用户在手机上批准 / 拒绝。
-- 不做移动端发起任务、不做移动端编辑。桥接进程与 daemon 同机。
-- 实现：`bridge.ts`（事件流 → 消息）、`pairing.ts`（配对）、`format.ts`；`check-bridge-payload.ts` 守卫桥接消息的负载形状。
+> M5 曾有一个 Telegram 桥接（`apps/bridge-telegram`），2026-10-09 整块移除，原因与以后重做的路线见 `docs/adr/030-remove-telegram-bridge.md`。
 
 ## 端之间的一致性
 

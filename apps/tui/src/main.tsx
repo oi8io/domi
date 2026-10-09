@@ -731,7 +731,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   }
 
   // 要连 domid 的命令：接线在端上（和对话同一条路）
-  if (!cli.flags.help && (cli.command === 'task' || cli.command === 'bridge' || cli.command === 'review')) {
+  if (!cli.flags.help && (cli.command === 'task' || cli.command === 'review')) {
     process.exit(await runDaemonCommand(cli, io))
   }
 
@@ -750,14 +750,6 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
 async function runDaemonCommand(cli: ParsedCli, io: { out(s: string): void; err(s: string): void }): Promise<number> {
   const config = cli.flags.connect === undefined ? loadConfigOrThrow() : loadConfig()
   const home = process.env.HOME || homedir()
-  if (cli.command === 'bridge') {
-    const { runBridgeCommand } = await import('./bridge-cli.ts')
-    return runBridgeCommand(cli.sub, io, {
-      config,
-      home,
-      ...(cli.flags.connect === undefined ? {} : { connect: cli.flags.connect }),
-    })
-  }
   const token = resolveClientToken({ config, env: process.env, home })
   try {
     const { client } = await connectDaemon({

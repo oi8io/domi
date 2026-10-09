@@ -23,7 +23,7 @@ import {
   type ThemeChoice,
 } from '../theme/store.ts'
 import { Notice, Page } from './Page.tsx'
-import { Field, Saved, ToggleRow } from './settings/fields.tsx'
+import { Field, Saved } from './settings/fields.tsx'
 import { PluginsTab } from './settings/PluginsTab.tsx'
 import { ProvidersTab } from './settings/ProvidersTab.tsx'
 import { RuntimeTab } from './settings/RuntimeTab.tsx'
@@ -34,7 +34,6 @@ import { str, useSettings } from './settings/useSettings.ts'
 const TABS = (): Array<[SettingsTab, string]> => [
   ['general', tr('web.settings.general')],
   ['models', tr('web.settings.models')],
-  ['messaging', tr('web.settings.messaging')],
   ['memory', tr('web.settings.memory')],
   ['soul', tr('web.settings.soul')],
   ['plugins', tr('web.settings.plugins')],
@@ -105,16 +104,6 @@ export function GeneralTab({ s }: TabProps) {
           ))}
         </fieldset>
       </Field>
-    </>
-  )
-}
-
-function MessagingTab() {
-  return (
-    <>
-      <Notice>{tr('web.settings.messagingSoon')}</Notice>
-      <ToggleRow label={tr('web.settings.telegram')} hint={tr('web.settings.telegramHint')} on={false} disabled />
-      <ToggleRow label={tr('web.settings.wechat')} hint={tr('web.settings.wechatHint')} on={false} disabled />
     </>
   )
 }
@@ -203,7 +192,6 @@ export function SettingsView({ client, tab, online }: { client: DomiClient; tab:
           {tab === 'general' && <GeneralTab s={s} />}
           {tab === 'models' &&
             (online ? <ProvidersTab client={client} s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
-          {tab === 'messaging' && <MessagingTab />}
           {tab === 'memory' && (online ? <MemoryTab s={s} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}
           {tab === 'usage' &&
             (online ? <UsageTab client={client} /> : <Notice>{tr('web.common.connectFirstDot')}</Notice>)}

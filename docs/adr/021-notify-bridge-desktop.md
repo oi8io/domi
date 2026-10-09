@@ -1,7 +1,7 @@
 # 021 通知、Telegram 桥接与桌面端的选型
 
 - 日期：2026-09-15
-- 状态：已采纳（PRD-M5-004 / 005 / 007 · 兑现 `docs/adr/010` 的 Tauri 与 Telegram 两行）
+- 状态：已采纳（PRD-M5-004 / 005 / 007 · 兑现 `docs/adr/010` 的 Tauri 与 Telegram 两行）；**「Telegram 桥接」一段已废弃（被 030 取代，2026-10-09 整块移除）**
 
 **Context**：三块都是「让长任务在人不在屏幕前时也能被看见 / 被放行」。ADR-010 押后了 Tauri 版本与 Telegram 库。
 

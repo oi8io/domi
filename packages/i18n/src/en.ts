@@ -377,7 +377,6 @@ export const en: Record<keyof typeof zh, string> = {
   'web.project.archive': 'Archive project',
   'web.settings.general': 'General',
   'web.settings.models': 'Model providers',
-  'web.settings.messaging': 'Messaging',
   'web.settings.memory': 'Memory',
   'web.settings.soul': 'Soul & persona',
   'web.settings.plugins': 'Plugins',
@@ -398,11 +397,6 @@ export const en: Record<keyof typeof zh, string> = {
   'web.settings.dark': 'Dark',
   'web.settings.light': 'Light',
   'web.settings.accent': 'Accent color',
-  'web.settings.messagingSoon': 'Messaging apps are coming soon.',
-  'web.settings.telegram': 'Telegram bridge',
-  'web.settings.telegramHint': 'Read-only trajectory + remote approvals (coming soon)',
-  'web.settings.wechat': 'WeChat bridge',
-  'web.settings.wechatHint': 'Read-only notifications (coming soon)',
   'web.settings.strategyFull': 'Leave as is (send the whole history to the model)',
   'web.settings.strategyClean': 'Structured cleanup (dedupe tool results, drop errors, trim stack traces)',
   'web.settings.strategyCompact': 'Cleanup + auto-compaction (summarize old turns at the threshold)',
@@ -861,7 +855,7 @@ export const en: Record<keyof typeof zh, string> = {
   'tui.task.attempt': ' attempt {attempt}',
   'tui.task.started': 'Started {name} ({runId}), {length, plural, one {# node} other {# nodes}}: {join}',
   'tui.task.progress': 'Progress: domi task status {runId}',
-  'tui.task.waitingAsk': '  ⏸ Waiting for approval: {capabilityId} (answer in TUI / Web / Telegram)',
+  'tui.task.waitingAsk': '  ⏸ Waiting for approval: {capabilityId} (answer in TUI / Web)',
   'tui.task.none': 'No runs yet.',
   'tui.task.retrying': 'Started rerunning {v}',
   'tui.task.alreadyEnded': 'This run has already finished',
@@ -904,12 +898,6 @@ export const en: Record<keyof typeof zh, string> = {
     "Can't reach {url}{v}. Make sure domid is running on the other side and listening on this address and port.",
   'tui.connect.ambiguous': '{length} projects are named "{arg}"; use a path instead: {join}',
   'tui.connect.noProject': 'No project named "{arg}". {v}You can also pass a path: domi -p ./path',
-  'tui.bridge.usage':
-    "Usage:\n  domi bridge pair        generate a pairing code (valid for 5 minutes), then send /pair <code> to your bot in Telegram\n  domi bridge telegram    start the bridge (put the token in DOMI_TELEGRAM_TOKEN or bridge.telegram.token in config.yaml)\n\nThe bridge only pushes long-task progress and approvals; it can't start or change tasks from Telegram, and it never sends file contents.",
-  'tui.bridge.code':
-    'Pairing code: {code} (valid for {v} minutes, single use)\nSend this to your bot in Telegram: /pair {code2}',
-  'tui.bridge.noToken': 'No Telegram bot token. Create a bot with @BotFather first, then set DOMI_TELEGRAM_TOKEN.',
-  'tui.bridge.started': 'Bridge started; Ctrl-C to quit.',
   'tui.review.lastPart': '\nLast part: {slice}',
   'common.untitledParen': '(untitled)',
   'tui.models.failedItem': '{name} ({v})',
@@ -1126,7 +1114,6 @@ Usage:
   domi memory list|search|delete|extract   entries recorded about you (L3)
   domi soul show|review|update|export|import   Soul: review changes, export to share, import someone else's
   domi task run|list|status|retry|cancel      long-task orchestration (DAG, runs in domid)
-  domi bridge pair|telegram                   Telegram bridge: generate a pairing code / start the bridge
   domi plugin list|install|remove|scaffold    plugins: confirm each permission on install; code runs in a sandbox
   domi review [--base commit] [--spec doc]...  send a read-only reviewer to check changes against the requirements (it can't see the chat history)
   domi hook commit-msg|secrets                example hooks (referenced from hooks in config.yaml)
@@ -1265,11 +1252,6 @@ mcp:
 #   webhook:
 #     url: https://example.com/hook      # POST JSON; failures don't affect the task
 
-# Telegram bridge: pair with domi bridge pair, start with domi bridge telegram. The token is better kept in DOMI_TELEGRAM_TOKEN
-# bridge:
-#   telegram:
-#     token: "123456:ABC..."
-
 # Plugins (docs/adr/022, 023). Install with domi plugin install <dir>, list with domi plugin list
 # plugins:
 #   enabled: true            # false = load no plugins at all
@@ -1399,24 +1381,6 @@ server:
   'eval.expected': '  expected: {v}',
   'eval.actual': '  actual: {v}',
   'eval.jump': '  jump to: trajectory panel seq {v}',
-  'bridge.paired': 'Paired. Long-task progress and approvals will be pushed here.',
-  'bridge.alreadyPaired': 'This chat is already paired.',
-  'bridge.codeExpired': 'The pairing code has expired; run domi bridge pair on your computer again.',
-  'bridge.codeWrong': 'Wrong pairing code.',
-  'bridge.noCode': 'No pairing code yet: run domi bridge pair on your computer.',
-  'bridge.readOnly': "Only progress and approvals are pushed here; you can't start or change tasks.",
-  'bridge.ask': '⏸ Needs confirmation: {capabilityId}',
-  'bridge.file': 'File: {basename}',
-  'bridge.writeLines': 'Writes {length, plural, one {# line} other {# lines}}',
-  'bridge.program': 'Program: {v}',
-  'bridge.formAsk': '(This request needs a form; in Telegram you can only reject it. To fill it in, go to TUI / Web)',
-  'bridge.seeFull': 'See the full content in TUI or Web',
-  'bridge.notPaired': "This chat isn't paired",
-  'bridge.badButton': "Didn't understand that button",
-  'bridge.expired': 'This request has expired',
-  'bridge.allowed': 'Allowed',
-  'bridge.denied': 'Denied',
-  'bridge.answeredElsewhere': 'Already answered elsewhere',
   'trace.rule': ', rule: {matchedRule}',
   'trace.tools': '\nCapabilities: {join}',
   'common.none': 'none',
