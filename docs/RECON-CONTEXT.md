@@ -222,8 +222,8 @@ Anthropic 的提示缓存需要显式断点或顶层自动 `cache_control`，不
 | **S4** | 🟠 | 单次工具结果上限过大：`fs.read` ≤1MB 的文件**整篇返回**（≈25 万 tok，单次就能撑爆）；shell 内联 100KB（≈2.5 万 tok） | `fs-read.ts` `FS_READ_MAX_BYTES`；`shell-exec.ts:8` | 内联上限按 token 定（如 8–10k tok），超出写文件 + 返回头尾与路径（Cursor「长输出写文件」、M7 已有输出落盘目录可复用）；`fs.read` 默认最多 N 行 |
 | **S5** | 🟠 | 窗口不随模型变：`maxTokens` 是全局 150k，切到 128k 窗口的模型会在厂商那边 400；守卫只估历史，没算 system、工具定义、输出预留 | `schema.ts:259`；`build-context.ts:232` | 模型目录带 `contextWindow / maxOutput`；有效预算 = 窗口 − 输出预留 − 安全余量（Claude Code：`窗口 − min(maxOutput, 20k) − 13k`）；守卫估「整份请求」 |
 | **S6** | 🟠 | 压缩失败无「抖动保护」：超阈值后每轮开头都会再试一次、再失败一次，每次都是一次真实模型调用 | `session.ts:1095` | 连续失败 N 次熔断并在状态栏提示（Claude Code 有 thrashing detection） |
-| **S8** | 🔴 | 内部会话 `_memory` 泄漏成用户可见的任务：被改了标题、`kind`、挂进项目，用户在里面干活；记忆失败记录写进用户的对话 | R0；`memory-service.ts`（`MEMORY_SESSION_ID`） | `_` 前缀会话一律不进会话列表、不可 `submit`、不可挂项目 / 改类型（daemon 层拒绝）；已泄漏的数据做一次迁移把用户事件搬出 |
-| **S9** | 🔴 | 记忆抽取在 DeepSeek 上 7/7 失败，L3 与 Soul 实际为空——记忆层名存实亡 | R0；`memory-service.ts` structured() | 结构化输出按厂商降级：不支持 json_schema 的用「工具调用当结构化输出」（让模型调一个 `submit_items` 工具，参数即 schema）；兼容「直接给数组」等常见偏差；失败率进指标 |
+| **S8** | 🟢 | 内部会话 `_memory` 泄漏成用户可见的任务：被改了标题、`kind`、挂进项目，用户在里面干活；记忆失败记录写进用户的对话 | R0；`memory-service.ts`（`MEMORY_SESSION_ID`） | **已修（M15-007）**：`_` 前缀会话一律不进会话列表、不可 `submit` / 改名 / 挂项目（daemon 层拒绝，`INTERNAL_SESSION`）；`domi migrate-m15` 把泄漏的用户事件迁出成普通会话（备份 + 幂等）；`doctor --context` 检测未迁移会话并提示 |
+| **S9** | 🟢 | 记忆抽取在 DeepSeek 上 7/7 失败，L3 与 Soul 实际为空——记忆层名存实亡 | R0；`memory-service.ts` structured() | **已修（M15-007）**：结构化输出按厂商降级——不支持 json_schema 的第一次尝试走 `submit_items` 工具（inputSchema = zod→JSON schema），之后退提示词；兼容「直接给数组」（包 `{items}` 再试）与 markdown 包裹；失败抛 `StructuredOutputError` 由调用方落 `error{scope:'memory'}` 并计入 doctor 记忆成功率；真机复测（DeepSeek ≥90%）归 DoD |
 | **S7** | 🟡 | 思考型模型 + 工具：DeepSeek 思考模式要求**带工具时回传全部 reasoning_content，否则 400**；Z.ai 开 preserved thinking 时也要求原样回传。domi 要么丢掉、要么拼进正文 | `build-context.ts` model.reason 分支 | 见 M1。**R0 实测 DeepSeek v4 不回传也不报错**（347 次）→ 对 DeepSeek 降为质量问题；Anthropic / Z.ai 仍按协议必须回传 |
 
 ### 4.2 经济性
