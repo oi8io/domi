@@ -15,8 +15,34 @@ import { estimateTextTokens, fnv1a } from '@domi/protocol'
 export interface PromptCtx {
   cwd: string
   model: string
+  /**
+   * M15（SPEC-M15-010 AC-1）：身份分段模式。默认 chat（通用身份）；
+   * task=任务模式（先写计划）、subagent=子 agent（只回结论、控制长度）。全在冻结前缀里。
+   */
+  mode?: 'chat' | 'task' | 'subagent' | undefined
+  /**
+   * M15（SPEC-M15-010 AC-2）：环境定格快照（会话开始采集一次）。
+   * 会变的一半（日期/git 分支与改动文件数）不走这里——由 runtime 以 ctx.note 追加送达。
+   */
+  env?: PromptEnv | undefined
   /** 会变的东西一律从 ctx 进来，且只允许出现在非 cacheable 层 */
   dynamic?: Record<string, unknown>
+}
+
+/** 环境定格：与会话同生的字段。采集在 runtime（collectEnv），这里只定义形状 */
+export interface PromptEnv {
+  /** 例如 darwin arm64 */
+  os: string
+  /** 例如 /bin/zsh */
+  shell: string
+  /** 项目根（向上找到 package.json 等） */
+  projectRoot: string
+  /** 项目类型：node / rust / go / python / unknown… */
+  projectType: string
+  /** 包管理器：pnpm / yarn / npm / bun / cargo…（按锁文件与工具推断） */
+  pkgManager: string
+  /** git 远端（origin）；没有 git 或没有远端时为 null */
+  gitRemote: string | null
 }
 
 export interface PromptLayer {

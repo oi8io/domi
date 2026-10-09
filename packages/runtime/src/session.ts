@@ -86,6 +86,7 @@ import {
   renderProviderOptions,
   StructuredOutputError,
 } from '@domi/model'
+import type { PromptEnv } from '@domi/prompt'
 import { assemble, BUILTIN_LAYERS, layersFromConfig, mergeLayers, type PromptLayer } from '@domi/prompt'
 import {
   type DomiEvent,
@@ -101,6 +102,7 @@ import { ASK_USER_CAPABILITY, makeAskUserTool } from './ask-user.ts'
 import { AttachmentError, AttachmentStore, DEFAULT_ATTACHMENT_MAX_BYTES, isImage } from './attachments.ts'
 import { type CheckpointController, CheckpointError, resolveSnapshots, stepStartSnapshot } from './checkpoints.ts'
 import { degrade } from './degrade.ts'
+import { collectEnv, envDynamicText } from './env.ts'
 import {
   makePlanGate,
   makePlanUpdateTool,
@@ -252,6 +254,8 @@ interface FrozenContext {
   /** 计划文本（session.plan 层）——turn 内定格；变化走 ctx.note 追加，下一 turn 生效 */
   planText: string
   cwd: string
+  /** M15（SPEC-M15-010 AC-2）：环境定格快照（会话生命周期内采集一次） */
+  env: PromptEnv | null
 }
 
 export interface SessionOptions {
@@ -303,6 +307,11 @@ export interface SessionOptions {
    * 之后每次成功返回后取快照，fs.checkpoint 事件落进事件流。不给 = 没有快照（checkpoint.diff 降级）
    */
   checkpoints?: CheckpointController
+  /**
+   * M15（SPEC-M15-010 AC-1）：身份分段模式。不传就按会话 kind 推（task→task，其余 chat）。
+   * 子 agent 必须显式传 'subagent'（createChild 里做）
+   */
+  mode?: 'chat' | 'task' | 'subagent' | undefined
 }
 
 /** 一轮输入里除了文字之外的东西（PRD-M8-010） */
@@ -442,6 +451,13 @@ export class DomiSession {
    * 显式刷新（refreshContext）落 ctx.refresh 并重定格。
    */
   private frozen: FrozenContext | null = null
+  /**
+   * M15（SPEC-M15-010 AC-2）：环境定格快照。会话生命周期内采集一次（首次 freeze 时惰性初始化）——
+   * git 探测是子进程 IO，不该每轮 freeze 都跑
+   */
+  private frozenEnv: PromptEnv | null = null
+  /** M15（SPEC-M15-010 AC-2）：会变一半（日期/分支/改动数）上次送达的文本，变了才追加 */
+  private lastEnvNote: string | null = null
 
   /** 定格快照的内容 */
   private readFrozen(): FrozenContext {
@@ -454,6 +470,7 @@ export class DomiSession {
       catalog,
       planText: planPromptText(this.planPolicy),
       cwd: this.opts.cwd,
+      env: this.frozenEnv,
     }
   }
 
@@ -461,6 +478,7 @@ export class DomiSession {
 
   /** 重定格：turn 开始 / 显式刷新时调用 */
   private freeze(): void {
+    if (this.frozenEnv === null) this.frozenEnv = collectEnv(this.opts.cwd)
     this.frozen = this.readFrozen()
     this.frozenSkills = this.skillSource?.list().length ?? 0
   }
@@ -1034,6 +1052,7 @@ export class DomiSession {
       dbPath: o.dbPath,
       cwd: o.cwd,
       sessionId: c.sessionId,
+      mode: 'subagent',
       ...(this.injectedProvider ? { provider: this.provider } : {}),
       ...(o.memory ? { memory: o.memory } : {}),
       ...(o.skills ? { skills: o.skills } : {}),
@@ -1436,6 +1455,12 @@ export class DomiSession {
     }
   }
 
+  /** M15（SPEC-M15-010 AC-1）：身份分段模式——显式给的就用，否则按会话 kind 推 */
+  private promptMode(): 'chat' | 'task' | 'subagent' {
+    if (this.opts.mode !== undefined) return this.opts.mode
+    return this.log.sessions.get(this.opts.sessionId)?.kind === 'task' ? 'task' : 'chat'
+  }
+
   private prompt(): PromptParts {
     // M15（SPEC-M15-003 · INV-12(b)）：定格快照。turn 内 soul/rules/catalog/计划/环境只读这份——
     // 来源变化不打扰当前请求（下一 turn 或显式刷新才生效）
@@ -1463,8 +1488,19 @@ export class DomiSession {
     if (live !== '' && live !== f.planText) {
       notes.push({ reason: 'plan', text: live })
     }
+    // 环境会变一半（日期/git 分支/改动文件数）：变了才追加（SPEC-M15-010 AC-2）
+    const envText = envDynamicText(this.opts.cwd)
+    if (envText !== this.lastEnvNote) {
+      this.lastEnvNote = envText
+      notes.push({ reason: 'env', text: envText })
+    }
     const layers = mergeLayers([...BUILTIN_LAYERS, ...extra], layersFromConfig(this.opts.config.prompt.layers))
-    const a = assemble(layers, { cwd: f.cwd, model: this.currentModel })
+    const a = assemble(layers, {
+      cwd: f.cwd,
+      model: this.currentModel,
+      mode: this.promptMode(),
+      env: f.env ?? undefined,
+    })
     const text = (role: 'system' | 'user'): string =>
       a.messages
         .filter((m) => m.role === role)

@@ -206,10 +206,14 @@ export async function runCommand(cli: ParsedCli, io: Io): Promise<number> {
       const cfg = loadConfig({ home: userHome() })
       const custom = layersFromConfig(cfg.prompt.layers)
       // 仓库规矩层（BUG-M7-001）：和会话里同一个层、同一个信任判断
-      const { dumpRulesLayer } = await import('@domi/runtime')
+      const { collectEnv, dumpRulesLayer } = await import('@domi/runtime')
       const rules = dumpRulesLayer(process.cwd(), dataDir())
       const base = rules.layer === null ? BUILTIN_LAYERS : [...BUILTIN_LAYERS, rules.layer]
-      const a = assemble(mergeLayers(base, custom), { cwd: process.cwd(), model: cfg.model.name })
+      const a = assemble(mergeLayers(base, custom), {
+        cwd: process.cwd(),
+        model: cfg.model.name,
+        env: collectEnv(process.cwd()),
+      })
       io.out(formatDump(a))
       if (rules.note !== null) io.out(rules.note)
       return 0

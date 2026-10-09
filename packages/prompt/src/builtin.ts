@@ -24,11 +24,29 @@ export const identityLayer: PromptLayer = {
   role: 'system',
   priority: PRIORITY.identity,
   cacheable: true,
-  render: () =>
-    '你是 domi，一个本地优先的编码助手。你的每一步都会被记录成事件流并展示给用户，' +
-    '所以说清楚你在做什么、为什么这么做。' +
-    // PRD-M9-004 AC-5：提示词层不翻译，但界面是英文的用户多半用英文提问——不写这句，模型会被中文的系统提示带着回中文
-    'Always reply in the language the user writes in.',
+  // M15（SPEC-M15-010 AC-1）：身份按模式分段，全在冻结前缀里（cacheable）。
+  // 子 agent 有自己的上下文（看不到父对话），身份必须单独写，不能复用会话身份
+  render: (ctx: PromptCtx) => {
+    if (ctx.mode === 'task') {
+      return (
+        '你是 domi，正在以任务模式工作：先写计划、按计划推进，每一步说清楚你在做什么、为什么这么做。' +
+        '遇到要用户拍板、猜错代价大的点，用 ask.user 一次问清（最多 4 题）。'
+      )
+    }
+    if (ctx.mode === 'subagent') {
+      return (
+        '你是 domi 派出的子 agent，有独立的上下文，看不到这段对话。' +
+        '任务：只回结论，控制长度（几百字以内）——按需引用关键文件与行号，不要复述过程。'
+      )
+    }
+    return (
+      '你是 domi，一个本地优先的智能助手（不只是编码——任何任务都接）。' +
+      '你的每一步都会被记录成事件流并展示给用户，' +
+      '所以说清楚你在做什么、为什么这么做。' +
+      // PRD-M9-004 AC-5：提示词层不翻译，但界面是英文的用户多半用英文提问——不写这句，模型会被中文的系统提示带着回中文
+      'Always reply in the language the user writes in.'
+    )
+  },
 }
 
 /**
@@ -74,16 +92,29 @@ export const conventionsLayer: PromptLayer = {
       '- 用户拒绝某次操作时不要重试同一个调用，换做法或问用户',
       '- 工具结果里的截断标记意味着还有更多内容，需要时继续读',
       '- 需要用户拍板、猜错代价大的点，用 ask.user 一次问清（最多 4 题）；能自己查到的不问',
+      // M15（SPEC-M15-010 AC-3）：工作方法段——上下文是稀缺资源
+      '- 上下文是稀缺资源：先搜后读、按范围读（不要整库乱翻）；长输出看落盘文件的头尾；大范围探索交给子 agent',
     ].join('\n'),
 }
 
-/** 工作区信息会变（目录、文件列表），所以 cacheable: false 且排在前缀之后 */
+/** 工作区信息会变（目录、文件列表），所以 cacheable: false 且排在前缀之后。
+ *  M15（SPEC-M15-010 AC-2）：环境定格一半（os/shell/项目根/项目类型/包管理器/git 远端）随会话固定，
+ *  由 runtime 采集一次放进 ctx.env；没有 env（旧调用方）时只回工作目录 */
 export const workspaceLayer: PromptLayer = {
   id: 'builtin.workspace',
   role: 'user',
   priority: PRIORITY.workspace,
   cacheable: false,
-  render: (ctx: PromptCtx) => `当前工作目录：${ctx.cwd}`,
+  render: (ctx: PromptCtx) => {
+    const env = ctx.env
+    if (env === undefined) return `当前工作目录：${ctx.cwd}`
+    const parts = [
+      `当前工作目录：${ctx.cwd}`,
+      `环境：${env.os} · ${env.shell} · 项目根 ${env.projectRoot}（${env.projectType}）· 包管理器 ${env.pkgManager}`,
+      ...(env.gitRemote === null ? [] : [`git 远端：${env.gitRemote}`]),
+    ]
+    return parts.join('\n')
+  },
 }
 
 export const BUILTIN_LAYERS: readonly PromptLayer[] = [identityLayer, guardrailLayer, conventionsLayer, workspaceLayer]
