@@ -16,7 +16,7 @@
 | 组 | 方法 |
 |---|---|
 | 握手 | `handshake` |
-| 会话 | `session.list` `session.create` `session.read` `session.submit` `session.note` `session.note.withdraw` `session.interrupt` `session.subscribe` `session.history` `session.answer` `session.compact` `session.delete` `session.restore` `session.branch` `session.rename` `session.switchModel` `session.budget` |
+| 会话 | `session.list` `session.create` `session.read` `session.submit` `session.note` `session.note.withdraw` `session.interrupt` `session.subscribe` `session.history` `session.answer` `session.compact` `session.delete` `session.restore` `session.branch` `session.rename` `session.switchModel` `session.budget` `session.artifact`（M14 产物预览） `session.context`（M14 上下文 tab 静态项） |
 | 记忆 | `memory.list` `memory.search` `memory.delete` `memory.extract` |
 | Soul | `soul.get` `soul.write` `soul.export` `soul.import` `soul.changes` `soul.review` `soul.update` |
 | 任务 / 评审 | `task.start` `task.list` `task.get` `task.retry` `task.cancel` `task.create` `review.start` |
@@ -29,14 +29,14 @@
 
 通知（`NOTIFICATIONS`，daemon 主动推，客户端不轮询）：`session.events`（事件流增量推送，订阅后一次一批、seq 连续）、`session.ask`（权限询问）/ `session.askDone`（询问已被任一客户端回答，其余的据此关掉确认框）、`session.metrics`（状态栏指标，订阅时补发最近一份）、`session.busy`（忙闲变化）、`session.notes` / `session.notes.returned`（补充队列变化与退回，M13）、`sessions.changed`（列表该刷新了，500ms 合并，收到后重新 `session.list`）。
 
-## 事件全景（`DomiEventSchema`，SCHEMA_VERSION 15）
+## 事件全景（`DomiEventSchema`，SCHEMA_VERSION 17）
 
 | 组 | 事件 |
 |---|---|
 | 用户侧 | `user.input`（轮边界，可带 uploads / files / skills / noteIds）、`user.note`（运行中补充，M13） |
-| 模型侧 | `model.request` `model.delta` `model.reason` `model.usage` `model.switch` |
-| 工具侧 | `tool.call` `tool.result` `fs.snapshot`（文件写前/后指纹） `permission`（每个权限决策） `permissions.mode.switch` |
-| 上下文 | `ctx.cleanup` `ctx.compact` `ctx.ref` |
+| 模型侧 | `model.request`（可选 `ctx` 分段估算 M14 · `fingerprint` 前缀指纹 M15） `model.delta` `model.reason` `model.usage` `model.switch` |
+| 工具侧 | `tool.call` `tool.result` `fs.snapshot`（文件写前/后指纹） `fs.checkpoint`（步级快照 id，M14） `fs.discard`（丢弃文件改动，M14） `permission`（每个权限决策） `permissions.mode.switch` |
+| 上下文 | `ctx.cleanup` `ctx.compact` `ctx.ref` `ctx.fileref`（文件行引用，M14） `ctx.note`（追加送达动态内容，M15） `ctx.mask`（遮蔽决定，M15） `ctx.pin`（钉住事件，M15） `ctx.refresh`（显式刷新点，M15） `ctx.prefix.break`（前缀断裂观测，M15） |
 | 记忆 | `memory.write`（L3 语义 / L4 Soul 的真相） |
 | 任务 | `task.spawn` `task.run` `task.node` `task.resume` `task.retry` `task.end` |
 | 计划 | `plan.update`（M12，现行）`plan.proposed` / `plan.decided`（不再产生，类型保留读旧会话）`mode.switch`（不再产生，保留） |
@@ -54,13 +54,19 @@
 | 版本 | 含义 | 规则 |
 |---|---|---|
 | `PROTOCOL_VERSION`（=1） | RPC 面 | 加方法 / 通知不用升；不兼容改动才升，且不降级兼容 |
-| `SCHEMA_VERSION`（=15） | 事件面 | **新增事件类型或加字段 +1**，并追加一份 `fixtures/events/legacy-v{n}.jsonl`；删类型也不行——不再产生的类型留在联合里读旧会话；迁移只能加列 / 加表 / 加索引（`guard:migrations` 查，现有 14 条迁移） |
+| `SCHEMA_VERSION`（=17） | 事件面 | **新增事件类型或加字段 +1**，并追加一份 `fixtures/events/legacy-v{n}.jsonl`；删类型也不行——不再产生的类型留在联合里读旧会话；迁移只能加列 / 加表 / 加索引（`guard:migrations` 查） |
 
-版本史（v1→v15）写在 `event.ts` 文件头的注释里：`fs.snapshot`（v2）→ `model.switch`（v3）→ `ctx.cleanup`（v4）→ `ctx.compact`（v5）→ `ctx.ref`（v6）→ `memory.write`（v7）→ `task.*`（v8）→ `plugin.error`（v9）→ M7 一批（v10）→ `session.kind` / `schedule.fire`（v11）→ `model.switch.provider`（v12）→ `permissions.mode.switch`（v13）→ `plan.update`（v14）→ `user.note` + `error.stopReason/by` + `user.input.noteIds`（v15）。
+版本史（`event.ts` 文件头注释）：
+- **v1→v6 地基**：`fs.snapshot`、`model.switch`/`snapshot`/`revert`、`ctx.cleanup`、`ctx.compact`、`ctx.ref`
+- **v7→v10 记忆与编排**：`memory.write`、`task.*`、`plugin.error`、M7 一批（`workspace.trust`/`hook.run`/`verify.required`/计划/工作树/预算/评审）
+- **v11→v13 工作台与确认**：`session.kind`/`project.assign`/`schedule.fire`、`model.switch.provider`、`permissions.mode.switch`（`mode.switch` 不再产生）
+- **v14→v15（M12/M13）**：`plan.update`（`plan.proposed/decided` 不再产生）、`user.note` + `error.stopReason/by` + `user.input.noteIds`
+- **v16（M14 右侧栏）**：`fs.checkpoint`（步级快照）`ctx.fileref`（文件行引用）`fs.discard`（丢弃改动）；`model.request` 加可选 `ctx`（上下文分段估算）
+- **v17（M15 内核上下文）**：`ctx.note`（追加送达，INV-12(b) 落地）`ctx.mask`（遮蔽决定）`ctx.pin`（钉住）`ctx.refresh`（显式刷新点）`ctx.prefix.break`（前缀断裂观测）；`model.request` 加可选 `fingerprint`（前缀指纹，只记 FNV-1a 哈希不记内容）
 
 ## 客户端侧（`packages/client-core`）
 
-三端（TUI / Web / Desktop）共用 `DomiClient`（`client-core/src/client.ts`）：
+三端（TUI / Web / 桥接）共用 `DomiClient`（`client-core/src/client.ts`）：
 
 1. **握手**：版本不匹配停在 `incompatible`，不重连、不降级——重连只会一遍遍撞同一堵墙，而用户看到的是「一直在连接中」。
 2. **断线重连 + 断点续订**：每个会话记着最后收到的 seq，重连后用它续订，断开期间 daemon 上发生的事一条不漏地补回来。

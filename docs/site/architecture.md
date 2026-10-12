@@ -84,10 +84,10 @@ apps/
 ## 一次提交的数据流
 
 1. 客户端 `session.submit {text, refs?, uploads?, files?, skills?}` → daemon `core.ts` 同步占位 busy，交给 `DomiSession.submit`。
-2. `runtime/session.ts` 装配本轮：`buildContext(events, policy)` 从事件流投影出模型消息（只有 `user.input` / `user.note` / `model.reason` / `model.delta` / `tool.*` / `verify.required` 进上下文，其余是轨迹）。
-3. `kernel/loop.ts` 跑 `runTurn`：`provider.generate` 流式出 `model.delta` → 逐条经 `sink.append` 落盘 → daemon 把新事件**作为通知**推给所有订阅了该会话的客户端。
+2. `runtime/session.ts` 定格（freeze：soul / 仓库规矩 / 技能清单 / 计划 / 环境一次取齐，turn 内不现读，SPEC-M15-003）→ 预检降级链（预算器超阈值先遮蔽 `ctx.mask`，再超压缩 `ctx.compact`，硬顶停轮）→ `buildContext(events, policy)` 从事件流投影出模型消息（只有 `user.input` / `user.note` / `ctx.note` / `ctx.ref` / `ctx.fileref` / `model.reason` / `model.delta` / `tool.*` / `verify.required` 进上下文，其余是轨迹）。
+3. `kernel/loop.ts` 跑 `runTurn`：`prompt()` 层拼装（含动态注入的 `builtin.soul` 层）与 `buildContext` 在 `withPrompt` 汇合 → `provider.generate` 流式出 `model.delta` → 逐条经 `sink.append` 落盘 → daemon 把新事件**作为通知**推给所有订阅了该会话的客户端。
 4. 模型请求工具 → `capability` 的 `ToolRunner.run` 执行，权限引擎先决策（默认拒绝，决策本身就是一条 `permission` 事件）；`tool.result` 落盘后回灌上下文，再来一轮。
-5. 任一终止条件触发（最多 100 次工具调用 / 3 次参数解析重试 / 10 分钟墙钟 / 用户中断），产出带 `stopReason` 的 `error` 事件收场。
+5. 任一终止条件触发（最多 100 次工具调用 / 3 次参数解析重试 / 10 分钟墙钟 / 预算硬顶 / 用户中断），产出带 `stopReason` 的 `error` 事件收场。
 
 事件流是 append-only 的，以上每一步都是「追加事件」，没有一步是「改历史」。压缩、分支、状态栏、轨迹、记忆、编排状态全部是这条流的**投影**。
 
@@ -112,6 +112,7 @@ domi/
 ## 事件流是唯一的真相
 
 会话不是一个消息数组，而是一串只追加的事件：`user.input`、`model.delta`、`tool.call`、`permission`、`tool.result`……
+M14/M15 起又加了一批治理事件：`fs.checkpoint`（步级快照）、`ctx.fileref`（文件行引用）、`ctx.note`（动态内容追加送达）、`ctx.mask`（遮蔽决定）、`ctx.pin`（钉住）、`ctx.refresh`（显式刷新点）、`ctx.prefix.break`（前缀断裂观测）。
 上下文、状态栏、轨迹、记忆、编排状态全部是这串事件的**投影**。压缩不删事件，只追加一条 `ctx.compact`；
 分支不复制事件，只记一个父指针。
 
