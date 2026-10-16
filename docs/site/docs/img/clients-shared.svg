@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 430" width="880" height="430" role="img" aria-labelledby="t d">
+<title id="t">三端共享 client-core</title>
+<desc id="d">TUI / Web / Desktop 都走 DomiClient：握手版本检查、断线重连+fromSeq 续订、seq 去重；投影逻辑全在 client-core，端上只有接线。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="430" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">端上没有业务逻辑（INV-02），全是事件流的视图</text>
+
+<!-- 三端 -->
+<rect class="st" x="60" y="76" width="230" height="64" rx="10"/>
+<text class="k" x="76" y="100">TUI（Ink 7）</text>
+<text class="s" x="76" y="118">接线与按键 · DOMI_INTERNAL_ROLE=daemon</text>
+<text class="s" x="76" y="134">时就是 domid 本身</text>
+
+<rect class="st" x="60" y="152" width="230" height="64" rx="10"/>
+<text class="k" x="76" y="176">Web（Vite + React）</text>
+<text class="s" x="76" y="194">Home / Sessions / Projects / Tasks</text>
+<text class="s" x="76" y="210">Schedules / Settings / 轨迹 / 插件</text>
+
+<rect class="st" x="60" y="228" width="230" height="64" rx="10"/>
+<text class="k" x="76" y="252">Desktop（Tauri）</text>
+<text class="s" x="76" y="270">Web 的打包目标</text>
+<text class="s" x="76" y="286">src-tauri + README</text>
+
+<path d="M290 130 H350" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<path d="M290 184 H350" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<path d="M290 260 H350" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- client-core -->
+<rect class="warn" x="360" y="76" width="300" height="216" rx="12"/>
+<text class="k" x="376" y="100" style="fill:#FBBF24">client-core（投影全在这）</text>
+<text class="s" x="376" y="122">DomiClient：握手 · 续订 · 去重</text>
+<text class="s" x="376" y="142">SessionStore · trajectory</text>
+<text class="s" x="376" y="160">questions（问题框状态机）</text>
+<text class="s" x="376" y="178">tokens（估算）· highlight（高亮）</text>
+<text class="s" x="376" y="196">浏览器可跑：不 import node</text>
+<text class="s" x="376" y="214">不依赖 DOM 类型</text>
+<text class="s" x="376" y="232">某项要在 apps/web 写判断才能对等</text>
+<text class="s" x="376" y="250">→ client-core 缺东西，先补那边</text>
+
+<path d="M660 130 H720" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<path d="M660 184 H720" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- 事件流 -->
+<rect class="ok" x="730" y="76" width="130" height="216" rx="12"/>
+<text class="k" x="746" y="100" style="fill:#4ADE80">事件流</text>
+<text class="s" x="746" y="122">daemon 推送</text>
+<text class="s" x="746" y="140">session.subscribe</text>
+<text class="s" x="746" y="158">fromSeq 续订</text>
+<text class="s" x="746" y="176">seq 去重</text>
+<text class="s" x="746" y="194">版本不匹配</text>
+<text class="s" x="746" y="212">→ incompatible</text>
+
+<!-- 握手 -->
+<rect class="bad" x="60" y="312" width="800" height="72" rx="10"/>
+<text class="k" x="76" y="334" style="fill:#F87171">握手与续订</text>
+<text class="s" x="76" y="354">版本不匹配 → 停在 incompatible，不重连、不降级</text>
+<text class="s" x="76" y="372">断线重连 → 记着最后 seq，用 fromSeq 续订——断开期间的事一条不漏；同一 seq 只进一次 store</text>
+
+<text class="s" x="20" y="414">parity-checklist：两端 e2e 断言同一件事——同一事件流 fixture 进去，seq 序列与关键文本一致；加/删一项都是改 AC，走回写门</text>
+</svg>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>daemon 内部机制 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a class="active" href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>daemon 内部机制</h1>
+<blockquote>
+<p>本页回答四个问题：domid 启动时先做什么？core 怎么分发请求？同一会话为什么串行？出错了会怎样？
+<code>packages/daemon</code> —— 进程宿主。客户端全部经 Domi Protocol 访问它，它是事件流的唯一写入者。
+贯穿例子：给登录接口加限流——你按了发送，请求从终端到 domid 再到会话，全程经过 core。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>启动顺序有讲究：<strong>先抢锁、再监听</strong>；<strong>先开门、再连 MCP</strong>。</li>
+<li>两个入口：<code>bun packages/daemon/src/main.ts</code>（开发），或单二进制里 <code>DOMI_INTERNAL_ROLE=daemon domi</code>。</li>
+<li>core 只管分发与串行，传输（WS / stdio）在 transport 层——并发正确性只在一个地方证明。</li>
+<li><strong>同一会话串行</strong>：第二个请求直接回 <code>SESSION_BUSY</code>，不排队、不静默丢弃。</li>
+<li>运行中补充的队列在 core：为每个轮建 <code>ActiveTurn</code>，「忙不忙」的裁判是 core 的 <code>busy</code>。</li>
+<li>远程可连时强制 token；token 不打印（这些输出会进日志）。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>core</td>
+<td>daemon 的 JSON-RPC 分发与串行调度。</td>
+</tr>
+<tr>
+<td>transport</td>
+<td>传输层：搬字节（WS / stdio），不归 core 管。</td>
+</tr>
+<tr>
+<td>ActiveTurn</td>
+<td>core 为每个轮建的运行状态（含补充队列）。</td>
+</tr>
+<tr>
+<td>补充</td>
+<td>轮进行中用户追加的内容（session.note）。</td>
+</tr>
+<tr>
+<td>锁文件</td>
+<td><code>~/.domi/domid.lock</code>：防两个 domid 同时跑。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 启动顺序</h2>
+<p><img src="img/daem-boot.svg" alt="启动顺序" /></p>
+<p><code>main.ts</code> 的启动顺序，每一步都有理由：</p>
+<ol>
+<li><strong>先抢锁、再监听</strong>：<code>acquireLock(~/.domi/domid.lock)</code>——两个同时启动的进程里输的那个不会先占端口才发现自己不该起（<code>LockHeldError</code> → 退出码 3）。</li>
+<li>读配置（缺 key 也照样起）、定 domid 自己的语言、算 server 设置（端口 / host / token / allowedOrigins）。</li>
+<li><strong>先开门再连 MCP</strong>：<code>McpHub</code> 连 server 可能要好几秒（各自超时），不能让拉起 domid 的客户端一直等；工具每轮现取，连上之后自然就有了。</li>
+<li>建 <code>PluginHost</code>（沙箱 / 无沙箱）、<code>RuntimeHost</code>（把每个 DomiSession 接到 core 上）、<code>Daemon</code>（core）。</li>
+<li><code>serveWs</code> 监听。<strong>第一行 stdout 是 <code>domid listening &lt;url&gt;</code></strong>——拉起它的客户端读这一行拿地址。<code>DOMI_PORT=0</code> 时拿到真实端口后原地改写锁文件。</li>
+<li>远程可连（<code>DOMI_HOST=0.0.0.0</code>）时强制 token；token 不打印（这些输出会进日志）。</li>
+</ol>
+<h2>2. core：分发与串行（无传输细节）</h2>
+<p>core 进来的是 JSON-RPC 请求对象、出去的是响应对象；WS 还是 stdio 由 <code>transport-ws.ts</code> 负责。这样拆是因为<strong>并发与顺序的正确性只能在一个地方证明</strong>——两套传输不需要两套调度。</p>
+<p>两条硬规则：</p>
+<ol>
+<li><strong>daemon 是事件流的唯一写入者</strong>。客户端只提交意图。</li>
+<li><strong>同一会话串行</strong>。第二个请求进来不排队也不静默丢弃，直接回 <code>SESSION_BUSY</code>。</li>
+</ol>
+<p><img src="img/daem-core.svg" alt="core 分发与串行" /></p>
+<p>关键点：</p>
+<ul>
+<li><code>DaemonHost</code> 接口：core 只认这个接口（测试注入假的），生产实现是 <code>runtime-host.ts</code> 的 <code>RuntimeHost</code>。</li>
+<li><strong>错误翻译</strong>：只有 <code>SessionNotFoundError</code> 会翻译成 <code>SESSION_NOT_FOUND</code>；其它异常（配置坏了、库打不开）原样作为 <code>INTERNAL</code>——把一切打不开都说成「没有这个会话」，用户会去找一个本来就存在的东西。</li>
+<li>会话列表变化的方法（create / delete / restore / rename / branch / toTask / task.create / review.start / schedule.runNow）之后广播 <code>sessions.changed</code>。</li>
+<li><strong>运行中补充的队列在 core</strong>（M13 取舍-1）：core 为每个由它发起的轮建 <code>ActiveTurn { queue, ac }</code>。「会话忙不忙」的唯一裁判是 core 的 <code>busy</code>，队列要跟这个判断<strong>原子</strong>地一起做，否则有两个窗口会丢补充。host 自己发起的轮（评审会话、定时任务节点）没有 ActiveTurn，<code>session.note</code> 回 <code>SESSION_BUSY</code>。</li>
+<li><strong>收尾的竞态</strong>：正常收场（<code>stopReason === 'completed'</code>）时队列还有残留 → 不释放 busy，用残留开下一轮（<code>user.input.noteIds</code> 带上）；异常收场 → 清空队列并广播 <code>session.notes.returned</code>。</li>
+</ul>
+<h2>3. runtime-host：真宿主</h2>
+<ul>
+<li>每个会话一个 <code>DomiSession</code>，共用同一个 SQLite 文件（<code>~/.domi/events.db</code>）；会话列表由宿主自己的一条连接读。</li>
+<li>权限询问经 core 推给客户端（<code>session.ask</code>），由任一客户端回答（<code>session.answer</code>）。没有客户端在线时任务就停在询问上等——「断开不影响任务」：执行一个需要确认的操作，本来就该等人，而不是替人答。</li>
+<li><code>extraTools</code> 每轮现取：MCP 工具 + 插件工具（停用插件带的 MCP server 已连上的工具在此滤掉，启停即时生效）。</li>
+<li>daemon 启动后调 <code>resumeRuns</code>：没结束的编排运行接着跑。</li>
+</ul>
+<h2>4. 调度器与定时任务</h2>
+<p><code>scheduler.ts</code> + <code>cron.ts</code>：5 段 cron（分 时 日 月 周，支持 <code>*</code> <code>,</code> <code>-</code> <code>/</code> 与英文缩写；不支持 <code>L</code> <code>W</code> <code>#</code> 与秒），时区用 Intl 换算不引依赖。调度器在 domid 进程里跑，时钟与定时器都注入（测试用假时钟）；每次醒来对每个计划看「不晚于现在的最近应触发时刻」是否晚于 <code>last_due</code>，是就触发一次（错过多个周期也只补这一次）。应触发时刻之后 60 秒内算准点，超过算 <code>late</code>（domid 没开、机器睡着了）。详见<a href="scheduling.html">定时任务</a>。</p>
+<h2>5. 出错了怎么办：限流第 2 步进行中，你按了「发送」想追加一句话</h2>
+<ol>
+<li><strong>会话正忙</strong>。core 的 <code>busy</code> 为真 → 你的 <code>session.submit</code> 直接回 <code>SESSION_BUSY</code>。不排队、不静默丢弃——你看到明确错误，知道没发出去。</li>
+<li><strong>运行中补充</strong>。你走 <code>session.note</code>（不是 submit）→ 进 <code>ActiveTurn.queue</code>，本轮模型回合间送达，落 <code>user.note</code> 事件。</li>
+<li><strong>正常收场时队列有残留</strong>。不释放 busy，用残留开下一轮（<code>user.input.noteIds</code> 带上）——你的补充不会丢。</li>
+<li><strong>异常收场</strong>。清空队列并广播 <code>session.notes.returned</code>——端上把你的补充退回来。</li>
+<li><strong>两个 domid 同时启动</strong>。输的那个 <code>LockHeldError</code> → 退出码 3，不占端口。</li>
+<li><strong>daemon 重启</strong>。<code>resumeRuns</code> 把没结束的编排运行接着跑；事件全在库里。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>会话忙（你 submit）</td>
+<td>回 SESSION_BUSY</td>
+<td>稍后再试</td>
+</tr>
+<tr>
+<td>会话忙（你 note）</td>
+<td>host 发起的轮：回 SESSION_BUSY；core 发起的轮：进 ActiveTurn.queue</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>正常收场有残留补充</td>
+<td>不释放 busy，用残留开下一轮</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>异常收场</td>
+<td>清空队列，广播 session.notes.returned</td>
+<td>重新提交补充</td>
+</tr>
+<tr>
+<td>双开 domid</td>
+<td>输的退出码 3</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>daemon 重启</td>
+<td>resumeRuns 续跑未结束的编排</td>
+<td>不用管</td>
+</tr>
+</tbody>
+</table>
+<h2>6. 可靠性靠什么</h2>
+<ol>
+<li><strong>先抢锁再监听</strong>。双开时输的那个在占端口前就退出。</li>
+<li><strong>先开门再连 MCP</strong>。启动不被慢 MCP 拖住。</li>
+<li><strong>串行在一个地方证明</strong>。core 唯一裁判 busy，队列原子跟随。</li>
+<li><strong>错误翻译诚实</strong>。只有会话不存在才说 SESSION_NOT_FOUND，其它异常如实报 INTERNAL。</li>
+<li><strong>时钟注入</strong>。调度器测试用假时钟，时间逻辑可确定性地测。</li>
+<li><strong>补充不丢</strong>。残留队列开下一轮 / 异常退回，两条路都有交代。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>同一会话串行：同一时刻一个会话只处理一个请求。</li>
+<li>host 自己发起的轮（评审、定时任务）没有 ActiveTurn：<code>session.note</code> 回 <code>SESSION_BUSY</code>。</li>
+<li>cron 不支持 <code>L</code> <code>W</code> <code>#</code> 与秒（5 段）。错过多个周期只补一次。</li>
+<li>token 强制只发生在远程可连时；本地 stdio 不需要。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>启动顺序 / 锁 / 端口</td>
+<td><code>packages/daemon/src/main.ts</code></td>
+</tr>
+<tr>
+<td>JSON-RPC 分发与串行</td>
+<td><code>packages/daemon/src/core.ts</code></td>
+</tr>
+<tr>
+<td>会话宿主接线</td>
+<td><code>packages/daemon/src/runtime-host.ts</code></td>
+</tr>
+<tr>
+<td>锁文件</td>
+<td><code>packages/daemon/src/lock.ts</code></td>
+</tr>
+<tr>
+<td>WS 传输</td>
+<td><code>packages/daemon/src/transport-ws.ts</code></td>
+</tr>
+<tr>
+<td>调度器 / cron</td>
+<td><code>packages/daemon/src/{scheduler,cron}.ts</code></td>
+</tr>
+<tr>
+<td>鉴权 / token</td>
+<td><code>packages/daemon/src/auth.ts</code></td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/daemon/test/</code>（core 单测、transport 测试、调度器测试）。</p>
+<h2>相关</h2>
+<ul>
+<li>协议方法由 core 分发：<a href="protocol.html">Domi Protocol：daemon 与客户端之间的契约</a>。</li>
+<li>会话的装配与提交：<a href="agent-loop.html">Agent Loop：一轮里发生了什么</a>。</li>
+<li>定时任务的补触发与错过窗口：<a href="scheduling.html">定时任务</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

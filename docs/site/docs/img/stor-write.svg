@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 440" width="880" height="440" role="img" aria-labelledby="t d">
+<title id="t">一次写入的事务</title>
+<desc id="d">append 在单个事务里：分配 seq、序列化、写 events、同事务更新投影表。任一条失败整批回滚，磁盘不留半条。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F87171"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .tx{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.5}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="440" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">append：一个事务，要么全成要么全回滚</text>
+<text class="s" x="20" y="56">贯穿例子：模型输出 model.delta 逐条落盘——每一条都走这个事务</text>
+
+<!-- 事务框 -->
+<rect class="tx" x="60" y="84" width="500" height="280" rx="14"/>
+<text class="k" x="76" y="110" style="fill:#22D3EE">事务开始</text>
+
+<rect class="box" x="80" y="126" width="460" height="44" rx="8"/>
+<text class="k" x="96" y="148">① 分配 seq</text>
+<text class="s" x="220" y="148">SELECT MAX+1 → INSERT（主键兜底）</text>
+
+<path d="M310 170 V182" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<rect class="box" x="80" y="186" width="460" height="44" rx="8"/>
+<text class="k" x="96" y="208">② 序列化 payload</text>
+<text class="s" x="220" y="208">任一条失败 → 整批回滚（不留半条）</text>
+
+<path d="M310 230 V242" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<rect class="box" x="80" y="246" width="460" height="44" rx="8"/>
+<text class="k" x="96" y="268">③ 写 events + 同事务投影</text>
+<text class="s" x="220" y="268">FTS · 语义 · 进度 —— 同一事务</text>
+
+<path d="M310 290 V302" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<rect class="ok" x="80" y="306" width="220" height="40" rx="8"/>
+<text class="k" x="96" y="331" style="fill:#4ADE80">提交</text>
+<path d="M180 306 V284" fill="none" stroke="#4ADE80" stroke-width="1.4" marker-end="url(#ag)"/>
+<text class="s" x="140" y="274" style="fill:#4ADE80">成功 → 事件可见</text>
+
+<!-- 失败侧 -->
+<rect class="bad" x="340" y="306" width="200" height="40" rx="8"/>
+<text class="k" x="356" y="331" style="fill:#F87171">回滚</text>
+<path d="M440 306 V284" fill="none" stroke="#F87171" stroke-width="1.4" marker-end="url(#ar)"/>
+<text class="s" x="392" y="274" style="fill:#F87171">任一失败 → 磁盘不留半条</text>
+
+<!-- 右侧注释 -->
+<rect class="box" x="620" y="84" width="240" height="200" rx="10"/>
+<text class="k" x="636" y="108">为什么够用</text>
+<text class="s" x="636" y="130">seq 分配 + 序列化 + 投影</text>
+<text class="s" x="636" y="146">都在同一事务里</text>
+<text class="s" x="636" y="168">唯一写入者是 daemon</text>
+<text class="s" x="636" y="184">没有并发竞争</text>
+<text class="s" x="636" y="206">read 走 parseEvent 降级</text>
+<text class="s" x="636" y="222">永不抛「无法解析」</text>
+<text class="s" x="636" y="244" style="fill:#8FA1B2">多进程写同一库才需要</text>
+<text class="s" x="636" y="260" style="fill:#8FA1B2">真正的并发仲裁</text>
+
+<text class="s" x="20" y="408">真相只有 events 表：压缩是追加 ctx.compact、分支是记 parent_seq——没有一步「改历史」</text>
+</svg>

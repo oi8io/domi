@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>添加模型供应商 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a class="active" href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>添加模型供应商</h1>
+<blockquote>
+<p>给 domi 接入新的模型厂商。AC-4 判据：<strong>新增 provider 只需实现接口 + 注册，kernel 与 model/core 的 diff 为 0</strong>。
+对应 hermes 的 adding-providers + model-provider-plugin。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li><strong>三档做法</strong>：配置声明（零代码）→ 加厂商模板（一处纯数据）→ 实现 ModelProvider（两个文件）。</li>
+<li>协议兼容 OpenAI / Anthropic 的厂商，<strong>不用写代码</strong>。</li>
+<li>能力矩阵必须如实填——调用未声明的能力会在发请求前抛错。</li>
+<li>厂商名单只在 <code>vendors.ts</code> 一处，别的地方都不再写（<code>guard:providers</code> 扫全仓）。</li>
+<li>测试用 <code>StubProvider</code>——真实 LLM 调用不进 CI 门禁。</li>
+</ul>
+<h2>三档做法（从易到难）</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>做法</th>
+<th>要不要写代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>厂商 API 兼容 OpenAI / Anthropic 协议</td>
+<td>配置里声明一家 <code>custom</code>（或复用模板）即可</td>
+<td>不用。见<a href="config.html">配置与厂商</a></td>
+</tr>
+<tr>
+<td>常用厂商，走 OpenAI 兼容</td>
+<td>在 <code>vendors.ts</code> 加一个模板条目</td>
+<td>一处纯数据</td>
+</tr>
+<tr>
+<td>协议不兼容的厂商</td>
+<td>实现 <code>ModelProvider</code> + 在 <code>factory.ts</code> 注册适配器</td>
+<td>两个文件</td>
+</tr>
+</tbody>
+</table>
+<h2>第一档：配置声明（零代码）</h2>
+<pre><code class="language-yaml">model: { provider: my-llm, name: my-model }
+providers:
+  my-llm:
+    vendor: custom          # 或直接填 openai / anthropic / deepseek / gemini
+    protocol: openai        # custom 要自己选协议
+    base_url: https://llm.example.com/v1
+    api_key: ...            # 或写进 ~/.domi/secrets.yaml
+    capabilities: { toolCall: true, vision: false }   # 显式覆盖能力矩阵
+</code></pre>
+<p>模型清单会按 <code>/v1/models</code> 自动探测（<code>model/src/probe.ts</code>）；探测失败用 <code>models:</code> 清单兜底。</p>
+<h2>第二档：加厂商模板（vendors.ts）</h2>
+<p><code>packages/config/src/vendors.ts</code> 加一个 <code>Vendor</code> 条目：<code>{ id, label, protocol, adapter, defaultBaseUrl?, capabilities, envNames, keyHint }</code>。</p>
+<ul>
+<li><strong>能力矩阵必须如实填</strong>（toolCall / vision / reasoning / promptCache / structuredOutput）——调用未声明的能力会在发请求前抛错。</li>
+<li><code>envNames</code>：惯用 key 环境变量（<code>DOMI_&lt;ID&gt;_API_KEY</code> 之外再认的）。</li>
+<li>Web 的「新增 provider」表单、模型层的适配器选择、doctor 的检查全都从这份模板来——<strong>别的地方都不再写厂商名单</strong>（<code>guard:providers</code> 扫全仓）。</li>
+</ul>
+<h2>第三档：实现 ModelProvider（factory.ts）</h2>
+<ol>
+<li>
+<p>实现 <code>ModelProvider</code> 接口（<code>packages/model/src/provider.ts</code>）：</p>
+<pre><code class="language-ts">interface ModelProvider {
+  readonly id: string
+  readonly capabilities: ModelCapabilities
+  generate(req: ModelRequest, signal: AbortSignal): AsyncIterable&lt;ModelEvent&gt;
+}
+</code></pre>
+<p><code>ModelEvent</code> 只有五种：<code>delta</code> / <code>reason</code> / <code>tool-call</code> / <code>usage</code> / <code>error</code>。<strong><code>usage</code> 必须是原始字段</strong>——缓存命中率与压缩的 cache 前缀判断都靠它，适配层不做字段归一、不丢字段（ADR-004 逃生口）。</p>
+</li>
+<li>
+<p>在 <code>factory.ts</code> 的 <code>createProvider</code> 里注册：连接形状由 <code>connectionShape(cfg)</code> 解析（vendor + protocol + adapter），选对的构造器（多数情况用 AI SDK 的 <code>createOpenAICompatible</code> / <code>createAnthropic</code>，见 <code>ai-sdk-provider.ts</code>，不用自己写 SDK）。</p>
+</li>
+<li>
+<p>需要嵌入向量做语义记忆：<code>createEmbedder</code>（<code>embedding.ts</code>），不支持就抛 <code>EmbeddingUnsupportedError</code>（语义检索自动降级 FTS）。</p>
+</li>
+</ol>
+<h2>测试</h2>
+<ul>
+<li>用 <code>StubProvider</code>（<code>stub-provider.ts</code>）——真实 LLM 调用不进 CI 门禁（INV-08）。</li>
+<li>结构化输出：统一走 <code>generateStructured</code>（JSON Schema；不支持的模型用「提示词约束 + 解析重试」兜底）。</li>
+<li>重试：<code>retry.ts</code> 处理可恢复错误（流式中断等）。</li>
+</ul>
+<h2>相关</h2>
+<ul>
+<li>模型层机制：<a href="model-runtime.html">模型运行时</a>。</li>
+<li>配置与 secrets：<a href="config.html">配置与厂商</a>。</li>
+<li>有 PRD 依据（INV-10），改动登记在任务文件里。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

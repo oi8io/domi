@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>domi 开发者文档 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a class="active" href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · 开发者文档</div>
+    <h1>domi 开发者文档</h1>
+<blockquote>
+<p>开发者视角的 domi 全景：架构、各子系统内部机制、扩展指南与贡献方式。
+面向两类读者：<strong>改 domi 本身的人</strong>（从「架构」和「内幕」开始）与<strong>基于 domi 做扩展的人</strong>（直接看「扩展」）。</p>
+</blockquote>
+<h2>先读</h2>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>讲什么</th>
+<th>什么时候读</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="intro.html">domi 是什么</a></td>
+<td>产品定位：三个支点、能干什么、适合谁</td>
+<td>第一次了解 domi，还没决定要不要用</td>
+</tr>
+<tr>
+<td><a href="quickstart.html">快速开始</a></td>
+<td>装好、配上模型、第一次对话、权限与长任务</td>
+<td>第一次跑 domi</td>
+</tr>
+<tr>
+<td><a href="architecture.html">架构</a></td>
+<td>进程模型、包分层、一次提交的数据流、事件流与不变量</td>
+<td>改任何代码之前</td>
+</tr>
+<tr>
+<td><a href="agent-loop.html">Agent Loop 内部机制</a></td>
+<td>kernel 的循环：拼上下文 → 生成 → 落盘 → 执行工具 → 回灌</td>
+<td>想弄懂「一轮对话发生了什么」</td>
+</tr>
+<tr>
+<td><a href="protocol.html">Domi Protocol</a></td>
+<td>传输约定、方法 / 通知 / 事件清单、版本演进规则</td>
+<td>写客户端、改协议</td>
+</tr>
+</tbody>
+</table>
+<h2>内部机制（改 domi 本身）</h2>
+<table>
+<thead>
+<tr>
+<th>子系统</th>
+<th>文档</th>
+<th>关键包</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>daemon 宿主</td>
+<td><a href="daemon-internals.html">daemon 内部机制</a></td>
+<td><code>packages/daemon</code></td>
+</tr>
+<tr>
+<td>会话存储</td>
+<td><a href="session-storage.html">会话存储与事件流</a></td>
+<td><code>packages/store</code></td>
+</tr>
+<tr>
+<td>轨迹与回放</td>
+<td><a href="trajectory-and-replay.html">轨迹与回放</a></td>
+<td><code>packages/trace</code> · <code>packages/eval</code></td>
+</tr>
+<tr>
+<td>提示词</td>
+<td><a href="prompt-assembly.html">提示词分层与 cache 边界</a></td>
+<td><code>packages/prompt</code></td>
+</tr>
+<tr>
+<td>上下文压缩</td>
+<td><a href="context-compression.html">压缩与 prompt cache</a></td>
+<td><code>packages/memory</code> · <code>packages/kernel</code></td>
+</tr>
+<tr>
+<td>记忆与 Soul</td>
+<td><a href="memory-and-soul.html">记忆分层与 Soul</a></td>
+<td><code>packages/memory</code> · <code>packages/runtime</code></td>
+</tr>
+<tr>
+<td>编排</td>
+<td><a href="orchestration.html">编排：任务 · 子 agent · 计划</a></td>
+<td><code>packages/orchestrator</code> · <code>packages/runtime</code></td>
+</tr>
+<tr>
+<td>模型层</td>
+<td><a href="model-runtime.html">模型运行时</a></td>
+<td><code>packages/model</code></td>
+</tr>
+<tr>
+<td>工具与权限</td>
+<td><a href="tools-runtime.html">工具与权限运行时</a></td>
+<td><code>packages/capability</code></td>
+</tr>
+<tr>
+<td>MCP</td>
+<td><a href="mcp-internals.html">MCP 接入</a></td>
+<td><code>packages/mcp</code></td>
+</tr>
+<tr>
+<td>插件</td>
+<td><a href="plugins.html">插件运行时</a></td>
+<td><code>packages/plugin</code></td>
+</tr>
+<tr>
+<td>定时任务</td>
+<td><a href="scheduling.html">定时任务</a></td>
+<td><code>packages/daemon/src/{cron,scheduler}.ts</code></td>
+</tr>
+<tr>
+<td>配置</td>
+<td><a href="config.html">配置与厂商</a></td>
+<td><code>packages/config</code></td>
+</tr>
+<tr>
+<td>命令行</td>
+<td><a href="cli.html">CLI 与命令</a></td>
+<td><code>packages/cli</code></td>
+</tr>
+<tr>
+<td>客户端</td>
+<td><a href="clients.html">三端</a></td>
+<td><code>apps/tui</code> · <code>apps/web</code> · <code>apps/desktop</code> · <code>packages/client-core</code></td>
+</tr>
+<tr>
+<td>评估</td>
+<td><a href="eval.html">评估体系 L1 / L2</a></td>
+<td><code>packages/eval</code></td>
+</tr>
+</tbody>
+</table>
+<h2>扩展（基于 domi 做东西）</h2>
+<table>
+<thead>
+<tr>
+<th>想做什么</th>
+<th>文档</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>写一个插件（tool / skill / mcp / ui）</td>
+<td><a href="plugin-dev.html">插件开发</a></td>
+</tr>
+<tr>
+<td>写一个 Skill</td>
+<td><a href="skill-writing.html">Skill 编写</a></td>
+</tr>
+<tr>
+<td>给 domi 加内置工具</td>
+<td><a href="adding-tools.html">添加工具</a></td>
+</tr>
+<tr>
+<td>接入新的模型厂商</td>
+<td><a href="adding-providers.html">添加模型供应商</a></td>
+</tr>
+<tr>
+<td>在自己的程序里嵌入 domi</td>
+<td><a href="programmatic-integration.html">编程集成</a></td>
+</tr>
+</tbody>
+</table>
+<h2>参与</h2>
+<ul>
+<li>仓库规矩与提交规范见根目录 <a href="../../../CONTRIBUTING.md"><code>CONTRIBUTING.md</code></a>，站点版见<a href="contributing.html">贡献指南</a>。</li>
+<li>没想好从哪里下手：<code>docs/good-first-issues.md</code>。</li>
+<li>设计背景：<code>docs/DESIGN.md</code>（架构与路线图）、<code>docs/ENGINEERING.md</code>（工程规约）、<code>docs/PROCESS.md</code>（研发流程与回写门）。</li>
+<li>协议逐字段参考（生成文件，勿手改）：<a href="../../protocol.md"><code>docs/protocol.md</code></a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

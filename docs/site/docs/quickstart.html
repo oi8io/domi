@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>快速开始 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a class="active" href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>快速开始</h1>
+<blockquote>
+<p>第一次跑 domi：装好、配上模型、第一次对话、权限与长任务。想了解它是什么，先看<a href="intro.html">domi 是什么</a>。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>一条命令跑起来：<code>domi</code> 进 TUI，第一次会在后台拉起 domid。</li>
+<li>key 写进 <code>~/.domi/secrets.yaml</code> 或环境变量；<code>domi doctor</code> 每条问题都带修复命令。</li>
+<li><strong>没有规则的能力默认拒绝</strong>；危险能力只有你亲手写了 <code>allow</code> 规则才放行。</li>
+<li>任务在 domid 里跑，关掉终端也继续；重启后从上次完成的节点接着跑。</li>
+<li>出问题了先跑 <code>domi doctor</code>——它给出能直接粘贴的修复命令。</li>
+</ul>
+<h2>1. 装好并配上模型</h2>
+<pre><code class="language-sh">git clone &lt;仓库地址&gt; domi &amp;&amp; cd domi
+pnpm install &amp;&amp; pnpm build     # 产物是 dist/domi 单二进制；开发时也可以 bun apps/tui/src/main.tsx
+domi init &gt; ~/.domi/config.yaml
+export DEEPSEEK_API_KEY=sk-...     # 或者把 key 写进 ~/.domi/secrets.yaml
+domi doctor                    # 每条问题都带一条能直接粘贴的修复命令
+</code></pre>
+<p>key 写进 <code>~/.domi/secrets.yaml</code>（<code>providers.&lt;id&gt;.api_key</code>），或者用各家自己的环境变量（每家都认 <code>DOMI_&lt;ID&gt;_API_KEY</code>，厂商模板再加惯用名，例如 <code>ANTHROPIC_API_KEY</code>、<code>DEEPSEEK_API_KEY</code>）。</p>
+<p>多家供应商、本地模型或网关（LiteLLM、OpenRouter、Ollama）写在 <code>providers</code> 下，每家一段：</p>
+<pre><code class="language-yaml">model:
+  provider: deepseek        # 默认模型 = 一个 provider + 一个模型名
+  name: deepseek-chat
+providers:
+  deepseek:
+    vendor: deepseek        # 厂商模板给默认协议、地址与能力：openai / anthropic / deepseek / gemini / custom
+  local:
+    name: 本机 Ollama
+    vendor: custom
+    protocol: openai        # custom 要自己选协议
+    base_url: http://localhost:11434/v1
+    models: [qwen3:8b]      # 探测不到 /v1/models 时用这份清单
+    enabled: true
+</code></pre>
+<p>这些在 Web「设置 › 模型供应商」里都能改；模型清单会按 <code>/v1/models</code> 自动探测，对话里按 provider 分组切换。</p>
+<h2>2. 对话</h2>
+<pre><code class="language-sh">domi                           # 进 TUI；第一次会在后台拉起 domid
+</code></pre>
+<p>对话里常用的命令：<code>/model</code> 换模型、<code>/mode &lt;档位&gt;</code> 切确认模式、<code>/compact</code> 压缩上下文、<code>/branch</code> 从某一条分出新会话、<code>/ref &lt;会话&gt; [起-止]</code> 引用另一个会话的一段、<code>/continue</code> 接着做计划里没做完的步骤、<code>/soul</code> 看 Soul 待审阅的改动。模型跑着的时候也能接着打字：回车是<strong>补充</strong>，排队、下一步送达；要停下这一轮，Web 点「停止」、TUI 按 <code>Esc</code>。</p>
+<p>浏览器里打开 Web 端（<code>pnpm --filter @domi/web dev</code>），看到的是同一个 domid 里的同一批会话。</p>
+<p>TUI 默认是<strong>全屏模式</strong>（和 Claude Code 一样用终端的备用屏）：对话区自己滚动，输入框钉在底部。PgUp / PgDn 翻半屏，Ctrl+Home / Ctrl+End 到顶 / 到底，鼠标滚轮也能滚（<code>tui.mouse: false</code> 关掉，好让终端自己的鼠标选择可用）；往上翻着的时候来了新消息，底部会提示「N 条新消息」。要用终端自带的搜索或选择复制，按 <strong>Ctrl+O</strong> 把整段对话倒进终端的回滚区，按任意键回来。想要老样子（对话直接留在终端回滚里）：<code>tui.renderer: classic</code>，或临时 <code>DOMI_TUI_RENDERER=classic domi</code>。</p>
+<p>界面语言：<code>ui.locale: auto | zh | en</code>（auto 跟系统，TUI 看 <code>LANG</code>，Web 看浏览器）。</p>
+<h2>3. 权限</h2>
+<p>没有规则的能力默认拒绝。<code>config.yaml</code> 的 <code>permissions.rules</code> 按能力放行，<code>decision</code> 是 <code>allow</code> / <code>ask</code> / <code>deny</code>：</p>
+<pre><code class="language-yaml">permissions:
+  rules:
+    - { name: read, capability: fs.read, decision: allow }
+    - { name: write, capability: fs.write, decision: ask }
+</code></pre>
+<p>每个会话还有一个<strong>确认模式</strong>（<code>/mode</code>，Web 在输入框的下拉里，状态栏常驻显示）：</p>
+<ul>
+<li><code>on-demand</code>（默认）：按上面的规则走；危险能力（写 / 删 / 移动文件、跑命令、联网、MCP 与插件工具）只有你亲手写了 <code>allow</code> 规则才放行，规则是 <code>ask</code> 就问；</li>
+<li><code>always-ask</code>：没规则的普通能力也问你（没规则的危险能力仍然拒绝），危险能力即使规则 <code>allow</code> 也每次都问；</li>
+<li><code>allow-all</code>：跳过所有确认，只剩你显式写的 <code>deny</code> 规则还拦。</li>
+</ul>
+<p>下面这段就是 domi 里通配规则的匹配方式——<code>mcp.github.*</code> 管得到 <code>mcp.github.create_issue</code>，管不到 <code>mcp.githubx.y</code>：</p>
+<pre><code class="language-ts">import assert from 'node:assert/strict'
+
+function matches(pattern: string, capability: string): boolean {
+  if (!pattern.endsWith('.*')) return pattern === capability
+  const prefix = pattern.slice(0, -1)
+  return prefix.length &gt; 1 &amp;&amp; capability.startsWith(prefix)
+}
+
+assert.equal(matches('mcp.github.*', 'mcp.github.create_issue'), true)
+assert.equal(matches('mcp.github.*', 'mcp.githubx.y'), false)
+assert.equal(matches('fs.read', 'fs.read'), true)
+</code></pre>
+<h2>4. 长任务</h2>
+<pre><code class="language-sh">domi task run docs/tasks-example.yaml --follow
+</code></pre>
+<p>任务在 domid 里跑，关掉终端也继续；domid 被杀后重启会从上次完成的节点接着跑。</p>
+<h2>5. 出错了怎么办</h2>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>配置 / 环境有问题</td>
+<td><code>domi doctor</code> 列出问题 + 修复命令</td>
+<td>按提示粘贴命令</td>
+</tr>
+<tr>
+<td>缺 API key</td>
+<td>对话提交时报 missing_credential</td>
+<td>补 secrets / 环境变量</td>
+</tr>
+<tr>
+<td>能力被拒</td>
+<td>默认拒绝，落权限事件</td>
+<td>加 permissions.rules</td>
+</tr>
+<tr>
+<td>TUI 全屏挂掉</td>
+<td>写 tui-fallback，自动用 classic</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>模型清单探测不到</td>
+<td>用配置 models 兜底</td>
+<td>在 providers 里写 models</td>
+</tr>
+</tbody>
+</table>
+<p>想深入：权限怎么判的见<a href="tools-runtime.html">工具与权限运行时</a>；模型厂商怎么配见<a href="config.html">配置与厂商</a>。</p>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

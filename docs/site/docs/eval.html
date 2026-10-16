@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>评估体系 L1 / L2 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a class="active" href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>评估体系 L1 / L2</h1>
+<blockquote>
+<p>本页回答四个问题：怎么证明「没改坏」？怎么证明「真能干活」？测试金字塔什么样？回放怎么不花钱不联网？
+<code>packages/eval</code>。
+domi 的立场：<strong>评估以事件流回放为唯一数据源，不新增埋点</strong>；L1 是 CI 门禁，L2 只进 nightly / 手动。
+贯穿例子：给登录接口加限流——改完权限逻辑，先跑 L1 回放证明没改坏，再跑 L2 验证真能干活。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li><strong>L1 = 确定性回放</strong>（可进 CI）：回放的是模型与工具，跑的是真的 kernel——不花钱、不联网。</li>
+<li><strong>L2 = 端到端</strong>（真模型，不进 CI）：一题 = 一个目录，每次复制到新临时目录跑，题与题没有残留。</li>
+<li>判据：工具调用序列 + 事件流等价；对不上时给出 <code>Divergence{index, expected, actual, seq}</code>。</li>
+<li>fixture 存模型的<strong>原始 SSE 响应流</strong>，不是最终结果——只有「模型推理」被固定住，其它全真实跑。</li>
+<li>删除 <code>packages/eval</code> 后 kernel / store 测试仍全绿（INV-13 的守卫）。</li>
+<li>测试金字塔：单测 ~70% / 回放 ~25% / 真实 eval ~5%。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>回放</td>
+<td>用录制的模型响应重跑真实 kernel。</td>
+</tr>
+<tr>
+<td>fixture</td>
+<td>录制的原始 SSE 响应流（测试资产）。</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>确定性回放，进 CI 门禁。</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>端到端真模型，只进 nightly / 手动。</td>
+</tr>
+<tr>
+<td>Divergence</td>
+<td>回放对不上的位置（第几次调用）。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/eval-layers.svg" alt="L1 与 L2" /></p>
+<h2>2. L1：确定性回放（可进 CI）</h2>
+<p><code>eval/src/replay.ts</code>：</p>
+<ul>
+<li><strong>回放的是模型与工具，跑的是真的 kernel</strong>：真的 <code>buildContext</code>、真的 <code>runTurn</code>、真的终止条件、真的事件流——能抓到「改了 prompt 之后工具调用顺序变了」这类回归。</li>
+<li><strong>不花钱、不联网</strong>：回放期间任何出站调用都让测试失败（<code>assertNoNetwork</code>）；fixture 存模型的原始 SSE 响应流，不是最终结果。</li>
+<li>判据：工具调用序列 + 事件流等价；从第几次开始对不上给出 <code>Divergence{index, expected, actual, seq}</code>。</li>
+<li>命令：<code>domi eval run</code>（CI 里 <code>pnpm eval</code>）；<code>domi eval record &lt;sessionId&gt;</code> 录制（数据只有事件流）。</li>
+<li><strong>删除测试</strong>：删掉 <code>packages/eval</code> 后 kernel / store 测试仍全绿（INV-13 的守卫方式，<code>check-eval-isolation.ts</code>）。</li>
+</ul>
+<h2>3. L2：端到端（真模型，不进 CI）</h2>
+<p><code>eval/src/l2.ts</code>：L1 证明「没改坏」，L2 证明「真能干活」。</p>
+<ul>
+<li>一题 = 一个目录：<code>task.yaml</code>（提示与允许的能力）+ <code>workspace/</code>（初始文件）+ <code>check.ts</code>（判据，退出码 0 = 通过）。题在 <code>eval/l2/</code>。</li>
+<li>每次都复制到新的临时目录跑，题与题、次与次之间没有残留。</li>
+<li>harness 不认识模型：怎么跑一轮由调用方注入（CLI 用真实的 runtime，测试用替身）。</li>
+<li><code>mine.ts</code>：从 git 历史挖题（会写代码的评估源）。</li>
+</ul>
+<h2>4. 三层测试金字塔</h2>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>占比</th>
+<th>确定性</th>
+<th>进 CI？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>纯函数单测</td>
+<td>~70%</td>
+<td>完全确定</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>录制回放（ReplayProvider / L1）</td>
+<td>~25%</td>
+<td>确定</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>真实 eval（L2）</td>
+<td>~5%</td>
+<td>非确定</td>
+<td>❌（nightly / 手动，看趋势文件）</td>
+</tr>
+</tbody>
+</table>
+<h2>5. 出错了怎么办：L1 回放对不上了</h2>
+<ol>
+<li><strong>工具调用顺序变了</strong>。<code>Divergence{index, expected, actual, seq}</code>——从第几次开始对不上。<code>seq</code> 直接跳到轨迹面板对应节点，看哪一步变了。</li>
+<li><strong>回放期间有出站调用</strong>。<code>assertNoNetwork</code> 让测试失败。查是不是 fixture 依赖了网络（fixture 只存 SSE 流，不该有别的出站）。</li>
+<li><strong>改了 prompt 导致行为变化</strong>。这正是 L1 要抓的：改 prompt 是行为变更，先想清楚要不要改 fixture。</li>
+<li><strong>L2 题挂了</strong>。check.ts 退出码非 0。在临时目录里重跑，看 workspace 状态——每次都是干净的。</li>
+<li><strong>录制数据缺失</strong>。<code>domi eval record</code> 的数据只有事件流；缺埋点说明事件没录全。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>回放对不上</td>
+<td>给 Divergence（index/seq）</td>
+<td>用 seq 跳轨迹节点排查</td>
+</tr>
+<tr>
+<td>有出站调用</td>
+<td>assertNoNetwork 失败</td>
+<td>查 fixture 依赖</td>
+</tr>
+<tr>
+<td>prompt 改了行为</td>
+<td>L1 抓住差异</td>
+<td>决定改代码还是改 fixture</td>
+</tr>
+<tr>
+<td>L2 题挂</td>
+<td>check.ts 非 0</td>
+<td>临时目录重跑排查</td>
+</tr>
+<tr>
+<td>录制缺数据</td>
+<td>—</td>
+<td>检查事件是否录全</td>
+</tr>
+</tbody>
+</table>
+<h2>6. 可靠性靠什么</h2>
+<ol>
+<li><strong>事件流是唯一数据源</strong>：评估与轨迹同一份数据，不新增埋点。</li>
+<li><strong>只固定模型推理</strong>：工具、权限、压缩全部真实跑——回归抓得到。</li>
+<li><strong>无网保证</strong>：出站调用直接失败，CI 里不会偷偷联网。</li>
+<li><strong>隔离</strong>：L2 每次新临时目录，题与题无残留。</li>
+<li><strong>可删除</strong>：eval 包删掉其它测试仍绿，它不绑架系统。</li>
+<li><strong>AC 对照</strong>：<code>check-ac-coverage.ts</code> 把 PRD AC ↔ 测试点名对照——唯一防回退机制。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>L2 非确定：真实模型有波动，只进 nightly / 手动。</li>
+<li>fixture 需要维护：prompt / 行为变更后可能要重录。</li>
+<li>回放只固定「模型推理」：其它环节仍受环境影响。</li>
+<li><code>mine.ts</code> 挖题依赖 git 历史质量。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1 回放</td>
+<td><code>packages/eval/src/replay.ts</code></td>
+</tr>
+<tr>
+<td>L2 端到端</td>
+<td><code>packages/eval/src/l2.ts</code></td>
+</tr>
+<tr>
+<td>挖题</td>
+<td><code>packages/eval/src/mine.ts</code></td>
+</tr>
+<tr>
+<td>隔离守卫</td>
+<td><code>scripts/check-eval-isolation.ts</code></td>
+</tr>
+<tr>
+<td>AC 对照</td>
+<td><code>scripts/check-ac-coverage.ts</code></td>
+</tr>
+<tr>
+<td>L2 题</td>
+<td><code>eval/l2/</code></td>
+</tr>
+</tbody>
+</table>
+<h2>相关</h2>
+<ul>
+<li>轨迹与回放的关系：<a href="trajectory-and-replay.html">轨迹与回放</a>。</li>
+<li>修 bug 的流程：先写能复现的失败测试 → 再修（ENGINEERING.md 硬规则）。</li>
+<li>命令面：<code>domi eval run / record</code> 见 <a href="cli.html">CLI 与命令</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

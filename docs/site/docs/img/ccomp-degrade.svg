@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 640" width="880" height="640" role="img" aria-labelledby="t d">
+<title id="t">上下文降级链</title>
+<desc id="d">发请求前估占用，逐级降：达到遮蔽档先遮蔽，重估；仍到压缩档再压缩，重估；仍到硬顶则本轮停下并给出出路。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22D3EE"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F87171"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .warn{fill:#1A1A10;stroke:#FBBF24;stroke-width:1.4}
+  .violet{fill:#17142A;stroke:#A78BFA;stroke-width:1.4}
+  .ok{fill:#052E16;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#2A0A0A;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="640" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">上下文降级链：遮蔽 → 压缩 → 硬顶</text>
+<text class="s" x="20" y="56">每一级动作后重估占用；动作失败不阻断，由硬顶收口</text>
+
+<!-- 起点 -->
+<rect x="320" y="72" width="240" height="50" rx="10" fill="#0F1E26" stroke="#22D3EE" stroke-width="1.5"/>
+<text class="k" x="440" y="94" text-anchor="middle" style="fill:#22D3EE">发请求前：估占用</text>
+<text class="mono" x="440" y="112" text-anchor="middle">evaluate(used, effective)</text>
+<path d="M440 122 V136" fill="none" stroke="#22D3EE" stroke-width="1.4" marker-end="url(#ac)"/>
+
+<!-- 菱形1：遮蔽档 -->
+<path d="M440 138 L512 172 L440 206 L368 172 Z" fill="#1A1A10" stroke="#FBBF24" stroke-width="1.4"/>
+<text class="k" x="440" y="166" text-anchor="middle" style="fill:#FBBF24">≥60%？</text>
+<text class="s" x="440" y="184" text-anchor="middle">均衡 60% / 节省 45%</text>
+
+<path d="M440 206 V222" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="452" y="220">是</text>
+
+<!-- 动作1：遮蔽 -->
+<rect class="warn" x="300" y="224" width="280" height="64" rx="10"/>
+<text class="k" x="316" y="246" style="fill:#FBBF24">② 遮蔽一批冷区</text>
+<text class="s" x="316" y="262">落 ctx.mask；freed&gt;0 才减占用</text>
+<text class="s" x="316" y="278">腾不出（freed=0）视为未生效</text>
+
+<path d="M440 288 V304" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="452" y="300">重估</text>
+
+<!-- 菱形2：压缩档 -->
+<path d="M440 306 L512 340 L440 374 L368 340 Z" fill="#1A1A10" stroke="#FBBF24" stroke-width="1.4"/>
+<text class="k" x="440" y="334" text-anchor="middle" style="fill:#FBBF24">≥80%？</text>
+<text class="s" x="440" y="352" text-anchor="middle">任何策略不降</text>
+
+<path d="M440 374 V390" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="452" y="388">是</text>
+
+<!-- 动作2：压缩 -->
+<rect class="violet" x="300" y="392" width="280" height="64" rx="10"/>
+<text class="k" x="316" y="414" style="fill:#A78BFA">③ 压缩中间历史</text>
+<text class="s" x="316" y="430">落 ctx.compact；ok 且 freed&gt;0 才减</text>
+<text class="s" x="316" y="446">失败或腾不出 → 继续往下</text>
+
+<path d="M440 456 V472" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="452" y="468">重估</text>
+
+<!-- 菱形3：硬顶 -->
+<path d="M440 474 L512 508 L440 542 L368 508 Z" fill="#2A0A0A" stroke="#F87171" stroke-width="1.4"/>
+<text class="k" x="440" y="502" text-anchor="middle" style="fill:#F87171">≥92%？</text>
+<text class="s" x="440" y="520" text-anchor="middle">hard 档任何策略不降</text>
+
+<!-- 分叉 -->
+<path d="M440 542 V552 H230 V562" fill="none" stroke="#F87171" stroke-width="1.4" marker-end="url(#ar)"/>
+<text class="s" x="250" y="548" style="fill:#F87171">是</text>
+<rect class="bad" x="60" y="566" width="340" height="64" rx="10"/>
+<text class="k" x="76" y="588" style="fill:#F87171">本轮停：error{scope:context, recoverable}</text>
+<text class="s" x="76" y="604">出路：/compact · 新会话带摘要 · 换大窗口模型</text>
+
+<path d="M440 542 V552 H650 V562" fill="none" stroke="#4ADE80" stroke-width="1.4" marker-end="url(#ag)"/>
+<text class="s" x="560" y="548" style="fill:#4ADE80">否</text>
+<rect class="ok" x="480" y="566" width="340" height="64" rx="10"/>
+<text class="k" x="496" y="588" style="fill:#4ADE80">proceed：继续发请求</text>
+<text class="s" x="496" y="604">降级成功，模型照常生成</text>
+
+<!-- 右侧旁注 -->
+<text class="s" x="610" y="96">同一份 evaluate</text>
+<text class="s" x="610" y="114">守卫 / 状态栏 / 上下文 tab 同源</text>
+<text class="s" x="610" y="256" style="fill:#FBBF24">遮蔽 / 压缩失败不阻断</text>
+<text class="s" x="610" y="430" style="fill:#A78BFA">每级动作后重估，不跳级</text>
+</svg>

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>配置与厂商 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a class="active" href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>配置与厂商</h1>
+<blockquote>
+<p>本页回答四个问题：配置放哪？厂商知识在哪？什么能通过设置页改？改坏了会怎样？
+<code>packages/config</code> —— 配置 schema、加载、secrets、厂商模板。
+贯穿例子：给登录接口加限流——你在 <code>config.yaml</code> 里把 <code>loop.maxToolCalls</code> 调大。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li><strong>配置在 <code>~/.domi/config.yaml</code>，凭据只在 <code>~/.domi/secrets.yaml</code></strong>——两份文件，一个原则。</li>
+<li>「有哪些厂商」这件知识只在 <code>vendors.ts</code>（<code>guard:providers</code> 守着）：5 家模板，纯数据。</li>
+<li>缺 key 也照起：模型请求留到提交时报 <code>error.missing_credential</code>。</li>
+<li>凭据任何接口都不回吐给界面。</li>
+<li><strong><code>config.set</code> 白名单排除 permissions / hooks / MCP / 插件安装</strong>——界面永远不能给自己提权。</li>
+<li>Web 设置页读写的就是启动时读的那一份。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>config.yaml</td>
+<td>主配置（模型 / 权限 / MCP / 记忆 / 上限）。</td>
+</tr>
+<tr>
+<td>secrets.yaml</td>
+<td>凭据文件（providers.&lt;id&gt;.api_key）。</td>
+</tr>
+<tr>
+<td>厂商模板</td>
+<td>纯数据的厂商知识（协议 / 地址 / 能力 / 适配器）。</td>
+</tr>
+<tr>
+<td>白名单</td>
+<td>config.set 允许改的键的名单。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 两份文件，一个原则</h2>
+<p><img src="img/cfg-layout.svg" alt="配置加载" /></p>
+<ul>
+<li><code>~/.domi/config.yaml</code>：模型、权限、MCP、记忆、通知、插件、UI、TUI、hooks、verify、pricing、budget、skills、prompt、server、context、loop、attachments。<code>loadConfig</code> 读取（YAML）。</li>
+<li><code>~/.domi/secrets.yaml</code>：凭据（<code>providers.&lt;id&gt;.api_key</code>）。<code>loadSecrets</code> 读取；任何接口都不回吐给界面（凭据脱敏）。</li>
+</ul>
+<p>key 也可以用各家惯用的环境变量（<code>DOMI_&lt;ID&gt;_API_KEY</code> + 厂商模板里的惯用名，如 <code>ANTHROPIC_API_KEY</code>）。</p>
+<h2>2. 厂商模板（vendors.ts）</h2>
+<p><strong>「有哪些厂商」这件知识只在这里</strong>（<code>guard:providers</code> 守着）。每个模板是纯数据：<code>{ id, label, protocol, adapter, defaultBaseUrl?, capabilities, envNames, keyHint }</code>。</p>
+<table>
+<thead>
+<tr>
+<th>厂商</th>
+<th>适配器</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>openai</td>
+<td>openai-official</td>
+<td>Responses API</td>
+</tr>
+<tr>
+<td>anthropic</td>
+<td>anthropic</td>
+<td>官方</td>
+</tr>
+<tr>
+<td>deepseek</td>
+<td>openai-compatible</td>
+<td>兼容协议</td>
+</tr>
+<tr>
+<td>gemini</td>
+<td>官方</td>
+<td></td>
+</tr>
+<tr>
+<td>custom</td>
+<td>自选协议</td>
+<td>后面挂什么只有用户知道</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>PROTOCOLS</code>：<code>openai</code> | <code>anthropic</code>；<code>Adapter</code>：<code>openai-official</code> | <code>anthropic</code> | <code>openai-compatible</code>。</li>
+<li>能力矩阵（toolCall / vision / reasoning / promptCache / structuredOutput）是默认值——配置里可显式覆盖。</li>
+<li>放在 config 而不是 model：apps 不许 import model（那里有 AI SDK），而模板本身不需要 SDK；Web 经 <code>provider.vendors</code> 画「新增 provider」表单——两边都不自己写厂商名单。</li>
+</ul>
+<h2>3. 配置 schema 要点（zod）</h2>
+<table>
+<thead>
+<tr>
+<th>区</th>
+<th>要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model</code></td>
+<td>默认模型 = 一个 provider + 一个模型名</td>
+</tr>
+<tr>
+<td><code>providers</code></td>
+<td>每家一段（vendor / protocol / base_url / models / enabled / capabilities 覆盖）</td>
+</tr>
+<tr>
+<td><code>permissions.rules</code></td>
+<td>见<a href="tools-runtime.html">工具与权限运行时</a></td>
+</tr>
+<tr>
+<td><code>mcp</code></td>
+<td>servers / allowedHosts / timeoutMs，见<a href="mcp-internals.html">MCP 接入</a></td>
+</tr>
+<tr>
+<td><code>memory</code> / <code>notify</code> / <code>plugins</code></td>
+<td>enabled / allowUnsandboxed / disabled</td>
+</tr>
+<tr>
+<td><code>ui.locale</code></td>
+<td>auto | zh | en</td>
+</tr>
+<tr>
+<td><code>tui.renderer</code></td>
+<td>fullscreen | classic</td>
+</tr>
+<tr>
+<td><code>hooks</code> / <code>verify</code></td>
+<td>钩子 / 校验</td>
+</tr>
+<tr>
+<td><code>pricing</code></td>
+<td>内置定价表；用量成本只统计有定价表的模型</td>
+</tr>
+<tr>
+<td><code>budget</code></td>
+<td>预算</td>
+</tr>
+<tr>
+<td><code>skills.enabled</code></td>
+<td>技能开关</td>
+</tr>
+<tr>
+<td><code>prompt</code></td>
+<td>自定义提示词层</td>
+</tr>
+<tr>
+<td><code>server</code></td>
+<td>port / host / token</td>
+</tr>
+<tr>
+<td><code>context</code></td>
+<td>上下文</td>
+</tr>
+<tr>
+<td><code>loop</code></td>
+<td>上限，默认 100</td>
+</tr>
+<tr>
+<td><code>attachments.maxMB</code></td>
+<td>默认 20</td>
+</tr>
+</tbody>
+</table>
+<h2>4. 加载与写回</h2>
+<ul>
+<li><code>load.ts</code>：<code>loadConfig</code>（无 key 也照起；缺 key 留到提交时报 <code>error.missing_credential</code>，<code>data.reason = MISSING_CREDENTIAL</code>）、<code>configPath</code> / <code>domiHome</code>、<code>ConfigParseError</code>。</li>
+<li><code>preflight.ts</code>：<code>domi doctor</code> 的每一条问题带一条能直接粘贴的修复命令。</li>
+<li><code>write.ts</code>：<code>writeConfigPatch</code>——Web 设置页读写的就是启动时读的那一份；<strong><code>config.set</code> 的白名单必须排除 permissions / hooks / MCP / 插件安装</strong>——界面永远不能给自己提权。</li>
+<li><code>providers.ts</code>：<code>providerConnection</code> / <code>listProviders</code> / <code>credentialEnvNames</code> / <code>pricingOf</code>。</li>
+</ul>
+<h2>5. 出错了怎么办：把 YAML 写坏了</h2>
+<ol>
+<li><strong>YAML 解析失败</strong>。<code>loadConfig</code> 抛 <code>ConfigParseError</code>。打开配置看报错行，修 YAML。<code>domi doctor</code> 会给修复提示。</li>
+<li><strong>缺 API key</strong>。domi 照常启动；模型请求提交时报 <code>error.missing_credential</code>（<code>data.reason = MISSING_CREDENTIAL</code>）。在 secrets.yaml 或环境变量里补 key。</li>
+<li><strong>设置页改了不被允许的键</strong>。白名单拒绝——permissions / hooks / MCP / 插件安装不能经界面改。改配置文件。</li>
+<li><strong>厂商能力声明错了</strong>。配置里显式覆盖 capabilities 即可。</li>
+<li><strong>不小心删了配置</strong>。domi 用默认值启动；<code>domi init</code> 重新生成模板。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>YAML 写坏</td>
+<td>ConfigParseError</td>
+<td>修 YAML / domi doctor</td>
+</tr>
+<tr>
+<td>缺 API key</td>
+<td>照起，提交时报 missing_credential</td>
+<td>补 secrets / 环境变量</td>
+</tr>
+<tr>
+<td>设置页改敏感键</td>
+<td>白名单拒绝</td>
+<td>改配置文件</td>
+</tr>
+<tr>
+<td>能力声明错</td>
+<td>按声明拒绝/放行</td>
+<td>显式覆盖 capabilities</td>
+</tr>
+<tr>
+<td>配置被删</td>
+<td>默认值启动</td>
+<td>domi init 重建模板</td>
+</tr>
+</tbody>
+</table>
+<h2>6. 可靠性靠什么</h2>
+<ol>
+<li><strong>职责分离</strong>：配置与凭据分文件，凭据不回吐。</li>
+<li><strong>知识单点</strong>：厂商名单只在 vendors.ts，两边共用不重复写。</li>
+<li><strong>缺 key 不崩</strong>：启动不依赖凭据，错误留到真正需要时。</li>
+<li><strong>界面不能提权</strong>：config.set 白名单硬排除敏感区。</li>
+<li><strong>写回一致</strong>：设置页读写同一份启动时读的配置。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>YAML 是唯一格式（TOML 支持已删除）。</li>
+<li>用量成本只统计有定价表的模型（BUILTIN_PRICING 之外不统计）。</li>
+<li>厂商能力默认值是猜测：custom 的实际能力要靠显式覆盖。</li>
+<li>白名单保护的是界面路径，直接改文件仍然可能写坏。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>schema（zod）</td>
+<td><code>packages/config/src/schema.ts</code></td>
+</tr>
+<tr>
+<td>加载 / 路径</td>
+<td><code>packages/config/src/load.ts</code></td>
+</tr>
+<tr>
+<td>写回 / 白名单</td>
+<td><code>packages/config/src/write.ts</code></td>
+</tr>
+<tr>
+<td>厂商模板</td>
+<td><code>packages/config/src/vendors.ts</code></td>
+</tr>
+<tr>
+<td>doctor 问题源</td>
+<td><code>packages/config/src/preflight.ts</code></td>
+</tr>
+<tr>
+<td>provider 连接</td>
+<td><code>packages/config/src/providers.ts</code></td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/config/test/</code>（schema 校验、secrets 加载、vendor 解析、白名单）。</p>
+<h2>相关</h2>
+<ul>
+<li>模型层怎么消费厂商模板：<a href="model-runtime.html">模型运行时</a>。</li>
+<li>设置页 RPC：<code>config.get</code> / <code>config.set</code> / <code>provider.vendors</code> 见 <a href="protocol.html">Domi Protocol</a>。</li>
+<li>命令行看配置：<code>domi doctor</code> / <code>domi init</code> 见 <a href="cli.html">CLI 与命令</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

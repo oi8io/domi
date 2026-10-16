@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 520" width="880" height="520" role="img" aria-labelledby="t d">
+<title id="t">遮蔽与压缩的差别</title>
+<desc id="d">左边遮蔽：冷区工具输出换成指针，事件流原文还在，信息零丢失。右边压缩：中间历史换成结构化摘要，有损。两者都只追加事件。</desc>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:10.5px;fill:#8FA1B2}
+  .ev{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .cold{fill:#1A1A10;stroke:#FBBF24;stroke-width:1.3}
+  .willc{fill:#17142A;stroke:#A78BFA;stroke-width:1.3}
+  .ptr{fill:#111A23;stroke:#FBBF24;stroke-width:1.3}
+  .summ{fill:#111A23;stroke:#A78BFA;stroke-width:1.3}
+  .ok{fill:#052E16;stroke:#4ADE80;stroke-width:1.3}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+</style>
+<rect width="880" height="520" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">遮蔽 vs 压缩：都只追加事件</text>
+<text class="s" x="20" y="56">上面是事件流（原文一条不动），下面是模型看到的投影</text>
+
+<!-- 左半 -->
+<text class="k" x="20" y="92" style="fill:#22D3EE">遮蔽（mask）：信息零丢失</text>
+<text class="s" x="20" y="114">事件流原文</text>
+<rect class="ev" x="20" y="124" width="30" height="44" rx="4"/><text class="mono" x="35" y="151" text-anchor="middle">1</text>
+<rect class="cold" x="58" y="124" width="30" height="44" rx="4"/><text class="mono" x="73" y="151" text-anchor="middle">2</text>
+<rect class="cold" x="96" y="124" width="30" height="44" rx="4"/><text class="mono" x="111" y="151" text-anchor="middle">3</text>
+<rect class="cold" x="134" y="124" width="30" height="44" rx="4"/><text class="mono" x="149" y="151" text-anchor="middle">4</text>
+<rect class="cold" x="172" y="124" width="30" height="44" rx="4"/><text class="mono" x="187" y="151" text-anchor="middle">5</text>
+<rect class="cold" x="210" y="124" width="30" height="44" rx="4"/><text class="mono" x="225" y="151" text-anchor="middle">6</text>
+<rect class="ev" x="248" y="124" width="30" height="44" rx="4"/><text class="mono" x="263" y="151" text-anchor="middle">7</text>
+<rect class="ev" x="286" y="124" width="30" height="44" rx="4"/><text class="mono" x="301" y="151" text-anchor="middle">8</text>
+<rect class="ev" x="324" y="124" width="30" height="44" rx="4"/><text class="mono" x="339" y="151" text-anchor="middle">9</text>
+<rect class="ev" x="362" y="124" width="30" height="44" rx="4"/><text class="mono" x="377" y="151" text-anchor="middle">10</text>
+<path d="M200 168 V182" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="208" y="180">投影</text>
+<text class="s" x="20" y="196">模型看到</text>
+<rect class="ev" x="20" y="204" width="30" height="44" rx="4"/><text class="mono" x="35" y="231" text-anchor="middle">1</text>
+<rect class="ptr" x="58" y="204" width="152" height="44" rx="6"/>
+<text class="mono" x="134" y="226" text-anchor="middle">已遮蔽，见 ctx.mask</text>
+<text class="mono" x="134" y="240" text-anchor="middle">（指针，内容不渲染）</text>
+<rect class="ev" x="218" y="204" width="30" height="44" rx="4"/><text class="mono" x="233" y="231" text-anchor="middle">7</text>
+<rect class="ev" x="256" y="204" width="30" height="44" rx="4"/><text class="mono" x="271" y="231" text-anchor="middle">8</text>
+<rect class="ev" x="294" y="204" width="30" height="44" rx="4"/><text class="mono" x="309" y="231" text-anchor="middle">9</text>
+<rect class="ev" x="332" y="204" width="30" height="44" rx="4"/><text class="mono" x="347" y="231" text-anchor="middle">10</text>
+<text class="s" x="20" y="272">代价：一次缓存重写。被遮内容还在事件流里</text>
+
+<!-- 中分隔线 -->
+<line x1="440" y1="80" x2="440" y2="285" stroke="#2A3B4D" stroke-width="1.2" stroke-dasharray="6 5"/>
+
+<!-- 右半 -->
+<text class="k" x="460" y="92" style="fill:#A78BFA">压缩（compact）：有损</text>
+<text class="s" x="460" y="114">事件流原文</text>
+<rect class="ev" x="460" y="124" width="30" height="44" rx="4"/><text class="mono" x="475" y="151" text-anchor="middle">1</text>
+<rect class="ev" x="498" y="124" width="30" height="44" rx="4"/><text class="mono" x="513" y="151" text-anchor="middle">2</text>
+<rect class="willc" x="536" y="124" width="30" height="44" rx="4"/><text class="mono" x="551" y="151" text-anchor="middle">3</text>
+<rect class="willc" x="574" y="124" width="30" height="44" rx="4"/><text class="mono" x="589" y="151" text-anchor="middle">4</text>
+<rect class="willc" x="612" y="124" width="30" height="44" rx="4"/><text class="mono" x="627" y="151" text-anchor="middle">5</text>
+<rect class="willc" x="650" y="124" width="30" height="44" rx="4"/><text class="mono" x="665" y="151" text-anchor="middle">6</text>
+<rect class="willc" x="688" y="124" width="30" height="44" rx="4"/><text class="mono" x="703" y="151" text-anchor="middle">7</text>
+<rect class="willc" x="726" y="124" width="30" height="44" rx="4"/><text class="mono" x="741" y="151" text-anchor="middle">8</text>
+<rect class="ev" x="764" y="124" width="30" height="44" rx="4"/><text class="mono" x="779" y="151" text-anchor="middle">9</text>
+<rect class="ev" x="802" y="124" width="30" height="44" rx="4"/><text class="mono" x="817" y="151" text-anchor="middle">10</text>
+<path d="M650 168 V182" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="658" y="180">投影</text>
+<text class="s" x="460" y="196">模型看到</text>
+<rect class="ev" x="460" y="204" width="30" height="44" rx="4"/><text class="mono" x="475" y="231" text-anchor="middle">1</text>
+<rect class="ev" x="498" y="204" width="30" height="44" rx="4"/><text class="mono" x="513" y="231" text-anchor="middle">2</text>
+<rect class="summ" x="536" y="204" width="226" height="44" rx="6"/>
+<text class="mono" x="649" y="226" text-anchor="middle">结构化摘要（固定字段）</text>
+<text class="mono" x="649" y="240" text-anchor="middle">替换被压区间 3–8</text>
+<rect class="ev" x="770" y="204" width="30" height="44" rx="4"/><text class="mono" x="785" y="231" text-anchor="middle">9</text>
+<rect class="ev" x="808" y="204" width="30" height="44" rx="4"/><text class="mono" x="823" y="231" text-anchor="middle">10</text>
+<text class="s" x="460" y="272">保边：最近 8 步 / 24k token 逐字保留；摘要字段固定</text>
+
+<!-- 底部对比 -->
+<rect class="ok" x="20" y="300" width="410" height="96" rx="10"/>
+<text class="k" x="36" y="324" style="fill:#4ADE80">遮蔽（mask）</text>
+<text class="s" x="36" y="344">代价：一次缓存重写</text>
+<text class="s" x="36" y="362">保真：指针，零丢失</text>
+<text class="s" x="36" y="380">触发：60%（节省档 45%）</text>
+
+<rect class="box" x="450" y="300" width="410" height="96" rx="10"/>
+<text class="k" x="466" y="324" style="fill:#A78BFA">压缩（compact）</text>
+<text class="s" x="466" y="344">代价：一次模型摘要调用（token + 延迟）</text>
+<text class="s" x="466" y="362">保真：摘要，有损</text>
+<text class="s" x="466" y="380">触发：80%（任何策略不降）</text>
+
+<text class="s" x="20" y="440">两者都只追加 ctx.mask / ctx.compact 事件。原始事件一个字节不动，任何一步都能被审计复现</text>
+</svg>

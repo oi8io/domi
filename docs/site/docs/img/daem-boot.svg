@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 520" width="880" height="520" role="img" aria-labelledby="t d">
+<title id="t">domid 启动顺序</title>
+<desc id="d">先抢锁再监听；先开门再连 MCP。启动六步：抢锁、配置、serveWs、宿主、监听、第一行 listening 地址。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="520" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">domid 启动：先抢锁、再监听；先开门、再连 MCP</text>
+<text class="s" x="20" y="56">两个入口：bun main.ts（开发）· DOMI_INTERNAL_ROLE=daemon domi（单二进制）</text>
+
+<rect class="st" x="60" y="84" width="520" height="52" rx="10"/>
+<text class="mono" x="76" y="106">①</text><text class="k" x="110" y="106">先抢锁</text>
+<text class="s" x="200" y="106">acquireLock(~/.domi/domid.lock)</text>
+<text class="s" x="200" y="124">输的那个不占端口就退出（LockHeldError → 码 3）</text>
+
+<rect class="st" x="60" y="148" width="520" height="52" rx="10"/>
+<text class="mono" x="76" y="170">②</text><text class="k" x="110" y="170">读配置</text>
+<text class="s" x="200" y="170">loadConfig（缺 key 也照样起）</text>
+<text class="s" x="200" y="188">算端口 / host / token / allowedOrigins</text>
+
+<rect class="warn" x="60" y="212" width="520" height="52" rx="10"/>
+<text class="mono" x="76" y="234" style="fill:#FBBF24">③</text><text class="k" x="110" y="234" style="fill:#FBBF24">先开门再连 MCP</text>
+<text class="s" x="200" y="234">McpHub 连 server 可能要好几秒</text>
+<text class="s" x="200" y="252">不能让拉起 domid 的客户端一直等</text>
+
+<rect class="st" x="60" y="276" width="520" height="52" rx="10"/>
+<text class="mono" x="76" y="298">④</text><text class="k" x="110" y="298">建宿主</text>
+<text class="s" x="200" y="298">PluginHost · RuntimeHost · Daemon(core)</text>
+<text class="s" x="200" y="316">MCP 工具每轮现取，连上自然就有</text>
+
+<rect class="ok" x="60" y="340" width="520" height="52" rx="10"/>
+<text class="mono" x="76" y="362" style="fill:#4ADE80">⑤</text><text class="k" x="110" y="362" style="fill:#4ADE80">serveWs 监听</text>
+<text class="s" x="200" y="362">第一行 stdout：domid listening &lt;url&gt;</text>
+<text class="s" x="200" y="380">DOMI_PORT=0 → 真实端口原地改写锁文件</text>
+
+<rect class="warn" x="60" y="404" width="520" height="52" rx="10"/>
+<text class="mono" x="76" y="426" style="fill:#FBBF24">⑥</text><text class="k" x="110" y="426" style="fill:#FBBF24">远程强制 token</text>
+<text class="s" x="200" y="426">DOMI_HOST=0.0.0.0 时可远程连</text>
+<text class="s" x="200" y="444">token 不打印（这些输出会进日志）</text>
+
+<!-- 右侧 -->
+<rect class="box" x="640" y="84" width="220" height="200" rx="10"/>
+<text class="k" x="656" y="108" style="fill:#FBBF24">顺序为什么重要</text>
+<text class="s" x="656" y="130">先抢锁：双开不占端口</text>
+<text class="s" x="656" y="152">先开门：启动不被慢 MCP 拖住</text>
+<text class="s" x="656" y="174">第一行 stdout：拉起方读地址</text>
+<text class="s" x="656" y="196">token 不打印：不泄密进日志</text>
+<text class="s" x="656" y="218">锁文件记 pid / port / host</text>
+<text class="s" x="656" y="240" style="fill:#8FA1B2">rewriteLock 用于端口重分配</text>
+
+<text class="s" x="20" y="500">启动后 resumeRuns：没结束的编排运行接着跑（M5-003）</text>
+</svg>

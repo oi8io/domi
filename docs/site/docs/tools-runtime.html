@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工具与权限运行时 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a class="active" href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>工具与权限运行时</h1>
+<blockquote>
+<p>本页回答四个问题：工具怎么定义、怎么执行？权限是怎么判的？什么默认拒绝、什么可以授权？出错了会怎样？
+交互演示：<a href="tools-runtime-explainer.html">权限判定模拟</a>（选能力与配置，看决策链每一步）。
+<code>packages/capability</code> —— Tool 注册表、权限引擎、内置工具、Skill 注册表。
+贯穿例子：给登录接口加限流——domi 要写 <code>app.ts</code>（fs.write）、跑测试（shell.exec）、改依赖（fs.edit）。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li><strong>Tool 是唯一执行原语，Skill 不可执行</strong>。Skill 结构上没有 <code>execute</code>，加一个就编译期报错。</li>
+<li>权限<strong>默认拒绝</strong>，不是默认询问。没显式声明过的能力，直接拒。</li>
+<li><strong>每个权限决策都产生一条 <code>permission</code> 事件</strong>——可审计，轨迹里看得见。</li>
+<li>判定有五道：父范围 → 确认模式 → 危险清单 → 规则表 → askAlways 收紧，最后才到兜底。</li>
+<li>通配规则按「.」分段：<code>mcp.git.*</code> 管不到 <code>mcp.github.x</code>。</li>
+<li><code>shell.exec</code> 是唯一可做会话级授权的工具：按命令指纹（<code>argv[0] + ' ' + argv[1]</code>）授权，危险词 / 裸命令不能授权。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tool</td>
+<td>可执行原语：名字 + 能力 + schema + execute。</td>
+</tr>
+<tr>
+<td>capability</td>
+<td>能力的类别 id（如 <code>fs.write</code>）。权限按它判定。</td>
+</tr>
+<tr>
+<td>决策</td>
+<td>allow / deny / ask，带来源与命中的规则。</td>
+</tr>
+<tr>
+<td>会话级授权</td>
+<td>本会话内持续有效的授权（带 grant）。</td>
+</tr>
+<tr>
+<td>危险能力</td>
+<td>写 / 删文件、跑命令、联网、MCP 与插件工具。</td>
+</tr>
+<tr>
+<td>指纹</td>
+<td>命令的可静态计算的摘要，用于授权。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/trun-tools.svg" alt="工具执行全景" /></p>
+<p><img src="img/trun-decision.svg" alt="权限决策链" /></p>
+<h2>2. Tool：类型层强制 INV-05</h2>
+<pre><code class="language-ts">interface Tool&lt;A = unknown, R = unknown&gt; {
+  readonly name: string
+  readonly capability: CapabilityId   // 无此字段无法通过 registerTool 的类型检查
+  readonly description: string
+  readonly schema: z.ZodType&lt;A&gt;
+  readonly inputJsonSchema?: Record&lt;string, unknown&gt;  // MCP 工具 schema 原样给
+  execute(args: A, ctx: ToolCtx): Promise&lt;R&gt;
+}
+</code></pre>
+<p><code>ToolCtx</code> 是工具与外界打交道的全部通道：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cwd</code></td>
+<td>所有文件访问的根，越界一律拒绝</td>
+</tr>
+<tr>
+<td><code>signal</code></td>
+<td>取消信号</td>
+</tr>
+<tr>
+<td><code>emit(ev)</code></td>
+<td>工具往事件流补事件的通道——工具不自己写 store，事件交出去由 loop 统一落盘</td>
+</tr>
+<tr>
+<td><code>elicit?</code></td>
+<td>向用户要输入</td>
+</tr>
+<tr>
+<td><code>stamps?</code></td>
+<td>过期写保护指纹</td>
+</tr>
+<tr>
+<td><code>jobs?</code></td>
+<td>后台命令</td>
+</tr>
+<tr>
+<td><code>outputDir?</code></td>
+<td>超长输出落盘</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Skill 结构上没有 <code>execute</code></strong>（写成 <code>execute?: never</code>）：给 Skill 加 execute 在编译期就报错。真正的强制在 kernel：只有 Tool 会被 loop 调用。</p>
+<h2>3. 权限引擎：默认拒绝，决策即事件</h2>
+<p>判定链（从上到下，命中即返回）：</p>
+<p><img src="img/trun-decision.svg" alt="权限判定决策" /></p>
+<ol>
+<li><strong>父范围</strong>（scope）：子 agent 只能用父会话允许的能力。范围是「能不能提」——返回 false 直接拒绝，不看规则、不问人。</li>
+<li><strong>确认模式</strong>（permissionsMode）：<code>always-ask</code> / <code>on-demand</code>（默认）/ <code>allow-all</code>。
+<ul>
+<li><code>allow-all</code>：跳过所有确认（只剩显式 deny 与父范围）。</li>
+<li>其它模式继续往下。</li>
+</ul>
+</li>
+<li><strong>危险清单</strong>：危险能力（写 / 删 / 移动文件、跑命令、联网、MCP 与插件工具）——无规则时拒绝，规则 ask 时才问。</li>
+<li><strong>规则表</strong>（rules）：精确匹配优先；没有精确匹配取前缀最长的 <code>前缀.*</code> 通配。<code>mcp.github.*</code> 管得到 <code>mcp.github.create_issue</code>，管不到 <code>mcp.githubx.y</code>（按「.」分段）。</li>
+<li><strong>askAlways 收紧</strong>：这些能力即使规则说 allow 也要问人；只会更严，不会更松。</li>
+<li><strong>兜底</strong>：<code>always-ask</code> 无规则也问；<code>on-demand</code> 无规则拒（默认分支返回 deny，不是 ask）。</li>
+</ol>
+<p>为什么默认 deny 而不是 ask？ask 看起来更友好，实际上是把「没想过的能力」变成「弹个窗让用户点同意」，用户点第三次之后就不看内容了。fail-closed 的意思是：没显式声明过的，直接拒。</p>
+<p><code>Decision</code>：<code>allow | deny | ask</code>，带 <code>source</code>（<code>default</code> / <code>config</code> / <code>user</code> / <code>mode</code> / <code>session-grant</code>）、<code>matchedRule</code>、<code>channel</code>（用户在哪个端回答的）、<code>grant</code>（会话级授权）。<strong>每个决策都产生一条 <code>permission</code> 事件</strong>。</p>
+<h2>4. 会话级授权：shell.exec 为什么特殊</h2>
+<p><code>grantFor</code>：<code>shell.exec</code> 例外地可授权——命令指纹 <code>argv[0] + ' ' + argv[1]</code> 可静态算。危险词 / 裸命令返回 null 不可授权。</p>
+<p>真正被执行的是 <code>cmd</code>（<code>sh -c cmd</code>），所以 <strong><code>cmd</code> 优先于 <code>argv</code></strong>——否则带个无害 argv 就能让指纹和实际执行的命令对不上。路径类能力不提供「本会话始终允许」（参数能碰到什么没法静态限定）。</p>
+<h2>5. 内置工具</h2>
+<table>
+<thead>
+<tr>
+<th>工具</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fs.read</code> / <code>fs.write</code> / <code>fs.edit</code> / <code>fs.glob</code> / <code>fs.grep</code> / <code>fs.list</code></td>
+<td>文件操作；<code>fs.write</code> 带 <code>fs.snapshot</code> 前后指纹（过期写保护 <code>stamps.ts</code>）</td>
+</tr>
+<tr>
+<td><code>shell.exec</code> / <code>shell-jobs</code></td>
+<td>命令执行（<code>sh -c</code>）与后台任务；指纹授权</td>
+</tr>
+<tr>
+<td><code>skill.load</code></td>
+<td>模型主动加载 Skill 正文（渐进式披露）</td>
+</tr>
+<tr>
+<td><code>task.spawn</code></td>
+<td>子 agent（见<a href="orchestration.html">编排</a>）</td>
+</tr>
+<tr>
+<td><code>ask.user</code> / <code>plan.update</code></td>
+<td>提问与计划（runtime 注入）</td>
+</tr>
+<tr>
+<td><code>memory.recall</code> / <code>review.report</code></td>
+<td>记忆检索与评审（runtime 注入）</td>
+</tr>
+</tbody>
+</table>
+<p>代码智能工具（<code>packages/codeintel</code>）：<code>makeOutlineTool</code>（文件结构大纲）、<code>makeDiagnosticsTool</code>（TS 诊断）。这些是工具不是内核能力——模型用它们「看」代码，然后自己决定怎么改。</p>
+<h2>6. 出错了怎么办：限流做到第 2 步，domi 想删临时文件</h2>
+<ol>
+<li><strong>写 <code>app.ts</code></strong>。规则里有 <code>fs.write: allow</code> → 决策 allow，落 <code>permission</code> 事件。执行 <code>fs.write</code>，前后指纹落 <code>fs.snapshot</code>。</li>
+<li><strong>跑测试</strong>。<code>shell.exec</code> 命中规则 ask（或无规则，on-demand 默认）→ 决策 ask，弹窗问你。你点「允许并记住本会话」→ 会话级授权，本轮后续命令不再问。</li>
+<li><strong>domi 想 <code>rm</code> 临时文件</strong>。<code>rm</code> 是危险命令，指纹算不出 → 不可授权；规则没有 → 决策 deny。domi 看到 deny，改走别的路径。</li>
+<li><strong>规则写错了</strong>（<code>mcp.git.*</code> 想管 <code>mcp.github.x</code>）。按「.」分段，<code>mcp.git.*</code> 管不到 <code>mcp.github.x</code> → 该能力走了兜底。修规则即可。</li>
+<li><strong>子 agent 想用父会话没允许的能力</strong>。父范围返回 false → 直接 deny（source: default，PARENT_SCOPE_RULE）。审计能看见。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>规则 allow</td>
+<td>直接执行，落 permission 事件</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>规则 ask / 无规则 always-ask</td>
+<td>弹窗问</td>
+<td>允许 / 拒绝 / 会话级授权</td>
+</tr>
+<tr>
+<td>无规则 on-demand</td>
+<td>默认拒绝</td>
+<td>想放行：加规则或切模式</td>
+</tr>
+<tr>
+<td>危险命令（rm 等）</td>
+<td>指纹算不出 → 不可授权</td>
+<td>手动执行或放宽规则</td>
+</tr>
+<tr>
+<td>子 agent 越权</td>
+<td>父范围拦截，直接 deny</td>
+<td>在父会话允许该能力</td>
+</tr>
+<tr>
+<td>规则写错（通配）</td>
+<td>按「.」分段，不误匹配</td>
+<td>修规则</td>
+</tr>
+</tbody>
+</table>
+<h2>7. 可靠性靠什么</h2>
+<ol>
+<li><strong>fail-closed</strong>。默认 deny，没声明过的不存在「碰运气」。</li>
+<li><strong>类型层强制</strong>。capability 字段、Skill 无 execute，都是编译期报错。</li>
+<li><strong>决策即事件</strong>。每个判定落 <code>permission</code> 事件，事后可审计「是哪条放行的」。</li>
+<li><strong>指纹静态可算</strong>。授权对象是命令的可验证摘要，不是用户的「信任」。</li>
+<li><strong>范围先于规则</strong>。子 agent 越权在规则之前就被拦，不进入问人路径。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li><code>shell.exec</code> 是唯一可会话级授权的工具；路径类能力不能（参数无法静态限定）。</li>
+<li>通配规则按「.」分段：不匹配 <code>mcp.githubx.y</code> 这种「看起来像」的写法（设计如此，宁严勿松）。</li>
+<li><code>allow-all</code> 模式只适合受信环境；它会跳过确认（只剩显式 deny 与父范围）。</li>
+<li>Skill 不可执行是结构保证，但 Skill 内容仍可能诱导模型调用工具——那是提示词层面的事，不是执行层面。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>权限引擎（判定链）</td>
+<td><code>packages/capability/src/permission.ts</code></td>
+</tr>
+<tr>
+<td>Tool 接口与注册表</td>
+<td><code>packages/capability/src/*</code></td>
+</tr>
+<tr>
+<td>内置工具</td>
+<td><code>packages/capability/src/tools/</code></td>
+</tr>
+<tr>
+<td>危险能力清单</td>
+<td><code>packages/capability/src/tools/dangerous.ts</code></td>
+</tr>
+<tr>
+<td>过期写保护</td>
+<td><code>packages/capability/src/tools/stamps.ts</code></td>
+</tr>
+<tr>
+<td>代码智能工具</td>
+<td><code>packages/codeintel/src/*</code></td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/capability/test/</code>（权限默认值断言、规则匹配、指纹、越界拒绝）。</p>
+<h2>相关</h2>
+<ul>
+<li>工具的执行入口（loop）与 ToolCtx 装配：<a href="agent-loop.html">Agent Loop：一轮里发生了什么</a>。</li>
+<li>加一个内置工具：<a href="adding-tools.html">添加工具</a>。</li>
+<li>插件工具 / MCP 工具如何变成普通 Tool：<a href="plugins.html">插件运行时</a>、<a href="mcp-internals.html">MCP 接入</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

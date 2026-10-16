@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三端 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a class="active" href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>三端</h1>
+<blockquote>
+<p>本页回答四个问题：三端怎么连 daemon？共享层做什么？端上有什么坑？出错了会怎样？
+<code>apps/tui</code> · <code>apps/web</code> · <code>apps/desktop</code> + <code>packages/client-core</code>。
+domi 的端规约一句话：<strong>端上没有业务逻辑（INV-02），全是事件流的视图</strong>。
+贯穿例子：给登录接口加限流——你在 Web 设置页改配置，TUI 里跑任务。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>三端连 daemon 都走 <code>DomiClient</code> 这一个类：<strong>握手 / 断线重连+断点续订 / 去重</strong>三件事，渲染层一件都不用管。</li>
+<li>断线重连用 <code>session.subscribe</code> 的 <code>fromSeq</code> 续订——断开期间的事一条不漏。</li>
+<li>client-core 能在浏览器里跑（不 import node 模块、不依赖 DOM 类型）。</li>
+<li>端上没有业务逻辑：如果某项需要在 <code>apps/web</code> 里写判断才能对等，那是 client-core 缺东西，先补那边。</li>
+<li>Web 产物 JS gzip 132KB / CSS gzip 6.3KB（阈值 gzip 250KB，还有余量）。</li>
+<li>M5 曾有 Telegram 桥接，2026-10-09 整块移除（见 <code>docs/adr/030-remove-telegram-bridge.md</code>）。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DomiClient</td>
+<td>三端共用的协议客户端类。</td>
+</tr>
+<tr>
+<td>seq</td>
+<td>事件流里递增的序号。</td>
+</tr>
+<tr>
+<td>续订</td>
+<td>重连后从 last seq 接着订阅。</td>
+</tr>
+<tr>
+<td>投影</td>
+<td>把事件流变成视图状态的计算。</td>
+</tr>
+<tr>
+<td>接线处</td>
+<td>端上把输入接进来、把输出打出去的地方。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/clients-shared.svg" alt="三端共享层" /></p>
+<h2>2. 共享层：client-core</h2>
+<p>三端连 daemon 都走 <code>DomiClient</code>（<code>client-core/src/client.ts</code>）这一个类，它负责三件事（渲染层一件都不用管）：</p>
+<ol>
+<li><strong>握手</strong>：版本不匹配停在 <code>incompatible</code>，不重连、不降级。</li>
+<li><strong>断线重连 + 断点续订</strong>：每个会话记着最后收到的 seq，重连后用 <code>session.subscribe</code> 的 <code>fromSeq</code> 续订，断开期间的事一条不漏。</li>
+<li><strong>去重</strong>：同一个 seq 只进一次 store。</li>
+</ol>
+<p>它必须能在浏览器里跑（不 import node 模块、不依赖 DOM 类型）。投影逻辑（<code>SessionStore</code>、<code>trajectory.ts</code>、<code>questions.ts</code> 的问题框状态机、<code>tokens.ts</code> 的 token 估算、<code>highlight.ts</code> 的语法高亮）全在这层——某项如果需要在 <code>apps/web</code> 里写判断才能对等，那是 client-core 缺东西，先补那边（parity-checklist 的判定规则）。</p>
+<h2>3. TUI（apps/tui，Ink 7）</h2>
+<ul>
+<li><code>main.tsx</code> 负责<strong>接线与按键</strong>，不负责业务：组件只认 client-core 的 store。</li>
+<li>同一个可执行文件还有第二个角色：<code>DOMI_INTERNAL_ROLE=daemon</code> 时就是 domid 本身（单二进制里没有别的文件可以跑）。</li>
+<li>渲染器：默认全屏（终端备用屏）；<code>tui.renderer: classic</code> 或 <code>DOMI_TUI_RENDERER=classic</code> 回退。首帧前挂过会写 <code>~/.domi/state/tui-fallback</code>，之后自动用 classic。</li>
+<li><strong>已知坑</strong>：不要在 React 组件里调 Ink 的 <code>renderToString</code>（reconciler 是单例，嵌套调用在渲染里返回空串、在 effect 里把 yoga 弄崩）；TUI 拿显示行一律走 <code>useTranscriptLines</code>（在 setImmediate 里算）。</li>
+<li>无 TTY 环境验证有限：切片、滚动状态机、滚轮解析、整屏布局有测试，但备用屏进出、真滚轮、Ctrl+O 往返只能在真终端里看。</li>
+</ul>
+<h2>4. Web（apps/web，Vite + React + Tailwind v4）</h2>
+<ul>
+<li>视图：Home（Composer）/ Sessions / Projects（任务树）/ Tasks / Schedules / Settings（模型、权限、确认模式、用量）/ 轨迹页 / 插件页。</li>
+<li>设置页写的就是 daemon 启动时读的那份配置；<code>config.set</code> 白名单排除权限 / hooks / MCP / 插件安装（界面不能给自己提权，见<a href="config.html">配置与厂商</a>）。</li>
+<li>界面文案走 <code>@domi/i18n</code>：<code>apps/*</code> 里不许出现写死的中文（<code>guard:i18n</code>），UI 用 <code>tr()</code>。</li>
+</ul>
+<h2>5. Desktop（apps/desktop，Tauri）</h2>
+<p>Web 的一个打包目标（端顺序：TUI → Web → Desktop 套壳）。<code>src-tauri</code> + 一个 README。</p>
+<h2>6. 端之间的一致性</h2>
+<p><code>docs/parity-checklist.md</code> 是 TUI ↔ Web 功能对等的判据本身：一项算「对等」，要求两端 e2e 都有用例且都绿，断言的是<strong>同一件事</strong>——同一份事件流 fixture 进去，两端渲染出来的 seq 序列与关键文本一致。<strong>加一项 / 删一项都是改 AC，走回写门。</strong> 目前两端 e2e 仍缺（Web 等 Playwright；TUI 有假 stdin 可以直接写）。</p>
+<h2>7. 出错了怎么办：网断了，任务还在跑</h2>
+<ol>
+<li><strong>断线</strong>。DomiClient 重连，<code>fromSeq</code> 续订——断开期间的事件一条不漏，store 去重。</li>
+<li><strong>版本不匹配</strong>。握手停在 <code>incompatible</code>：不重连、不降级。升级对应端。</li>
+<li><strong>TUI 首帧挂掉</strong>。写 <code>~/.domi/state/tui-fallback</code>，之后自动用 classic 渲染器。</li>
+<li><strong>Web 设置页改敏感键</strong>。白名单拒绝——界面不能给自己提权。改配置文件。</li>
+<li><strong>两端行为不一致</strong>。parity-checklist 判据：先在 client-core 补投影，再修端。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>断线</td>
+<td>重连 + fromSeq 续订 + 去重</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>版本不匹配</td>
+<td>停在 incompatible</td>
+<td>升级对应端</td>
+</tr>
+<tr>
+<td>TUI 首帧挂</td>
+<td>写 tui-fallback，自动用 classic</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>设置页改敏感键</td>
+<td>白名单拒绝</td>
+<td>改配置文件</td>
+</tr>
+<tr>
+<td>端行为不一致</td>
+<td>parity-checklist 判定</td>
+<td>先补 client-core</td>
+</tr>
+</tbody>
+</table>
+<h2>8. 可靠性靠什么</h2>
+<ol>
+<li><strong>连接逻辑单点</strong>：三端共用 DomiClient，行为一致。</li>
+<li><strong>续订不丢事件</strong>：断开期间的事件按 seq 补回来。</li>
+<li><strong>去重</strong>：同一个 seq 只进一次 store。</li>
+<li><strong>业务在共享层</strong>：端上没有业务逻辑，对等由 client-core 保证。</li>
+<li><strong>失败可回退</strong>：TUI 渲染器失败自动降 classic。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>TUI 无 TTY 环境验证有限：备用屏进出、真滚轮、Ctrl+O 只能在真终端里看。</li>
+<li>两端 e2e 仍缺（Web 等 Playwright，ADR-013）。</li>
+<li>版本不匹配不自动升级——要用户动手。</li>
+<li>Telegram 桥接已移除，重做路线见 ADR-030。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DomiClient（握手 / 续订 / 去重）</td>
+<td><code>packages/client-core/src/client.ts</code></td>
+</tr>
+<tr>
+<td>投影（store / 轨迹 / 问题框 / tokens）</td>
+<td><code>packages/client-core/src/{store,trajectory,questions,tokens,highlight}.ts</code></td>
+</tr>
+<tr>
+<td>TUI 接线 / 渲染</td>
+<td><code>apps/tui/src/</code></td>
+</tr>
+<tr>
+<td>Web</td>
+<td><code>apps/web/src/</code></td>
+</tr>
+<tr>
+<td>Desktop 壳</td>
+<td><code>apps/desktop/</code></td>
+</tr>
+<tr>
+<td>对等判据</td>
+<td><code>docs/parity-checklist.md</code></td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>apps/web/test/*.spec.tsx</code>、<code>apps/tui/test/*.spec.tsx</code>（渲染 / 按键级）、<code>daemon/test/transport.spec.ts</code>（真 WebSocket 推送）。</p>
+<h2>相关</h2>
+<ul>
+<li>协议客户端细节：<a href="protocol.html">Domi Protocol</a>。</li>
+<li>状态栏六项指标（模型 / token / 花费 / 耗时 / 工具数 / 上下文占用）：<code>observability/src/report.ts</code> + client-core 同源格式化。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

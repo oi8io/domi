@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 420" width="880" height="420" role="img" aria-labelledby="t d">
+<title id="t">CLI 18 命令</title>
+<desc id="d">domi 命令共 18 个分四组：环境与体检、会话与数据、模型能力、插件与信任；逻辑住 packages，apps 只接线。</desc>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11.5px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="420" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">domi 命令共 18 个 · 四组</text>
+<text class="s" x="20" y="56">util.parseArgs · 不带 commander · 逻辑住 packages · apps 只接线（INV-02）</text>
+
+<rect class="st" x="60" y="84" width="390" height="120" rx="10"/>
+<text class="k" x="76" y="106">环境与体检</text>
+<text class="mono" x="76" y="128">chat · doctor · init · report-bug</text>
+<text class="s" x="76" y="150">chat 进 TUI，第一次拉起 domid</text>
+<text class="s" x="76" y="168">doctor 每条问题带修复命令</text>
+<text class="s" x="76" y="186">init 生成 config 模板 / .domi/ 与 AGENT.md</text>
+
+<rect class="ok" x="470" y="84" width="390" height="120" rx="10"/>
+<text class="k" x="486" y="106" style="fill:#4ADE80">会话与数据</text>
+<text class="mono" x="486" y="128">session · data · trace · prompt</text>
+<text class="mono" x="486" y="148">migrate · migrate-m15</text>
+<text class="s" x="486" y="170">trace --html 输出交互 HTML</text>
+<text class="s" x="486" y="188">migrate-m15 内部会话迁移（备份+幂等）</text>
+
+<rect class="warn" x="60" y="224" width="390" height="120" rx="10"/>
+<text class="k" x="76" y="246" style="fill:#FBBF24">模型能力</text>
+<text class="mono" x="76" y="268">eval · memory · soul · task</text>
+<text class="s" x="76" y="290">eval 录制 / 回放 / L2（动态 import）</text>
+<text class="s" x="76" y="308">task run &lt;yaml&gt; --follow 跑 DAG</text>
+<text class="s" x="76" y="326">memory list --all · soul 命令面</text>
+
+<rect class="bad" x="470" y="224" width="390" height="120" rx="10"/>
+<text class="k" x="486" y="246" style="fill:#F87171">插件与信任</text>
+<text class="mono" x="486" y="268">plugin · trust · hook · review</text>
+<text class="s" x="486" y="290">plugin install / scaffold / list</text>
+<text class="s" x="486" y="308">trust --revoke 撤销信任</text>
+<text class="s" x="486" y="326">hook / review 各自包</text>
+
+<text class="s" x="20" y="378">带值的选项必须在 flags 里声明类型——否则 strict:false 会把它当布尔、值掉进 positionals（踩过的坑）</text>
+<text class="s" x="20" y="398">加命令：进 COMMANDS（args.ts）+ 逻辑住 packages + 有 PRD 依据 + 子命令超 8 个先重评 ADR-008</text>
+</svg>

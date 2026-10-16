@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 380" width="880" height="380" role="img" aria-labelledby="t d">
+<title id="t">触发判定时间线</title>
+<desc id="d">每天 9 点跑报告：08:30 醒来不触发；09:10 醒来刚错过（准点窗口内）触发；10:00 醒来超 60 秒触发 late；连续错过只补最近一次。</desc>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="380" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">每天 09:00 跑限流报告：四种醒来时刻</text>
+
+<!-- 时间轴 -->
+<line x1="60" y1="110" x2="840" y2="110" stroke="#2A3B4D" stroke-width="2"/>
+<circle cx="120" cy="110" r="5" fill="#8FA1B2"/>
+<circle cx="200" cy="110" r="5" fill="#22D3EE"/>
+<circle cx="330" cy="110" r="5" fill="#8FA1B2"/>
+<circle cx="460" cy="110" r="5" fill="#8FA1B2"/>
+<circle cx="620" cy="110" r="5" fill="#8FA1B2"/>
+<circle cx="760" cy="110" r="5" fill="#8FA1B2"/>
+<text class="mono" x="92" y="100">08:00</text>
+<text class="mono" x="175" y="100">09:00</text>
+<text class="mono" x="300" y="100">09:10</text>
+<text class="mono" x="430" y="100">09:30</text>
+<text class="mono" x="590" y="100">10:00</text>
+<text class="mono" x="730" y="100">10:30</text>
+<text class="s" x="660" y="128">60 秒准点窗口</text>
+
+<!-- 场景1 -->
+<rect class="bad" x="60" y="150" width="260" height="72" rx="10"/>
+<text class="k" x="76" y="172" style="fill:#F87171">08:30 醒来</text>
+<text class="s" x="76" y="190">最近应触发 = 今天 09:00（未来）</text>
+<text class="s" x="76" y="206">→ 不触发，等下一个周期</text>
+
+<!-- 场景2 -->
+<rect class="ok" x="340" y="150" width="250" height="72" rx="10"/>
+<text class="k" x="356" y="172" style="fill:#4ADE80">09:10 醒来</text>
+<text class="s" x="356" y="190">应触发 09:00 晚于 last_due</text>
+<text class="s" x="356" y="206">→ 触发 · 准点（≤60 秒，late=false）</text>
+
+<!-- 场景3 -->
+<rect class="warn" x="620" y="150" width="240" height="72" rx="10"/>
+<text class="k" x="636" y="172" style="fill:#FBBF24">10:00 醒来</text>
+<text class="s" x="636" y="190">应触发 09:00，已过 60 秒</text>
+<text class="s" x="636" y="206">→ 触发 · late=true（domid 没开）</text>
+
+<!-- 场景4 -->
+<rect class="box" x="60" y="246" width="800" height="86" rx="10"/>
+<text class="k" x="76" y="268">连续错过 3 天，10:00 醒来</text>
+<text class="s" x="76" y="288">最近应触发 = 今天 09:00（晚于 last_due）→ 触发一次 · late=true</text>
+<text class="s" x="76" y="304">前两天的应触发时刻 → skipped（schedule_runs 记 skipped，不补）</text>
+<text class="s" x="76" y="322">「错过多个周期也只补最近这一次」——宁可少跑，不可多跑</text>
+
+<text class="s" x="20" y="362">已知限制：夏令时被跳过的那一刻（如美东 3 月第二个周日 02:30）当天不触发</text>
+</svg>

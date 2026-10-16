@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>模型运行时 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a class="active" href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>模型运行时</h1>
+<blockquote>
+<p>本页回答四个问题：模型层怎么统一？能力矩阵怎么用？结构化输出和重试怎么兜底？出错了会怎样？
+<code>packages/model</code> —— ModelProvider 接口、AI SDK 适配、能力矩阵、结构化输出、重试。
+贯穿例子：给登录接口加限流——domi 每轮调用模型，输出流式回到事件流。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li><strong>所有厂商都归约成同一个 <code>ModelProvider</code></strong>。kernel 只认识这一个接口。</li>
+<li><code>ModelEvent</code> 只有<strong>五种</strong>：<code>delta</code> / <code>reason</code> / <code>tool-call</code> / <code>usage</code> / <code>error</code>。</li>
+<li><strong>能力矩阵静态声明</strong>：调用未声明的能力在发请求前就抛错，不靠运行时碰运气。</li>
+<li><code>providerOptions</code> 与原始 <code>usage</code> <strong>原样透传</strong>——适配层不做字段归一、不丢字段。</li>
+<li><code>factory.ts</code> 是唯一知道「有哪些 provider」的地方：新增厂商只需实现接口 + 注册，kernel 与 model/core 的 diff 为 0。</li>
+<li>自定义 <code>fetch</code> 可注入：企业代理 / mTLS / 测试截流（不能靠改 <code>globalThis.fetch</code>——AI SDK 在模块加载时就把它抓走了）。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ModelProvider</td>
+<td>kernel 认识的唯一模型接口。</td>
+</tr>
+<tr>
+<td>ModelEvent</td>
+<td>模型输出的统一事件（五种）。</td>
+</tr>
+<tr>
+<td>能力矩阵</td>
+<td>静态声明的模型能力（toolCall / vision 等）。</td>
+</tr>
+<tr>
+<td>适配器</td>
+<td>把 AI SDK 的流翻译成 ModelEvent 的层。</td>
+</tr>
+<tr>
+<td>厂商模板</td>
+<td>纯数据的厂商配置（协议 / 地址 / 能力 / 适配器）。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/mruntime-flow.svg" alt="模型层归约" /></p>
+<h2>2. ModelProvider：kernel 认识的唯一接口</h2>
+<pre><code class="language-ts">interface ModelProvider {
+  readonly id: string
+  readonly capabilities: ModelCapabilities   // 静态声明的能力矩阵
+  generate(req: ModelRequest, signal: AbortSignal): AsyncIterable&lt;ModelEvent&gt;
+}
+</code></pre>
+<p>kernel 不 import 任何 provider SDK（INV-02），只 import 这里的类型。</p>
+<p><code>ModelEvent</code> 五种：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>delta</code></td>
+<td>输出文本增量</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>思维链文本</td>
+</tr>
+<tr>
+<td><code>tool-call</code></td>
+<td>请求调用工具</td>
+</tr>
+<tr>
+<td><code>usage</code></td>
+<td>用量（原始字段，原样透传）</td>
+</tr>
+<tr>
+<td><code>error</code></td>
+<td>错误（带 recoverable 标记）</td>
+</tr>
+</tbody>
+</table>
+<p>两个关键设计：</p>
+<ul>
+<li><strong>能力矩阵静态声明</strong>（toolCall / vision / reasoning / promptCache / structuredOutput）。调用未声明的能力在发请求前抛错——不靠运行时碰运气。如果模型其实支持（常见于自定义网关），在「设置 › 模型供应商」或 <code>config.yaml</code> 的 <code>providers.${provider}.capabilities</code> 里显式打开。</li>
+<li><strong>ADR-004 逃生口</strong>：<code>providerOptions</code> 与原始 <code>usage</code> 原样透传。缓存命中率（状态栏）与压缩时保住 prompt cache 前缀的判断都靠这份原始 usage——丢了就没有输入。</li>
+</ul>
+<h2>3. 工厂与厂商模板</h2>
+<p><code>factory.ts</code> 是唯一知道「有哪些 provider」的地方。实现经 AI SDK（<code>ai-sdk-provider.ts</code>）：<code>createOpenAI</code> / <code>createAnthropic</code> / <code>createOpenAICompatible</code>。</p>
+<p>厂商知识在 <code>packages/config/src/vendors.ts</code>（<code>guard:providers</code> 扫全仓，SDK 包名只允许出现在 factory.ts）：</p>
+<table>
+<thead>
+<tr>
+<th>厂商</th>
+<th>协议 / 适配</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>openai</td>
+<td>官方 Responses API</td>
+</tr>
+<tr>
+<td>anthropic</td>
+<td>官方</td>
+</tr>
+<tr>
+<td>deepseek</td>
+<td>openai 兼容</td>
+</tr>
+<tr>
+<td>gemini</td>
+<td>官方</td>
+</tr>
+<tr>
+<td>custom</td>
+<td>自选协议</td>
+</tr>
+</tbody>
+</table>
+<p>每个模板是纯数据：协议、默认地址、默认能力、惯用环境变量名、用哪种适配器。</p>
+<ul>
+<li><code>connectionShape(cfg)</code>：vendor + protocol + adapter 三者的解析。</li>
+<li><code>createProvider(conn, name)</code>：配置 → Provider 实例；<code>providerConfigOf</code> 把 <code>providerConnection</code> 变成工厂参数。</li>
+<li>自定义 <code>fetch</code> 的注入点：企业代理 / mTLS / 测试截流。</li>
+</ul>
+<h2>4. 结构化输出与重试</h2>
+<table>
+<thead>
+<tr>
+<th>模块</th>
+<th>干什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>structured.ts</code></td>
+<td>统一走 JSON Schema；对不支持 structured output 的模型用「Zod schema → 提示词约束 + 解析重试」兜底，接口对上层一致（<code>generateStructured</code> / <code>StructuredOutputError</code>）</td>
+</tr>
+<tr>
+<td><code>retry.ts</code></td>
+<td>可恢复错误的有限重试（流式中断等）</td>
+</tr>
+<tr>
+<td><code>probe.ts</code></td>
+<td><code>/v1/models</code> 探测（模型清单自动发现；探测失败用配置里的 <code>models</code> 清单兜底）</td>
+</tr>
+<tr>
+<td><code>embedding.ts</code></td>
+<td>L3 语义记忆的向量嵌入（嵌入不支持 → <code>EmbeddingUnsupportedError</code>，语义检索降级 FTS）</td>
+</tr>
+<tr>
+<td><code>stub-provider.ts</code></td>
+<td>CI 里的模型替身（真实 LLM 调用不进 CI 门禁）</td>
+</tr>
+</tbody>
+</table>
+<h2>5. 出错了怎么办：限流做到第 2 步，模型流中断了</h2>
+<ol>
+<li><strong>流式中断</strong>。<code>retry.ts</code> 判定为可恢复错误 → 有限重试（有次数上限）。重试仍失败 → 落 <code>model.delta</code> 流的 <code>error</code> 事件。</li>
+<li><strong>调用了未声明的能力</strong>。发请求前抛错——不是等到响应才失败。去配置里显式打开该能力。</li>
+<li><strong>嵌入不支持</strong>。<code>EmbeddingUnsupportedError</code> → 语义检索降级 FTS 全文检索，记忆功能继续可用。</li>
+<li><strong>探测失败</strong>（模型清单发现不了）。用配置里的 <code>models</code> 清单兜底。</li>
+<li><strong>模型返回不可解析的结构化输出</strong>。<code>StructuredOutputError</code> → 按提示词约束重试解析；仍失败则上层按错误处理。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>流式中断</td>
+<td>有限重试；仍失败落 error 事件</td>
+<td>不用管（或看轨迹）</td>
+</tr>
+<tr>
+<td>能力未声明</td>
+<td>发请求前抛错</td>
+<td>在配置里显式打开</td>
+</tr>
+<tr>
+<td>嵌入不支持</td>
+<td>降级 FTS</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>模型清单探测失败</td>
+<td>用配置 models 兜底</td>
+<td>在配置里写明 models</td>
+</tr>
+<tr>
+<td>结构化输出解析失败</td>
+<td>重试解析；仍失败按错误处理</td>
+<td>不用管</td>
+</tr>
+</tbody>
+</table>
+<h2>6. 可靠性靠什么</h2>
+<ol>
+<li><strong>接口单一</strong>。所有厂商归约成一个 ModelProvider，kernel 不用知道厂商差异。</li>
+<li><strong>能力静态声明</strong>。错配在发请求前暴露，不是运行中。</li>
+<li><strong>usage 原样透传</strong>。缓存命中判断依赖原始字段，透传保证不丢输入。</li>
+<li><strong>兜底阶梯</strong>。结构化输出有提示词约束兜底；嵌入有 FTS 兜底；探测有配置兜底。</li>
+<li><strong>CI 用替身</strong>。真实 LLM 不进 CI 门禁，测试确定性由 stub-provider 保证。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>厂商能力差异靠显式声明解决：声明错了（关掉实际支持的能力）会拒绝可用路径。</li>
+<li>自定义 fetch 必须走注入点，改 <code>globalThis.fetch</code> 无效（AI SDK 模块加载时已抓走）。</li>
+<li>结构化输出兜底（提示词约束）不保证 100% 解析成功。</li>
+<li>探测只认 <code>/v1/models</code> 形态，非标准网关需配置兜底。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ModelProvider 接口与 ModelEvent</td>
+<td><code>packages/model/src/provider.ts</code></td>
+</tr>
+<tr>
+<td>能力矩阵</td>
+<td><code>packages/model/src/capability.ts</code></td>
+</tr>
+<tr>
+<td>AI SDK 适配</td>
+<td><code>packages/model/src/ai-sdk-provider.ts</code></td>
+</tr>
+<tr>
+<td>厂商注册表（唯一）</td>
+<td><code>packages/model/src/factory.ts</code></td>
+</tr>
+<tr>
+<td>厂商模板</td>
+<td><code>packages/config/src/vendors.ts</code></td>
+</tr>
+<tr>
+<td>结构化输出 / 重试 / 探测 / 嵌入</td>
+<td><code>packages/model/src/{structured,retry,probe,embedding}.ts</code></td>
+</tr>
+<tr>
+<td>CI 模型替身</td>
+<td><code>packages/model/src/stub-provider.ts</code></td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/model/test/</code>（能力矩阵、结构化输出、重试、factory 注册表；全部打桩）。</p>
+<h2>相关</h2>
+<ul>
+<li>谁消费：kernel 的 loop（<code>ProviderLike</code> 结构同构）与 runtime 的 <code>model-resolve.ts</code> / <code>model-catalog.ts</code>。</li>
+<li>加一家新厂商：<a href="adding-providers.html">添加模型供应商</a>。</li>
+<li>厂商配置怎么改：<a href="config.html">配置与厂商</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

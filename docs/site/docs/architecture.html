@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>架构：domi 内部结构导图 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a class="active" href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>架构：domi 内部结构导图</h1>
+<blockquote>
+<p>本页回答四个问题：domi 由哪些部分组成？一条消息进去后发生什么？为什么 kernel 必须零 IO？出错了会怎样？
+用它定位自己在代码库里的位置，然后深入各子系统专项文档。
+贯穿例子：给登录接口加限流——从你点发送，到 domi 改完文件、给你看 diff。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>domi 分四层：视图层 → daemon → runtime → kernel，外加从旁注入的包。</li>
+<li><strong>kernel 零 IO</strong>：纯函数，不碰存储、网络、模型。它要什么，都从 ports 注入。</li>
+<li><strong>daemon 是事件流的唯一写入者</strong>。客户端只提交意图，同一会话串行。</li>
+<li>一条消息走六步：提交 → 定格 → 预检降级 → 拼上下文 → 跑一轮 → 工具循环，直到终止条件触发。</li>
+<li>事件流只追加，不改写。上下文、轨迹、记忆全是这条流的<strong>投影</strong>。</li>
+<li>依赖方向单向：<code>protocol ← kernel ← runtime ← daemon ← apps</code>。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>视图层</td>
+<td>终端（TUI）、网页（Web）、桌面壳（Desktop）。零业务逻辑。</td>
+</tr>
+<tr>
+<td>daemon</td>
+<td>后台进程 domid。会话宿主、事件唯一写入者。</td>
+</tr>
+<tr>
+<td>kernel</td>
+<td>纯函数 agent loop：拼上下文、跑一轮、终止条件、恢复。</td>
+</tr>
+<tr>
+<td>runtime</td>
+<td>装配点：把 kernel + store + 记忆 + 能力拼成 DomiSession。</td>
+</tr>
+<tr>
+<td>投影</td>
+<td>从事件流算出来的视图（上下文、轨迹、状态栏）。</td>
+</tr>
+<tr>
+<td>注入</td>
+<td>把外部能力（事件读写、工具执行、时钟）通过接口递给 kernel。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/arch-layers.svg" alt="分层架构" /></p>
+<p><img src="img/arch-flow.svg" alt="一次提交的数据流" /></p>
+<h2>2. 四条边界</h2>
+<p>三条硬边界由 <code>guard:dep</code>（depcruise + 物理依赖守卫）在 CI 里查：</p>
+<ol>
+<li><strong>kernel 零 IO</strong>。<code>packages/kernel</code> 不 import 视图、不 import 具体存储 / 网络 / 模型 SDK。它的 <code>package.json</code> 里除了 <code>@domi/protocol</code> 一无所有——物理上装不了就写不出违规代码。它需要的一切（事件读写、工具执行、时钟）从 ports 注入。</li>
+<li><strong>三端零业务逻辑</strong>。<code>apps/*</code> 只经 <code>@domi/client-core</code> + Domi Protocol 与 daemon 通信。投影逻辑（轨迹、问题框状态机、会话 store）一律放 <code>packages/client-core</code>。</li>
+<li><strong>daemon 是事件流的唯一写入者</strong>。客户端只提交意图；同一会话串行，第二个请求直接回 <code>SESSION_BUSY</code>（不排队、不静默丢弃）。</li>
+<li><strong>依赖方向单向</strong>：<code>protocol ← kernel ← runtime ← daemon ← apps</code>。<code>capability / store / memory / model / prompt</code> 从旁注入，<code>runtime</code> 是装配点。</li>
+</ol>
+<p>SDK 包名只允许出现在 <code>packages/model/src/factory.ts</code>；厂商知识只在 <code>packages/config/src/vendors.ts</code>（<code>guard:providers</code> 扫全仓）。</p>
+<h2>3. 包结构</h2>
+<p><code>packages/</code> 共 22 个包，按职责分四组：</p>
+<table>
+<thead>
+<tr>
+<th>组</th>
+<th>包</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>核心链</td>
+<td>protocol（契约）· kernel（agent loop）· runtime（门面）· daemon（宿主）</td>
+</tr>
+<tr>
+<td>注入能力</td>
+<td>capability（工具注册表 / 权限引擎）· store（SQLite 事件流）· memory（压缩 / Soul）· model（模型接口）· prompt（分层拼装）</td>
+</tr>
+<tr>
+<td>扩展宿主</td>
+<td>plugin · mcp · orchestrator（DAG）· codeintel · checkpoint（回滚）· trace · observability</td>
+</tr>
+<tr>
+<td>工具</td>
+<td>cli · config · client-core · notify · eval · i18n</td>
+</tr>
+</tbody>
+</table>
+<p><code>apps/</code> 三个端：tui（Ink 7，同一二进制经 <code>DOMI_INTERNAL_ROLE=daemon</code> 也可当 domid）、web（Vite + React）、desktop（Tauri 套壳）。</p>
+<h2>4. 一次提交的数据流</h2>
+<p>还是「给登录接口加限流」。你点了发送：</p>
+<ol>
+<li>客户端 <code>session.submit</code> → daemon <code>core.ts</code> 同步占位 busy，交给 <code>DomiSession.submit</code>。</li>
+<li>runtime 定格（freeze：Soul / 仓库规矩 / 技能清单 / 计划 / 环境一次取齐，turn 内不现读）。</li>
+<li>预检降级链：预算器超阈值先遮蔽（<code>ctx.mask</code>），再超压缩（<code>ctx.compact</code>），硬顶停轮。</li>
+<li><code>buildContext</code> 从事件流投影出模型消息——只有 10 类事件进上下文，其余是轨迹。</li>
+<li>kernel 跑 <code>runTurn</code>：<code>prompt()</code> 层拼装（含动态注入的 Soul 层）与 <code>buildContext</code> 在 <code>withPrompt</code> 汇合 → <code>provider.generate</code> 流式出 <code>model.delta</code> → 逐条经 <code>sink.append</code> 落盘 → daemon 把新事件作为通知推给所有订阅的客户端。</li>
+<li>模型请求工具 → <code>ToolRunner.run</code> 执行，权限引擎先决策（默认拒绝，决策本身就是一条 <code>permission</code> 事件）；<code>tool.result</code> 落盘后回灌上下文，再来一轮。</li>
+<li>任一终止条件触发，产出带 <code>stopReason</code> 的 <code>error</code> 事件收场。</li>
+</ol>
+<p><strong>事件流是 append-only 的</strong>：以上每一步都是「追加事件」，没有一步是「改历史」。压缩、分支、状态栏、轨迹、记忆、编排状态全部是这条流的投影。</p>
+<h2>5. 事件流是唯一的真相</h2>
+<p>会话不是一个消息数组，而是一串只追加的事件：<code>user.input</code>、<code>model.delta</code>、<code>tool.call</code>、<code>permission</code>、<code>tool.result</code>……投影是纯函数——同样的输入永远得出同样的视图。</p>
+<pre><code class="language-ts">import assert from 'node:assert/strict'
+
+type Ev =
+  | { t: 'user.input'; text: string }
+  | { t: 'model.delta'; text: string }
+  | { t: 'permission'; decision: string }
+  | { t: 'model.usage'; raw: Record&lt;string, number&gt; }
+
+function project(events: Ev[]): Array&lt;{ role: string; content: string }&gt; {
+  const out: Array&lt;{ role: string; content: string }&gt; = []
+  let text = ''
+  const flush = () =&gt; {
+    if (text) out.push({ role: 'assistant', content: text })
+    text = ''
+  }
+  for (const ev of events) {
+    if (ev.t === 'user.input') {
+      flush()
+      out.push({ role: 'user', content: ev.text })
+    } else if (ev.t === 'model.delta') text += ev.text
+  }
+  flush()
+  return out
+}
+
+const msgs = project([
+  { t: 'user.input', text: '你好' },
+  { t: 'model.delta', text: '你' },
+  { t: 'model.delta', text: '好' },
+  { t: 'permission', decision: 'allow' },
+  { t: 'model.usage', raw: { input_tokens: 3 } },
+])
+assert.deepEqual(msgs, [
+  { role: 'user', content: '你好' },
+  { role: 'assistant', content: '你好' },
+])
+</code></pre>
+<h2>6. 出错了怎么办：限流做到第 2 步，工具崩了</h2>
+<ol>
+<li><strong>工具执行失败</strong>。<code>tool.result</code> 带 error 落盘，回灌上下文。模型看到错误信息，下一轮决定重试、换方案还是问用户。domi 不吞错误。</li>
+<li><strong>权限被拒</strong>。权限引擎默认拒绝。<code>permission</code> 事件落盘，模型得知被拒，改走不需该权限的路径。</li>
+<li><strong>会话忙</strong>（另一个请求正在处理）。<code>SESSION_BUSY</code> 回给客户端。不排队、不静默丢弃。</li>
+<li><strong>终止条件触发</strong>。最多 100 次工具调用 / 3 次参数解析重试 / 10 分钟墙钟 / 预算硬顶 / 用户中断——任一命中就收场，产出带 <code>stopReason</code> 的 <code>error</code> 事件。</li>
+<li><strong>daemon 崩溃</strong>。事件全在 SQLite 里。重启后按事件流重建投影，一条不丢。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工具执行失败</td>
+<td>tool.result 带 error 落盘，模型下一轮处理</td>
+<td>不用管（或看轨迹里的错误）</td>
+</tr>
+<tr>
+<td>权限被拒</td>
+<td>落 permission 事件，模型改路径</td>
+<td>想放行：在权限面板允许该操作</td>
+</tr>
+<tr>
+<td>会话忙</td>
+<td>回 SESSION_BUSY，不排队</td>
+<td>稍后再试</td>
+</tr>
+<tr>
+<td>终止条件触发</td>
+<td>带 stopReason 收场</td>
+<td>看 stopReason 决定继续还是调整</td>
+</tr>
+<tr>
+<td>daemon 崩溃</td>
+<td>事件落盘不丢，重启重建投影</td>
+<td>重启 domid</td>
+</tr>
+</tbody>
+</table>
+<h2>7. 可靠性靠什么</h2>
+<ol>
+<li><strong>事件流只追加</strong>。任何历史事件永远可解析（新增类型升 SCHEMA_VERSION 并补 fixture）。</li>
+<li><strong>kernel 零 IO</strong>。核心逻辑可测：喂事件、断言输出，不用起服务。</li>
+<li><strong>权限默认拒绝</strong>。每个决定都是一条事件，事后可审计。</li>
+<li><strong>Tool 是唯一执行原语，Skill 只是文字</strong>。工具 / MCP / 插件 / 引用的输出是数据，不是指令。</li>
+<li><strong>投影是纯函数</strong>。同样的流，永远同样的视图；坏了能重放。</li>
+<li><strong>边界有守卫</strong>。依赖方向、厂商知识位置、迁移规则都有 <code>guard:*</code> 在 CI 里查。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>会话串行：同一会话同时只处理一个请求。</li>
+<li>kernel 的纯函数带来样板：每次 IO 都要走注入，改一个端口要动 kernel + runtime 两层。</li>
+<li>事件流是唯一真相，但 SQLite 单文件是单点；没有集群 / 多副本。</li>
+<li>投影重算与事件量线性相关：超长会话的首次投影会变慢（有压缩与遮蔽缓解）。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>进程宿主 / JSON-RPC 分发</td>
+<td><code>packages/daemon/src/core.ts</code></td>
+</tr>
+<tr>
+<td>会话装配点 / 定格 / 降级链</td>
+<td><code>packages/runtime/src/session.ts</code></td>
+</tr>
+<tr>
+<td>agent loop / 终止条件</td>
+<td><code>packages/kernel/src/loop.ts</code></td>
+</tr>
+<tr>
+<td>事件投影</td>
+<td><code>packages/kernel/src/build-context.ts</code></td>
+</tr>
+<tr>
+<td>事件存储</td>
+<td><code>packages/store/src/*</code></td>
+</tr>
+<tr>
+<td>权限引擎</td>
+<td><code>packages/capability/src/*</code></td>
+</tr>
+<tr>
+<td>依赖守卫</td>
+<td><code>package.json</code>（<code>guard:*</code>）</td>
+</tr>
+</tbody>
+</table>
+<h2>相关</h2>
+<ul>
+<li>一轮里到底发生什么：<a href="agent-loop.html">Agent Loop：一轮里发生了什么</a>。</li>
+<li>客户端怎么与 daemon 通信：<a href="protocol.html">Domi Protocol：daemon 与客户端之间的契约</a>。</li>
+<li>上下文怎么被治理：<a href="context-compression.html">压缩与 prompt cache</a>。</li>
+<li>各子系统导航：<a href="index.html">文档导航</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

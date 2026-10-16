@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 460" width="880" height="460" role="img" aria-labelledby="t d">
+<title id="t">断线重连与断点续订</title>
+<desc id="d">客户端记着最后收到的 seq，断线期间 daemon 照常跑；重连后握手，用 fromSeq 续订补齐错过的全部事件。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22D3EE"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .gap{fill:#17142A;stroke:#F87171;stroke-width:1.3;stroke-dasharray:5 4}
+  .ln{stroke:#8FA1B2;stroke-width:1.3;fill:none}
+</style>
+<rect width="880" height="460" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">断线不丢事件：断点续订</text>
+<text class="s" x="20" y="56">客户端记着最后收到的 seq；重连后用它续订，断开期间的事件一条不漏补回来</text>
+
+<!-- 泳道 -->
+<rect x="40" y="84" width="360" height="340" rx="10" fill="#111A23" opacity="0.55"/>
+<text class="k" x="56" y="110">客户端 DomiClient</text>
+<rect x="480" y="84" width="360" height="340" rx="10" fill="#111A23" opacity="0.55"/>
+<text class="k" x="496" y="110">daemon</text>
+
+<!-- 正常阶段 -->
+<text class="s" x="56" y="142">正常：收事件，记 seq</text>
+<rect class="box" x="56" y="150" width="200" height="36" rx="8"/>
+<text class="mono" x="72" y="173">记 seq=12</text>
+<path d="M480 168 H446" fill="none" class="ln" marker-end="url(#a)"/>
+<text class="s" x="420" y="140">推 events[..12]</text>
+<path d="M440 190 H470" fill="none" class="ln" marker-end="url(#ac)"/>
+<text class="s" x="410" y="182">session.events 通知</text>
+
+<!-- 断线 -->
+<text class="s" x="56" y="222">断线：停止收事件</text>
+<rect class="gap" x="56" y="230" width="300" height="54" rx="8"/>
+<text class="s" x="72" y="252" style="fill:#F87171">客户端离线，不知道发生了什么</text>
+<text class="s" x="72" y="270" style="fill:#8FA1B2">daemon 照常跑：工具执行、事件落盘</text>
+<text class="s" x="420" y="246">推 events[13..15]</text>
+<text class="s" x="420" y="264">（没人收，落盘不丢）</text>
+<path d="M480 240 H446" fill="none" stroke="#F87171" stroke-width="1.6" stroke-dasharray="6 4"/>
+<path d="M480 260 H446" fill="none" stroke="#F87171" stroke-width="1.6" stroke-dasharray="6 4"/>
+
+<!-- 重连 -->
+<text class="s" x="56" y="316">重连</text>
+<rect class="box" x="56" y="322" width="210" height="36" rx="8"/>
+<text class="mono" x="72" y="345">handshake{ver:1}</text>
+<path d="M266 340 H468" fill="none" class="ln" marker-end="url(#ac)"/>
+<text class="s" x="300" y="314">① 重新握手</text>
+<rect class="box" x="480" y="322" width="190" height="36" rx="8"/>
+<text class="mono" x="496" y="345">ok{serverVer:1}</text>
+<path d="M468 340 H446" fill="none" class="ln" marker-end="url(#a)"/>
+
+<!-- 续订 -->
+<rect class="box" x="56" y="376" width="260" height="36" rx="8" stroke="#4ADE80" stroke-width="1.4"/>
+<text class="mono" x="72" y="399" style="fill:#4ADE80">session.subscribe{fromSeq:13}</text>
+<path d="M316 394 H468" fill="none" class="ln" marker-end="url(#ag)"/>
+<text class="s" x="322" y="368" style="fill:#4ADE80">② 从断点续订</text>
+<rect class="box" x="480" y="376" width="240" height="36" rx="8" stroke="#4ADE80" stroke-width="1.4"/>
+<text class="mono" x="496" y="399">events[13..15] 补发</text>
+<path d="M468 394 H446" fill="none" class="ln" marker-end="url(#ag)"/>
+<text class="s" x="404" y="428" style="fill:#4ADE80">③ 补齐，一条不漏</text>
+</svg>

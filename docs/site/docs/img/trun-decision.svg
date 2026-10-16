@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 620" width="880" height="620" role="img" aria-labelledby="t d">
+<title id="t">权限判定决策链</title>
+<desc id="d">六步：父范围 → 确认模式 → 危险清单 → 规则表 → askAlways 收紧 → 兜底。命中即返回，决策带 source 与 matchedRule。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F87171"/></marker>
+  <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#FBBF24"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="620" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">权限判定：六道关卡，命中即返回</text>
+<text class="s" x="20" y="56">每个决策都落一条 permission 事件（source + matchedRule，可审计）</text>
+
+<!-- ① 父范围 -->
+<rect class="st" x="60" y="84" width="360" height="56" rx="10"/>
+<text class="k" x="76" y="106">① 父范围（scope）</text>
+<text class="s" x="76" y="124">子 agent 只能用父会话允许的能力</text>
+<text class="s" x="76" y="138">范围是「能不能提」，不是「要不要问」</text>
+<rect class="bad" x="500" y="88" width="200" height="40" rx="8"/>
+<text class="k" x="516" y="112" style="fill:#F87171">不许 → deny(default)</text>
+<path d="M420 106 H488" fill="none" stroke="#F87171" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M660 108 H700" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="704" y="104">继续</text>
+
+<!-- ② 模式 -->
+<rect class="st" x="60" y="160" width="360" height="56" rx="10"/>
+<text class="k" x="76" y="182">② 确认模式</text>
+<text class="s" x="76" y="200">always-ask / on-demand（默认）/ allow-all</text>
+<rect class="ok" x="500" y="164" width="200" height="40" rx="8"/>
+<text class="k" x="516" y="188" style="fill:#4ADE80">allow-all → allow(mode)</text>
+<path d="M420 182 H488" fill="none" stroke="#4ADE80" stroke-width="1.3" marker-end="url(#ag)"/>
+<path d="M660 184 H700" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="704" y="180">其它模式继续</text>
+
+<!-- ③ 危险 -->
+<rect class="warn" x="60" y="236" width="360" height="56" rx="10"/>
+<text class="k" x="76" y="258" style="fill:#FBBF24">③ 危险清单</text>
+<text class="s" x="76" y="276">写 / 删文件 · 跑命令 · 联网 · MCP / 插件</text>
+<text class="s" x="76" y="290">无规则时拒绝；规则 ask 时才问</text>
+
+<!-- ④ 规则 -->
+<rect class="st" x="60" y="312" width="360" height="72" rx="10"/>
+<text class="k" x="76" y="334">④ 规则表</text>
+<text class="s" x="76" y="352">精确匹配优先；否则最长前缀通配</text>
+<text class="s" x="76" y="368">mcp.github.* → mcp.github.create_issue ✓</text>
+<text class="s" x="76" y="382">mcp.git.* → mcp.github.x ✗（按「.」分段）</text>
+
+<!-- ⑤ askAlways -->
+<rect class="warn" x="60" y="404" width="360" height="56" rx="10"/>
+<text class="k" x="76" y="426" style="fill:#FBBF24">⑤ askAlways 收紧</text>
+<text class="s" x="76" y="444">这些能力规则 allow 也要问人</text>
+<text class="s" x="76" y="458">只会更严，不会更松</text>
+
+<!-- ⑥ 兜底 -->
+<rect class="bad" x="60" y="480" width="360" height="72" rx="10"/>
+<text class="k" x="76" y="502" style="fill:#F87171">⑥ 兜底（fail-closed）</text>
+<text class="s" x="76" y="520">always-ask：无规则也问 → ask</text>
+<text class="s" x="76" y="536">on-demand：无规则 → deny（default）</text>
+<text class="s" x="76" y="552">危险 + (always-ask 或规则 ask) → ask</text>
+
+<!-- 右侧结果 -->
+<rect class="box" x="500" y="236" width="340" height="316" rx="12"/>
+<text class="k" x="516" y="260">结果三态 + 来源</text>
+<rect class="ok" x="516" y="276" width="308" height="52" rx="8"/>
+<text class="k" x="532" y="298" style="fill:#4ADE80">allow</text>
+<text class="s" x="532" y="316">规则放行 · session-grant 授权 · allow-all 档位</text>
+<rect class="warn" x="516" y="340" width="308" height="52" rx="8"/>
+<text class="k" x="532" y="362" style="fill:#FBBF24">ask</text>
+<text class="s" x="532" y="380">规则 ask · askAlways · always-ask 兜底</text>
+<rect class="bad" x="516" y="404" width="308" height="52" rx="8"/>
+<text class="k" x="532" y="426" style="fill:#F87171">deny</text>
+<text class="s" x="532" y="444">默认拒绝 · 父范围 · 显式 deny 规则</text>
+<text class="s" x="516" y="484" style="fill:#8FA1B2">source：default / config / user /</text>
+<text class="s" x="516" y="500" style="fill:#8FA1B2">mode / session-grant</text>
+<text class="s" x="516" y="524" style="fill:#8FA1B2">matchedRule 原样进事件，</text>
+<text class="s" x="516" y="540" style="fill:#8FA1B2">事后审计「是哪条放行的」</text>
+
+<text class="s" x="20" y="594">为什么默认 deny 而不是 ask？ask 会把「没想过的能力」变成弹窗；用户点第三次之后就不看内容了。fail-closed：没显式声明过的，直接拒</text>
+</svg>

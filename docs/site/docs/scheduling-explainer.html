@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>错过补触发模拟</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0D141B;color:#E8EEF4;font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;line-height:1.6;padding:16px}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:20px;margin-bottom:4px}
+  .sub{font-size:13px;color:#8FA1B2;margin-bottom:12px}
+  .demo-note{font-size:12px;color:#8FA1B2;background:#111A23;border:1px solid #2A3B4D;border-radius:8px;padding:8px 10px;margin-bottom:14px}
+  .panel{background:#111A23;border:1px solid #2A3B4D;border-radius:10px;padding:14px;margin-bottom:14px}
+  .field{margin-bottom:8px}
+  .field label{display:block;font-size:13px;color:#8FA1B2;margin-bottom:4px}
+  select{width:100%;background:#0D141B;color:#E8EEF4;border:1px solid #2A3B4D;border-radius:8px;padding:8px;font-size:14px}
+  .btnrow{display:flex;gap:8px;margin-bottom:14px}
+  .btn{flex:1;background:#0F1E26;color:#22D3EE;border:1px solid #22D3EE;border-radius:8px;padding:10px;font-size:14px;cursor:pointer}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn.again{color:#A78BFA;border-color:#A78BFA;display:none}
+  .steps{background:#0D141B;border:1px solid #2A3B4D;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px}
+  .steps .row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #16202B}
+  .steps .row:last-child{border-bottom:none}
+  .steps .n{flex:none;width:130px;font-weight:700}
+  .steps .d{flex:1;color:#E8EEF4}
+  .steps .r{flex:none;text-align:right;font-size:12px}
+  .ok{color:#4ADE80}.warn{color:#FBBF24}.bad{color:#F87171}.mut{color:#8FA1B2}
+  .verdict{background:#17142A;border:1px solid #A78BFA;border-radius:10px;padding:14px;display:none;font-size:14px}
+  .verdict.show{display:block}
+  .verdict .big{font-size:20px;font-weight:700;margin-bottom:6px}
+  code{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;background:#16202B;padding:2px 5px;border-radius:4px;color:#9BE8F5}
+  pre{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;background:#16202B;padding:10px;border-radius:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+  @media (max-width:480px){.steps .n{width:96px}.steps .r{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>错过补触发模拟</h1>
+  <p class="sub">计划：每天早上 09:00 跑限流报告。选「醒来时刻」，看调度器怎么判定准点 / late / 只补一次。</p>
+  <p class="demo-note">这是演示，不连接 domid。判定规则与事件名是真实的，时刻是模拟的。</p>
+
+  <div class="panel">
+    <div class="field">
+      <label>醒来时刻（调度器醒来时的状态）</label>
+      <select id="scene">
+        <option value="s1">08:30 醒来 —— 应触发时刻在未来</option>
+        <option value="s2">09:10 醒来 —— 刚错过（60 秒准点窗口内）</option>
+        <option value="s3">10:00 醒来 —— 错过很久（domid 没开 / 机器睡着）</option>
+        <option value="s4">昨天已跑过，今天 08:30 醒来</option>
+        <option value="s5">连续错过 3 天，10:00 才醒来</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="btnrow">
+    <button class="btn" id="next">开始</button>
+    <button class="btn again" id="again">重新演示</button>
+  </div>
+
+  <div class="steps" id="steps">点「开始」，逐步走调度器的判定。</div>
+  <div class="verdict" id="verdict">
+    <div class="big" id="vbig"></div>
+    <div id="vdetail"></div>
+    <pre id="vevent"></pre>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id) }
+  var SCENES = {
+    s1: { name:'08:30 醒来', wake:'08:30', next:'今天 09:00（未来）', lastDue:'昨天 09:00', cmp:'晚于 last_due？否——应触发在未来', act:'不触发', actCls:'bad', evt:'（不产生 schedule.fire）', note:'调度器去睡，09:00 正常触发。' },
+    s2: { name:'09:10 醒来', wake:'09:10', next:'今天 09:00', lastDue:'昨天 09:00', cmp:'09:00 晚于 昨天 09:00？是', act:'触发 · 准点（≤60 秒）', actCls:'ok', evt:'{"event":"schedule.fire","due":"09:00","late":false}', note:'触发后 last_due 更新为今天 09:00。' },
+    s3: { name:'10:00 醒来', wake:'10:00', next:'今天 09:00', lastDue:'昨天 09:00', cmp:'09:00 晚于 昨天 09:00？是', act:'触发 · late=true', actCls:'warn', evt:'{"event":"schedule.fire","due":"09:00","late":true}', note:'domid 没开 / 机器睡着了 → 醒来补跑，标记 late。' },
+    s4: { name:'昨天已跑，08:30 醒来', wake:'08:30', next:'今天 09:00（未来）', lastDue:'昨天 09:00', cmp:'晚于 last_due？否——应触发在未来', act:'不触发', actCls:'bad', evt:'（不产生 schedule.fire）', note:'昨天跑过不影响今天：还没到 09:00，等正常触发。' },
+    s5: { name:'错过 3 天，10:00 醒来', wake:'10:00', next:'今天 09:00', lastDue:'3 天前 09:00', cmp:'09:00 晚于 3 天前 09:00？是', act:'触发一次 · late=true', actCls:'warn', evt:'{"event":"schedule.fire","due":"09:00","late":true}\\n（前两天的应触发 → skipped，不补）', note:'错过多个周期也只补最近这一次——宁可少跑，不可多跑。' }
+  }
+  var state = { phase:0, scene:'s1' }
+
+  function reset(){
+    state.phase = 0
+    $('steps').innerHTML = '点「开始」，逐步走调度器的判定。'
+    $('verdict').className = 'verdict'
+    $('next').textContent = '开始'
+    $('next').disabled = false
+    $('again').style.display = 'none'
+  }
+  function resetIfStarted(){ if (state.phase > 0) reset() }
+
+  function addStep(n, d, cls, r){
+    var row = document.createElement('div'); row.className = 'row'
+    var n1 = document.createElement('div'); n1.className = 'n ' + cls; n1.textContent = n
+    var d1 = document.createElement('div'); d1.className = 'd'; d1.innerHTML = d
+    var r1 = document.createElement('div'); r1.className = 'r ' + cls; r1.textContent = r || ''
+    row.appendChild(n1); row.appendChild(d1); row.appendChild(r1)
+    $('steps').appendChild(row)
+  }
+  function finish(big, detail, evt, cls){
+    $('vbig').className = cls
+    $('vbig').textContent = big
+    $('vdetail').innerHTML = detail
+    $('vevent').textContent = evt
+    $('verdict').className = 'verdict show'
+    $('next').textContent = '完成'
+    $('next').disabled = true
+    $('again').style.display = ''
+  }
+
+  function step(){
+    var s = SCENES[state.scene]
+    var p = state.phase
+    if (p === 1){
+      addStep('① 醒来', '调度器在 <b>' + s.wake + '</b> 醒来。间隔最长 60 秒，系统休眠后靠这个兜底。', 'mut')
+      state.phase = 2; return
+    }
+    if (p === 2){
+      addStep('② 算最近应触发时刻', '计划「每天 09:00」→ 不晚于现在的最近应触发时刻 = <b>' + s.next + '</b>。', 'mut')
+      state.phase = 3; return
+    }
+    if (p === 3){
+      addStep('③ 比较 last_due', '<b>' + s.cmp + '</b>（last_due = ' + s.lastDue + '）。', 'warn', '判定')
+      state.phase = 4; return
+    }
+    if (p === 4){
+      addStep('④ 结论', s.act + '。' + s.note, s.actCls, '完成')
+      finish(s.act, '场景：' + s.name + '<br>' + s.cmp + '<br>触发后 last_due 更新。', s.evt, s.actCls)
+      state.phase = p; return
+    }
+  }
+
+  $('next').addEventListener('click', function(){
+    if (state.phase === 0){
+      state.phase = 1
+      $('steps').innerHTML = ''
+      $('next').textContent = '下一步'
+    }
+    step()
+  })
+  $('again').addEventListener('click', reset)
+  $('scene').addEventListener('change', function(){ state.scene = this.value; resetIfStarted() })
+  reset()
+})()
+</script>
+</body>
+</html>

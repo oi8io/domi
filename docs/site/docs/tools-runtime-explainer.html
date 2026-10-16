@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>权限判定模拟</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0D141B;color:#E8EEF4;font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;line-height:1.6;padding:16px}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-size:20px;margin-bottom:4px}
+  .sub{font-size:13px;color:#8FA1B2;margin-bottom:12px}
+  .demo-note{font-size:12px;color:#8FA1B2;background:#111A23;border:1px solid #2A3B4D;border-radius:8px;padding:8px 10px;margin-bottom:14px}
+  .panel{background:#111A23;border:1px solid #2A3B4D;border-radius:10px;padding:14px;margin-bottom:14px}
+  .field{margin-bottom:12px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:13px;color:#8FA1B2;margin-bottom:4px}
+  select{width:100%;background:#0D141B;color:#E8EEF4;border:1px solid #2A3B4D;border-radius:8px;padding:8px;font-size:14px}
+  .seg{display:flex;gap:6px}
+  .seg button{flex:1;background:#0D141B;color:#8FA1B2;border:1px solid #2A3B4D;border-radius:8px;padding:8px 4px;font-size:13px;cursor:pointer}
+  .seg button.on{background:#0F1E26;color:#22D3EE;border-color:#22D3EE}
+  .sw{display:flex;align-items:center;gap:8px;color:#E8EEF4;font-size:14px;cursor:pointer}
+  .sw input{width:16px;height:16px}
+  .btnrow{display:flex;gap:8px;margin-bottom:14px}
+  .btn{flex:1;background:#0F1E26;color:#22D3EE;border:1px solid #22D3EE;border-radius:8px;padding:10px;font-size:14px;cursor:pointer}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn.again{color:#A78BFA;border-color:#A78BFA;display:none}
+  .steps{background:#0D141B;border:1px solid #2A3B4D;border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px}
+  .steps .row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #16202B}
+  .steps .row:last-child{border-bottom:none}
+  .steps .n{flex:none;width:64px;font-weight:700}
+  .steps .d{flex:1;color:#E8EEF4}
+  .steps .r{flex:none;text-align:right;font-size:12px}
+  .ok{color:#4ADE80}.warn{color:#FBBF24}.bad{color:#F87171}.mut{color:#8FA1B2}
+  .verdict{background:#17142A;border:1px solid #A78BFA;border-radius:10px;padding:14px;display:none;font-size:14px}
+  .verdict.show{display:block}
+  .verdict .big{font-size:20px;font-weight:700;margin-bottom:6px}
+  code{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;background:#16202B;padding:2px 5px;border-radius:4px;color:#9BE8F5}
+  pre{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;background:#16202B;padding:10px;border-radius:8px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+  @media (max-width:480px){.steps .r{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>权限判定模拟</h1>
+  <p class="sub">贯穿例子：给登录接口加限流。选能力与配置，看判定链每一步怎么走。</p>
+  <p class="demo-note">这是演示，不连接 domid。判定链与来源名是真实的，配置是模拟的。</p>
+
+  <div class="panel">
+    <div class="field">
+      <label>能力（capability）</label>
+      <select id="cap">
+        <option value="fs.write">fs.write —— 写文件（危险）</option>
+        <option value="shell.exec">shell.exec —— 跑命令（危险，可指纹授权）</option>
+        <option value="mcp.github.create_issue">mcp.github.create_issue —— MCP 工具（危险）</option>
+        <option value="skill.load">skill.load —— 加载技能（安全）</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>确认模式（permissionsMode）</label>
+      <div class="seg" id="mode">
+        <button data-v="on-demand">on-demand（默认）</button>
+        <button data-v="always-ask">always-ask</button>
+        <button data-v="allow-all">allow-all</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>规则（rules）</label>
+      <select id="rule">
+        <option value="none">无规则</option>
+        <option value="allow">allow</option>
+        <option value="ask">ask</option>
+        <option value="deny">deny</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>askAlways 收紧（PRD-M8-004）</label>
+      <label class="sw"><input type="checkbox" id="askAlways"> 这些能力即使规则 allow 也要问人</label>
+    </div>
+    <div class="field">
+      <label>父范围（子 agent 场景）</label>
+      <select id="scope">
+        <option value="allow">父会话允许该能力</option>
+        <option value="deny">父会话不允许</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>会话级授权（仅 shell.exec 可指纹）</label>
+      <label class="sw"><input type="checkbox" id="grant"> 本会话已授权该命令（grant）</label>
+    </div>
+  </div>
+
+  <div class="btnrow">
+    <button class="btn" id="next">判定</button>
+    <button class="btn again" id="again">重新演示</button>
+  </div>
+
+  <div class="steps" id="steps">点「判定」开始，逐步走决策链。</div>
+  <div class="verdict" id="verdict">
+    <div class="big" id="vbig"></div>
+    <div id="vdetail"></div>
+    <pre id="vevent"></pre>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id) }
+  var segs = document.querySelectorAll('#mode button')
+  var DANGER = { 'fs.write':true, 'shell.exec':true, 'mcp.github.create_issue':true, 'skill.load':false }
+  var FINGERPRINTABLE = { 'shell.exec':true }
+  var state = { phase:0, cap:'fs.write', mode:'on-demand', rule:'none', askAlways:false, scope:'allow', grant:false }
+
+  function render(){
+    $('cap').value = state.cap
+    for (var i=0;i<segs.length;i++) segs[i].className = (segs[i].getAttribute('data-v')===state.mode)?'on':''
+    $('rule').value = state.rule
+    $('askAlways').checked = state.askAlways
+    $('scope').value = state.scope
+    $('grant').checked = state.grant
+    // grant 只有 shell.exec 有意义
+    $('grant').disabled = (state.cap !== 'shell.exec')
+  }
+
+  function reset(){
+    state.phase = 0
+    $('steps').innerHTML = '点「判定」开始，逐步走决策链。'
+    $('verdict').className = 'verdict'
+    $('next').textContent = '判定'
+    $('next').disabled = false
+    $('again').style.display = 'none'
+  }
+  function resetIfStarted(){ if (state.phase > 0) reset() }
+
+  function addStep(n, d, cls, r){
+    var row = document.createElement('div')
+    row.className = 'row'
+    var n1 = document.createElement('div'); n1.className = 'n ' + cls; n1.textContent = n
+    var d1 = document.createElement('div'); d1.className = 'd'; d1.innerHTML = d
+    var r1 = document.createElement('div'); r1.className = 'r ' + cls; r1.textContent = r || ''
+    row.appendChild(n1); row.appendChild(d1); row.appendChild(r1)
+    $('steps').appendChild(row)
+  }
+  function finish(big, detail, evt, cls){
+    $('vbig').className = cls
+    $('vbig').textContent = big
+    $('vdetail').innerHTML = detail
+    $('vevent').textContent = evt
+    $('verdict').className = 'verdict show'
+    $('next').textContent = '完成'
+    $('next').disabled = true
+    $('again').style.display = ''
+  }
+
+  function step(){
+    var c = state.cap, m = state.mode, r = state.rule, a = state.askAlways, s = state.scope, g = state.grant
+    var p = state.phase
+    var danger = DANGER[c], fprint = FINGERPRINTABLE[c]
+    var capName = c
+
+    // ① 父范围
+    if (p === 1){
+      if (s === 'deny'){
+        addStep('① 父范围', '子 agent 只能用父会话允许的能力。父会话<b>不允许</b>，直接拒绝，不看规则、不问人。', 'bad', '终止')
+        finish('deny', '来源：<code>default</code>（父范围拦截）· 规则：<code>PARENT_SCOPE_RULE</code>', '{"event":"permission","decision":"deny","source":"default","matchedRule":"PARENT_SCOPE_RULE"}', 'bad')
+      } else {
+        addStep('① 父范围', '父会话允许该能力，进入下一关。', 'ok', '继续')
+        p++
+      }
+      state.phase = p; return
+    }
+    // ② 模式
+    if (p === 2){
+      if (m === 'allow-all'){
+        if (r === 'deny'){
+          addStep('② 确认模式', 'allow-all：跳过所有确认，只剩显式 deny 与父范围。规则是 <code>deny</code> → 拒绝。', 'bad', '终止')
+          finish('deny', '来源：<code>config</code>（显式 deny 规则）', '{"event":"permission","decision":"deny","source":"config","matchedRule":"rule"}', 'bad')
+        } else {
+          addStep('② 确认模式', 'allow-all：跳过所有确认。无显式 deny → 放行。', 'ok', '终止')
+          finish('allow', '来源：<code>mode</code>（档位放行，审计可看出）', '{"event":"permission","decision":"allow","source":"mode","matchedRule":null}', 'ok')
+        }
+        state.phase = p; return
+      }
+      addStep('② 确认模式', m === 'always-ask' ? 'always-ask：无规则也问，继续判定。' : 'on-demand：无规则拒（默认），继续判定。', 'warn', '继续')
+      state.phase = p + 1; return
+    }
+    // ③ 规则匹配（含危险/askAlways/兜底逻辑）
+    if (p === 3){
+      var ruleTxt = r === 'none' ? '无规则' : ('规则 ' + r)
+      if (r !== 'none'){
+        addStep('③ 规则表', capName + ' 命中 ' + ruleTxt + '。精确匹配优先，否则最长前缀通配。', 'ok', '命中')
+        state.phase = p + 1; return
+      }
+      addStep('③ 规则表', capName + ' 无规则。' + (danger ? '它属于危险能力（写文件 / 跑命令 / 联网 / MCP）。' : '它不是危险能力。'), 'mut', '无命中')
+      state.phase = p + 1; return
+    }
+    // ④ 危险 + 会话授权 + askAlways + 兜底
+    if (p === 4){
+      if (r === 'deny'){
+        addStep('④ 兜底前', '显式 deny 规则 → 拒绝。', 'bad', '终止')
+        finish('deny', '来源：<code>config</code> · 规则：<code>deny</code>', '{"event":"permission","decision":"deny","source":"config","matchedRule":"rule"}', 'bad')
+      } else if (g && fprint){
+        addStep('④ 会话级授权', capName + ' 可指纹授权（argv[0]+" "+argv[1]）。本会话已授权 → 放行。', 'ok', '终止')
+        finish('allow', '来源：<code>session-grant</code>（本会话授权，带 grant）', '{"event":"permission","decision":"allow","source":"session-grant","grant":{...}}', 'ok')
+      } else if (r === 'ask'){
+        addStep('④ 问人', '规则 <code>ask</code> → 弹窗问人。' + (fprint ? '（或选「本会话已授权」走 session-grant）' : ''), 'warn', '终止')
+        finish('ask', '来源：<code>config</code> · 规则：<code>ask</code>。你点「允许并记住本会话」会变成 session-grant。', '{"event":"permission","decision":"ask","source":"config","matchedRule":"rule"}', 'warn')
+      } else if (a){
+        addStep('⑤ askAlways 收紧', '规则是 <code>allow</code>，但 askAlways 命中 → 也要问人。只会更严，不会更松。', 'warn', '终止')
+        finish('ask', '来源：<code>config</code> · askAlways 收紧', '{"event":"permission","decision":"ask","source":"config","askAlways":true}', 'warn')
+      } else if (r === 'allow'){
+        addStep('⑤ 规则放行', '规则 <code>allow</code>，无 askAlways → 直接放行。', 'ok', '终止')
+        finish('allow', '来源：<code>config</code> · 规则：<code>allow</code>。matchedRule 原样进事件，事后可审计。', '{"event":"permission","decision":"allow","source":"config","matchedRule":"rule"}', 'ok')
+      } else {
+        // 无规则兜底
+        if (m === 'always-ask'){
+          addStep('⑥ 兜底', '无规则 + always-ask → 也问人。', 'warn', '终止')
+          finish('ask', '来源：<code>default</code> · always-ask 兜底', '{"event":"permission","decision":"ask","source":"default"}', 'warn')
+        } else {
+          addStep('⑥ 兜底', '无规则 + on-demand → <b>默认拒绝</b>（fail-closed）。' + (danger ? '危险能力无规则时同样拒绝。' : ''), 'bad', '终止')
+          finish('deny', '来源：<code>default</code> · 没显式声明过的能力，直接拒', '{"event":"permission","decision":"deny","source":"default","matchedRule":null}', 'bad')
+        }
+      }
+      state.phase = p; return
+    }
+  }
+
+  $('next').addEventListener('click', function(){
+    if (state.phase === 0){
+      state.phase = 1
+      $('steps').innerHTML = ''
+      $('next').textContent = '下一步'
+    }
+    step()
+  })
+  $('again').addEventListener('click', reset)
+
+  $('cap').addEventListener('change', function(){ state.cap = this.value; render(); resetIfStarted() })
+  for (var i=0;i<segs.length;i++){
+    segs[i].addEventListener('click', function(){
+      state.mode = this.getAttribute('data-v'); render(); resetIfStarted()
+    })
+  }
+  $('rule').addEventListener('change', function(){ state.rule = this.value; resetIfStarted() })
+  $('askAlways').addEventListener('change', function(){ state.askAlways = this.checked; resetIfStarted() })
+  $('scope').addEventListener('change', function(){ state.scope = this.value; resetIfStarted() })
+  $('grant').addEventListener('change', function(){ state.grant = this.checked; resetIfStarted() })
+
+  render()
+})()
+</script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>插件开发 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a class="active" href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>插件开发</h1>
+<p>插件是一个目录，里面有 <code>domi-plugin.yaml</code> 与你的代码 / Skill / MCP 配置。四类扩展点：</p>
+<table>
+<thead>
+<tr>
+<th>扩展点</th>
+<th>你写什么</th>
+<th>domi 怎么用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>tool</td>
+<td>一个 <code>execute(args, ctx)</code></td>
+<td>注册为 <code>plugin.&lt;插件名&gt;.&lt;工具名&gt;</code>，跑在沙箱里</td>
+</tr>
+<tr>
+<td>skill</td>
+<td>一个 SKILL.md</td>
+<td>进 Skill 清单，模型用 <code>skill.load</code> 读</td>
+</tr>
+<tr>
+<td>mcp</td>
+<td>一段 MCP server 配置</td>
+<td>和用户自己配的 server 一起连</td>
+</tr>
+<tr>
+<td>ui</td>
+<td>一个静态 HTML</td>
+<td>Web 的「插件」页里，在隔离 iframe 中显示</td>
+</tr>
+</tbody>
+</table>
+<h2>先说结论</h2>
+<ul>
+<li>插件代码跑在系统级沙箱里（Linux：bubblewrap；macOS：sandbox-exec）：<strong>没有网络，看不到任何用户文件</strong>。</li>
+<li>读写文件、发请求都经 <code>ctx</code>；没声明的权限被拒绝并记一条权限事件。</li>
+<li><code>permissions</code> 必填，安装时逐条确认；manifest 被改过插件就停用，直到重新安装确认。</li>
+<li>超时会被强杀；崩溃不会影响 domi，只会让这次调用失败并留一条 <code>plugin.error</code>。</li>
+<li>返回值会被模型当<strong>不可信数据</strong>——不要在里面写「请模型做某事」。</li>
+<li>用户仍然要在权限规则里放行 <code>plugin.&lt;插件名&gt;.*</code>（或设为 ask）——沙箱管「看不见」，权限规则管「允不允许」。</li>
+</ul>
+<h2>从脚手架开始</h2>
+<pre><code class="language-sh">domi plugin scaffold tool ./my-plugin
+cd my-plugin &amp;&amp; bun test
+domi plugin install .
+</code></pre>
+<h2>manifest</h2>
+<pre><code class="language-yaml">name: my-plugin
+version: 0.1.0
+api: 1                      # 插件 API 主版本
+description: 做什么的
+permissions:                # 必填；什么都不要也写 permissions: {}
+  read: [&quot;**/*.md&quot;]         # 相对工作目录的 glob
+  write: []
+  hosts: [api.example.com]  # ctx.fetch 能访问的主机，*.example.com 匹配子域
+contributes:
+  tools:
+    - name: lines
+      description: 统计行数
+      entry: tools/lines.ts
+      input: { type: object, properties: { path: { type: string } }, required: [path] }
+      timeoutMs: 10000      # 最长 120000
+</code></pre>
+<p>安装时，domi 会把 <code>permissions</code> 逐条列给用户确认；确认过的权限连同 manifest 的哈希一起记下来。
+之后 manifest 被改过，插件就停用，直到重新安装确认。</p>
+<h2>工具的写法</h2>
+<p>工具代码跑在系统级沙箱里（Linux：bubblewrap；macOS：sandbox-exec）：<strong>没有网络，看不到任何用户文件</strong>。
+读写文件、发请求都经 <code>ctx</code>，domi 按你声明的权限核对，没声明的会被拒绝并记一条权限事件。</p>
+<pre><code class="language-ts">import assert from 'node:assert/strict'
+
+interface Ctx {
+  readFile(path: string): Promise&lt;string&gt;
+  fetch(url: string): Promise&lt;{ status: number; text: string }&gt;
+}
+
+const tool = {
+  async execute(args: { path?: unknown }, ctx: Ctx) {
+    if (typeof args.path !== 'string') throw new Error('需要 path')
+    const text = await ctx.readFile(args.path)
+    return { path: args.path, lines: text === '' ? 0 : text.split('\n').length }
+  },
+}
+
+// 测试时自己造一个假 ctx——插件的测试不依赖 domi
+const ctx: Ctx = {
+  async readFile(path) {
+    if (path !== 'a.md') throw new Error('没有声明这个权限')
+    return '第一行\n第二行'
+  },
+  async fetch() {
+    throw new Error('没有网络权限')
+  },
+}
+assert.deepEqual(await tool.execute({ path: 'a.md' }, ctx), { path: 'a.md', lines: 2 })
+await assert.rejects(tool.execute({ path: 'b.env' }, ctx), /没有声明/)
+</code></pre>
+<p><code>ctx</code> 的全部能力：<code>cwd</code>、<code>readFile(path)</code>、<code>writeFile(path, content)</code>、<code>fetch(url, {method, headers, body})</code>（返回 <code>{status, headers, text}</code>）、<code>log(message)</code>。</p>
+<p>几条规矩：</p>
+<ul>
+<li>返回值会作为工具结果交给模型，而且会被当作<strong>不可信数据</strong>——不要在里面写「请模型做某事」</li>
+<li>超时会被强杀；崩溃不会影响 domi，只会让这次调用失败并留一条 <code>plugin.error</code></li>
+<li>用户仍然要在权限规则里放行 <code>plugin.&lt;插件名&gt;.*</code>（或设为 ask）</li>
+</ul>
+<h2>版本与弃用</h2>
+<p><code>api</code> 只写主版本。小版本只会加可选字段；弃用的字段在加载时打一条 warn 并写明移除版本；
+主版本变化意味着不兼容，旧插件会安装失败并说明原因。</p>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

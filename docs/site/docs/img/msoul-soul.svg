@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 480" width="880" height="480" role="img" aria-labelledby="t d">
+<title id="t">Soul 怎么更新</title>
+<desc id="d">新条目蒸馏成最少修改操作，以 SoulChange 呈现审阅、逐条可否决；写回前校验 mtime，文件被人改过就报 CONFLICT 不覆盖。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22D3EE"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F87171"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="480" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">Soul 更新：蒸馏 → 审阅 → 写回</text>
+<text class="s" x="20" y="56">贯穿例子：你纠正 domi「限流时别动数据库表结构」</text>
+
+<!-- 步骤竖排 -->
+<rect class="st" x="60" y="84" width="500" height="52" rx="10"/>
+<text class="k" x="76" y="106">① 蒸馏</text>
+<text class="s" x="76" y="124">L3 新条目 → 生成最少修改操作（最多 10 个 / 次）</text>
+
+<path d="M310 136 V150" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<rect class="warn" x="60" y="154" width="500" height="66" rx="10"/>
+<text class="k" x="76" y="176" style="fill:#FBBF24">② 审阅（soul.changes）</text>
+<text class="s" x="76" y="196">SoulChange：add / update / remove · 带 before / after / sources</text>
+<text class="s" x="76" y="212">逐条可否决；否决 = 删除</text>
+
+<path d="M310 220 V234" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<rect class="box" x="60" y="238" width="500" height="66" rx="10"/>
+<text class="k" x="76" y="260">③ 校验 mtime</text>
+<text class="s" x="76" y="280">文件在之后被改过 → CONFLICT，不覆盖</text>
+<text class="s" x="76" y="296">只动 ownedLines：domi 写过、且没被人改过的行</text>
+
+<path d="M310 304 V318" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<rect class="ok" x="60" y="322" width="220" height="46" rx="10"/>
+<text class="k" x="76" y="349" style="fill:#4ADE80">写回 soul.md + src 注释</text>
+<path d="M170 322 V304" fill="none" stroke="#4ADE80" stroke-width="1.4" marker-end="url(#ag)"/>
+<text class="s" x="108" y="292" style="fill:#4ADE80">通过 → 落盘</text>
+
+<rect class="bad" x="340" y="322" width="220" height="46" rx="10"/>
+<text class="k" x="356" y="349" style="fill:#F87171">CONFLICT / 否决</text>
+<path d="M450 322 V304" fill="none" stroke="#F87171" stroke-width="1.4" marker-end="url(#ar)"/>
+<text class="s" x="396" y="292" style="fill:#F87171">不写 · 重新读文件</text>
+
+<!-- 右侧 -->
+<rect class="box" x="620" y="84" width="240" height="280" rx="10"/>
+<text class="k" x="636" y="108" style="fill:#FBBF24">为什么这样设计</text>
+<text class="s" x="636" y="130">soul.md 是全局的</text>
+<text class="s" x="636" y="146">两个会话同时更新</text>
+<text class="s" x="636" y="162">会互相覆盖</text>
+<text class="s" x="636" y="186">→ MemoryService 串行写</text>
+<text class="s" x="636" y="210">domi 可能记错</text>
+<text class="s" x="636" y="226">→ 必经审阅，逐条可否决</text>
+<text class="s" x="636" y="250">人会手动改文件</text>
+<text class="s" x="636" y="266">→ mtime 冲突保护</text>
+<text class="s" x="636" y="290">→ ownedLines 只动自己的行</text>
+<text class="s" x="636" y="314" style="fill:#8FA1B2">导入的 Soul 文字</text>
+<text class="s" x="636" y="330" style="fill:#8FA1B2">只作参考资料，不当指令</text>
+<text class="s" x="636" y="352" style="fill:#8FA1B2">导出单文件可分享</text>
+
+<text class="s" x="20" y="452">六固定区顺序不变：工作习惯 / 技术偏好 / 沟通风格 / 领域知识 / 对用户的模型 / 失败教训；人的其它二级标题原样保留在 extra</text>
+</svg>

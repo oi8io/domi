@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>轨迹与回放 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a class="active" href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>轨迹与回放</h1>
+<blockquote>
+<p>本页回答四个问题：轨迹是什么？回放怎么用真实会话当测试？轨迹数据怎么组织？出错了会怎样？
+<code>packages/trace</code> + <code>packages/eval</code> 的 L1。
+domi 把它做成了一等公民：<strong>轨迹与评估是一体两面</strong>——轨迹是事件流的渲染，回放是事件流的第二次消费（INV-13）。
+贯穿例子：给登录接口加限流——改动前先 <code>domi trace &lt;id&gt; --html</code> 看历史，改完用同一会话回放验证。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li><strong>轨迹 = 事件流的渲染，不是另做 tracing</strong>。<code>model.reason</code> / <code>tool.call</code> / <code>tool.result</code> / <code>permission</code> / <code>error</code> 每条事件都是轨迹的一节。</li>
+<li>埋点必须第一天就做：<code>model.reason</code> 与 <code>tool.*</code> 事件从 M0 就埋，后补代价极大。</li>
+<li><strong>回放 = 真实会话当测试 fixture</strong>：回放的是模型与工具，跑的是真的 kernel；不花钱、不联网、可进 CI。</li>
+<li>fixture 存模型的<strong>原始 SSE 响应流</strong>，不是最终结果——只有「模型推理」被固定住。</li>
+<li>判据是「工具调用序列 + 事件流等价」，对不上给 <code>Divergence{index, expected, actual, seq}</code>——seq 直接跳到轨迹面板对应节点。</li>
+<li>分页 / 引用 / 分支在事件里都有对应：<code>ctx.ref</code> / <code>parent_seq</code> / <code>paginateByTurns</code>。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>轨迹</td>
+<td>事件流按轮分组、打标签、给序号的渲染。</td>
+</tr>
+<tr>
+<td>回放</td>
+<td>用录制的模型响应重跑真实 kernel。</td>
+</tr>
+<tr>
+<td>fixture</td>
+<td>录制的原始 SSE 响应流（测试资产）。</td>
+</tr>
+<tr>
+<td>节点模型</td>
+<td>轨迹的六类标签（用户 / 模型 / 工具 / 权限 / 上下文 / 错误）。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/trace-replay.svg" alt="轨迹与回放" /></p>
+<h2>2. 轨迹 = 事件流的渲染</h2>
+<p>事件流里每一条 <code>model.reason</code>（思维链）、<code>tool.call</code> / <code>tool.result</code>、<code>permission</code>、<code>error</code> 都是轨迹的一节。渲染层只是把事件按轮分组、打标签、给序号：</p>
+<ul>
+<li><code>packages/trace/src/text.ts</code> —— 纯文本轨迹（<code>domi trace &lt;id&gt;</code>）</li>
+<li><code>packages/trace/src/html.ts</code> —— HTML 轨迹（<code>domi trace &lt;id&gt; --html &lt;路径&gt;</code>，可交互）</li>
+<li><code>packages/trace/src/model.ts</code> —— 轨迹的节点模型（用户 / 模型 / 工具 / 权限 / 上下文 / 错误六类标签）</li>
+</ul>
+<p>Web 端「轨迹」页用同一份模型：按轮分组、六类标签、Turns / Calls 过滤、搜索、时间线。TUI 的 <code>domi trace</code> CLI 与 <code>--html</code> 输出同源。</p>
+<p><strong>埋点必须第一天就做</strong>：<code>model.reason</code> 与 <code>tool.*</code> 事件从 M0 就埋，后补代价极大。</p>
+<h2>3. 回放：真实会话 = 测试 fixture</h2>
+<p>事件流可回放 ⟹ 真实会话可以当作测试 fixture 重放。这就是 L1（<code>packages/eval/src/replay.ts</code>）：</p>
+<ul>
+<li><strong>回放的是模型与工具，跑的是真的 kernel</strong>：真的 <code>buildContext</code>、真的 <code>runTurn</code>、真的终止条件、真的事件流。所以它能抓到「改了 prompt 之后工具调用顺序变了」这类回归。</li>
+<li><strong>不花钱、不联网、可进 CI</strong>。回放期间任何出站调用都让测试失败（<code>assertNoNetwork</code>）。</li>
+<li>fixture 存<strong>模型的原始 SSE 响应流</strong>，不是最终结果——tool 执行、权限检查、事件生成、压缩触发全都还在真实跑，只有「模型推理」这一步被固定住（<code>fixtures/sessions/</code>，跟着代码进版本库，是测试资产不是用户数据）。</li>
+<li>判据是「工具调用序列 + 事件流等价」：从第几次调用开始对不上，给出 <code>Divergence{index, expected, actual, seq}</code>——seq 能直接跳到轨迹面板的对应节点。</li>
+</ul>
+<p>录制：<code>domi eval record &lt;sessionId&gt;</code>（数据来源只有事件流，不新增埋点）。</p>
+<h2>4. 轨迹数据的组织</h2>
+<ul>
+<li><code>fixtures/events/legacy-v*.jsonl</code> —— 历史事件流 fixture：每次 <code>SCHEMA_VERSION</code> 升版补一份，保证旧事件永远可解析（INV-01 的机器验证）。</li>
+<li>分页 / 引用 / 分支在事件里都有对应：<code>ctx.ref</code>（跨会话引用）、<code>parent_seq</code>（分支）、<code>paginateByTurns</code>（超长会话按轮切页）。</li>
+</ul>
+<h2>5. 出错了怎么办：回放对不上，怎么看</h2>
+<ol>
+<li><strong>工具调用顺序变了</strong>。<code>Divergence{index, expected, actual, seq}</code>——从第几次开始对不上。用 <code>seq</code> 跳到轨迹面板对应节点，看是哪一步变了。</li>
+<li><strong>改了 schema 旧事件解析不了</strong>。<code>fixtures/events/legacy-v*.jsonl</code> 保证旧事件永远可解析——升版时补一份。</li>
+<li><strong>回放期间出站调用</strong>。<code>assertNoNetwork</code> 失败。查 fixture 是否依赖网络。</li>
+<li><strong>轨迹缺节</strong>。<code>model.reason</code> / <code>tool.*</code> 事件没埋全——后补代价极大，这是 M0 就要做的事。</li>
+<li><strong>超长会话加载慢</strong>。<code>paginateByTurns</code> 按轮切页。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>回放对不上</td>
+<td>Divergence（index/seq）</td>
+<td>用 seq 跳轨迹节点排查</td>
+</tr>
+<tr>
+<td>schema 升版</td>
+<td>legacy fixture 保解析</td>
+<td>升版补一份 legacy-v*</td>
+</tr>
+<tr>
+<td>有出站调用</td>
+<td>assertNoNetwork 失败</td>
+<td>查 fixture 依赖</td>
+</tr>
+<tr>
+<td>轨迹缺节</td>
+<td>—</td>
+<td>补事件埋点（M0 就该有）</td>
+</tr>
+<tr>
+<td>超长会话</td>
+<td>paginateByTurns 切页</td>
+<td>不用管</td>
+</tr>
+</tbody>
+</table>
+<h2>6. 可靠性靠什么</h2>
+<ol>
+<li><strong>一体两面</strong>：轨迹与评估用同一份事件流，不重复造数据。</li>
+<li><strong>埋点先行</strong>：M0 就埋 reason / tool 事件，后补成本可控。</li>
+<li><strong>只固定模型推理</strong>：回放时其余环节真实跑，回归抓得到。</li>
+<li><strong>旧事件永可解析</strong>：legacy fixture 随 schema 升版补齐。</li>
+<li><strong>seq 可跳转</strong>：Divergence 与轨迹面板用 seq 对齐，排查有入口。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>回放只固定「模型推理」：其它环节仍受环境影响。</li>
+<li>fixture 是测试资产：行为变更后可能需要重录。</li>
+<li>轨迹渲染只覆盖事件流已有的事件：没埋的点画不出来。</li>
+<li>legacy fixture 需要人工随升版维护。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>纯文本轨迹</td>
+<td><code>packages/trace/src/text.ts</code></td>
+</tr>
+<tr>
+<td>HTML 轨迹</td>
+<td><code>packages/trace/src/html.ts</code></td>
+</tr>
+<tr>
+<td>节点模型（六类标签）</td>
+<td><code>packages/trace/src/model.ts</code></td>
+</tr>
+<tr>
+<td>L1 回放</td>
+<td><code>packages/eval/src/replay.ts</code></td>
+</tr>
+<tr>
+<td>历史事件流 fixture</td>
+<td><code>fixtures/events/legacy-v*.jsonl</code></td>
+</tr>
+<tr>
+<td>会话 fixture</td>
+<td><code>fixtures/sessions/</code></td>
+</tr>
+</tbody>
+</table>
+<h2>相关</h2>
+<ul>
+<li>事件契约：<a href="protocol.html">Domi Protocol</a>。</li>
+<li>L1 / L2 评估体系：<a href="eval.html">评估体系</a>。</li>
+<li>状态栏指标（另一个事件流投影）：<code>packages/observability/src/report.ts</code> 与 <code>packages/kernel/src/metrics.ts</code>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

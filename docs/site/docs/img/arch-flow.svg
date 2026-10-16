@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 620" width="880" height="620" role="img" aria-labelledby="t d">
+<title id="t">一次提交的数据流</title>
+<desc id="d">提交后：占位 busy、定格、预检降级链、buildContext 投影、runTurn 汇合生成、工具循环，终止条件触发后带 stopReason 收场。每步都是追加事件。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22D3EE"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+  <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#FBBF24"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .step{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.3}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.3}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.3}
+  .ln{stroke:#8FA1B2;stroke-width:1.3;fill:none}
+</style>
+<rect width="880" height="620" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">一次提交的数据流（贯穿例子：给登录接口加限流）</text>
+<text class="s" x="20" y="56">每一步都是「追加事件」，没有一步是「改历史」；右侧是这条流每次追加的事件</text>
+
+<!-- 步骤竖排 -->
+<rect class="step" x="60" y="90" width="520" height="52" rx="10"/>
+<text class="k" x="76" y="112">① 提交</text>
+<text class="s" x="76" y="130">session.submit → core 占位 busy → DomiSession.submit</text>
+<rect class="ok" x="640" y="94" width="200" height="44" rx="8"/>
+<text class="mono" x="656" y="120">user.input</text>
+
+<rect class="step" x="60" y="154" width="520" height="52" rx="10"/>
+<text class="k" x="76" y="176">② 定格 freeze</text>
+<text class="s" x="76" y="194">Soul / 规矩 / 技能 / 计划 / 环境一次取齐，turn 内不现读</text>
+<rect class="box" x="640" y="158" width="200" height="44" rx="8"/>
+<text class="s" x="656" y="184">（不产生事件，快照只进提示词）</text>
+
+<rect class="warn" x="60" y="218" width="520" height="52" rx="10"/>
+<text class="k" x="76" y="240" style="fill:#FBBF24">③ 预检降级链</text>
+<text class="s" x="76" y="258">超阈值先遮蔽 ctx.mask → 再压缩 ctx.compact → 硬顶停轮</text>
+<rect class="box" x="640" y="222" width="200" height="44" rx="8"/>
+<text class="mono" x="656" y="248">ctx.mask / ctx.compact</text>
+
+<rect class="step" x="60" y="282" width="520" height="52" rx="10"/>
+<text class="k" x="76" y="304">④ 拼上下文 buildContext</text>
+<text class="s" x="76" y="322">事件流投影 → 模型消息（10 类事件进上下文，其余是轨迹）</text>
+<rect class="box" x="640" y="286" width="200" height="44" rx="8"/>
+<text class="s" x="656" y="312">（不产生事件，只读）</text>
+
+<rect class="step" x="60" y="346" width="520" height="52" rx="10"/>
+<text class="k" x="76" y="368">⑤ 跑一轮 runTurn</text>
+<text class="s" x="76" y="386">prompt() 层拼装 与 buildContext 在 withPrompt 汇合 → generate 流式输出</text>
+<rect class="ok" x="640" y="350" width="200" height="44" rx="8"/>
+<text class="mono" x="656" y="376">model.request / delta</text>
+
+<!-- 工具循环 -->
+<rect class="warn" x="60" y="410" width="520" height="66" rx="10"/>
+<text class="k" x="76" y="432" style="fill:#FBBF24">⑥ 工具循环（可多轮）</text>
+<text class="s" x="76" y="452">权限引擎先决策（默认拒绝）→ ToolRunner.run → 落盘回灌</text>
+<text class="s" x="76" y="468">→ 再来一轮（回到 ④）</text>
+<rect class="box" x="640" y="414" width="200" height="58" rx="8"/>
+<text class="mono" x="656" y="438">tool.call / result</text>
+<text class="mono" x="656" y="456">permission / fs.snapshot</text>
+<path d="M580 443 H628" fill="none" class="ln" marker-end="url(#ag)"/>
+<path d="M580 426 V300 H628" fill="none" class="ln" marker-end="url(#ag)" stroke="#4ADE80" stroke-dasharray="5 4"/>
+<text class="s" x="566" y="330" style="fill:#4ADE80">回灌再跑一轮</text>
+
+<!-- 终止 -->
+<rect class="ok" x="60" y="492" width="520" height="66" rx="10"/>
+<text class="k" x="76" y="514" style="fill:#4ADE80">⑦ 终止条件触发 → 收场</text>
+<text class="s" x="76" y="534">最多 100 次工具调用 · 3 次参数解析重试 · 10 分钟墙钟</text>
+<text class="s" x="76" y="550">预算硬顶 · 用户中断 —— 带 stopReason</text>
+<rect class="box" x="640" y="496" width="200" height="58" rx="8"/>
+<text class="mono" x="656" y="520">error{stopReason}</text>
+<text class="mono" x="656" y="538">（+ 推送所有订阅者）</text>
+<path d="M580 529 H628" fill="none" class="ln" marker-end="url(#a)"/>
+
+<text class="s" x="20" y="596">事件流 append-only：压缩不删事件只追加 ctx.compact；分支不复制事件只记父指针。上下文、状态栏、轨迹、记忆全是这条流的投影</text>
+</svg>

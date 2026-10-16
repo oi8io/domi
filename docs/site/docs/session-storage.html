@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>会话存储与事件流 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a class="active" href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>会话存储与事件流</h1>
+<blockquote>
+<p>本页回答四个问题：事件存在哪？一次写入怎么保证原子？哪些表能删掉重建？迁移怎么做到只加不改？
+<code>packages/store</code> —— SQLite 事件流（<code>bun:sqlite</code>），daemon 是唯一写入者。
+贯穿例子：给登录接口加限流——你 30 秒前发的那条消息、domi 改过的每个文件版本，都在这条流里。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>磁盘上只有<strong>事件流</strong>，其余全是投影。真相是 <code>events</code> 表。</li>
+<li>写入是<strong>一个事务</strong>：seq 分配、序列化、投影表更新要么全成，要么全回滚。</li>
+<li>投影表（FTS、语义、进度、已读、项目、日程）可以删掉重建，丢了不伤真相。</li>
+<li>迁移<strong>只加不改</strong>：加列 / 加表 / 加索引。旧行的含义永远不变。</li>
+<li>磁盘版本高于代码版本时，<strong>只读打开并告警，不拒绝启动</strong>。</li>
+<li>事件落盘前按 <code>~/.domi/secrets.yaml</code> 脱敏，界面 / 导出 / 轨迹都不回吐凭据。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>事件流</td>
+<td>只追加的事件序列。会话的全部真相。</td>
+</tr>
+<tr>
+<td>投影</td>
+<td>从事件流算出来的表或视图（搜索、语义记忆、进度）。</td>
+</tr>
+<tr>
+<td>事务</td>
+<td>一批操作要么全成、要么全不成的边界。</td>
+</tr>
+<tr>
+<td>迁移</td>
+<td>旧库升到新 schema 的脚本。</td>
+</tr>
+<tr>
+<td>脱敏</td>
+<td>落盘前把凭据替换掉。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/stor-layout.svg" alt="存储布局" /></p>
+<p><img src="img/stor-write.svg" alt="一次写入的事务" /></p>
+<h2>2. 文件与打开</h2>
+<ul>
+<li>生产路径：<code>~/.domi/events.db</code>。<code>:memory:</code> 仅供不需要跨进程持久化的用例。</li>
+<li>首次运行，父目录由 store 自己建——「第一次跑就崩」是最劝退的失败方式（SQLite 只会给一句 <code>SQLITE_CANTOPEN</code>）。</li>
+<li>PRAGMAS 与 DDL 无条件跑（<code>IF NOT EXISTS</code> 幂等）。</li>
+<li>磁盘版本高于代码版本：置位 <code>readOnlyFuture</code>，<strong>只读打开并告警，不拒绝启动</strong>（INV-01 的兑现）。</li>
+</ul>
+<h2>3. 事件表与 seq</h2>
+<pre><code class="language-sql">CREATE TABLE events (
+  session_id TEXT, seq INTEGER, parent_seq INTEGER, ts INTEGER,
+  schema_version INTEGER, type TEXT, payload TEXT
+)  -- 主键 (session_id, seq)
+</code></pre>
+<p>三个不显然的地方（<code>sqlite-event-log.ts</code> 文件头，改之前先读）：</p>
+<ol>
+<li><strong>seq 在同一事务内分配</strong>（<code>SELECT MAX+1 → INSERT</code>），靠主键兜底。够用是因为只有一个写入者；哪天多进程同时写同一个库才需要换成真正的并发仲裁。</li>
+<li><strong>序列化放在事务内部</strong>——一批事件里任意一条序列化失败，整批回滚，磁盘上不会留半条。</li>
+<li><strong>read 走 <code>parseEvent</code> 的降级路径</strong>，永不抛「无法解析」（INV-01）。</li>
+</ol>
+<p>会话元数据在 <code>sessions</code> 表（<code>id</code> / <code>created_at</code> / <code>cwd</code>，STRICT 表）。分支记 <code>parent_seq</code> 指针，<strong>不复制事件</strong>。</p>
+<h2>4. 投影表：可以删掉重建</h2>
+<p>真相只有 <code>events</code> 表。以下全部在 <code>append</code> 的<strong>同一个事务里</strong>投影：</p>
+<table>
+<thead>
+<tr>
+<th>表 / 索引</th>
+<th>是什么</th>
+<th>丢了怎么办</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>events_fts</code>（FTS5）</td>
+<td>全文检索</td>
+<td>重放重建</td>
+</tr>
+<tr>
+<td><code>semantic_items</code></td>
+<td>L3 语义记忆</td>
+<td>重放重建</td>
+</tr>
+<tr>
+<td><code>memory_progress</code> / <code>fts_progress</code></td>
+<td>各投影到第几条</td>
+<td>重建</td>
+</tr>
+<tr>
+<td><code>read_marks</code></td>
+<td>已读标记</td>
+<td>重建</td>
+</tr>
+<tr>
+<td><code>projects</code></td>
+<td>项目</td>
+<td>重建</td>
+</tr>
+<tr>
+<td><code>schedules</code> / <code>schedule_runs</code></td>
+<td>定时任务</td>
+<td>重建</td>
+</tr>
+</tbody>
+</table>
+<p>两个实现细节：</p>
+<ul>
+<li><strong>FTS 用 trigram 分词器</strong>。默认的 unicode61 不切中文，「数据库迁移」整条会被当成一个词。代价：查询串至少要三个字符，两个字的中文词匹配不到——那条路径由调用方降级成 LIKE 扫描。</li>
+<li><strong>embedding 是唯一不来自事件的列</strong>。<code>semantic_items</code> 里的向量是算出来的缓存，丢了重算。</li>
+</ul>
+<h2>5. 迁移：只加不改</h2>
+<p><code>migrate.ts</code> + <code>schema.ts</code> 的 <code>MIGRATIONS</code>（现有 <strong>3 条</strong>：v3、v8、v11——会话列、子 agent、项目/日程）。规则：</p>
+<ul>
+<li>迁移只能加列 / 加表 / 加索引，不能改旧行的含义。</li>
+<li><code>guard:migrations</code> 检查迁移是否幂等、是否只做加法。</li>
+<li><code>domi migrate</code> 命令封装（<code>cli</code> 的 <code>migrateDatabase</code>）。</li>
+</ul>
+<p><strong>M15 有一条独立迁移</strong>（<code>domi migrate-m15</code>，<code>packages/store/src/migrate-m15.ts</code>）：M4 之前的版本允许 <code>_</code> 前缀会话（内部会话）被当作普通会话使用，用户事件可能落进 <code>_memory</code>。这个脚本把这些泄漏的用户事件迁出成普通会话，内部会话只留记忆事件。三个硬性要求：</p>
+<ol>
+<li>迁移前自动把 <code>events.db</code> 复制到 <code>backups/pre-m15-migration-&lt;ts&gt;/</code>，失败可回滚。</li>
+<li>幂等可重跑：<code>migrated-&lt;原id&gt;</code> 会话已存在就跳过。</li>
+<li>保留原 seq 映射：<code>UPDATE session_id</code> 后原 seq 原样保留，<code>ctx.ref</code> 引用照常解析。</li>
+</ol>
+<p>它不删任何事件——只是把一批事件从旧会话划到新会话名下（INV-01）。</p>
+<h2>6. 隐私与脱敏</h2>
+<p><code>redact.ts</code>：<code>serializeRedacted</code>——事件落盘前按 <code>~/.domi/secrets.yaml</code> 里的凭据做脱敏。界面 / 导出 / 轨迹任何接口都不回吐凭据（HANDOFF 硬规矩 2：凭据不进仓库、不回吐给界面）。<code>guard:secrets</code> 扫 <code>fixtures</code> 与 <code>docs</code>。</p>
+<h2>7. 搜索</h2>
+<p><code>store/search.ts</code>：<code>INDEXED_TYPES</code> 决定哪些事件类型进 FTS（<code>user.note</code> 也在列）。查询串 &lt; 3 字符走 LIKE 降级。</p>
+<h2>8. 出错了怎么办：限流第 2 步写到一半，进程崩溃</h2>
+<ol>
+<li><strong>一批事件写一半崩了</strong>。事务回滚，磁盘上不留半条。重启后从最后一条完整事件继续。</li>
+<li><strong>磁盘版本高于代码版本</strong>（你用旧版 domi 打开了新版建的库）。只读打开并告警——绝不写，绝不错乱。升级 domi 即可。</li>
+<li><strong>迁移失败</strong>。<code>migrate-m15</code> 会把 <code>events.db</code> 先备份到 <code>backups/pre-m15-migration-&lt;ts&gt;/</code>；失败可回滚。普通迁移是纯加列，失败也不伤旧行。</li>
+<li><strong>投影表坏了 / 被删了</strong>。重放事件流重建，真相还在。</li>
+<li><strong>凭据泄漏风险</strong>。<code>serializeRedacted</code> 在落盘前处理；<code>guard:secrets</code> 在 CI 扫 fixtures 与 docs。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>写入中断</td>
+<td>事务回滚，不留半条</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>库版本比代码新</td>
+<td>只读打开并告警</td>
+<td>升级 domi</td>
+</tr>
+<tr>
+<td>迁移失败</td>
+<td>m15 先备份可回滚；加列迁移不伤旧行</td>
+<td>看告警，必要时手动回滚</td>
+</tr>
+<tr>
+<td>投影表坏</td>
+<td>重放重建</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>换了凭据</td>
+<td>旧库里的脱敏数据不受影响</td>
+<td>更新 secrets.yaml</td>
+</tr>
+</tbody>
+</table>
+<h2>9. 为什么只有事件流</h2>
+<ul>
+<li><strong>压缩</strong>：<code>ctx.compact</code> 只是又一条事件（INV-12，「压缩后可重放等价」免费得到）。</li>
+<li><strong>分支 / 回放</strong>：从某 seq 重放即 fork / time-travel。</li>
+<li><strong>状态栏 / 轨迹 / 记忆</strong>：全是投影，不用另做埋点（INV-13）。</li>
+<li><strong>整库可审计</strong>：权限决策、模型调用、工具执行都在事件里。</li>
+</ul>
+<h2>已知限制</h2>
+<ul>
+<li>单写入者假设：seq 分配靠主键兜底，多进程写同一库需要换成真正的并发仲裁。</li>
+<li>单文件单点：没有多副本 / 集群。</li>
+<li>FTS trigram 最少三个字符，两字中文词匹配不到（有 LIKE 降级）。</li>
+<li><code>semantic_items</code> 的 embedding 不是事件来源，重放重建要重新调用 embedding 服务。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>事件写入（事务 / seq / 投影）</td>
+<td><code>packages/store/src/sqlite-event-log.ts</code></td>
+</tr>
+<tr>
+<td>迁移与 schema</td>
+<td><code>packages/store/src/{migrate,schema}.ts</code></td>
+</tr>
+<tr>
+<td>M15 内部会话泄漏迁移</td>
+<td><code>packages/store/src/migrate-m15.ts</code></td>
+</tr>
+<tr>
+<td>全文检索 / 语义投影</td>
+<td><code>packages/store/src/{search,semantic}.ts</code></td>
+</tr>
+<tr>
+<td>脱敏</td>
+<td><code>packages/store/src/redact.ts</code></td>
+</tr>
+<tr>
+<td>项目 / 日程 / 已读</td>
+<td><code>packages/store/src/{projects,schedules,read-marks}.ts</code></td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/store/test/</code>（append 原子性、迁移、搜索、脱敏）。</p>
+<h2>相关</h2>
+<ul>
+<li>事件契约与版本规则：<a href="protocol.html">Domi Protocol：daemon 与客户端之间的契约</a>。</li>
+<li>记忆与 Soul 的投影关系：<a href="memory-and-soul.html">记忆分层与 Soul</a>。</li>
+<li>压缩怎么只追加不删事件：<a href="context-compression.html">压缩与 prompt cache</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

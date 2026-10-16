@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Loop：一轮里发生了什么 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a class="active" href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>Agent Loop：一轮里发生了什么</h1>
+<blockquote>
+<p>本页回答四个问题：domi 怎么把你说的一句话变成一连串动作？一轮什么时候停？上下文快满了怎么办？出错了会怎样？
+贯穿例子：目标「给登录接口加限流」，计划第 2 步「写限流中间件」正在进行。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>domi 把你说的一句话当作<strong>一轮</strong>。一轮从 <code>session.submit</code> 开始，到写一条 <code>error</code> 事件收场。</li>
+<li>一轮开始时，domi 先<strong>定格</strong>一份快照：Soul、仓库规矩、技能清单、计划、环境变量。本轮内不再现读。</li>
+<li>发请求前，domi 按<strong>预算器</strong>预检：上下文快满时先遮蔽旧工具输出，再压缩，还不够就停下。</li>
+<li>模型看到的内容由<strong>两条轨道</strong>拼成：事件投影（历史说了什么）+ 提示词层（domi 是谁、有什么规矩），在 <code>withPrompt</code> 汇合。</li>
+<li>一轮有三个独立上限：工具调用 100 次、参数解析连续失败 3 次、单轮 10 分钟。任何一个到顶就停。</li>
+<li>出错了<strong>不会自动重跑</strong>。已做的工作和计划都保留，你点「继续」才接着做。</li>
+<li>任何拼装阶段的异常都转成事件落盘，不会把 daemon 拖垮。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一轮</td>
+<td>从你说一句话，到模型这次停下。</td>
+</tr>
+<tr>
+<td>定格</td>
+<td>一轮开始时，domi 把本轮要用的内容一次取齐。本轮内不再现读。</td>
+</tr>
+<tr>
+<td>事件投影</td>
+<td>把事件流里的历史拼成模型消息（左轨）。</td>
+</tr>
+<tr>
+<td>提示词层</td>
+<td>domi 的身份、规矩、Soul、计划等分层内容（右轨）。</td>
+</tr>
+<tr>
+<td>预算器</td>
+<td>估算上下文占用的工具。占用超过阈值就降级。</td>
+</tr>
+<tr>
+<td>遮蔽</td>
+<td>把旧的工具输出换成指针，事件原文不动。</td>
+</tr>
+<tr>
+<td>压缩</td>
+<td>把中间一段历史换成摘要。</td>
+</tr>
+<tr>
+<td>终止条件</td>
+<td>让这一轮停下的原因。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/aloop-overview.svg" alt="一轮对话的总体流程" /></p>
+<ol>
+<li>你说一句话。domi 落一条 <code>user.input</code>，并把它标记为这一轮的开始。</li>
+<li>domi 定格：Soul、仓库规矩、技能清单、计划、环境变量一次取齐。</li>
+<li>domi 预检：按预算器估占用。超过阈值就降级（见第 3 节）。</li>
+<li>domi 跑主循环：拼上下文 → 生成 → 落盘 → 执行工具 → 回灌，直到满足终止条件。</li>
+<li>domi 写一条 <code>error</code> 事件，说明这轮为什么停。一轮结束。</li>
+</ol>
+<h2>2. 定格：一轮开始时 domi 先记下什么</h2>
+<p>domi 在一轮开始时取一份快照，包含五样东西：</p>
+<table>
+<thead>
+<tr>
+<th>内容</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Soul</td>
+<td>从记忆里取的人格层（人类可读的 Markdown）</td>
+</tr>
+<tr>
+<td>仓库规矩</td>
+<td>项目里的 AGENTS.md 等指令</td>
+</tr>
+<tr>
+<td>技能清单</td>
+<td>有哪些 Skill（只列不装）</td>
+</tr>
+<tr>
+<td>计划</td>
+<td>任务会话里的步骤清单（见<a href="orchestration.html">编排</a>）</td>
+</tr>
+<tr>
+<td>环境变量</td>
+<td>当前项目 / 工作目录等</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么定格</strong>：一轮可能跑几十步，横跨几分钟。如果每步都现读，Soul 改了一半、计划换了版本，模型看到的内容就不一致。定格保证：<strong>这一轮里，模型看到的始终是同一份世界</strong>。</p>
+<p>来源变化不会打扰当前请求。它会在下一轮生效；你也可以手动刷新（<code>ctx.refresh</code>）。</p>
+<h2>3. 预检：上下文快满时先降级</h2>
+<p>发请求前，domi 用预算器估算上下文占用。占用 = 上一次模型请求的输入 + 本次新增的内容 ÷ 有效窗口。</p>
+<p>预检按三条档位逐级降：</p>
+<table>
+<thead>
+<tr>
+<th>占用</th>
+<th>domi 做什么</th>
+<th>落什么事件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>≥60%（节省档 45%）</td>
+<td>遮蔽一批旧工具输出（至少 8000 token）</td>
+<td><code>ctx.mask</code></td>
+</tr>
+<tr>
+<td>≥80%（节省档 70%）</td>
+<td>压缩中间历史成摘要</td>
+<td><code>ctx.compact</code></td>
+</tr>
+<tr>
+<td>≥92%</td>
+<td>本轮停，告诉你怎么办</td>
+<td><code>error{scope:'context'}</code></td>
+</tr>
+</tbody>
+</table>
+<p>每降一级，domi 重新估一次占用。遮蔽腾不出空间，就继续往下走。降到 92% 硬顶，本轮停下——此时 <code>error</code> 事件带 <code>recoverable</code>，你可以按提示继续。</p>
+<blockquote>
+<p>遮蔽和压缩只改变模型<strong>看到</strong>的内容，不改事件流里的原文。详见<a href="context-compression.html">压缩与 prompt cache</a>。</p>
+</blockquote>
+<h2>4. 主循环：两条轨道汇合</h2>
+<p><img src="img/aloop-sequence.svg" alt="一轮对话的时序" /></p>
+<p>主循环 <code>runTurn</code> 反复执行四件事，直到终止：</p>
+<p><strong>（1）拼上下文（两条轨道）</strong></p>
+<table>
+<thead>
+<tr>
+<th>轨道</th>
+<th>干什么</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>左轨 · 事件投影</td>
+<td><code>buildContext</code> 把历史事件拼成模型消息</td>
+<td>只进 10 类：user.input、user.note、ctx.note、ctx.ref、ctx.fileref、model.reason（可选）、model.delta、tool.call、tool.result、verify.required。其余事件（权限、用量、遮蔽、压缩等）是轨迹，不进上下文</td>
+</tr>
+<tr>
+<td>右轨 · 提示词层</td>
+<td><code>prompt()</code> 现拼分层提示词</td>
+<td>身份 → 规矩 → 能力 → 约定 → Soul（非空才放）→ 技能清单 → 用户自定义 → 工作区 → 计划。每轮现拼，不进事件流</td>
+</tr>
+</tbody>
+</table>
+<p>两条轨道在 <code>withPrompt</code> 汇合：运行中的补充（notes）追加成新的用户消息 → 系统块放最前 → 稳定用户块插在第二位。这样动态内容永远<strong>追加</strong>，不改已发出的消息，前缀保持稳定。</p>
+<p><strong>（2）生成</strong>。domi 把拼好的消息交给模型。模型流式返回，domi 把每一条增量逐条落盘。<code>model.request</code> 事件同时记录上下文分段（右侧栏用）和前缀指纹（用来发现缓存前缀断裂）。</p>
+<p><strong>（3）执行工具</strong>。模型要求调用工具时，domi 先过权限（默认拒绝，每个决定都落一条事件），再执行。工具不能自己写事件流——它把事件交出来，由主循环统一落盘。工具结果回灌上下文，循环继续。</p>
+<p><strong>（4）检查终止条件</strong>。每步开头都检查一次（见下一节）。</p>
+<p><strong>运行中补充</strong>：模型跑着的时候你也能打字。补充先排队，在主循环的安全点送达（此时上一步的工具结果都已落盘，不会插进 tool_use 和 tool_result 之间）。收场前还会再取一次，取到就追加并继续。</p>
+<p><strong>动态变化</strong>：计划更新、环境变化这类内容，当轮通过追加消息送达，同时落一条 <code>ctx.note</code> 事件。下一轮照样可见。</p>
+<h2>5. 这一轮什么时候停</h2>
+<p><img src="img/aloop-exit.svg" alt="这一轮什么时候停" /></p>
+<p>三个独立计数器，任何一个到顶就停：</p>
+<table>
+<thead>
+<tr>
+<th>上限</th>
+<th>默认</th>
+<th>配置项</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工具调用次数</td>
+<td>100 次</td>
+<td><code>loop.maxToolCalls</code></td>
+</tr>
+<tr>
+<td>参数解析连续失败</td>
+<td>3 次</td>
+<td><code>loop.maxArgParseRetries</code></td>
+</tr>
+<tr>
+<td>单轮时长</td>
+<td>10 分钟</td>
+<td><code>loop.maxWallClockMs</code></td>
+</tr>
+</tbody>
+</table>
+<p>加上另外四种停法：</p>
+<ul>
+<li><strong>正常收场</strong>：没有工具要跑，步骤都做完了。</li>
+<li><strong>预算硬顶</strong>：上下文占用 ≥92%。</li>
+<li><strong>模型流错误</strong>：模型接口持续报错，自动重试 3 次（间隔递增、带随机抖动）后仍失败。模型已经输出后断掉不重试，避免你看到重复的半句话。</li>
+<li><strong>你中断</strong>：Web 点「停止」、TUI 按 <code>Esc</code>。已输出的内容保留。</li>
+</ul>
+<p>任何停下都会写一条 <code>error{stopReason}</code> 事件，带上三个计数器的值。停下后：计划保留、已做的工作保留、界面显示「上次被打断了」和「继续」按钮。</p>
+<h2>6. 出错了怎么办：第 2 步写到一半，类型检查报错</h2>
+<p>还是「给登录接口加限流」。这一轮里，模型正在写第 2 步「写限流中间件」。它改了 <code>app.ts</code>，跑 <code>bun test</code>，类型检查报错。</p>
+<ol>
+<li><strong>报错是工具结果，不是轮结束</strong>。domi 把报错交回模型，这一轮不会因为一次报错就停。</li>
+<li><strong>模型自己处理</strong>。它读报错，选一种做法：修好再试（最常见）、换个办法、或者问你。</li>
+<li><strong>修好就继续</strong>。重跑测试通过，工具结果回灌，循环继续。</li>
+<li><strong>修不好，上限兜底</strong>。工具调用次数、解析重试、或墙钟到顶，这一轮停。<code>error</code> 事件写明原因。</li>
+<li><strong>停后不自动重跑</strong>。<code>app.ts</code> 改了一半——要不要再来一次，由你决定。你点「继续」，模型先查当前状态，再从断点接着做。</li>
+</ol>
+<p><strong>如果模型接口一直报错</strong>：domi 自动重试 3 次（间隔逐次加倍、带抖动），仍失败就收场，会话不丢。你换个模型，再点「继续」。</p>
+<p><strong>如果你点停止</strong>：已输出的内容保留，工具中止，<code>error{stopReason:'interrupted'}</code> 落盘。</p>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工具报错</td>
+<td>把结果交回模型，模型修复、换办法或问你</td>
+<td>通常不用管</td>
+</tr>
+<tr>
+<td>模型接口持续报错</td>
+<td>重试 3 次（间隔递增带抖动），仍失败停这一轮</td>
+<td>换个模型，再点「继续」</td>
+</tr>
+<tr>
+<td>工具调用到 100 次</td>
+<td>停这一轮，计数器写进 error</td>
+<td>点「继续」，或改做法</td>
+</tr>
+<tr>
+<td>参数解析连续失败 3 次</td>
+<td>停这一轮</td>
+<td>点「继续」，或检查工具调用</td>
+</tr>
+<tr>
+<td>单轮超 10 分钟</td>
+<td>停这一轮</td>
+<td>点「继续」，或拆小任务</td>
+</tr>
+<tr>
+<td>上下文占用 ≥92%</td>
+<td>停这一轮，error 带可恢复标记</td>
+<td>按提示压缩，或点「继续」</td>
+</tr>
+<tr>
+<td>你点「停止」</td>
+<td>停这一轮，已输出保留</td>
+<td>点「继续」，或说新要求</td>
+</tr>
+<tr>
+<td>拼装阶段异常</td>
+<td>转成 error 事件落盘，不穿出</td>
+<td>下一次提交照常能跑</td>
+</tr>
+</tbody>
+</table>
+<h2>7. 可靠性靠什么</h2>
+<ol>
+<li><strong>记录在先，进度是算出来的。</strong> 每一步（输入、输出、工具调用、结果、停止原因）都是一条事件。跑到哪一步，从事件算出来，没有另外的状态文件。任何时刻被杀，重启后重读记录就知道停在哪。</li>
+<li><strong>事件只追加，不修改。</strong> 遮蔽、压缩都只追加事件，不改历史。回放和审计看到的永远是真的。</li>
+<li><strong>决策与效果分离。</strong> 主循环的输出是事件，事件是纯数据，纯数据可断言。大部分逻辑不用起 daemon 就能测。</li>
+<li><strong>三个上限独立计数。</strong> 停下时记下所有计数器的值。事后能看出是哪个上限、谁中断的。</li>
+<li><strong>异常不外溢。</strong> 拼装阶段的任何异常都转成事件落盘，不会让整个 daemon 崩掉。</li>
+<li><strong>工具不自己写库。</strong> 工具把事件交出来，由主循环统一落盘。顺序和事务边界只有一个地方管。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>单轮最长 10 分钟（可配 <code>loop.maxWallClockMs</code>），超长任务请用<a href="orchestration.html">长任务</a>。</li>
+<li>模型开始输出后断流不重试——避免重复半句话，但这也意味着那次输出丢失。</li>
+<li>定格的内容本轮内不刷新：改了配置要等下一轮或手动刷新（<code>ctx.refresh</code>）才生效。</li>
+<li>主循环是串行的：同一会话同一时间只跑一轮，第二个提交会收到「忙」。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>主循环 runTurn、终止条件、安全点</td>
+<td><code>packages/kernel/src/loop.ts</code></td>
+</tr>
+<tr>
+<td>事件投影（左轨）</td>
+<td><code>packages/kernel/src/build-context.ts</code></td>
+</tr>
+<tr>
+<td>两轨汇合 withPrompt</td>
+<td><code>packages/kernel/src/preamble.ts</code></td>
+</tr>
+<tr>
+<td>预算器与档位判定</td>
+<td><code>packages/kernel/src/budget.ts</code></td>
+</tr>
+<tr>
+<td>降级链编排（遮蔽→压缩→硬顶）</td>
+<td><code>packages/runtime/src/degrade.ts</code></td>
+</tr>
+<tr>
+<td>定格、prompt() 层拼装（含 Soul 注入）、预检触发</td>
+<td><code>packages/runtime/src/session.ts</code></td>
+</tr>
+<tr>
+<td>压缩与遮蔽的实现</td>
+<td><code>packages/memory/src/{compact,mask,strategy}.ts</code></td>
+</tr>
+<tr>
+<td>模型接口重试</td>
+<td><code>packages/model/src/retry.ts</code></td>
+</tr>
+<tr>
+<td>端口接口（kernel 依赖什么）</td>
+<td><code>packages/kernel/src/ports.ts</code></td>
+</tr>
+<tr>
+<td>事件契约</td>
+<td><code>packages/protocol/src/event.ts</code></td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/kernel/test/loop.spec.ts</code>（终止条件、安全点、异常转事件）；L1 回放跑的是真的 <code>runTurn</code>（见<a href="eval.html">评估体系</a>）。</p>
+<h2>相关</h2>
+<ul>
+<li>分层提示词与 Soul 的动态注入：<a href="prompt-assembly.html">提示词分层与 cache 边界</a>。</li>
+<li>遮蔽 / 压缩 / 预算器细节：<a href="context-compression.html">压缩与 prompt cache</a>。</li>
+<li>一轮之上的计划、审批与长任务：<a href="orchestration.html">编排</a>。</li>
+<li>工具与权限引擎：<a href="tools-runtime.html">工具与权限运行时</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

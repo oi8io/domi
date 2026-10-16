@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>提示词分层与 cache 边界 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a class="active" href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>提示词分层与 cache 边界</h1>
+<blockquote>
+<p>本页回答四个问题：模型看到的提示词是怎么拼出来的？Soul 什么时候放进去？为什么前缀必须稳定？前缀断了怎么发现？
+贯穿例子：给登录接口加限流——domi 以任务模式工作，带计划。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>提示词是一串<strong>有序的层</strong>。每层有 id、role、priority、cacheable 四个属性。</li>
+<li>priority ≤500 的层全在<strong>稳定前缀</strong>里。800 / 900 是会变层。</li>
+<li><strong>Soul 是运行时动态注入的层</strong>（priority 400），非空才放。技能清单同理（450）。</li>
+<li>动态内容走<strong>追加</strong>（notes），不走改写——前缀保持 byte 级稳定。</li>
+<li>前缀<strong>指纹</strong>（FNV-1a 哈希）落进每次请求。下一轮对比，断裂可观测。</li>
+<li>系统提示词每轮现拼，没有本地渲染缓存。prompt cache 命中靠<strong>前缀内容稳定</strong>，不是靠缓存。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>层</td>
+<td>提示词的一个有序片段。</td>
+</tr>
+<tr>
+<td>稳定前缀</td>
+<td>请求开头的固定部分。厂商 prompt cache 按它匹配。</td>
+</tr>
+<tr>
+<td>定格</td>
+<td>turn 开始时一次取齐本轮要用的内容，turn 内不现读。</td>
+</tr>
+<tr>
+<td>notes</td>
+<td>运行中的动态内容（计划、环境变化等），追加送达。</td>
+</tr>
+<tr>
+<td>指纹</td>
+<td>前缀内容的哈希，用来发现缓存断裂。</td>
+</tr>
+<tr>
+<td>会变层</td>
+<td>每轮内容都可能变的层（计划、动态内容）。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/passm-flow.svg" alt="提示词怎么拼出来" /></p>
+<ol>
+<li>左轨 <code>buildContext</code>：把事件历史拼成消息。</li>
+<li>右轨 <code>prompt()</code>：把各层拼成提示词。Soul 和技能清单在这里动态注入。</li>
+<li><code>withPrompt</code> 汇合：notes 追加 → system 置顶 → 稳定 user 块插第二位。</li>
+<li>domi 把整份消息交给模型，同时落 <code>model.request</code>（带层清单与指纹）。</li>
+<li>下一轮生成前对比指纹，发现前缀断裂就落观测事件。</li>
+</ol>
+<h2>2. 层：提示词是一串有序的片段</h2>
+<p><img src="img/passm-layers.svg" alt="层与优先级" /></p>
+<p>一层是一个 <code>{id, role, priority, cacheable, render}</code>。role 只有 system / user 两档。同一 role 的层按 priority 从小到大拼。</p>
+<p>内置优先级（编号留了间隔，你插层不用改内置编号）：</p>
+<table>
+<thead>
+<tr>
+<th>priority</th>
+<th>层</th>
+<th>内容</th>
+<th>cacheable</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>100</td>
+<td>builtin.identity</td>
+<td>我是谁（按模式分段）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>150</td>
+<td>builtin.guardrail</td>
+<td>注入防护——先立规矩，再说能力</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>200</td>
+<td>capabilities</td>
+<td>工具能力声明</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>300</td>
+<td>builtin.conventions</td>
+<td>会话惯例 / 输出约定</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>400</td>
+<td>builtin.soul</td>
+<td><strong>动态注入</strong>（非空才放）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>450</td>
+<td>builtin.skills</td>
+<td>技能清单（只列不装）</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>500</td>
+<td>userStatic</td>
+<td>用户自定义层的默认落点</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>800</td>
+<td>workspace</td>
+<td>工作区 / 项目上下文</td>
+<td>❌ 会变</td>
+</tr>
+<tr>
+<td>900</td>
+<td>dynamic</td>
+<td>计划 / 轮级动态内容</td>
+<td>❌ 会变</td>
+</tr>
+</tbody>
+</table>
+<p><strong>身份按模式分段</strong>（identity 层）：普通会话、任务会话（带计划）、子 agent 的「我是谁」不同。子 agent 有独立上下文，看不到父对话——它的身份必须单独写，不能复用会话身份。</p>
+<h2>3. 稳定前缀：≤500 都别动</h2>
+<p>prompt cache 按前缀匹配：前缀里任何一个 byte 变了，整个前缀缓存失效。</p>
+<p>所以 500 以下（含）都是稳定前缀，800 / 900 是会变层。<strong>会变层不能标成 cacheable</strong>——<code>CacheBoundaryError</code> 在构建期就抛错，不是运行期才发现。</p>
+<h2>4. Soul 什么时候放进去</h2>
+<p>Soul 不在 <code>packages/prompt/src/builtin.ts</code> 里——你在源码里找不到它。它在每次 <code>prompt()</code> 时注入：</p>
+<ol>
+<li>turn 开始，domi 定格，从记忆取 Soul 文本。</li>
+<li>Soul 非空，domi 追加一层：<code>{id:'builtin.soul', role:'system', priority:400, cacheable:true}</code>。</li>
+<li>Soul 为空，不发这一层（免得空占前缀）。</li>
+<li>技能清单同理：非空才注入 450 层。</li>
+</ol>
+<p><strong>为什么放稳定前缀</strong>：Soul 极少变。放 400 意味着它参与前缀匹配，每次命中缓存；放会变区则每次都击穿缓存。</p>
+<p><strong>什么时候更新</strong>：Soul 变化不影响当前请求（定格快照不变）。下一轮或显式刷新（<code>ctx.refresh</code>）才生效。</p>
+<h2>5. 动态内容走 notes，不走改写</h2>
+<p>计划提示变化、环境变化这类轮级内容，domi <strong>不</strong>改写已发出的消息（一改，前缀就断了）。它把内容放进 notes，追加送达：</p>
+<ol>
+<li><code>prompt()</code> 把动态内容放进 <code>PromptParts.notes</code>（reason 标记：计划 / 环境 / 验证 / 补充 / 换模型）。</li>
+<li><code>withPrompt</code> 把 notes 渲染成<strong>新的 user 块</strong>，追加到消息末尾。</li>
+<li>主循环落一条 <code>ctx.note</code> 事件，让后续轮次也可见（追加送达，允许重复）。</li>
+</ol>
+<p>旧的 <code>PromptParts.dynamic</code> 字段已弃用——不再拼进最后一条 user 消息。</p>
+<h2>6. 前缀指纹：断了能看见</h2>
+<ul>
+<li>每次请求前，domi 给工具 schema 和每条消息各算一个 FNV-1a 哈希（只记哈希，不记内容），落进 <code>model.request.fingerprint</code>。</li>
+<li>下一轮生成前，<code>fingerprintOf</code> 对比上一轮指纹，<code>locateBreak</code> 定位断裂点。</li>
+<li>前缀变化分两种：<strong>预期</strong>（新事件追加——消息变长但前缀一致）；<strong>非预期断裂</strong>（缓存被击穿），落 <code>ctx.prefix.break</code> 观测事件。</li>
+<li>层清单与哈希（<code>layers</code> / <code>layerHashes</code>）同时落进 <code>model.request.ctx.layers</code>，右侧栏上下文 tab 按层展示。</li>
+</ul>
+<p>这是「prompt cache 到底有没有被击穿」的运行时证据。</p>
+<p><strong>厂商缓存参数</strong>：请求发出时，domi 按厂商渲染缓存参数（anthropic 的 <code>cache_control</code> TTL、openai 兼容网关的 <code>prompt_cache_key</code>）。缺省按会话档位：任务会话 3600 秒，自由会话 300 秒（<code>context.cacheTtlOverride</code> 可覆盖）。</p>
+<h2>7. 出错了怎么办：第 2 步进行中，你改了配置</h2>
+<p>还是「给登录接口加限流」。第 2 步写限流中间件进行中，模型正在改 <code>app.ts</code>。</p>
+<ol>
+<li><strong>你改了 <code>config.yaml</code>（环境变化）</strong>。当前请求不受影响——定格快照没变。下一轮生效。你想立即生效就手动 <code>ctx.refresh</code>。</li>
+<li><strong>计划更新了</strong>（第 2 步标记完成）。domi 把它放进 notes，追加送达，落 <code>ctx.note</code>。前缀没动。</li>
+<li><strong>厂商缓存断了</strong>（前缀非预期变化）。domi 对比指纹发现断裂，落 <code>ctx.prefix.break</code>。请求照常发——只是这次少一次缓存命中，多付一点输入 token。</li>
+<li><strong>有人把会变层标成 cacheable</strong>。构建期抛 <code>CacheBoundaryError</code>，请求发不出去。修配置（去掉 cacheable 或降 priority）就能恢复。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>你改了配置 / Soul</td>
+<td>定格快照不变，下一轮生效</td>
+<td>想立即生效：<code>ctx.refresh</code></td>
+</tr>
+<tr>
+<td>计划更新 / 环境变化</td>
+<td>notes 追加送达，落 ctx.note</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>前缀非预期断裂</td>
+<td>落 ctx.prefix.break，照常继续</td>
+<td>通常不用管（只损失缓存命中）</td>
+</tr>
+<tr>
+<td>会变层标成 cacheable</td>
+<td>CacheBoundaryError 构建期抛错</td>
+<td>修配置</td>
+</tr>
+<tr>
+<td>模型看不到你的新改动</td>
+<td>定格快照没刷新</td>
+<td><code>ctx.refresh</code></td>
+</tr>
+</tbody>
+</table>
+<h2>8. 可靠性靠什么</h2>
+<ol>
+<li><strong>层是纯数据。</strong> 同样的层拼出同样的文本。指纹可复算，断裂可观测。</li>
+<li><strong>前缀稳定靠纪律。</strong> 追加不改写 + 构建期边界检查，双保险。</li>
+<li><strong>边界错误早抛。</strong> 会变层标 cacheable 在构建期就报错，不拖到运行期才发现缓存全断。</li>
+<li><strong>指纹只记哈希，不记内容。</strong> 观测缓存健康不泄露会话内容。</li>
+<li><strong>定格让一轮内看到的世界一致。</strong> 模型几十步内读到的 Soul、计划、环境是同一份。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>系统提示词每轮现拼，<strong>没有本地渲染缓存</strong>。前缀稳定靠内容不变，不是靠缓存层。</li>
+<li>稳定前缀有代价：前缀越长，每次请求的输入 token 越多。Soul 空时自动省掉这一层。</li>
+<li>前缀断裂只观测、不自动修复。再次命中缓存要靠后续轮次前缀恢复一致。</li>
+<li><code>userStatic</code>（500）仍在稳定前缀里。用户往这里加长内容会占前缀预算。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>层结构、内置层与优先级</td>
+<td><code>packages/prompt/src/{layer,builtin}.ts</code></td>
+</tr>
+<tr>
+<td>Soul / 技能动态注入（400 / 450）</td>
+<td><code>packages/runtime/src/session.ts</code>（<code>prompt()</code>）</td>
+</tr>
+<tr>
+<td>两轨汇合 withPrompt</td>
+<td><code>packages/kernel/src/preamble.ts</code></td>
+</tr>
+<tr>
+<td>前缀指纹与断裂定位</td>
+<td><code>packages/kernel/src/fingerprint.ts</code></td>
+</tr>
+<tr>
+<td>厂商缓存参数渲染</td>
+<td><code>packages/runtime/src/session.ts</code></td>
+</tr>
+<tr>
+<td>定格与 notes 来源</td>
+<td><code>packages/runtime/src/session.ts</code>（<code>freeze</code> / <code>pendingContextChanges</code>）</td>
+</tr>
+<tr>
+<td>配置（cacheTtlOverride 等）</td>
+<td><code>packages/config/src/schema.ts</code>（<code>context.*</code>）</td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/prompt/test/layer.spec.ts</code>（分层 / 边界 / 缓存失效）。</p>
+<h2>相关</h2>
+<ul>
+<li>两条轨道如何汇合、安全点在哪：<a href="agent-loop.html">Agent Loop：一轮里发生了什么</a>。</li>
+<li>遮蔽 / 压缩替换哪一段、为什么不动前缀：<a href="context-compression.html">压缩与 prompt cache</a>。</li>
+<li>Soul 从哪来：<a href="memory-and-soul.html">记忆分层与 Soul</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

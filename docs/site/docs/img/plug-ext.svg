@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 460" width="880" height="460" role="img" aria-labelledby="t d">
+<title id="t">插件四类扩展点</title>
+<desc id="d">tool 注册为 plugin.&lt;名&gt;.&lt;工具&gt; 跑沙箱；skill 进清单；mcp 一起连；ui 隔离 iframe。manifest permissions 必填并哈希锁定。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+</style>
+<rect width="880" height="460" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">插件四类扩展点</text>
+<text class="s" x="20" y="56">manifest：domi-plugin.yaml · api:1（只认主版本）· permissions 必填</text>
+
+<!-- 插件 -->
+<rect class="warn" x="60" y="90" width="220" height="120" rx="12"/>
+<text class="k" x="76" y="114" style="fill:#FBBF24">插件</text>
+<text class="s" x="76" y="136">~/.domi/plugins/</text>
+<text class="s" x="76" y="154">name ≤40 · version</text>
+<text class="s" x="76" y="172">permissions 必填</text>
+<text class="s" x="76" y="190">确认过的权限 + manifest 哈希</text>
+
+<!-- 四出口 -->
+<path d="M280 130 H320" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<rect class="st" x="330" y="82" width="200" height="62" rx="10"/>
+<text class="k" x="346" y="104">tool</text>
+<text class="s" x="346" y="122">plugin.&lt;名&gt;.&lt;工具&gt;</text>
+<text class="s" x="346" y="138">跑在沙箱里</text>
+
+<rect class="st" x="560" y="82" width="200" height="62" rx="10"/>
+<text class="k" x="576" y="104">skill</text>
+<text class="s" x="576" y="122">进 Skill 清单</text>
+<text class="s" x="576" y="138">优先级：项目 &gt; 用户 &gt; 插件 &gt; 官方</text>
+
+<rect class="st" x="330" y="160" width="200" height="62" rx="10"/>
+<text class="k" x="346" y="182">mcp</text>
+<text class="s" x="346" y="200">声明的 server</text>
+<text class="s" x="346" y="216">与用户配置的一起连</text>
+
+<rect class="st" x="560" y="160" width="200" height="62" rx="10"/>
+<text class="k" x="576" y="182">ui</text>
+<text class="s" x="576" y="200">Web「插件」页</text>
+<text class="s" x="576" y="216">隔离 iframe 显示</text>
+
+<!-- 工具细节 -->
+<rect class="box" x="60" y="268" width="680" height="110" rx="10"/>
+<text class="k" x="76" y="292" style="fill:#FBBF24">工具条目</text>
+<text class="s" x="76" y="314">name · description（≤500）· entry · input（JSON Schema）· timeoutMs（默认 30s，最长 120s）</text>
+<text class="s" x="76" y="334">弃用登记 DEPRECATIONS：命中时 warn 并写明移除版本</text>
+<text class="s" x="76" y="352">安装：permissions 逐条确认 → 确认过的权限 + manifest 哈希记下</text>
+<text class="s" x="76" y="370">manifest 被改过 → 插件停用，直到重新安装确认</text>
+
+<!-- 右侧安全 -->
+<rect class="ok" x="760" y="82" width="100" height="140" rx="10"/>
+<text class="k" x="772" y="110" style="fill:#4ADE80">安全</text>
+<text class="s" x="772" y="132">默认最小</text>
+<text class="s" x="772" y="150">权限哈希锁</text>
+<text class="s" x="772" y="168">沙箱隔离</text>
+<text class="s" x="772" y="186">超时强杀</text>
+
+<text class="s" x="20" y="424">脚手架：domi plugin scaffold &lt;tool|skill|mcp&gt; &lt;目录&gt; · 官方示例在 plugins/（word-count / git-workflow / mcp-filesystem）</text>
+<text class="s" x="20" y="446">启停是热的：只有「启动时就停用、且带 MCP server 的插件被重新启用」才回 restartRequired</text>
+</svg>

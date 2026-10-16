@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 440" width="880" height="440" role="img" aria-labelledby="t d">
+<title id="t">配置两份文件</title>
+<desc id="d">config.yaml 管行为，secrets.yaml 管凭据；loadConfig/loadSecrets 分别读取；设置页经 config.set 白名单写回，凭据不回吐。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F87171"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="440" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">配置在 config.yaml，凭据只在 secrets.yaml</text>
+
+<rect class="st" x="60" y="76" width="300" height="130" rx="12"/>
+<text class="k" x="76" y="100">~/.domi/config.yaml</text>
+<text class="s" x="76" y="122">模型 · 权限 · MCP · 记忆 · 通知</text>
+<text class="s" x="76" y="140">插件 · UI · hooks · verify · pricing</text>
+<text class="s" x="76" y="158">budget · skills · prompt · server</text>
+<text class="s" x="76" y="176">context · loop（默认 100）· attachments</text>
+<text class="s" x="76" y="194">loadConfig 读取（YAML）</text>
+
+<rect class="warn" x="60" y="226" width="300" height="110" rx="12"/>
+<text class="k" x="76" y="250" style="fill:#FBBF24">~/.domi/secrets.yaml</text>
+<text class="s" x="76" y="272">providers.&lt;id&gt;.api_key</text>
+<text class="s" x="76" y="290">loadSecrets 读取</text>
+<text class="s" x="76" y="308">任何接口都不回吐给界面</text>
+<text class="s" x="76" y="326">（凭据脱敏）</text>
+
+<!-- 右侧：加载 -->
+<path d="M360 140 H420" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="368" y="132">读</text>
+
+<rect class="box" x="430" y="76" width="200" height="130" rx="12"/>
+<text class="k" x="446" y="100">运行期</text>
+<text class="s" x="446" y="122">无 key 也照起</text>
+<text class="s" x="446" y="140">缺 key → 提交时</text>
+<text class="s" x="446" y="158">error.missing_credential</text>
+<text class="s" x="446" y="176">ConfigParseError</text>
+<text class="s" x="446" y="194">domi doctor 修复提示</text>
+
+<!-- 设置页 -->
+<path d="M630 140 H690" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<rect class="ok" x="700" y="76" width="160" height="130" rx="12"/>
+<text class="k" x="716" y="100" style="fill:#4ADE80">Web 设置页</text>
+<text class="s" x="716" y="122">config.get / set</text>
+<text class="s" x="716" y="140">读写同一份启动时</text>
+<text class="s" x="716" y="158">读的配置</text>
+<text class="s" x="716" y="176">白名单写回</text>
+
+<!-- 白名单 -->
+<rect class="bad" x="430" y="226" width="430" height="110" rx="12"/>
+<text class="k" x="446" y="250" style="fill:#F87171">config.set 白名单硬排除</text>
+<text class="s" x="446" y="272">permissions / hooks / MCP / 插件安装</text>
+<text class="s" x="446" y="290">界面永远不能给自己提权</text>
+<text class="s" x="446" y="308">想改这些 → 直接改配置文件</text>
+<text class="s" x="446" y="326" style="fill:#8FA1B2">key 也可用环境变量：DOMI_&lt;ID&gt;_API_KEY / ANTHROPIC_API_KEY</text>
+
+<text class="s" x="20" y="382">厂商模板在 vendors.ts：openai / anthropic / deepseek / gemini / custom —— 纯数据，guard:providers 守着</text>
+<text class="s" x="20" y="404">放在 config 而不是 model：apps 不许 import model（那里有 AI SDK）；Web 经 provider.vendors 画「新增 provider」表单</text>
+</svg>

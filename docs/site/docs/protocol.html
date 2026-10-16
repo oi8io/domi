@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Domi Protocol：daemon 与客户端之间的契约 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a class="active" href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>Domi Protocol：daemon 与客户端之间的契约</h1>
+<blockquote>
+<p>本页回答四个问题：daemon 和客户端怎么通信？事件流怎么演进而不破坏旧数据？断线了会怎样？改协议要过哪些关？
+逐字段参考在 <a href="../../protocol.md"><code>docs/protocol.md</code></a>（由脚本生成，勿手改）。本页讲约定、全景与演进规则。
+贯穿例子：给登录接口加限流——客户端（TUI / Web / 桌面端）在全程监听这个会话的事件。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>传输是 JSON-RPC 2.0：stdio（本地单二进制）或 WebSocket（远程）。</li>
+<li><strong>握手必须是第一个请求</strong>。版本不匹配直接拒绝，不降级、不重连。</li>
+<li><strong>daemon 是事件流的唯一写入者</strong>。客户端只提交意图；同一会话串行，忙时回 <code>SESSION_BUSY</code>。</li>
+<li>事件推送是<strong>通知</strong>（没有 id），客户端不轮询。断线靠 <code>session.subscribe</code> 的 <code>fromSeq</code> 断点续订。</li>
+<li>事件 schema 只增不改不删（<code>SCHEMA_VERSION</code> 17）。未知事件降级为 <code>UnknownEvent</code>，历史永远可解析。</li>
+<li>改协议有 CI 门：<code>guard:protocol</code> / <code>guard:api</code> / <code>guard:append-only</code> / <code>guard:migrations</code>。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>握手</td>
+<td>连接后的第一个请求，交换版本号。</td>
+</tr>
+<tr>
+<td>通知</td>
+<td>没有 id 的 JSON-RPC 消息，不期待回复。</td>
+</tr>
+<tr>
+<td>方法</td>
+<td>客户端调 daemon 的请求（如 <code>session.submit</code>）。</td>
+</tr>
+<tr>
+<td>事件</td>
+<td>daemon 产生的流式记录（如 <code>model.delta</code>）。</td>
+</tr>
+<tr>
+<td>断点续订</td>
+<td>重连后从上次的 seq 继续订阅，不丢事件。</td>
+</tr>
+<tr>
+<td>投影</td>
+<td>从事件流算出来的视图（上下文、轨迹、状态栏）。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 传输与约定</h2>
+<p><img src="img/prot-transport.svg" alt="连接与消息" /></p>
+<ol>
+<li>客户端连接，先发 <code>handshake</code>。</li>
+<li>版本匹配：继续。不匹配：返回 <code>PROTOCOL_VERSION_MISMATCH</code>，<strong>双方版本号都在 data 里</strong>。不降级、不重连。</li>
+<li>客户端调方法（如 <code>session.submit</code>），daemon 处理并回结果。</li>
+<li>daemon 产生的事件作为通知推给所有订阅了该会话的客户端。</li>
+</ol>
+<p>未握手就调其它方法，返回 <code>NOT_HANDSHAKED</code>。daemon 的报错带 <code>messageKey</code> + <code>params</code>，端上按自己的语言渲染（i18n）。</p>
+<h2>2. 方法全景</h2>
+<p>客户端能调什么，由 <code>METHODS</code>（<code>packages/protocol/src/rpc.ts</code>）定义。按用途分组：</p>
+<table>
+<thead>
+<tr>
+<th>组</th>
+<th>方法（示例）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>会话</td>
+<td><code>session.list</code> <code>session.create</code> <code>session.submit</code> <code>session.note</code> <code>session.interrupt</code> <code>session.subscribe</code> <code>session.history</code> <code>session.compact</code> <code>session.branch</code> <code>session.switchModel</code> <code>session.budget</code></td>
+</tr>
+<tr>
+<td>记忆</td>
+<td><code>memory.list</code> <code>memory.search</code> <code>memory.delete</code> <code>memory.extract</code></td>
+</tr>
+<tr>
+<td>Soul</td>
+<td><code>soul.get</code> <code>soul.write</code> <code>soul.export</code> <code>soul.import</code> <code>soul.review</code></td>
+</tr>
+<tr>
+<td>任务 / 评审</td>
+<td><code>task.start</code> <code>task.list</code> <code>task.retry</code> <code>task.cancel</code> <code>review.start</code></td>
+</tr>
+<tr>
+<td>插件 / 项目 / 定时</td>
+<td><code>plugin.list</code> <code>plugin.ui</code> · <code>project.list</code> <code>project.create</code> <code>project.archive</code> · <code>schedule.create</code> <code>schedule.runs</code> <code>schedule.preview</code></td>
+</tr>
+<tr>
+<td>配置 / 模型</td>
+<td><code>config.get</code> <code>config.set</code> <code>provider.vendors</code> <code>model.list</code> <code>skill.list</code></td>
+</tr>
+<tr>
+<td>工作树</td>
+<td><code>worktree.diff</code> <code>worktree.discard</code> <code>worktree.restore</code> <code>worktree.apply</code></td>
+</tr>
+<tr>
+<td>其它</td>
+<td><code>usage.summary</code> <code>fs.list</code> <code>attachment.put</code> <code>audit.record</code></td>
+</tr>
+</tbody>
+</table>
+<h2>3. 事件全景</h2>
+<p>daemon 主动推的事件（<code>DomiEventSchema</code>）。订阅后一次一批、seq 连续：</p>
+<table>
+<thead>
+<tr>
+<th>组</th>
+<th>事件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用户侧</td>
+<td><code>user.input</code>（轮边界） <code>user.note</code>（运行中补充）</td>
+</tr>
+<tr>
+<td>模型侧</td>
+<td><code>model.request</code> <code>model.delta</code> <code>model.reason</code> <code>model.usage</code> <code>model.switch</code></td>
+</tr>
+<tr>
+<td>工具侧</td>
+<td><code>tool.call</code> <code>tool.result</code> <code>fs.snapshot</code> <code>fs.checkpoint</code> <code>permission</code></td>
+</tr>
+<tr>
+<td>上下文</td>
+<td><code>ctx.cleanup</code> <code>ctx.compact</code> <code>ctx.ref</code> <code>ctx.note</code> <code>ctx.mask</code> <code>ctx.pin</code> <code>ctx.refresh</code> <code>ctx.prefix.break</code></td>
+</tr>
+<tr>
+<td>记忆 / 任务 / 计划</td>
+<td><code>memory.write</code> · <code>task.spawn</code> <code>task.run</code> <code>task.end</code> · <code>plan.update</code></td>
+</tr>
+<tr>
+<td>其它</td>
+<td><code>snapshot</code> <code>revert</code> <code>hook.run</code> <code>verify.required</code> <code>budget.warn</code> <code>schedule.fire</code> <code>review.findings</code> <code>plugin.error</code> <code>error</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>两条硬规则</strong>（<code>event.ts</code> 文件头）：</p>
+<ol>
+<li>字段只增不改不删；新增字段必须可选且有默认值。</li>
+<li>未知事件类型<strong>降级</strong>为 <code>UnknownEvent</code> 保留原文，绝不抛错——历史永远可解析。</li>
+</ol>
+<p>schema 用 <code>z.looseObject</code>：已知类型遇到未来新增字段时字段必须留下来，否则 payload 还在磁盘上、内存里却没了。</p>
+<h2>4. 事件流怎么演进</h2>
+<p><img src="img/prot-version.svg" alt="版本演进" /></p>
+<p>两套版本号，职责分开：</p>
+<table>
+<thead>
+<tr>
+<th>版本号</th>
+<th>管什么</th>
+<th>什么时候升</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PROTOCOL_VERSION</code>（=1）</td>
+<td>RPC 面</td>
+<td>加方法 / 通知不用升；不兼容改动才升，且不降级兼容</td>
+</tr>
+<tr>
+<td><code>SCHEMA_VERSION</code>（=17）</td>
+<td>事件面</td>
+<td><strong>新增事件类型或加字段 +1</strong>，并追加一份 <code>fixtures/events/legacy-v{n}.jsonl</code></td>
+</tr>
+</tbody>
+</table>
+<p>事件面几个关键节点：</p>
+<ul>
+<li><strong>v1→v6 地基</strong>：<code>fs.snapshot</code>、<code>model.switch</code>、<code>ctx.compact</code>、<code>ctx.ref</code>。</li>
+<li><strong>v7→v10 记忆与编排</strong>：<code>memory.write</code>、<code>task.*</code>、工作树、预算、评审。</li>
+<li><strong>v11→v13 工作台</strong>：<code>session.kind</code>、<code>schedule.fire</code>、<code>permissions.mode.switch</code>。</li>
+<li><strong>v14→v15（M12/M13）</strong>：<code>plan.update</code>、<code>user.note</code>。</li>
+<li><strong>v16（M14 右侧栏）</strong>：<code>fs.checkpoint</code>、<code>ctx.fileref</code>、<code>fs.discard</code>。</li>
+<li><strong>v17（M15 内核上下文）</strong>：<code>ctx.note</code>、<code>ctx.mask</code>、<code>ctx.pin</code>、<code>ctx.refresh</code>、<code>ctx.prefix.break</code>。</li>
+</ul>
+<p>不再产生的事件类型<strong>留在联合里</strong>（读旧会话用），不删。迁移只能加列 / 加表 / 加索引（<code>guard:migrations</code> 查）。</p>
+<h2>5. 客户端怎么保证不丢事件</h2>
+<p>三端（TUI / Web / 桌面）共用 <code>DomiClient</code>：</p>
+<ol>
+<li><strong>握手</strong>：版本不匹配停在 <code>incompatible</code>，不重连、不降级——重连只会一遍遍撞同一堵墙。</li>
+<li><strong>断线重连 + 断点续订</strong>：每个会话记着最后收到的 seq，重连后用 <code>fromSeq</code> 续订，断开期间的事件一条不漏补回来。</li>
+<li><strong>去重</strong>：同一个 seq 只进一次 store——投影是追加式的，重复一次就是重复一条消息。</li>
+</ol>
+<p><img src="img/prot-reconnect.svg" alt="断线续订" /></p>
+<p>客户端必须能在浏览器里跑：不 import 任何 node 模块，不依赖 DOM 类型，连接用最小的 <code>WireSocket</code> 描述（浏览器 WebSocket 与 Bun WebSocket 的公共子集）。</p>
+<h2>6. 出错了怎么办：限流第 2 步做到一半，客户端断线</h2>
+<p>还是「给登录接口加限流」。第 2 步写限流中间件进行中，你的终端断网了。</p>
+<ol>
+<li><strong>断线</strong>。客户端停在最后收到的 seq。daemon 继续跑：工具执行、事件落盘都不受影响。</li>
+<li><strong>重连</strong>。客户端重新握手，成功后用 <code>fromSeq</code> 续订。断线期间 domi 写过的所有事件（<code>tool.result</code>、<code>model.delta</code>、<code>permission</code>……）一次性补回来。</li>
+<li><strong>版本不匹配</strong>（daemon 升级了，客户端是旧的）。握手返回 <code>PROTOCOL_VERSION_MISMATCH</code>，客户端停在 <code>incompatible</code>。升级客户端即可。</li>
+<li><strong>会话忙</strong>（另一个请求正在处理这个会话）。返回 <code>SESSION_BUSY</code>。不排队、不静默丢弃——客户端看到明确错误，稍后再试。</li>
+<li><strong>未知事件</strong>（daemon 更新了事件类型，旧客户端不认识）。降级为 <code>UnknownEvent</code> 保留原文，不抛错。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>断线</td>
+<td>记最后 seq，重连后 <code>fromSeq</code> 续订补事件</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>版本不匹配</td>
+<td>握手拒绝，客户端停 incompatible</td>
+<td>升级客户端（或回退 daemon）</td>
+</tr>
+<tr>
+<td>会话忙</td>
+<td>回 SESSION_BUSY，不排队</td>
+<td>稍后再试</td>
+</tr>
+<tr>
+<td>旧客户端遇新事件</td>
+<td>降级 UnknownEvent，不抛错</td>
+<td>不用管（升级后能看到完整）</td>
+</tr>
+<tr>
+<td>你改协议</td>
+<td>guard:protocol 等四个守卫把关</td>
+<td>升版本 + 补 fixture + 重新生成文档</td>
+</tr>
+</tbody>
+</table>
+<h2>7. 改协议的完整流程</h2>
+<ol>
+<li>改 <code>rpc.ts</code>（方法）或 <code>event.ts</code>（事件）。事件变更按版本规则升 <code>SCHEMA_VERSION</code> 并补 fixture。</li>
+<li><code>bun run scripts/gen-protocol-docs.ts</code> 重新生成 <code>docs/protocol.md</code> / <code>docs/protocol.schema.json</code>；<code>bun run scripts/gen-api-snapshot.ts</code> 重新生成 <code>.api.md</code>。</li>
+<li>跑 <code>pnpm guard</code>：<code>guard:protocol</code> / <code>guard:api</code> / <code>guard:append-only</code> / <code>guard:migrations</code> 都会查。</li>
+<li>在 <code>docs/tasks/M*.md</code> 里登记（协议改动须有 PRD 引用）。</li>
+</ol>
+<h2>8. 可靠性靠什么</h2>
+<ol>
+<li><strong>只增不改</strong>。字段加、类型留、迁移只加列——旧数据永远可读。</li>
+<li><strong>未知即降级</strong>。新事件在旧客户端里不炸，历史永远可解析。</li>
+<li><strong>断点续订</strong>。断线不丢事件，重连一次补齐。</li>
+<li><strong>错误码可见</strong>。<code>SESSION_BUSY</code> 比 <code>-32001</code> 省一次查表——错误码最终会出现在终端里和 issue 里。</li>
+<li><strong>版本门禁</strong>。不兼容改动被守卫挡住，漏改一个 fixture 都红。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>不降级兼容：老客户端必须升级才能连新版 daemon。</li>
+<li>会话串行：同一会话同时只处理一个请求，并发场景要排队。</li>
+<li><code>SCHEMA_VERSION</code> 升了就要补 fixture，改一次事件面至少要动四个文件。</li>
+<li>客户端投影是追加式的：重复推送会让投影错乱，去重靠 seq 纪律。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>方法 / 错误码 / 握手</td>
+<td><code>packages/protocol/src/rpc.ts</code></td>
+</tr>
+<tr>
+<td>事件 schema 与版本</td>
+<td><code>packages/protocol/src/event.ts</code></td>
+</tr>
+<tr>
+<td>客户端（握手 / 续订 / 去重）</td>
+<td><code>packages/client-core/src/client.ts</code></td>
+</tr>
+<tr>
+<td>生成协议文档</td>
+<td><code>scripts/gen-protocol-docs.ts</code></td>
+</tr>
+<tr>
+<td>历史事件 fixture</td>
+<td><code>fixtures/events/legacy-v*.jsonl</code></td>
+</tr>
+</tbody>
+</table>
+<h2>相关</h2>
+<ul>
+<li>事件流怎么被消费：<a href="agent-loop.html">Agent Loop：一轮里发生了什么</a>。</li>
+<li>断线重连后 UI 怎么投影：<a href="trajectory-and-replay.html">轨迹与回放</a>。</li>
+<li>会话怎么存储：<a href="session-storage.html">会话存储</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

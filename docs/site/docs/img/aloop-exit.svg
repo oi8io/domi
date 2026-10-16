@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 540" width="880" height="540" role="img" aria-labelledby="t d">
+<title id="t">这一轮什么时候停</title>
+<desc id="d">七个停止原因：正常完成、工具调用到上限、参数解析连续失败、超时、预算硬顶、模型流错误、用户中断。任何停下都会写一条 error 事件。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .h{font-size:14px;font-weight:700}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .ok{fill:#052E16;stroke:#4ADE80;stroke-width:1.4}
+  .warn{fill:#1A1A10;stroke:#FBBF24;stroke-width:1.4}
+  .bad{fill:#2A0A0A;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="540" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="34" style="fill:#22D3EE">这一轮什么时候停：七个原因，互相独立</text>
+<text class="s" x="20" y="54">每轮有三个独立计数器；任何一个到顶，这一轮就停，并把三个计数器的值一起写进 error 事件</text>
+
+<!-- 起点 -->
+<rect x="330" y="80" width="220" height="56" rx="10" fill="#0F1E26" stroke="#22D3EE" stroke-width="1.6"/>
+<text class="h" x="440" y="104" text-anchor="middle" style="fill:#22D3EE">主循环 runTurn</text>
+<text class="s" x="440" y="124" text-anchor="middle">每一步开头都检查一次</text>
+
+<!-- 第一行分支：3 个 -->
+<path d="M330 136 V180" fill="none" stroke="#4ADE80" stroke-width="1.3" marker-end="url(#ag)"/>
+<rect class="ok" x="110" y="182" width="210" height="78" rx="10"/>
+<text class="k" x="126" y="206" style="fill:#4ADE80">正常收场</text>
+<text class="s" x="126" y="224">没有工具要跑，步骤做完</text>
+<text class="mono" x="126" y="244">stopReason: completed</text>
+
+<path d="M440 136 V180" fill="none" stroke="#FBBF24" stroke-width="1.3" marker-end="url(#a)"/>
+<rect class="warn" x="335" y="182" width="210" height="78" rx="10"/>
+<text class="k" x="351" y="206" style="fill:#FBBF24">工具调用到上限</text>
+<text class="s" x="351" y="224">工具调用 ≥100 次</text>
+<text class="mono" x="351" y="242">loop.maxToolCalls</text>
+<text class="mono" x="351" y="258">stopReason: max_tool_calls</text>
+
+<path d="M550 136 V180" fill="none" stroke="#FBBF24" stroke-width="1.3" marker-end="url(#a)"/>
+<rect class="warn" x="560" y="182" width="210" height="92" rx="10"/>
+<text class="k" x="576" y="206" style="fill:#FBBF24">参数解析连续失败</text>
+<text class="s" x="576" y="222">连续失败 ≥3 次</text>
+<text class="mono" x="576" y="238">loop.maxArgParseRetries</text>
+<text class="mono" x="576" y="254">stopReason:</text>
+<text class="mono" x="576" y="270">max_arg_parse_retries</text>
+
+<!-- 第二行分支：4 个 -->
+<path d="M290 260 V302" fill="none" stroke="#FBBF24" stroke-width="1.3" marker-end="url(#a)"/>
+<rect class="warn" x="110" y="304" width="210" height="78" rx="10"/>
+<text class="k" x="126" y="328" style="fill:#FBBF24">单轮超时</text>
+<text class="s" x="126" y="346">单轮时长 ≥10 分钟</text>
+<text class="mono" x="126" y="364">loop.maxWallClockMs</text>
+<text class="mono" x="126" y="380">stopReason: wall_clock</text>
+
+<path d="M440 260 V302" fill="none" stroke="#FBBF24" stroke-width="1.3" marker-end="url(#a)"/>
+<rect class="warn" x="335" y="304" width="210" height="78" rx="10"/>
+<text class="k" x="351" y="328" style="fill:#FBBF24">预算硬顶</text>
+<text class="s" x="351" y="346">上下文占用 ≥92%</text>
+<text class="mono" x="351" y="364">stopReason: budget</text>
+<text class="mono" x="351" y="380">recoverable，可继续</text>
+
+<path d="M550 260 V302" fill="none" stroke="#F87171" stroke-width="1.3" marker-end="url(#a)"/>
+<rect class="bad" x="560" y="304" width="210" height="78" rx="10"/>
+<text class="k" x="576" y="328" style="fill:#F87171">模型流错误</text>
+<text class="s" x="576" y="346">重试 3 次后仍失败</text>
+<text class="s" x="576" y="364">已输出不重试</text>
+<text class="mono" x="576" y="380">stopReason: stream_error</text>
+
+<!-- 中断 -->
+<path d="M440 382 V426" fill="none" stroke="#F87171" stroke-width="1.3" marker-end="url(#a)"/>
+<rect class="bad" x="280" y="428" width="320" height="66" rx="10"/>
+<text class="k" x="296" y="452" style="fill:#F87171">你中断</text>
+<text class="s" x="296" y="470">Web 停止 / TUI Esc，已输出保留，带 by（哪个端）</text>
+<text class="mono" x="296" y="486">stopReason: interrupted</text>
+
+<text class="s" x="20" y="524">任何停下都会写一条 error{stopReason}；计划与已做的工作保留，点「继续」接着做</text>
+</svg>

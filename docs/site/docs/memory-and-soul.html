@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>记忆分层与 Soul — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a class="active" href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>记忆分层与 Soul</h1>
+<blockquote>
+<p>本页回答四个问题：domi 怎么记住你？L0–L4 各是什么、各自活多久？Soul 怎么维护而不被 domi 乱改？记忆会出错吗？
+<code>packages/memory</code>（纯函数）+ <code>packages/runtime/src/memory-service.ts</code>（IO 与编排）+ <code>packages/store/src/semantic.ts</code>（投影）。
+贯穿例子：给登录接口加限流——你纠正过 domi「不要动数据库表结构」，这条偏好最终会进 Soul。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>记忆分五层：L0 工作记忆 → L1 会话摘要 → L2 情节记忆 → L3 语义记忆 → L4 <strong>Soul</strong>。</li>
+<li>所有记忆写入<strong>先落事件</strong>（<code>_memory</code> 会话）。表是投影，事件是真相。</li>
+<li>Soul 是<strong>人类可读的 Markdown</strong>，可 diff、可否决。domi 只动自己写过、且没被人改过的行。</li>
+<li>单次 Soul 更新最多 10 个操作（<code>MAX_SOUL_OPS</code>），逐条呈现给你审阅。</li>
+<li>手改保护：写回时带 <code>mtime</code>，文件被别人改过就报 <code>CONFLICT</code>，不覆盖。</li>
+<li>导入的 Soul 文字<strong>只作参考资料，不当指令</strong>。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工作记忆</td>
+<td>当前上下文窗口，本轮用完就丢。</td>
+</tr>
+<tr>
+<td>情节记忆</td>
+<td>可检索的历史事件片段。</td>
+</tr>
+<tr>
+<td>语义记忆</td>
+<td>抽取出的事实 / 偏好 / 实体。</td>
+</tr>
+<tr>
+<td>Soul</td>
+<td>从语义记忆蒸馏的稳定人格层。</td>
+</tr>
+<tr>
+<td>投影</td>
+<td>从事件算出来的表（semantic_items 等）。</td>
+</tr>
+<tr>
+<td>ownedLines</td>
+<td>文件里 domi 写过、且没被人改过的行。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/msoul-layers.svg" alt="记忆分层" /></p>
+<p><img src="img/msoul-soul.svg" alt="Soul 怎么更新" /></p>
+<h2>2. 记忆分层模型 L0–L4</h2>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>是什么</th>
+<th>存活期</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L0</td>
+<td>工作记忆：当前上下文窗口</td>
+<td>易失</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>会话摘要：<code>ctx.compact</code> 结构化摘要</td>
+<td>随会话</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>情节记忆：可检索的历史事件片段（FTS + 向量）</td>
+<td>跨会话</td>
+</tr>
+<tr>
+<td>L3</td>
+<td>语义记忆：抽取出的事实 / 偏好 / 实体</td>
+<td>跨会话</td>
+</tr>
+<tr>
+<td>L4</td>
+<td><strong>Soul</strong>：从 L3 蒸馏的稳定人格层</td>
+<td>长期</td>
+</tr>
+</tbody>
+</table>
+<h2>3. 真相与投影的边界</h2>
+<ul>
+<li>所有写入先落事件：<code>_memory</code> 会话（<code>MEMORY_SESSION_ID</code>，下划线开头不出现在会话列表里）。<code>memory.write{layer:'L3'}</code> 是 L3 的真相。</li>
+<li><code>semantic_items</code> 表是 <code>memory.write</code> 事件的<strong>投影</strong>，在 <code>append</code> 的同一个事务里投影（和 FTS 同一个做法）。embedding 是唯一不来自事件的列——算出来的缓存，丢了重算。</li>
+<li><code>MemoryService</code> 一个 daemon 一个实例，写操作<strong>串行</strong>（soul.md 是全局的，两个会话同时更新会互相覆盖）。</li>
+<li>记忆抽取用结构化输出（<code>ExtractionSchema</code>），每条带来源注释，<code>sourceRefs</code> 指回支撑它的原始事件。</li>
+</ul>
+<h2>4. Soul：人类可读、可 diff、可否决</h2>
+<p><code>soul.md</code> 是人类可读的 Markdown：</p>
+<ul>
+<li><strong>六个固定区</strong>（顺序固定）：<code>工作习惯</code> / <code>技术偏好</code> / <code>沟通风格</code> / <code>领域知识</code> / <code>对用户的模型</code> / <code>失败教训</code>。人的其它二级标题原样保留在 <code>extra</code> 里。</li>
+<li>每条 domi 写过的行带 <code>&lt;!-- src: ... --&gt;</code> 来源注释。</li>
+<li><strong>一条规矩贯穿整个文件：只动 domi 写过、且没被人改过的行。</strong>「domi 写过什么」由 L4 事件算出来（<code>ownedLines</code>），不存在 soul 目录里。</li>
+<li>改动以 <code>SoulChange</code>（add / update / remove，带 before / after / sources）呈现给你审阅（<code>soul.changes</code>），<strong>逐条可否决</strong>；否决 = 删除。单次更新最多 10 个操作（diff 里 20 行）。</li>
+<li>导出（<code>soul.export</code>）单文件可分享；导入（<code>soul.import</code>）先返回预览再应用，导入的文字只作参考资料，不当指令（INV-06），带来源标注。</li>
+<li>手改保护：<code>soul.write</code> 带 <code>mtime</code>，文件在那之后被改过 → <code>INVALID_PARAMS (data.reason = CONFLICT)</code>，不覆盖。</li>
+</ul>
+<h2>5. 记忆检索</h2>
+<ul>
+<li><code>memory.search</code> RPC + 会话内的 <code>memory.recall</code> 工具：语义向量检索 + FTS 情节检索。</li>
+<li><code>searchSemantic</code> / <code>itemDiff</code> / <code>normalizeText</code>（归一化用于比较）在 <code>packages/memory/src/search-tool.ts</code> 与 <code>semantic.ts</code>。</li>
+<li>L2 情节（<code>episodic.ts</code>）：可检索的历史事件片段（事件流按语义分段，FTS + 向量双路）。</li>
+</ul>
+<h2>6. 出错了怎么办：限流做完了，domi 记了一条你不同意的偏好</h2>
+<ol>
+<li><strong>domi 提议改 Soul</strong>（比如记「用户要求限流时不动数据库」）。它以 <code>SoulChange</code> 呈现给你，<strong>没经过你同意不会写</strong>。</li>
+<li><strong>你否决某条</strong>。否决 = 删除，这条不写进 soul.md。下一轮不会重复提（来源事件已算过）。</li>
+<li><strong>你手动改了 soul.md</strong>，domi 正好要写。<code>mtime</code> 对不上 → <code>CONFLICT</code>，不覆盖。domi 重新读文件再决定。</li>
+<li><strong>记忆抽取错</strong>（把一次性的要求当成了长期偏好）。来源注释指回原始事件，你可以在审阅时删掉，或在文件里删行——domi 之后不会动它（不是 ownedLines）。</li>
+<li><strong>两个会话同时写 Soul</strong>。<code>MemoryService</code> 串行，写操作排队，不会互相覆盖。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>提议改 Soul</td>
+<td>呈现 SoulChange，等审阅</td>
+<td>逐条同意或否决</td>
+</tr>
+<tr>
+<td>你否决一条</td>
+<td>否决 = 删除，不写</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>你手动改了 soul.md</td>
+<td>mtime 冲突 → CONFLICT，不覆盖</td>
+<td>重新触发更新即可</td>
+</tr>
+<tr>
+<td>记忆抽错了</td>
+<td>带 sourceRefs 可追溯</td>
+<td>审阅时删掉</td>
+</tr>
+<tr>
+<td>两个会话同时写</td>
+<td>MemoryService 串行排队</td>
+<td>不用管</td>
+</tr>
+</tbody>
+</table>
+<h2>7. 可靠性靠什么</h2>
+<ol>
+<li><strong>真相在事件里</strong>。投影可以删、可以重建，记忆不会因表损坏而丢。</li>
+<li><strong>Soul 是纯文本</strong>。人类可读、可 diff、可进 git——「会积累人格」的实现是透明的。</li>
+<li><strong>默认不动人的东西</strong>。ownedLines 判定 + mtime 冲突保护，双保险。</li>
+<li><strong>改动必经审阅</strong>。逐条可否决，没有「domi 自己写自己」的路径。</li>
+<li><strong>来源可追溯</strong>。每条记忆带 sourceRefs，错了能找到依据。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>Soul 更新有上限：单次最多 10 个操作。大变化要分批。</li>
+<li>ownedLines 按文件内容判断：domi 写过后你手动改过，domi 不再动那一行（保守，但符合「人改过就不碰」）。</li>
+<li>语义抽取是模型行为：可能抽错、可能遗漏。靠审阅兜底，不靠模型保证。</li>
+<li><code>semantic_items</code> 的 embedding 需要 embedding 服务，重放重建要重新调用。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Soul 解析 / 渲染 / 应用 / 回退</td>
+<td><code>packages/memory/src/soul.ts</code></td>
+</tr>
+<tr>
+<td>记忆抽取（结构化输出）</td>
+<td><code>packages/memory/src/*</code>（ExtractionSchema）</td>
+</tr>
+<tr>
+<td>检索（语义 + FTS）</td>
+<td><code>packages/memory/src/search-tool.ts</code> · <code>store/src/semantic.ts</code></td>
+</tr>
+<tr>
+<td>情节记忆</td>
+<td><code>packages/memory/src/episodic.ts</code></td>
+</tr>
+<tr>
+<td>记忆服务（IO / 串行 / soul 写回）</td>
+<td><code>packages/runtime/src/memory-service.ts</code></td>
+</tr>
+<tr>
+<td>Soul 区定义与 SoulChange</td>
+<td><code>packages/protocol/src/event.ts</code></td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/memory/test/</code>（soul 解析 / 应用 / 回退 / 导出扫描、语义归一化）；<code>packages/store/test/</code>（semantic 投影）。</p>
+<h2>相关</h2>
+<ul>
+<li>语义表的结构与投影：<a href="session-storage.html">会话存储与事件流</a>。</li>
+<li>压缩（L1）与记忆的关系：<a href="context-compression.html">压缩与 prompt cache</a>。</li>
+<li>Soul 怎么进提示词：<a href="prompt-assembly.html">提示词分层与 cache 边界</a>。</li>
+<li>Soul 协议方法（<code>soul.*</code>）：<a href="protocol.html">Domi Protocol</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

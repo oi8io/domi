@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 480" width="880" height="480" role="img" aria-labelledby="t d">
+<title id="t">工具执行全景</title>
+<desc id="d">模型请求工具，loop 从注册表取 Tool，先过权限引擎（决策即事件），再 execute；工具经 ToolCtx 与外界交互，事件交回 loop 统一落盘。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22D3EE"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F87171"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="480" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">工具执行：先过权限，再执行</text>
+<text class="s" x="20" y="56">Tool 是唯一执行原语；Skill 结构上没有 execute，编译期就报错</text>
+
+<!-- 模型请求 -->
+<rect class="st" x="60" y="84" width="240" height="52" rx="10"/>
+<text class="k" x="76" y="106">模型请求工具</text>
+<text class="mono" x="76" y="124">tool.call{name, args}</text>
+<path d="M300 110 H350" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- 注册表 -->
+<rect class="box" x="360" y="84" width="220" height="52" rx="10"/>
+<text class="k" x="376" y="106">注册表查 Tool</text>
+<text class="s" x="376" y="124">name → 注册的 Tool</text>
+<path d="M580 110 H618" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- 权限引擎 -->
+<rect class="warn" x="628" y="84" width="220" height="66" rx="10"/>
+<text class="k" x="644" y="106" style="fill:#FBBF24">权限引擎判定</text>
+<text class="s" x="644" y="124">默认拒绝 · 决策即事件</text>
+<text class="s" x="644" y="140">permission 事件落盘</text>
+<path d="M738 150 V186" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- 分叉 -->
+<text class="s" x="700" y="178">allow / ask / deny</text>
+
+<!-- deny -->
+<rect class="bad" x="628" y="192" width="160" height="40" rx="8"/>
+<text class="k" x="644" y="216" style="fill:#F87171">deny → 不执行</text>
+<text class="s" x="660" y="228">模型看到拒绝</text>
+
+<!-- allow/ask 通过 -->
+<path d="M738 186 V210" fill="none" stroke="#4ADE80" stroke-width="1.3" marker-end="url(#ag)"/>
+<rect class="ok" x="820" y="192" width="60" height="40" rx="8"/>
+<text class="s" x="832" y="216" style="fill:#4ADE80">通过</text>
+
+<!-- execute -->
+<rect class="st" x="60" y="260" width="520" height="66" rx="10"/>
+<text class="k" x="76" y="282">execute(args, ToolCtx)</text>
+<text class="s" x="76" y="300">cwd（越界拒绝）· signal · emit(ev) · elicit · stamps · jobs · outputDir</text>
+<text class="s" x="76" y="316">工具不自己写 store——事件交出去由 loop 统一落盘</text>
+<path d="M580 293 H628" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- 事件落盘 -->
+<rect class="ok" x="640" y="260" width="220" height="52" rx="10"/>
+<text class="k" x="656" y="282" style="fill:#4ADE80">emit → loop 落盘</text>
+<text class="s" x="656" y="300">tool.result 回灌上下文</text>
+<path d="M750 312 V340" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="690" y="334">再来一轮</text>
+
+<!-- 底部 -->
+<rect class="box" x="60" y="380" width="760" height="66" rx="10"/>
+<text class="k" x="76" y="402" style="fill:#FBBF24">会话级授权（shell.exec 例外）</text>
+<text class="s" x="76" y="422">指纹 = argv[0] + ' ' + argv[1]，静态可算</text>
+<text class="s" x="76" y="438">真正执行的是 cmd（sh -c cmd），所以 cmd 优先于 argv</text>
+<text class="s" x="76" y="454">危险词 / 裸命令 → null 不可授权；路径类能力不可授权</text>
+
+<text class="s" x="20" y="470">贯穿例子：写 app.ts（fs.write 规则 allow 直接放行）· 跑测试（shell.exec 指纹授权）· rm 临时文件（危险命令不可授权）</text>
+</svg>

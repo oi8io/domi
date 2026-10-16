@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>出错演练 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;--line2:#2A3B4D;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;--red:#F87171;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+.top{position:sticky;top:0;z-index:5;background:rgba(7,11,15,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1180px;margin:0 auto;padding:0 16px;height:54px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-weight:900;font-size:16px;color:var(--ink)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px;margin-left:8px}
+.top a.back{font-size:13.5px;color:var(--muted)}
+main{max-width:1180px;margin:0 auto;padding:22px 16px 60px}
+h1{font-size:clamp(22px,3vw,30px);font-weight:900;line-height:1.3}
+.lead{color:var(--muted);margin:6px 0 18px;max-width:820px}
+.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.ctl h4{font-size:12px;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:6px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{font:inherit;font-size:13px;color:var(--muted);background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:5px 10px;cursor:pointer}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{color:#06222A;background:var(--cyan);border-color:var(--cyan);font-weight:700}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+.player{display:flex;align-items:center;gap:8px;margin:14px 0;flex-wrap:wrap}
+.btn{font:inherit;font-size:14px;font-weight:700;border-radius:9px;padding:7px 14px;cursor:pointer;border:1px solid var(--line2);background:var(--panel2);color:var(--ink)}
+.btn.primary{background:var(--cyan);border-color:var(--cyan);color:#06222A}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.progress{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto}
+.grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h3{font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.06em;margin-bottom:10px;display:flex;justify-content:space-between;gap:8px}
+.card h3 span.tag{font-family:var(--mono);font-weight:500;letter-spacing:0}
+.say{border-left:3px solid var(--violet);background:var(--panel2);border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:14px;min-height:64px}
+.say .who{font-size:12px;color:var(--violet);font-weight:700;margin-bottom:2px}
+.say p{font-size:15.5px}
+.steps{display:flex;flex-direction:column;gap:8px}
+.step{display:flex;align-items:center;gap:10px;border:1px solid var(--line2);border-radius:10px;padding:9px 12px;background:var(--panel2);transition:border-color .25s,background .25s}
+.step .n{font-weight:900;width:22px;text-align:center}
+.step .txt{flex:1;min-width:0}
+.step .meta{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.badge{font-size:12px;font-weight:700;border-radius:6px;padding:2px 8px;white-space:nowrap}
+.st-pending .badge{color:var(--muted);background:#16202A}
+.st-in_progress,.st-running{border-color:var(--cyan);background:#0F1E26}
+.st-in_progress .badge,.st-running .badge{color:#06222A;background:var(--cyan)}
+.st-done{border-color:#1F5135}
+.st-done .badge{color:#06200F;background:var(--green)}
+.st-failed{border-color:var(--red);background:#221316}
+.st-failed .badge{color:#2A0A0A;background:var(--red)}
+.st-blocked{border-style:dashed;opacity:.7}
+.st-blocked .badge,.st-cancelled .badge{color:var(--muted);background:#16202A}
+.st-cancelled{border-style:dashed;opacity:.7}
+.st-skipped .badge{color:var(--muted);background:#16202A}
+.banner{margin-top:12px;border:1px solid var(--violet);background:#17142A;border-radius:10px;padding:9px 12px;display:none;align-items:center;gap:10px;font-size:14px}
+.banner.show{display:flex}
+.banner .b{margin-left:auto;background:var(--violet);color:#120D24;font-weight:800;border-radius:6px;padding:2px 10px;font-size:13px}
+.runstate{margin-top:12px;font-size:13.5px;color:var(--muted)}
+.runstate b{color:var(--ink)}
+.actions{margin-top:14px;display:none}
+.actions.show{display:block}
+.actions .q{font-size:13px;color:var(--amber);font-weight:700;margin-bottom:6px}
+.actions .row{display:flex;flex-wrap:wrap;gap:8px}
+.actions .btn{border-color:var(--amber);color:var(--amber);background:#1A1A10}
+.actions .btn:hover{background:#26240F}
+.log{font-family:var(--mono);font-size:12.5px;max-height:560px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding-right:4px}
+.log::-webkit-scrollbar{width:5px}
+.log::-webkit-scrollbar-thumb{background:var(--line2);border-radius:3px}
+.ev{display:grid;grid-template-columns:34px 140px minmax(0,1fr);gap:8px;padding:5px 8px;border-radius:7px;background:var(--panel2);border-left:3px solid var(--line2);animation:in .35s ease}
+.ev .seq{color:#5B6B7B;text-align:right}
+.ev .t{font-weight:700;word-break:break-all}
+.ev .d{font-family:var(--sans);color:var(--muted);font-size:13px;line-height:1.5}
+.ev.new{background:#13202B}
+.c-cyan{border-left-color:var(--cyan)}.c-cyan .t{color:var(--cyan)}
+.c-green{border-left-color:var(--green)}.c-green .t{color:var(--green)}
+.c-red{border-left-color:var(--red)}.c-red .t{color:var(--red)}
+.c-amber{border-left-color:var(--amber)}.c-amber .t{color:var(--amber)}
+.c-violet{border-left-color:var(--violet)}.c-violet .t{color:var(--violet)}
+.c-muted .t{color:var(--ink)}
+.ev.sys{background:transparent;border-left:3px dashed var(--red);grid-template-columns:1fr}
+.ev.sys .d{color:var(--red);font-weight:700}
+.empty{color:var(--muted);font-family:var(--sans);font-size:13.5px;padding:8px}
+@keyframes in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.notes{margin-top:22px;color:var(--muted);font-size:13.5px}
+.notes li{margin:4px 0 4px 18px}
+@media (max-width:860px){
+  .controls{grid-template-columns:1fr}
+  .grid{grid-template-columns:1fr}
+  .ev{grid-template-columns:28px 104px minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){.ev{animation:none}.step{transition:none}}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html">domi<small>开发者文档</small></a>
+  <a class="back" href="orchestration.html">← 回到「编排」</a>
+</div></div>
+<main>
+  <h1>出错演练：4 步计划，第 2 步出问题</h1>
+  <p class="lead">目标是「给登录接口加限流」。选一条路线和一种故障，然后按「下一步」。左边看计划的状态，右边看 domi 往会话记录里写了什么。确认模式按默认的「按需」。</p>
+
+  <div class="controls">
+    <div class="ctl"><h4>路线</h4><div class="seg" id="c-route"></div></div>
+    <div class="ctl"><h4>步骤依赖（只对长任务有用）</h4><div class="seg" id="c-deps"></div></div>
+    <div class="ctl"><h4>第 ② 步遇到的故障</h4><div class="seg" id="c-fault"></div></div>
+  </div>
+
+  <div class="player">
+    <button class="btn primary" id="next">下一步 ▶</button>
+    <button class="btn" id="auto">自动播放</button>
+    <button class="btn" id="reset">从头开始</button>
+    <span class="progress" id="prog"></span>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <div class="say"><div class="who" id="who">说明</div><p id="say"></p></div>
+      <h3>计划 <span class="tag" id="planTag"></span></h3>
+      <div class="steps" id="steps"></div>
+      <div class="banner" id="banner"><span id="bannerText"></span><span class="b">继续</span></div>
+      <div class="runstate" id="runstate"></div>
+      <div class="actions" id="actions"><div class="q" id="actQ"></div><div class="row" id="actRow"></div></div>
+    </section>
+    <section class="card">
+      <h3>会话记录 <span class="tag" id="logTag"></span></h3>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+
+  <ul class="notes">
+    <li>记录名（如 <code>task.node</code>、<code>plan.update</code>）是 domi 真实的事件类型。内容做了简化。</li>
+    <li>这是一个演示，不连接 domid。规则来自 <code>packages/runtime/src/plan.ts</code>、<code>packages/orchestrator/src/*</code>、<code>packages/kernel/src/loop.ts</code> 等，详见 <a href="orchestration.html">编排</a>。</li>
+  </ul>
+</main>
+
+<script>
+(() => {
+'use strict';
+const STEP_TEXT = ['读现有登录代码，找到入口', '写限流中间件', '补测试', '跑全量测试，更新文档'];
+const LABEL = { pending:'待做', in_progress:'进行中', done:'完成', skipped:'跳过', running:'执行中', failed:'失败', blocked:'被挡住', cancelled:'已中止' };
+const ROUTES = [['A','A · 在本会话里做'],['B','B · 转成长任务']];
+const DEPS = [[true,'写了依赖 ①→②→③→④'],[false,'没写依赖']];
+const FAULTS = {
+  A: [['fix','报错，但模型能修好'],['stuck','一直修不好'],['ask','要你确认，但你不在'],['stop','你点了「停止」'],['crash','domid 被杀'],['budget','用量到顶']],
+  B: [['fix','报错，但模型能修好'],['stuck','一直修不好'],['ask','要你确认，但你不在'],['stop','你取消了运行'],['crash','domid 被杀'],['budget','用量到顶']],
+};
+const opt = { route:'A', deps:true, fault:'fix' };
+
+// ── 世界状态 + 帧 ─────────────────────────────
+let frames = [], cur = -1, world, timer = null;
+
+function fresh() {
+  return { steps: STEP_TEXT.map((t,i) => ({ n:i+1, text:t, st:'pending', attempt:0 })), log: [], seq: 0,
+           banner:null, run:null, actions:null, who:'说明', say:'' };
+}
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function blockedProjection(w) {
+  if (opt.route !== 'B' || !opt.deps) return;
+  for (let i = 1; i < 4; i++) {
+    const s = w.steps[i], prev = w.steps[i-1];
+    if (s.st === 'pending' && (prev.st === 'failed' || prev.st === 'blocked')) s.st = 'blocked';
+    if (s.st === 'blocked' && !(prev.st === 'failed' || prev.st === 'blocked')) s.st = 'pending';
+  }
+}
+/** 一拍：说一句话、追加若干记录、改状态 */
+function beat(say, evs = [], mut, extra = {}) {
+  if (mut) mut(world);
+  blockedProjection(world);
+  for (const e of evs) { world.seq += e.sys ? 0 : 1; world.log.push({ ...e, seq: e.sys ? '' : world.seq }); }
+  world.say = say; world.who = extra.who || '说明';
+  world.banner = extra.banner === undefined ? world.banner : extra.banner;
+  world.run = extra.run === undefined ? world.run : extra.run;
+  world.actions = extra.actions || null;
+  frames.push({ snap: clone({ ...world, actions: world.actions ? world.actions.map(a => a.label) : null, q: extra.q || '' }), fresh: evs.length, actions: world.actions });
+  world.actions = null;
+}
+const E = (t, d, c = 'muted') => ({ t, d, c });
+const SYS = (d) => ({ sys: true, d });
+const setSt = (i, st) => (w) => { w.steps[i].st = st; };
+const many = (...fs) => (w) => fs.forEach(f => f(w));
+const planEv = (w, note) => E('plan.update', note || w.steps.map(s => `${'①②③④'[s.n-1]}${({done:'[x]',in_progress:'[>]',pending:'[ ]',skipped:'[-]'})[s.st] || '[ ]'}`).join(' '), 'cyan');
+
+// ── 公共开头 ─────────────────────────────
+function intro() {
+  beat('你在项目里新建一个任务：「给登录接口加限流」。domi 建一个任务会话，把你的话写进记录。', [E('user.input','给登录接口加限流','cyan')]);
+  beat('模型先读代码。读文件不需要计划，权限规则放行。', [E('tool.call','fs.read src/auth/login.ts'), E('permission','fs.read → allow（规则 read）','green'), E('tool.result','ok · 读到 182 行','green')]);
+  beat('模型写计划，共 4 步。按需模式下，你没说「先别动」，所以不用审批。第 ① 步标成进行中。',
+    [], (w) => { w.steps[0].st = 'in_progress'; });
+  world.log.push({ ...planEv(world), seq: ++world.seq }); frames[frames.length-1].snap = clone({ ...world, actions:null, q:'' }); frames[frames.length-1].fresh = 1;
+  if (opt.route === 'A') introA(); else introB();
+}
+function introA() {
+  beat('第 ① 步做完。模型更新整份计划：① 完成，② 进行中。', [], many(setSt(0,'done'), setSt(1,'in_progress')));
+  pushPlan();
+  beat('第 ② 步：模型改代码。改文件之前，domi 先给工作区打一个快照。', [E('tool.call','fs.edit src/middleware/rate-limit.ts'), E('permission','fs.edit → allow（你写的规则）','green'), E('fs.checkpoint','baseline · 快照 3f9a…','violet'), E('tool.result','ok · 新增 48 行','green'), E('fs.checkpoint','after · 快照 7c21…','violet')]);
+}
+function introB() {
+  beat('批准计划时，你选了「批准并转成长任务」。domi 把每一步变成一个节点，开始后台运行。',
+    [E('plan.decided','approved · asTask · runId run-k3x9','cyan'), E('task.run', opt.deps ? '4 个节点，依赖 ①→②→③→④' : '4 个节点，没有依赖','violet')],
+    (w) => { w.steps.forEach(s => { s.st = 'pending'; }); }, { run: '运行中' });
+  beat('节点 ① 开始。它在一个新会话里做（run-k3x9.s1.1）。', [E('task.node','s1 · started · 第 1 次','violet')], (w) => { w.steps[0].st = 'running'; w.steps[0].attempt = 1; });
+  beat('节点 ① 完成。它最后的回答会作为参考资料，交给依赖它的节点。', [E('task.node','s1 · done · 41s','green')], setSt(0,'done'));
+  beat('节点 ② 开始，开一个新会话 run-k3x9.s2.1。', [E('task.node','s2 · started · 第 1 次','violet')], (w) => { w.steps[1].st = 'running'; w.steps[1].attempt = 1; });
+}
+function pushPlan(note) {
+  const f = frames[frames.length-1];
+  world.log.push({ ...planEv(world, note), seq: ++world.seq });
+  f.snap = clone({ ...world, actions: f.snap.actions, q: f.snap.q }); f.fresh += 1;
+}
+function failOnce() {
+  if (opt.route === 'A') beat('模型跑类型检查。检查失败，退出码 1。这个结果作为数据交回模型。这一轮不会因此停下。', [E('tool.call','shell.exec pnpm tsc --noEmit'), E('permission','shell.exec → allow（规则）','green'), E('tool.result','ok:false · exit 1 · TS2345 类型不匹配','red')]);
+  else beat('在节点 ② 的会话里，类型检查失败。报错交回这个节点里的模型，处理方式和路线 A 一样。', [E('↳ tool.result','节点 s2 的会话 · exit 1 · TS2345 类型不匹配','red')]);
+}
+function finishA(from = 2) {
+  for (let i = from; i < 4; i++) {
+    beat(`第 ${'①②③④'[i-1]} 步完成，第 ${'①②③④'[i]} 步开始。`, [], many(setSt(i-1,'done'), setSt(i,'in_progress')));
+    pushPlan();
+  }
+  beat('最后一步跑全量测试。测试通过，所以「收工前检查」放行。', [E('tool.call','shell.exec pnpm test'), E('tool.result','ok · exit 0 · 1867 passed','green')], setSt(3,'done'));
+  pushPlan();
+  beat('四步都完成。模型给出结论，这一轮正常结束。', [E('model.delta','结论：已加限流，测试通过','cyan')], null, { banner: null, who: '结束' });
+}
+function finishB(from) {
+  for (let i = from; i < 4; i++) {
+    const s = world.steps[i];
+    if (s.st === 'done') continue;
+    beat(`节点 ${'①②③④'[i]} 开始，新会话。`, [E('task.node',`s${i+1} · started · 第 ${s.attempt+1} 次`,'violet')], (w) => { w.steps[i].st = 'running'; w.steps[i].attempt += 1; });
+    beat(`节点 ${'①②③④'[i]} 完成。`, [E('task.node',`s${i+1} · done`,'green')], setSt(i,'done'));
+  }
+  beat('没有能跑的节点了，而且全部完成。整个运行记为「完成」。', [E('task.end','done','green')], null, { run: '已完成', who: '结束' });
+}
+
+// ── 路线 A 的六种故障 ─────────────────────────────
+function scenarioA() {
+  const f = opt.fault;
+  if (f === 'fix') {
+    failOnce();
+    beat('模型读报错，改代码，重新检查。这次通过了。', [E('tool.call','fs.edit src/middleware/rate-limit.ts'), E('tool.result','ok','green'), E('tool.call','shell.exec pnpm tsc --noEmit'), E('tool.result','ok · exit 0','green')]);
+    finishA(2);
+  } else if (f === 'stuck') {
+    failOnce();
+    beat('模型反复修改、反复检查，一直不通过。每次调用都计数。', [E('tool.call','fs.edit … ×47'), E('tool.result','exit 1 …','red'), E('tool.call','shell.exec pnpm tsc ×52'), E('tool.result','exit 1 …','red')]);
+    stoppedA('单轮工具调用满 100 次。domi 停下这一轮，并记下三个计数器当时的值。', E('error','loop · max_tool_calls · counters{toolCalls:100, argParseRetries:0, elapsedMs:412k}','red'));
+  } else if (f === 'ask') {
+    beat('模型想装一个限流库。按你的规则，shell.exec 装依赖要先问你。你不在电脑前。', [E('tool.call','shell.exec pnpm add rate-limiter-flexible'), E('(询问)','shell.exec 等你确认 · 没有超时','amber')], null,
+      { actions: [
+        { label:'你回来了，点「允许」', run: () => { beat('你允许了。domi 写一条权限记录，来源是「你」。命令开始执行。', [E('permission','shell.exec → allow（source: user）','green'), E('tool.result','ok · 已安装','green')]); finishA(2); } },
+        { label:'你回来了，点「拒绝」', run: () => { beat('你拒绝了。工具不执行。模型收到一句话：用户拒绝了这个操作。', [E('permission','shell.exec → deny（source: user）','red'), E('tool.result','ok:false · user_denied','red')]); beat('模型换个办法：不装新库，自己写一个简单的令牌桶。它在说明里写下这个变化。', []); pushPlan('计划不变，说明：不引入新依赖，自写令牌桶'); finishA(2); } },
+      ], q: '这一轮停在这里等你。等待期间，这个会话算「还在跑」。' });
+  } else if (f === 'stop') {
+    beat('模型正在跑类型检查。你在 Web 上点了「停止」。', [E('tool.call','shell.exec pnpm tsc --noEmit')]);
+    stoppedA('domi 停下这一轮。正在跑的工具调用配上「被中断」的结果，已输出的内容都保留。', [E('tool.result','interrupted','red'), E('error','loop · interrupted · by web','red')]);
+  } else if (f === 'crash') {
+    beat('模型正在跑类型检查。这时 domid 被强制杀掉（kill -9）。', [E('tool.call','shell.exec pnpm tsc --noEmit'), SYS('✕ domid 进程被杀')]);
+    beat('domid 重新启动。它发现记录不完整：有一个工具调用没有结果，这一轮也没有结束标记。', [SYS('domid 重启 · 打开会话 · 检查一致性')]);
+    stoppedA('domi 只追加两条记录补齐，不重跑命令。这条命令可能已经执行了一半，要不要再来，由你决定。', [E('tool.result','interrupted（补齐）','red'), E('error','recovery · 这一轮在进程退出时中断','red')]);
+  } else if (f === 'budget') {
+    beat('这个会话设了 token 上限。用到 80% 时，domi 提醒一次。', [E('budget.warn','tokens · 160k / 200k','amber')]);
+    failOnce();
+    beat('模型继续修。下一次动手前，用量到顶。domi 暂停，问你怎么办。', [E('(询问)','token 到了上限：200k / 200k','amber')], null, { actions: [
+      { label:'继续（上限放宽一半）', run: () => { beat('你选继续。新上限 300k 写进记录，重开会话也有效。', [E('budget.decided','continue · tokens · limit 300000','amber')]); beat('模型修好了类型错误。', [E('tool.call','fs.edit …'), E('tool.result','ok','green'), E('tool.call','shell.exec pnpm tsc'), E('tool.result','ok · exit 0','green')]); finishA(2); } },
+      { label:'停止', run: () => { beat('你选停止。这次工具调用不执行。模型收到指示：总结进展，然后结束。', [E('budget.decided','stop · tokens','amber'), E('tool.result','budget_stop','red')]); stoppedA('这一轮以「用量到顶」结束。', E('error','loop · budget','red')); } },
+    ], q: '用量到顶。你要怎么办？' });
+  }
+}
+function stoppedA(say, evs) {
+  beat(say, Array.isArray(evs) ? evs : [evs], null, { banner: '上次被打断了 · 计划还剩 3/4 步', actions: [
+    { label:'点「继续」', run: () => {
+      beat('「继续」等于替你说一句话。计划本来就在上下文里。', [E('user.input','继续执行计划里没做完的步骤。先看一眼当前状态……','cyan')], null, { banner: null });
+      beat('模型先查现状：看改动、重跑检查。它发现原来的写法和类型不合，决定换个办法：改用中间件工厂的写法。', [E('tool.call','shell.exec git diff --stat'), E('tool.result','ok · 1 file changed','green')]);
+      beat('它在计划的说明里记下这个变化。步骤本身没变，所以即使在「每次都问」模式下也不用重新批准；如果它加了或删了步骤，就要重新批准。', [], null);
+      pushPlan('步骤不变 · 说明：改用中间件工厂的写法');
+      beat('新办法通过了类型检查。', [E('tool.call','shell.exec pnpm tsc --noEmit'), E('tool.result','ok · exit 0','green')]);
+      finishA(2);
+    } },
+    { label:'回到第 ② 步之前', run: () => {
+      beat('你选「回到这一步之前 · 文件和对话都回滚」。domi 先给当前状态打一个快照，所以这次回滚也能撤销。', [E('fs.checkpoint','回滚前快照 9e04…','violet'), E('revert','both · 回到 ② 开始前','violet')], (w) => { w.steps[1].st = 'pending'; w.steps[0].st = 'done'; }, { banner: null });
+      beat('文件恢复到第 ② 步之前。被回滚的对话还在，只是标成「已回滚」。你可以换个说法重新开始。', [], null, { who: '结束' });
+    } },
+  ], q: 'domi 不会自动续跑。你可以：' });
+}
+
+// ── 路线 B 的六种故障 ─────────────────────────────
+function scenarioB() {
+  const f = opt.fault;
+  if (f === 'fix') {
+    failOnce();
+    beat('节点里的模型改代码，重新检查，通过了。节点会话正常结束。', [E('↳ tool.result','节点 s2 的会话 · exit 0','green'), E('task.node','s2 · done','green')], setSt(1,'done'));
+    finishB(2);
+  } else if (f === 'stuck' || f === 'budget') {
+    if (f === 'budget') {
+      failOnce();
+      beat('节点 ② 的用量到了运行定义里的上限。询问转到运行会话里问你。', [E('(询问)','token 到了上限 · 来自节点 s2','amber')], null, { actions: [
+        { label:'继续（上限放宽一半）', run: () => { beat('你选继续。节点里的模型修好了错误。', [E('↳ budget.decided','节点 s2 的会话 · continue','amber'), E('task.node','s2 · done','green')], setSt(1,'done')); finishB(2); } },
+        { label:'停止', run: () => { beat('你选停止。节点 ② 的会话以「用量到顶」结束，所以这个节点算失败。', [E('↳ budget.decided','节点 s2 的会话 · stop','amber'), E('task.node','s2 · failed · 停在 budget','red')], setSt(1,'failed')); afterFailB(); } },
+      ], q: '用量到顶。你要怎么办？' });
+      return;
+    }
+    failOnce();
+    beat('节点里的模型一直修不好，单轮工具调用满 100 次。节点会话没有正常结束。', [E('↳ error','节点 s2 的会话 · loop · max_tool_calls','red')]);
+    beat('节点 ② 记为「失败」，原因和最后的回答写进记录。', [E('task.node','s2 · failed · 停在 max_tool_calls','red')], setSt(1,'failed'));
+    afterFailB();
+  } else if (f === 'ask') {
+    beat('节点 ② 想装一个限流库，需要你确认。节点会话里的询问转到运行会话。你不在。', [E('↳ tool.call','节点 s2 的会话 · shell.exec pnpm add rate-limiter-flexible'), E('(询问)','转到 run-k3x9 · 没有超时','amber')], null, { actions: [
+      { label:'你回来了，点「允许」', run: () => { beat('你允许了。命令执行，节点接着做，最后完成。', [E('↳ permission','节点 s2 的会话 · allow · source: user','green'), E('task.node','s2 · done','green')], setSt(1,'done')); finishB(2); } },
+      { label:'你回来了，点「拒绝」', run: () => { beat('你拒绝了。节点里的模型换个办法：自己写令牌桶。节点完成。', [E('↳ permission','节点 s2 的会话 · deny · source: user','red'), E('task.node','s2 · done','green')], setSt(1,'done')); finishB(2); } },
+    ], q: '运行停在这里等你。等待期间，它算「还在跑」。' });
+  } else if (f === 'stop') {
+    beat('你在任务列表里对这次运行点了「取消」。domi 中止正在执行的节点，记下运行结束。', [E('task.end','cancelled','red')], (w) => { w.steps[1].st = 'cancelled'; }, { run: '已取消', who: '结束' });
+    beat('运行结束，状态是「已取消」。已完成的节点 ① 和它的改动都还在。', [], null, { who: '结束' });
+  } else if (f === 'crash') {
+    beat('节点 ② 执行到一半，domid 被强制杀掉。', [SYS('✕ domid 进程被杀')]);
+    beat('domid 重新启动。它找出所有没结束的运行，接着跑。不需要你操作。', [SYS('domid 重启 · 扫描没结束的运行')]);
+    beat('domi 写一条「恢复」记录：① 已完成，② 要重跑。② 回到待跑。', [E('task.resume','completed=[s1] · rerun=[s2]','violet')], setSt(1,'pending'));
+    beat('节点 ② 从头再跑一次，开一个新会话 run-k3x9.s2.2。这就是「至少执行一次」。', [E('task.node','s2 · started · 第 2 次','violet')], (w) => { w.steps[1].st = 'running'; w.steps[1].attempt = 2; });
+    beat('这次节点 ② 完成。', [E('task.node','s2 · done','green')], setSt(1,'done'));
+    finishB(2);
+  }
+}
+function afterFailB() {
+  if (opt.deps) {
+    beat('③ 依赖 ②，④ 依赖 ③，所以都被挡住，不执行。「被挡住」是从记录算出来的，不另写记录。', [], null);
+    beat('没有能跑的节点了。有节点失败，整个运行记为「失败」。', [E('task.end','failed','red')], null, { run: '失败', actions: retryActions(), q: '节点失败不会自动重试。你可以：' });
+  } else {
+    beat('③ ④ 不依赖 ②，所以照常执行。', [E('task.node','s3 · started','violet')], (w) => { w.steps[2].st = 'running'; w.steps[2].attempt = 1; });
+    beat('③ 完成。注意：如果 ③ 其实需要 ② 的结果，这里就会出问题——所以要在计划里写依赖。', [E('task.node','s3 · done','green')], setSt(2,'done'));
+    beat('④ 也完成了。', [E('task.node','s4 · started','violet'), E('task.node','s4 · done','green')], (w) => { w.steps[3].st = 'done'; w.steps[3].attempt = 1; });
+    beat('所有节点都到头了。有一个失败，整个运行记为「失败」。', [E('task.end','failed','red')], null, { run: '失败', actions: retryActions(), q: '节点失败不会自动重试。你可以：' });
+  }
+}
+function retryActions() {
+  return [{ label:'对 ② 点「重试」', run: () => {
+    beat('domi 写一条重试记录。只有失败的 ② 重新打开；已完成的节点不动。', [E('task.retry','s2','violet')], setSt(1,'pending'), { run: '运行中' });
+    beat('节点 ② 第 2 次尝试，开一个新会话。这次换了思路，通过了。', [E('task.node','s2 · started · 第 2 次','violet'), E('task.node','s2 · done','green')], (w) => { w.steps[1].st = 'done'; w.steps[1].attempt = 2; });
+    finishB(2);
+  } }];
+}
+
+function build() {
+  frames = []; world = fresh(); cur = -1;
+  intro();
+  if (opt.route === 'A') scenarioA(); else scenarioB();
+}
+
+// ── 渲染 ─────────────────────────────
+const $ = (id) => document.getElementById(id);
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]); }
+function render() {
+  const fr = frames[cur];
+  const s = fr ? fr.snap : fresh();
+  $('who').textContent = fr ? s.who : '说明';
+  $('say').textContent = fr ? s.say : '选好路线和故障，然后按「下一步」。';
+  $('planTag').textContent = opt.route === 'A' ? '本会话 · 计划步骤' : '长任务 · 节点';
+  $('steps').innerHTML = s.steps.map(st => {
+    const meta = opt.route === 'B' && st.attempt > 0 ? `<div class="meta">run-k3x9.s${st.n}.${st.attempt}</div>` : '';
+    return `<div class="step st-${st.st}"><span class="n">${'①②③④'[st.n-1]}</span><div class="txt">${esc(st.text)}${meta}</div><span class="badge">${LABEL[st.st]}</span></div>`;
+  }).join('');
+  const bn = $('banner');
+  bn.classList.toggle('show', !!s.banner); $('bannerText').textContent = s.banner || '';
+  $('runstate').innerHTML = opt.route === 'B' && s.run ? `运行 run-k3x9：<b>${esc(s.run)}</b>` : '';
+  const log = $('log');
+  if (s.log.length === 0) log.innerHTML = '<div class="empty">还没有记录。</div>';
+  else {
+    const n = fr ? fr.fresh : 0;
+    log.innerHTML = s.log.map((e, i) => e.sys
+      ? `<div class="ev sys${i >= s.log.length - n ? ' new' : ''}"><span class="d">${esc(e.d)}</span></div>`
+      : `<div class="ev c-${e.c}${i >= s.log.length - n ? ' new' : ''}"><span class="seq">${e.seq}</span><span class="t">${esc(e.t)}</span><span class="d">${esc(e.d)}</span></div>`).join('');
+    log.scrollTop = log.scrollHeight;
+  }
+  $('logTag').textContent = `${s.log.filter(e => !e.sys).length} 条`;
+  const acts = fr && fr.actions && cur === frames.length - 1 ? fr.actions : null;
+  $('actions').classList.toggle('show', !!acts);
+  $('actQ').textContent = acts ? s.q : '';
+  $('actRow').innerHTML = '';
+  if (acts) acts.forEach((a) => {
+    const b = document.createElement('button'); b.className = 'btn'; b.textContent = a.label;
+    b.onclick = () => { stopAuto(); world = clone(frames[cur].snap); world.actions = null; a.run(); step(); };
+    $('actRow').appendChild(b);
+  });
+  const atEnd = cur >= frames.length - 1;
+  $('next').disabled = atEnd;
+  $('auto').disabled = atEnd;
+  $('prog').textContent = `${Math.max(cur + 1, 0)} / ${frames.length}`;
+}
+function step() { if (cur < frames.length - 1) { cur++; render(); } if (cur >= frames.length - 1) stopAuto(); }
+function stopAuto() { if (timer) { clearInterval(timer); timer = null; $('auto').textContent = '自动播放'; } }
+function seg(id, items, key, onPick) {
+  const el = $(id); el.innerHTML = '';
+  items.forEach(([v, l]) => {
+    const b = document.createElement('button'); b.textContent = l;
+    b.setAttribute('aria-pressed', String(opt[key] === v));
+    if (key === 'deps' && opt.route === 'A') b.disabled = true;
+    b.onclick = () => { opt[key] = v; onPick && onPick(); restart(); };
+    el.appendChild(b);
+  });
+}
+function controls() {
+  seg('c-route', ROUTES, 'route', () => { if (!FAULTS[opt.route].some(([v]) => v === opt.fault)) opt.fault = 'fix'; });
+  seg('c-deps', DEPS, 'deps');
+  seg('c-fault', FAULTS[opt.route], 'fault');
+}
+function restart() { stopAuto(); controls(); build(); render(); }
+$('next').onclick = () => { stopAuto(); step(); };
+$('reset').onclick = restart;
+$('auto').onclick = () => {
+  if (timer) return stopAuto();
+  $('auto').textContent = '暂停';
+  step();
+  timer = setInterval(step, 1600);
+};
+document.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' && !e.target.closest('button')) { stopAuto(); step(); } });
+restart();
+})();
+</script>
+</body>
+</html>

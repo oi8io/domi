@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 520" width="880" height="520" role="img" aria-labelledby="t d">
+<title id="t">MCP hub：server 变 Tool</title>
+<desc id="d">每个 server 各自连各自超时；工具以 mcp.&lt;server&gt;.&lt;tool&gt; 变成普通 Tool 走权限；HTTP 出站过白名单；二进制落 blob。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F87171"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+</style>
+<rect width="880" height="520" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">MCP 是 Tool 的一种来源，不是与 Tool 并列的概念</text>
+<text class="s" x="20" y="56">协议交给 SDK；hub 只管隔离 · 命名 · 白名单 · blob · 弃用 API</text>
+
+<!-- servers -->
+<rect class="box" x="60" y="90" width="240" height="150" rx="10"/>
+<text class="k" x="76" y="114">MCP servers</text>
+<rect class="st" x="76" y="124" width="208" height="36" rx="8"/>
+<text class="mono" x="92" y="148">github（stdio）</text>
+<rect class="st" x="76" y="166" width="208" height="36" rx="8"/>
+<text class="mono" x="92" y="190">remote（http）</text>
+<text class="s" x="76" y="222">各自连、各自超时</text>
+<text class="s" x="76" y="238">一个挂了不拖别的</text>
+
+<path d="M300 165 H340" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- hub -->
+<rect class="warn" x="350" y="90" width="220" height="150" rx="10"/>
+<text class="k" x="366" y="114" style="fill:#FBBF24">hub（packages/mcp）</text>
+<text class="s" x="366" y="136">版本协商 / MRTR / 列表缓存</text>
+<text class="s" x="366" y="154">交给 SDK</text>
+<text class="s" x="366" y="176">工具命名 mcp.&lt;server&gt;.&lt;tool&gt;</text>
+<text class="s" x="366" y="194">elicitation → onElicit</text>
+<text class="s" x="366" y="212">不调用弃用 sampling / roots</text>
+
+<path d="M570 165 H610" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+<text class="s" x="578" y="156">普通 Tool</text>
+
+<!-- 权限 -->
+<rect class="ok" x="620" y="90" width="240" height="150" rx="10"/>
+<text class="k" x="636" y="114" style="fill:#4ADE80">权限路径（同一套）</text>
+<text class="s" x="636" y="136">mcp.github.* 通配放行</text>
+<text class="s" x="636" y="154">permission 事件照常落</text>
+<text class="s" x="636" y="172">tool.call / tool.result 照常</text>
+<text class="s" x="636" y="190">输出是数据，不是指令（INV-06）</text>
+
+<!-- 底部两块 -->
+<rect class="box" x="60" y="276" width="400" height="140" rx="10"/>
+<text class="k" x="76" y="300" style="fill:#FBBF24">HTTP 出站白名单</text>
+<text class="s" x="76" y="322">allowedHosts 里的域名才放行</text>
+<text class="s" x="76" y="340">guardedFetch 拦截其余</text>
+<text class="s" x="76" y="358">用户数据不出本机</text>
+<text class="s" x="76" y="376">（除非显式配置的模型 API）</text>
+<text class="s" x="76" y="394" style="fill:#8FA1B2">域名级，不是路径级</text>
+
+<rect class="box" x="480" y="276" width="380" height="140" rx="10"/>
+<text class="k" x="496" y="300" style="fill:#FBBF24">二进制结果落 blob</text>
+<text class="s" x="496" y="322">~/.domi/blobs</text>
+<text class="s" x="496" y="340">事件里只留引用</text>
+<text class="s" x="496" y="358">上下文不被大结果撑爆</text>
+<text class="s" x="496" y="376">配置 mcp.servers：stdio / http</text>
+<text class="s" x="496" y="394">插件可声明 mcpServers()</text>
+
+<text class="s" x="20" y="452">停用插件带的 MCP server 已连上的话，它的工具在 extraTools 里滤掉（启停即时生效）</text>
+<text class="s" x="20" y="474">先开门再连 server：启动不被慢 MCP 拖住；工具每轮现取，连上自然就有</text>
+<text class="s" x="20" y="496">check-deprecated-mcp 守卫在 CI 查弃用 API；出站域名白名单测试在 packages/mcp/test/</text>
+</svg>

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 520" width="880" height="520" role="img" aria-labelledby="t d">
+<title id="t">core 分发与串行</title>
+<desc id="d">请求进 core：会话忙回 SESSION_BUSY；空闲则建 ActiveTurn（含补充队列），处理后广播事件。host 发起的轮没有 ActiveTurn。</desc>
+<defs>
+  <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FA1B2"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4ADE80"/></marker>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F87171"/></marker>
+  <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#FBBF24"/></marker>
+</defs>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .mono{font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:11px;fill:#9BE8F5}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+  .bad{fill:#17141E;stroke:#F87171;stroke-width:1.4}
+</style>
+<rect width="880" height="520" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">core：唯一裁判 busy，队列原子跟随</text>
+<text class="s" x="20" y="56">同一会话串行：第二个请求直接回 SESSION_BUSY，不排队、不静默丢弃</text>
+
+<!-- 请求入口 -->
+<rect class="st" x="60" y="84" width="280" height="44" rx="10"/>
+<text class="mono" x="76" y="110">session.submit{…}</text>
+<path d="M340 106 H390" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- 判定 -->
+<rect class="warn" x="400" y="84" width="300" height="44" rx="10"/>
+<text class="k" x="416" y="106" style="fill:#FBBF24">busy 判定（this.busy）</text>
+<text class="s" x="416" y="124">唯一裁判；补充队列要原子跟随</text>
+
+<path d="M550 128 V158" fill="none" stroke="#8FA1B2" stroke-width="1.3" marker-end="url(#a)"/>
+
+<!-- 忙 -->
+<rect class="bad" x="400" y="162" width="150" height="44" rx="10"/>
+<text class="mono" x="416" y="188" style="fill:#F87171">SESSION_BUSY</text>
+<path d="M550 162 V128" fill="none" stroke="#F87171" stroke-width="1.3" marker-end="url(#ar)"/>
+<text class="s" x="560" y="150" style="fill:#F87171">忙 → 直接拒绝</text>
+
+<!-- 空闲 -->
+<rect class="ok" x="590" y="162" width="230" height="44" rx="10"/>
+<text class="k" x="606" y="184" style="fill:#4ADE80">建 ActiveTurn{queue}</text>
+<text class="s" x="606" y="200">补充队列与 busy 一起建</text>
+<path d="M705 162 V128" fill="none" stroke="#4ADE80" stroke-width="1.3" marker-end="url(#ag)"/>
+<text class="s" x="716" y="150" style="fill:#4ADE80">空闲 → 处理</text>
+
+<!-- 处理 -->
+<rect class="st" x="60" y="240" width="760" height="54" rx="12"/>
+<text class="k" x="76" y="262">处理轮：提交 → runtime → kernel → 事件落盘 → 广播</text>
+<text class="s" x="76" y="280">模型请求工具 → ToolRunner.run → 权限决策 → tool.result 落盘 → 再来一轮</text>
+
+<!-- 补充侧 -->
+<rect class="box" x="60" y="320" width="360" height="120" rx="10"/>
+<text class="k" x="76" y="344">运行中补充（session.note）</text>
+<text class="s" x="76" y="366">core 发起的轮 → 进 ActiveTurn.queue</text>
+<text class="s" x="76" y="384">模型回合间送达，落 user.note 事件</text>
+<text class="s" x="76" y="402">host 发起的轮（评审 / 定时）</text>
+<text class="s" x="76" y="418">没有 ActiveTurn → 回 SESSION_BUSY</text>
+
+<!-- 收尾 -->
+<rect class="warn" x="460" y="320" width="360" height="120" rx="10"/>
+<text class="k" x="476" y="344" style="fill:#FBBF24">收尾竞态</text>
+<text class="s" x="476" y="366">正常收场 + 队列有残留 → 不释放 busy</text>
+<text class="s" x="476" y="384">用残留开下一轮（user.input.noteIds）</text>
+<text class="s" x="476" y="402">异常收场 → 清空队列</text>
+<text class="s" x="476" y="418">广播 session.notes.returned 退回</text>
+
+<text class="s" x="20" y="480">错误翻译诚实：只有 SessionNotFoundError 译成 SESSION_NOT_FOUND；其它异常原样作为 INTERNAL</text>
+<text class="s" x="20" y="498">会话列表变化的方法之后广播 sessions.changed（500ms 合并，端上重新 session.list）</text>
+</svg>

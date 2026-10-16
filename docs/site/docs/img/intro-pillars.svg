@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 360" width="880" height="360" role="img" aria-labelledby="t d">
+<title id="t">domi 三个支点</title>
+<desc id="d">Soul（可 diff 的人格）、轨迹（事件流可见可回放）、本地优先（默认拒绝）——缺任何一个就变成又一个 agent 框架。</desc>
+<style>
+  text{font-family:'PingFang SC','Noto Sans SC','Microsoft YaHei','Hiragino Sans GB',sans-serif;fill:#E8EEF4}
+  .s{font-size:11.5px;fill:#8FA1B2}
+  .k{font-size:12.5px;font-weight:700}
+  .box{fill:#111A23;stroke:#2A3B4D;stroke-width:1.2}
+  .st{fill:#0F1E26;stroke:#22D3EE;stroke-width:1.4}
+  .warn{fill:#17142A;stroke:#FBBF24;stroke-width:1.4}
+  .ok{fill:#0C2016;stroke:#4ADE80;stroke-width:1.4}
+</style>
+<rect width="880" height="360" rx="14" fill="#0D141B"/>
+
+<text class="k" x="20" y="36" style="fill:#22D3EE">三个支点，缺一不可</text>
+<text class="s" x="20" y="56">缺任何一个，domi 就变成「又一个 agent 框架」</text>
+
+<rect class="st" x="60" y="90" width="240" height="180" rx="12"/>
+<text class="k" x="76" y="114">① Soul —— 会积累的人格</text>
+<text class="s" x="76" y="136">跨会话沉淀的人格层</text>
+<text class="s" x="76" y="156">人类可读的 Markdown</text>
+<text class="s" x="76" y="176">可 diff：每次成长可见</text>
+<text class="s" x="76" y="194">可手改：能否决、能编辑</text>
+<text class="s" x="76" y="212">可导出：单文件分享</text>
+<text class="s" x="76" y="230">不是参数里的黑盒</text>
+
+<rect class="warn" x="320" y="90" width="240" height="180" rx="12"/>
+<text class="k" x="336" y="114" style="fill:#FBBF24">② 轨迹 —— 每一步可见</text>
+<text class="s" x="336" y="136">思考 / 工具调用 / 权限决策</text>
+<text class="s" x="336" y="156">全部追加进事件流</text>
+<text class="s" x="336" y="176">轨迹面板可回放任意会话</text>
+<text class="s" x="336" y="194">真实会话 = 测试 fixture</text>
+<text class="s" x="336" y="212">评估以事件流回放为唯一数据源</text>
+<text class="s" x="336" y="230">不新增埋点</text>
+
+<rect class="ok" x="580" y="90" width="240" height="180" rx="12"/>
+<text class="k" x="596" y="114" style="fill:#4ADE80">③ 本地优先 —— 默认拒绝</text>
+<text class="s" x="596" y="136">数据留在你的机器上</text>
+<text class="s" x="596" y="156">权限引擎默认拒绝</text>
+<text class="s" x="596" y="176">没有规则的能力不放行</text>
+<text class="s" x="596" y="194">每次放行 / 拒绝</text>
+<text class="s" x="596" y="212">都是一条可审计事件</text>
+
+<text class="s" x="20" y="310">TUI / Web / Desktop 都只是同一条事件流的不同视图——端上没有业务逻辑，全是投影</text>
+<text class="s" x="20" y="332">适合有 CLI 习惯的开发者；不服务非技术用户、零配置需求、多租户组织</text>
+</svg>

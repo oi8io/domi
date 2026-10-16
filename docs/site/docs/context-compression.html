@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>上下文压缩与遮蔽：模型看到什么，由你决定 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a class="active" href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>上下文压缩与遮蔽：模型看到什么，由你决定</h1>
+<blockquote>
+<p>本页回答四个问题：上下文快满时 domi 会做什么？遮蔽和压缩有什么区别？硬顶停轮后怎么恢复？哪些内容可以保住不压？
+贯穿例子：给登录接口加限流。第 2 步「写限流中间件」跑测试，工具输出很大。
+交互演示：<a href="context-compression-explainer.html">试一下降级链怎么走</a></p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>domi 用一个<strong>预算器</strong>估算上下文占用。占用分四档：正常、遮蔽、压缩、硬顶。</li>
+<li>快满时先<strong>遮蔽</strong>：把旧的工具输出换成指针。信息零丢失。</li>
+<li>遮蔽腾不出再<strong>压缩</strong>：把中间历史换成结构化摘要。信息有损。</li>
+<li>两种动作都只<strong>追加事件</strong>。原始事件一个字节不动。</li>
+<li>占用到 92% 硬顶，本轮停下，告诉你三条出路。</li>
+<li>压缩前先冲刷记忆。压缩后<strong>编辑守卫失效</strong>——模型改文件前必须重读。</li>
+<li>连续 2 次压缩失败后自动不再触发。手动 <code>/compact</code> 永远可用。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>预算器</td>
+<td>估算上下文占用的工具。</td>
+</tr>
+<tr>
+<td>档位</td>
+<td>按占用分出的等级：正常、遮蔽、压缩、硬顶。</td>
+</tr>
+<tr>
+<td>遮蔽</td>
+<td>把旧工具输出换成指针，模型看不到内容。</td>
+</tr>
+<tr>
+<td>压缩</td>
+<td>把中间历史换成摘要。</td>
+</tr>
+<tr>
+<td>热区</td>
+<td>最近 10 步且 32k token 内的工具输出，不遮。</td>
+</tr>
+<tr>
+<td>冷区</td>
+<td>热区之外的旧工具输出，可遮。</td>
+</tr>
+<tr>
+<td>钉住</td>
+<td>把某条事件钉住，遮蔽与压缩都跳过它。</td>
+</tr>
+<tr>
+<td>投影</td>
+<td>模型看到的上下文，由事件流算出来。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/ccomp-degrade.svg" alt="上下文降级链" /></p>
+<ol>
+<li>发请求前，domi 估占用。</li>
+<li>占用到遮蔽档（≥60%，节省档 45%）→ 遮蔽一批冷区。</li>
+<li>重估。仍到压缩档（≥80%）→ 压缩中间历史。</li>
+<li>重估。仍到硬顶（≥92%）→ 本轮停，落 <code>error</code>，告诉你出路。</li>
+<li>遮蔽或压缩失败<strong>不阻断</strong>——最终由硬顶收口。</li>
+</ol>
+<h2>2. 预算器：一个数字驱动三档</h2>
+<p><strong>有效窗口</strong> = 模型窗口 − 最大输出 − 13k 安全余量（不低于 4096）。</p>
+<p><strong>占用</strong> = 上次真实用量 + 本步增量估算（system + 工具定义 + 新事件）。</p>
+<p><code>evaluate(used, effective)</code> 给出档位：</p>
+<table>
+<thead>
+<tr>
+<th>占用</th>
+<th>档位</th>
+<th>domi 做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>≥60%（节省档 45%）</td>
+<td>mask</td>
+<td>遮蔽一批冷区</td>
+</tr>
+<tr>
+<td>≥80%</td>
+<td>compact</td>
+<td>压缩中间历史</td>
+</tr>
+<tr>
+<td>≥92%</td>
+<td>hard</td>
+<td>本轮停，落 <code>error{scope:'context', recoverable:true}</code></td>
+</tr>
+</tbody>
+</table>
+<p>这一份 <code>evaluate</code> 同时供给守卫、状态栏、上下文 tab。三处读同一个数字，不各算各的。</p>
+<p><strong>配置档位</strong>（<code>context.strategy</code>）：</p>
+<ul>
+<li><code>balanced</code>：默认。遮蔽阈值 60%。</li>
+<li><code>economical</code>：节省。遮蔽阈值降到 45%。</li>
+<li>老配置 <code>full</code> / <code>clean</code> / <code>compact</code> 读到时映射为 <code>balanced</code>。doctor 会提示，不回写。</li>
+</ul>
+<blockquote>
+<p>注意：economical 只调<strong>遮蔽</strong>阈值。压缩档始终是 80%。</p>
+</blockquote>
+<h2>3. 遮蔽：先把冷区藏起来</h2>
+<p><img src="img/ccomp-mask-vs-compact.svg" alt="遮蔽与压缩的差别" /></p>
+<p>遮蔽只动<strong>冷区</strong>的 <code>tool.result</code>：</p>
+<ul>
+<li>热区不遮：最近 10 步（以 <code>model.request</code> 为步起点）且 32k token 内的工具输出。</li>
+<li>钉住的跳过。已遮蔽的 seq 保持不变。</li>
+<li>单批至少腾出 <strong>8k token</strong> 才落一条 <code>ctx.mask</code>。按批记账，不逐条刷屏。</li>
+</ul>
+<p>模型看到的是指针「已遮蔽，见 ctx.mask」。事件流里原文还在。</p>
+<p><strong>代价</strong>：一次缓存重写。<strong>收益</strong>：信息零丢失。</p>
+<h2>4. 压缩：把中间换成摘要</h2>
+<ul>
+<li><strong>保边</strong>：最近 <code>compactKeepSteps</code>（默认 8）步<strong>且</strong> <code>compactKeepTokens</code>（默认 24_000）token 内逐字保留。满足其一即保留。</li>
+<li>覆盖区间换成<strong>结构化摘要</strong>（固定字段：目标、用户原话、关键决策、改过的文件、错误、当前步骤、待答问题、下一步）。</li>
+<li>摘要请求<strong>复用主前缀</strong>：主会话投影 + 提示词层 + 末尾摘要指令。只多付一点输出 token，吃主前缀缓存。</li>
+<li>压缩前先冲刷记忆（<code>memory.flush</code>），记忆先落盘。</li>
+<li>压缩后<strong>编辑守卫失效</strong>：模型现在只见过摘要，改文件前必须重读。</li>
+<li>落一条 <code>ctx.compact{fromSeq, toSeq, summary}</code>。原始事件一条不动。</li>
+<li>失败：落 <code>error{scope:'compact', recoverable:true}</code>，本轮照常继续。连续 2 次失败后自动不再触发，手动 <code>/compact</code> 仍可用。</li>
+</ul>
+<p>压缩之后再来请求，domi 会<strong>回补关键材料</strong>（最近读/改的文件、已加载技能正文、当前计划），尽量把压掉的内容补回来。</p>
+<h2>5. 钉住：这条不能丢</h2>
+<p><code>ctx.pin</code> 钉住某条事件。遮蔽与压缩都跳过它。</p>
+<ul>
+<li>典型用途：你显式引用的文件（<code>ctx.fileref</code>）、<code>verify.required</code> 的待验证内容。</li>
+<li>解钉恢复。钉住和解钉都落事件。</li>
+</ul>
+<h2>6. 为什么遮蔽先于压缩</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>遮蔽（mask）</th>
+<th>压缩（compact）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>代价</td>
+<td>一次缓存重写</td>
+<td>一次模型摘要请求（token + 延迟）</td>
+</tr>
+<tr>
+<td>保真</td>
+<td>指针，零丢失</td>
+<td>摘要，有损</td>
+</tr>
+<tr>
+<td>触发</td>
+<td>轻（60%）</td>
+<td>重（80%）</td>
+</tr>
+</tbody>
+</table>
+<p>降级链把「便宜且无损」的动作排在前面。只有遮蔽腾不出，才上压缩。</p>
+<h2>7. 出错了怎么办：跑测试输出太大，上下文快满</h2>
+<p>还是「给登录接口加限流」。第 2 步写限流中间件，跑 <code>bun test</code> 的输出每次几万 token，上下文占用一路涨。</p>
+<ol>
+<li><strong>占用 65%</strong>。domi 遮蔽一批旧测试输出，落 <code>ctx.mask</code>。模型继续。</li>
+<li><strong>占用 82%，遮蔽腾不出</strong>（一批腾出的 token 为 0，视为未生效）。domi 压缩中间历史，落 <code>ctx.compact</code>。模型看到的中间段变成摘要。</li>
+<li><strong>模型按摘要改了 <code>app.ts</code></strong>。编辑守卫失效——domi 强制模型先重读 <code>app.ts</code>，再改。</li>
+<li><strong>占用 95%</strong>。硬顶。本轮停，落 <code>error{scope:'context', recoverable:true}</code>，并给出三条出路：在对话里再压缩一次（<code>/compact</code>）；开新会话把摘要带过去；换一个窗口更大的模型。</li>
+<li><strong>压缩失败呢</strong>？落 <code>error{scope:'compact', recoverable:true}</code>，本轮照常继续。连续 2 次失败后自动不再触发；你手动 <code>/compact</code> 随时能用。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>占用 ≥60%（节省档 45%）</td>
+<td>遮蔽一批冷区，落 ctx.mask</td>
+<td>通常不用管</td>
+</tr>
+<tr>
+<td>遮蔽腾不出，占用仍 ≥80%</td>
+<td>压缩中间历史，落 ctx.compact</td>
+<td>通常不用管</td>
+</tr>
+<tr>
+<td>占用 ≥92% 硬顶</td>
+<td>本轮停，落 error，附三条出路</td>
+<td>选一条：/compact、新会话、换大窗口模型</td>
+</tr>
+<tr>
+<td>压缩失败</td>
+<td>落 error{scope:'compact'}，本轮照常</td>
+<td>不用管；连续 2 次后自动停，可手动 /compact</td>
+</tr>
+<tr>
+<td>压缩后模型要改文件</td>
+<td>编辑守卫失效，强制先重读</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>你手动 /compact</td>
+<td>立即压缩一次，落 ctx.compact</td>
+<td>没有</td>
+</tr>
+<tr>
+<td>某条内容不能丢</td>
+<td>钉住它（ctx.pin），遮蔽压缩都跳过</td>
+<td>没有</td>
+</tr>
+</tbody>
+</table>
+<h2>8. 可靠性靠什么</h2>
+<ol>
+<li><strong>一个预算器，所有读数同源。</strong> 守卫、状态栏、上下文 tab 读同一个 <code>evaluate</code>，不会出现「状态栏说还好、请求却停了」。</li>
+<li><strong>只追加，不改写。</strong> 遮蔽和压缩都是新事件。原始事件一个字节没动，回放与审计永远看到真的。</li>
+<li><strong>逐级降，每级重估。</strong> 不猜、不跳级。每级动作后都重新判档。</li>
+<li><strong>失败不阻断，硬顶收口。</strong> 遮蔽或压缩失败不会把请求硬发出去，也不会卡死——最终由硬顶兜底。</li>
+<li><strong>失败留痕走事件流。</strong> 压缩失败也落 <code>error</code> 事件，事后排查能找到，不是在 UI 里闪一下就没了。</li>
+<li><strong>熔断防空转。</strong> 连续 2 次压缩失败后自动停，不浪费模型调用。</li>
+<li><strong>钉住保关键内容。</strong> 你引用的文件、待验证内容永远在。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>压缩有损：摘要是概括，细节会丢。模型改文件前必须重读（编辑守卫已强制）。</li>
+<li><code>economical</code> 只调遮蔽阈值，压缩档始终 80%。</li>
+<li>压缩是一次真实模型调用：有 token 成本和延迟。</li>
+<li>硬顶停轮不自动恢复。你必须选一条出路（/compact、新会话、换模型）。</li>
+<li>遮蔽按批记账，单批不足 8k token 就不动作——占用略超阈值时可能不触发。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>预算器与档位</td>
+<td><code>packages/kernel/src/budget.ts</code></td>
+</tr>
+<tr>
+<td>降级链编排</td>
+<td><code>packages/runtime/src/degrade.ts</code></td>
+</tr>
+<tr>
+<td>遮蔽实现</td>
+<td><code>packages/memory/src/mask.ts</code></td>
+</tr>
+<tr>
+<td>压缩实现</td>
+<td><code>packages/memory/src/compact.ts</code></td>
+</tr>
+<tr>
+<td>投影策略（balanced / economical）</td>
+<td><code>packages/memory/src/strategy.ts</code></td>
+</tr>
+<tr>
+<td>compactNow 与请求前预检</td>
+<td><code>packages/runtime/src/session.ts</code></td>
+</tr>
+<tr>
+<td>配置与默认值</td>
+<td><code>packages/config/src/schema.ts</code>（<code>context.*</code>）</td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/memory/test/{mask,compact,strategy}.spec.ts</code>。</p>
+<h2>相关</h2>
+<ul>
+<li>降级链在 turn 里的位置：<a href="agent-loop.html">Agent Loop：一轮里发生了什么</a>。</li>
+<li>稳定前缀为什么不可动、Soul 为什么在稳定前缀里：<a href="prompt-assembly.html">提示词分层与 cache 边界</a>。</li>
+<li>事件流与存储：<a href="session-storage.html">会话存储与事件流</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>定时任务 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a class="active" href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>定时任务</h1>
+<blockquote>
+<p>本页回答四个问题：cron 怎么写？调度器怎么醒来、怎么补触发？迟到了会怎样？出错了会怎样？
+交互演示：<a href="scheduling-explainer.html">错过补触发模拟</a>（选场景，看调度器怎么判定准点 / late / 只补一次）。
+<code>packages/daemon/src/{cron,scheduler}.ts</code>。
+贯穿例子：每天早上 9 点给登录接口跑一次限流报告。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>cron 是 <strong>5 段</strong>：分 时 日 月 周。支持 <code>*</code> <code>,</code> <code>-</code> <code>/</code> 与英文缩写；<strong>不支持 <code>L</code> <code>W</code> <code>#</code> 与秒</strong>。</li>
+<li>时区用 <code>Intl</code> 换算，不引依赖；<code>nextRun</code> / <code>prevRun</code> 是纯函数，可单测。</li>
+<li>调度器在 domid 进程里跑，时钟与定时器<strong>全部注入</strong>（测试用假时钟）。</li>
+<li><strong>错过只补一次</strong>：醒来时「最近应触发时刻」晚于 <code>last_due</code> 就触发一次，错过多个周期也只补最近这一次。</li>
+<li>醒来的间隔最长 <strong>60 秒</strong>：系统休眠后定时器会漂，靠这个兜底。</li>
+<li>应触发时刻之后 60 秒内算<strong>准点</strong>，超过算 <strong>late</strong>（domid 没开、机器睡着了）——<code>late</code> 标志进 <code>schedule.fire</code> 事件。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>段</td>
+<td>cron 的一个字段（分 / 时 / 日 / 月 / 周）。</td>
+</tr>
+<tr>
+<td>last_due</td>
+<td>上次触发过的应触发时刻。</td>
+</tr>
+<tr>
+<td>准点</td>
+<td>触发发生在应触发时刻后 60 秒内。</td>
+</tr>
+<tr>
+<td>late</td>
+<td>触发发生在应触发时刻后超过 60 秒。</td>
+</tr>
+<tr>
+<td>补触发</td>
+<td>domid 醒来时补跑错过的最近一次。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 总体流程</h2>
+<p><img src="img/sched-wake.svg" alt="调度器醒来逻辑" /></p>
+<p><img src="img/sched-fire.svg" alt="触发判定" /></p>
+<h2>2. cron 表达式</h2>
+<p>5 段：分 时 日 月 周。支持 <code>*</code> <code>,</code> <code>-</code> <code>/</code>、月份与星期的英文缩写，周日写 0 或 7。<strong>不支持 <code>L</code> <code>W</code> <code>#</code> 与秒</strong>；日与周都限定时按 Vixie cron 的规矩取「或」。</p>
+<p>时区换算（<code>Intl</code>，不引依赖）：在 UTC 分钟上走，每一步看它在目标时区里是几月几日几点，按不匹配的那一级往前跳。</p>
+<p>已知限制：<strong>夏令时被跳过的那一刻</strong>（例如美东 3 月第二个周日 02:30）当天不触发。</p>
+<h2>3. 调度器：错过只补一次</h2>
+<p><code>scheduler.ts</code> 在 domid 进程里跑：</p>
+<ol>
+<li>每次醒来，对每个计划算「不晚于现在的最近一个应触发时刻」。</li>
+<li>它晚于 <code>last_due</code>？是 → 触发一次（<strong>错过多个周期也只补这一次</strong>）。否 → 不触发。</li>
+<li>醒来的间隔 = 到最近一次运行的时间，<strong>最长 60 秒</strong>（系统休眠之后定时器会漂，靠这个兜底）。</li>
+<li>应触发时刻之后 60 秒内算准点，超过就是 <code>late</code> —— <code>fire(schedule, due, late)</code> 的 <code>late</code> 标志进 <code>schedule.fire</code> 事件。</li>
+</ol>
+<h2>4. 触发 → 任务</h2>
+<p><code>fire</code> 真的去建任务并提交目标，返回会话 id（<code>task.start</code> 的 runId 就是会话 id）；<code>isBusy</code> 防止同一会话叠跑。调度器用的内部连接（<code>SYSTEM_CONN</code>）：不订阅、不收推送。daemon 重启后 <code>resumeRuns</code> 把没跑完的接着跑。</p>
+<p>RPC 面：<code>schedule.list / create / update / delete / runs / preview</code>（<code>previewCron</code> 给下一次触发时间）；<code>schedule.fire</code> 是事件。</p>
+<h2>5. 出错了怎么办：机器睡了 3 个小时，9 点的报告没跑</h2>
+<p>还是「每天早上 9 点跑限流报告」。今天你 10 点才打开电脑（domid 在 9 点没开）。</p>
+<ol>
+<li><strong>domid 醒来（10:00）</strong>。调度器对「每天 9 点」这个计划算最近应触发时刻 = 今天 09:00。</li>
+<li><strong>与 last_due 比较</strong>。昨天 09:00 已触发（last_due = 昨天 09:00）→ 今天 09:00 晚于 last_due → <strong>触发一次</strong>。</li>
+<li><strong>准点 / late 判定</strong>。触发时刻 10:00 距应触发 09:00 超过 60 秒 → <code>late: true</code>，进 <code>schedule.fire</code> 事件。</li>
+<li><strong>假如连续错过 3 天</strong>。醒来时最近应触发 = 今天 09:00（晚于 last_due）→ 只补今天这一次，前两天的跳过（<code>schedule_runs</code> 里记 skipped）。</li>
+<li><strong>假如你在 08:30 打开</strong>。最近应触发 = 今天 09:00，是未来时刻 → 不触发，等 09:00 正常跑。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>调度器做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>没到应触发时刻</td>
+<td>不算触发</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>醒来时刚错过（≤60 秒）</td>
+<td>触发，late=false（准点）</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>醒来时错过很久（&gt;60 秒）</td>
+<td>触发一次，late=true</td>
+<td>不用管（看 schedule.fire 的 late）</td>
+</tr>
+<tr>
+<td>连续错过多个周期</td>
+<td>只补最近一次，其余 skipped</td>
+<td>不用管</td>
+</tr>
+<tr>
+<td>夏令时被跳过的那刻</td>
+<td>当天不触发</td>
+<td>已知限制</td>
+</tr>
+<tr>
+<td>同一会话叠跑风险</td>
+<td>isBusy 防止叠跑</td>
+<td>不用管</td>
+</tr>
+</tbody>
+</table>
+<h2>6. 可靠性靠什么</h2>
+<ol>
+<li><strong>纯函数核心</strong>。<code>nextRun</code> / <code>prevRun</code> 可单测，时区逻辑不依赖环境。</li>
+<li><strong>时钟注入</strong>。测试用假时钟，时间行为确定性。</li>
+<li><strong>兜底唤醒</strong>。最长 60 秒间隔，休眠后不永久漂移。</li>
+<li><strong>错过有交代</strong>。只补一次 + skipped 记录 + late 标志，行为可审计。</li>
+<li><strong>防叠跑</strong>。isBusy 保证同一会话不叠跑。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>cron 不支持 <code>L</code> <code>W</code> <code>#</code> 与秒。</li>
+<li>夏令时被跳过的那一刻当天不触发。</li>
+<li>错过多个周期只补一次（设计如此，宁可少跑不可多跑）。</li>
+<li>调度器在 domid 进程里：domid 没开就没有触发（醒来后按 late 补）。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cron 解析 / nextRun / prevRun</td>
+<td><code>packages/daemon/src/cron.ts</code></td>
+</tr>
+<tr>
+<td>调度器（醒来 / 补触发 / late）</td>
+<td><code>packages/daemon/src/scheduler.ts</code></td>
+</tr>
+<tr>
+<td>定时任务存储</td>
+<td><code>packages/store/src/schedules.ts</code></td>
+</tr>
+<tr>
+<td>RPC 面</td>
+<td><code>packages/daemon/src/core.ts</code>（schedule.*）</td>
+</tr>
+</tbody>
+</table>
+<p>测试：<code>packages/daemon/test/scheduler.spec.ts</code>（假时钟 + 假定时器，含夏令时跳变、错过补触发、late 判定）。</p>
+<h2>相关</h2>
+<ul>
+<li>任务的执行循环：<a href="orchestration.html">编排：任务 · 子 agent · 计划</a>。</li>
+<li>调度器住在 daemon 里：<a href="daemon-internals.html">daemon 内部机制</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>

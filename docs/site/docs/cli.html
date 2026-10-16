@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLI 与命令 — domi 文档</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;--panel:#0D141B;--panel2:#111A23;--line:#1B2836;
+  --ink:#E8EEF4;--muted:#8FA1B2;--cyan:#22D3EE;--green:#4ADE80;
+  --violet:#A78BFA;--amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.5px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+/* 顶栏 */
+.top{position:sticky;top:0;z-index:50;background:rgba(7,11,15,.88);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;padding:0 20px;height:58px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:17px;color:var(--ink)}
+.brand .mark{width:20px;height:20px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:4px;top:7px;width:7px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:4px;top:12px;width:4px;height:2px;border-radius:1px;background:var(--cyan)}
+.brand small{font-weight:500;color:var(--muted);font-size:12px}
+.top-links{display:flex;gap:18px;font-size:13.5px;font-weight:500}
+.top-links a{color:var(--muted)}
+.top-links a:hover{color:var(--ink);text-decoration:none}
+/* 布局 */
+.layout{max-width:1240px;margin:0 auto;padding:26px 20px 60px;display:grid;grid-template-columns:248px 1fr;gap:34px}
+.side{position:sticky;top:84px;align-self:start;max-height:calc(100vh - 110px);overflow-y:auto;padding-right:6px}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.navgroup{margin-bottom:20px}
+.navgroup h4{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.navgroup a{display:block;font-size:13.5px;color:var(--muted);padding:5px 10px;border-radius:6px;border-left:2px solid transparent;line-height:1.45}
+.navgroup a:hover{color:var(--ink);background:var(--panel);text-decoration:none}
+.navgroup a.active{color:var(--cyan);border-left-color:var(--cyan);background:rgba(34,211,238,.07)}
+/* 正文 */
+.content{min-width:0}
+.content h1{font-size:clamp(25px,3vw,34px);font-weight:900;line-height:1.3;letter-spacing:-.01em;margin:6px 0 8px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.content .crumb{font-family:var(--mono);font-size:12px;color:var(--green);margin-bottom:4px}
+.content h2{font-size:21px;font-weight:800;margin:34px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line);line-height:1.4}
+.content h3{font-size:17px;font-weight:700;margin:26px 0 10px}
+.content h4{font-size:15.5px;font-weight:700;margin:20px 0 8px}
+.content p{margin:10px 0}
+.content ul,.content ol{margin:10px 0 10px 22px}
+.content li{margin:5px 0}
+.content blockquote{border-left:3px solid var(--violet);background:var(--panel);padding:12px 16px;margin:14px 0;border-radius:0 8px 8px 0;color:var(--muted)}
+.content blockquote p{margin:4px 0}
+.content a code{color:var(--cyan)}
+.content code{background:rgba(34,211,238,.09);color:#9BE8F5;padding:1.5px 6px;border-radius:5px;font-size:13px;word-break:break-word}
+.content pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:14px 0;overflow-x:auto;line-height:1.6}
+.content pre code{background:none;color:var(--ink);padding:0;font-size:13px;white-space:pre;word-break:normal}
+.content table{border-collapse:collapse;margin:16px 0;width:100%;font-size:13.5px;display:block;overflow-x:auto}
+.content th,.content td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+.content th{background:var(--panel);font-weight:700;color:var(--ink);white-space:nowrap}
+.content tr:nth-child(even) td{background:rgba(13,20,27,.45)}
+.content hr{border:0;border-top:1px solid var(--line);margin:28px 0}
+.content img{max-width:100%;border-radius:10px;border:1px solid var(--line)}
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:22px 20px;font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap;justify-content:space-between;max-width:1240px;margin:0 auto}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--cyan)}
+/* 移动端 */
+@media (max-width:880px){
+  .layout{grid-template-columns:1fr;padding-top:16px}
+  .side{position:static;max-height:none;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:12px 12px 4px;margin-bottom:20px}
+  .navgroup{margin-bottom:12px}
+  .navgroup a{padding:4px 8px}
+  .content pre{-webkit-overflow-scrolling:touch}
+}
+</style>
+</head>
+<body>
+<div class="top"><div class="top-in">
+  <a class="brand" href="index.html"><span class="mark"></span>domi<small>开发者文档</small></a>
+  <div class="top-links">
+    <a href="../web/index.html">← 返回主站</a>
+    <a href="index.html">文档首页</a>
+  </div>
+</div></div>
+<div class="layout">
+  <aside class="side"><div class="navgroup"><h4>概览</h4><a href="index.html">文档站首页</a><a href="intro.html">domi 是什么</a></div><div class="navgroup"><h4>快速开始</h4><a href="quickstart.html">快速开始</a></div><div class="navgroup"><h4>架构与内幕</h4><a href="architecture.html">架构</a><a href="agent-loop.html">Agent Loop 内部机制</a><a href="protocol.html">Domi Protocol</a><a href="daemon-internals.html">daemon 内部机制</a><a href="session-storage.html">会话存储与事件流</a><a href="trajectory-and-replay.html">轨迹与回放</a><a href="prompt-assembly.html">提示词分层与 cache</a><a href="context-compression.html">压缩与 prompt cache</a><a href="memory-and-soul.html">记忆分层与 Soul</a><a href="orchestration.html">编排</a><a href="model-runtime.html">模型运行时</a><a href="tools-runtime.html">工具与权限运行时</a><a href="mcp-internals.html">MCP 接入</a><a href="plugins.html">插件运行时</a><a href="scheduling.html">定时任务</a><a href="config.html">配置与厂商</a><a class="active" href="cli.html">CLI 与命令</a><a href="clients.html">三端</a><a href="eval.html">评估体系</a></div><div class="navgroup"><h4>扩展</h4><a href="plugin-dev.html">插件开发</a><a href="skill-writing.html">Skill 编写</a><a href="adding-tools.html">添加工具</a><a href="adding-providers.html">添加模型供应商</a><a href="programmatic-integration.html">编程集成</a></div><div class="navgroup"><h4>参与</h4><a href="contributing.html">贡献指南</a></div></aside>
+  <main class="content">
+    <div class="crumb">DOMI · DOCS</div>
+    <h1>CLI 与命令</h1>
+<blockquote>
+<p>本页回答四个问题：有哪些命令？命令逻辑住在哪？怎么加新命令？出错了会怎样？
+<code>packages/cli</code> —— 非交互命令。<strong>命令实现住在 packages 里而不是 apps 里</strong>——读事件流、读配置、问影子仓库都是业务；<code>apps/tui</code> 只负责把 argv 递进来、把字符串打出去。
+贯穿例子：给登录接口加限流——你跑 <code>domi doctor</code> 看环境，跑 <code>domi task run</code> 提交改动。</p>
+</blockquote>
+<h2>先说结论</h2>
+<ul>
+<li>命令共 <strong>18 个</strong>（含 <code>migrate-m15</code>）。</li>
+<li>用 Node/Bun 内置的 <code>util.parseArgs</code>，不引 commander/citty。</li>
+<li>逻辑住 packages，apps 只接线（INV-02）。</li>
+<li><strong>带值的选项必须在 <code>flags</code> 里声明</strong>——否则 <code>strict:false</code> 会把它当布尔、值掉进 positionals 里（踩过的坑）。</li>
+<li>大多数命令走协议：<code>domi task run</code> → <code>task.start</code>。</li>
+<li><code>domi doctor</code> 的每一条问题带一条能直接粘贴的修复命令。</li>
+</ul>
+<h2>用到的词</h2>
+<table>
+<thead>
+<tr>
+<th>词</th>
+<th>意思</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>命令面</td>
+<td><code>domi</code> 后第一个词（chat / doctor / init 等）。</td>
+</tr>
+<tr>
+<td>flags</td>
+<td>选项的声明（带值 or 布尔）。</td>
+</tr>
+<tr>
+<td>接线处</td>
+<td>apps 里把 argv 递进来、把输出打出去的地方。</td>
+</tr>
+<tr>
+<td>positionals</td>
+<td>命令后的裸参数。</td>
+</tr>
+</tbody>
+</table>
+<h2>1. 命令面</h2>
+<p>用 Node/Bun 内置的 <code>util.parseArgs</code>，不引 commander/citty（重新评估线是「子命令超过 8 个」——已踩线，下次加命令前先回去看那份 ADR）：</p>
+<pre><code>chat · doctor · init · session · data · prompt · report-bug · eval · trace
+migrate · migrate-m15 · memory · soul · task · plugin · trust · hook · review
+</code></pre>
+<p>按用途分组：</p>
+<table>
+<thead>
+<tr>
+<th>组</th>
+<th>命令</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>环境与体检</td>
+<td>chat / doctor / init / report-bug</td>
+</tr>
+<tr>
+<td>会话与数据</td>
+<td>session / data / trace / prompt / migrate / migrate-m15</td>
+</tr>
+<tr>
+<td>模型能力</td>
+<td>eval / memory / soul / task</td>
+</tr>
+<tr>
+<td>插件与信任</td>
+<td>plugin / trust / hook / review</td>
+</tr>
+</tbody>
+</table>
+<p>常用全局旗标：<code>--help</code> / <code>--version</code> / <code>--json</code> / <code>--yes</code> / <code>--ping</code> / <code>--follow</code>（<code>task run</code>）/ <code>--all</code>（<code>memory list</code>）/ <code>--connect ws://host:port</code>（连远程 domid）/ <code>--isolate</code>（隔离工作区）/ <code>--chat</code> / <code>-p &lt;项目&gt;</code> / <code>--project</code>（<code>init</code>）/ <code>--revoke</code>（<code>trust</code>）/ <code>--html &lt;路径&gt;</code>（<code>trace</code>）。</p>
+<h2>2. 各命令要点</h2>
+<table>
+<thead>
+<tr>
+<th>命令</th>
+<th>干什么</th>
+<th>实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>domi</code>（chat）</td>
+<td>进 TUI；第一次在后台拉起 domid</td>
+<td><code>apps/tui</code> 入口 + <code>launcher.ts</code></td>
+</tr>
+<tr>
+<td><code>domi init</code></td>
+<td>生成 <code>~/.domi/config.yaml</code> 模板；<code>--project</code> 在仓库里建 <code>.domi/</code> 与 AGENT.md 模板</td>
+<td><code>onboarding.ts</code></td>
+</tr>
+<tr>
+<td><code>domi doctor</code></td>
+<td>体检：每条问题带一条能直接粘贴的修复命令</td>
+<td><code>doctor.ts</code>（<code>diagnose</code> / <code>formatFindings</code>）</td>
+</tr>
+<tr>
+<td><code>domi session …</code></td>
+<td>列表 / 恢复 / 删除 / 分支等</td>
+<td><code>data.ts</code> + 协议</td>
+</tr>
+<tr>
+<td><code>domi trace &lt;id&gt;</code></td>
+<td>轨迹（纯文本；<code>--html</code> 输出交互 HTML）</td>
+<td><code>@domi/trace</code></td>
+</tr>
+<tr>
+<td><code>domi eval …</code></td>
+<td>录制 / 回放 / L2</td>
+<td><code>@domi/eval</code>（动态 import，见<a href="eval.html">评估体系</a>）</td>
+</tr>
+<tr>
+<td><code>domi memory …</code> / <code>domi soul …</code></td>
+<td>记忆与 Soul 的命令面</td>
+<td><code>data.ts</code> / <code>soul.ts</code></td>
+</tr>
+<tr>
+<td><code>domi task run &lt;yaml&gt; --follow</code></td>
+<td>跑 DAG 任务</td>
+<td>协议 <code>task.start</code></td>
+</tr>
+<tr>
+<td><code>domi plugin …</code></td>
+<td>install / scaffold / list</td>
+<td><code>plugin.ts</code></td>
+</tr>
+<tr>
+<td><code>domi prompt dump</code></td>
+<td>输出提示词分层拼装结果与 cache 前缀边界</td>
+<td><code>@domi/prompt</code></td>
+</tr>
+<tr>
+<td><code>domi migrate</code></td>
+<td>数据库迁移</td>
+<td><code>@domi/store</code></td>
+</tr>
+<tr>
+<td><code>domi migrate-m15</code></td>
+<td>把泄漏的内部会话迁出成普通会话（备份 + 幂等）</td>
+<td><code>@domi/store</code></td>
+</tr>
+<tr>
+<td><code>domi data</code></td>
+<td>导出 / 清理（<code>planPurge</code> 需要确认词）</td>
+<td><code>data.ts</code></td>
+</tr>
+<tr>
+<td><code>domi hook …</code> / <code>domi trust …</code> / <code>domi review …</code></td>
+<td>钩子 / 信任 / 评审</td>
+<td>各自包</td>
+</tr>
+</tbody>
+</table>
+<h2>3. 加命令的规矩</h2>
+<ol>
+<li>加进 <code>COMMANDS</code>（<code>args.ts</code>）；带值的选项必须在 <code>flags</code> 里声明类型。</li>
+<li>逻辑住 packages，apps 只接线（INV-02）。</li>
+<li>有 PRD 依据（任务 lint 会查）；改动登记在任务文件里。</li>
+<li>ADR-008 的重新评估条件满足时先回去看那份 ADR（引不引 commander）。</li>
+</ol>
+<h2>4. 出错了怎么办：<code>domi task run</code> 起不来</h2>
+<ol>
+<li><strong>命令名打错</strong>。<code>UnknownCommandError</code>，报错列出全部合法命令。查上面的列表。</li>
+<li><strong>带值选项没声明</strong>。值掉进 positionals，行为错乱——<code>flags</code> 里声明类型（踩过的坑）。</li>
+<li><strong>daemon 没起来 / 连不上</strong>。<code>domi</code> 第一次在后台拉起 domid；<code>--connect</code> 连远程。看 daemon 日志。</li>
+<li><strong>缺凭据</strong>。<code>error.missing_credential</code>。补 secrets / 环境变量（见<a href="config.html">配置与厂商</a>）。</li>
+<li><strong>数据库坏了</strong>。<code>domi migrate</code> 跑迁移；<code>domi migrate-m15</code> 修内部会话泄漏（先备份到 <code>backups/pre-m15-migration-&lt;ts&gt;/</code>，幂等）。</li>
+</ol>
+<h3>一张表看全部情况</h3>
+<table>
+<thead>
+<tr>
+<th>情况</th>
+<th>domi 做什么</th>
+<th>你要做什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>命令名打错</td>
+<td>UnknownCommandError 列出全部</td>
+<td>查命令列表</td>
+</tr>
+<tr>
+<td>带值选项没声明</td>
+<td>值掉进 positionals</td>
+<td>flags 里声明</td>
+</tr>
+<tr>
+<td>daemon 起不来</td>
+<td>拉起 / --connect</td>
+<td>看 daemon 日志</td>
+</tr>
+<tr>
+<td>缺凭据</td>
+<td>error.missing_credential</td>
+<td>补 secrets / 环境变量</td>
+</tr>
+<tr>
+<td>数据库问题</td>
+<td>migrate / migrate-m15</td>
+<td>跑迁移命令</td>
+</tr>
+</tbody>
+</table>
+<h2>5. 可靠性靠什么</h2>
+<ol>
+<li><strong>逻辑单点</strong>：命令逻辑住 packages，apps 只接线，可测。</li>
+<li><strong>明确的错误</strong>：UnknownCommandError 列全合法命令。</li>
+<li><strong>体检可执行</strong>：doctor 每条问题带修复命令。</li>
+<li><strong>迁移安全</strong>：migrate-m15 先备份、幂等、保 seq。</li>
+<li><strong>协议复用</strong>：大多数命令走同一套协议，行为一致。</li>
+</ol>
+<h2>已知限制</h2>
+<ul>
+<li>子命令已超 8 个——加命令前先重评 ADR-008（引不引 commander）。</li>
+<li><code>parseArgs</code> 的 <code>strict:false</code> 有坑：带值选项不声明会把值吞进 positionals。</li>
+<li><code>--connect</code> 连远程 domid 依赖网络与鉴权。</li>
+</ul>
+<h2>代码在哪里</h2>
+<table>
+<thead>
+<tr>
+<th>主题</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>命令清单 / 解析</td>
+<td><code>packages/cli/src/args.ts</code></td>
+</tr>
+<tr>
+<td>接线 / 分发</td>
+<td><code>packages/cli/src/{index,run}.ts</code></td>
+</tr>
+<tr>
+<td>输出抽象（测试注入）</td>
+<td><code>packages/cli/src/io.ts</code></td>
+</tr>
+<tr>
+<td>doctor / init / plugin</td>
+<td><code>packages/cli/src/{doctor,onboarding,plugin}.ts</code></td>
+</tr>
+<tr>
+<td>migrate-m15</td>
+<td><code>packages/store/src/migrate-m15.ts</code></td>
+</tr>
+</tbody>
+</table>
+<h2>相关</h2>
+<ul>
+<li>命令大多走协议：方法清单见 <a href="protocol.html">Domi Protocol</a>。</li>
+<li><code>domi eval</code> 的录制 / 回放：<a href="eval.html">评估体系</a>。</li>
+<li>配置命令的依赖：<a href="config.html">配置与厂商</a>。</li>
+</ul>
+
+  </main>
+</div>
+<footer class="foot">
+  <span>domi · local-first agent runtime — 文档站</span>
+  <a href="../web/index.html">返回主站</a>
+</footer>
+</body>
+</html>
