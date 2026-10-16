@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">domi kidney bean mark</title>
+  <desc id="desc">A single warm, plump kidney bean with a curved hilum, centered on a square canvas.</desc>
+  <defs>
+    <linearGradient id="seed" x1="0.16" y1="0.08" x2="0.86" y2="0.94">
+      <stop offset="0" stop-color="#F2D8B6"/>
+      <stop offset="0.48" stop-color="#D8AD7C"/>
+      <stop offset="1" stop-color="#B67E51"/>
+    </linearGradient>
+    <linearGradient id="hilum" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFF0D8"/>
+      <stop offset="1" stop-color="#E8C69E"/>
+    </linearGradient>
+  </defs>
+  <path
+    d="M265 50 C350 47 420 111 432 201 C448 317 385 421 292 456 C231 478 161 451 122 400 C87 353 91 292 125 253 C148 226 175 205 176 171 C178 112 213 59 265 50 Z"
+    fill="url(#seed)"
+    stroke="#9C6845"
+    stroke-opacity="0.34"
+    stroke-width="8"
+  />
+  <path
+    d="M148 283 C165 254 184 222 192 194"
+    fill="none"
+    stroke="#A36B43"
+    stroke-width="25"
+    stroke-linecap="round"
+  />
+  <path
+    d="M150 280 C167 252 184 222 191 196"
+    fill="none"
+    stroke="url(#hilum)"
+    stroke-width="12"
+    stroke-linecap="round"
+  />
+</svg>

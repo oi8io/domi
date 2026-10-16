@@ -150,7 +150,7 @@ bun test                      # 跑插件自带的测试
 domi plugin install .         # 安装（会逐条列出权限让你确认）
 \`\`\`
 
-写法见 docs/site/plugin-dev.md。
+写法见 docs/site/docs/plugin-dev.md。
 `
 }
 

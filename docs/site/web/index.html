@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>domi — 能看见每一步的本地 Agent 运行时</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#070B0F;
+  --panel:#0D141B;
+  --panel2:#111A23;
+  --line:#1B2836;
+  --ink:#E8EEF4;
+  --muted:#8FA1B2;
+  --cyan:#22D3EE;
+  --green:#4ADE80;
+  --violet:#A78BFA;
+  --amber:#FBBF24;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-size:16px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+code,kbd,.mono{font-family:var(--mono)}
+
+/* ===== 顶栏 ===== */
+header{
+  position:sticky;top:0;z-index:50;
+  border-bottom:1px solid transparent;
+}
+header.scrolled{background:rgba(7,11,15,.86);backdrop-filter:blur(10px);border-bottom-color:var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between;height:60px;flex-wrap:wrap;gap:8px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:18px;color:var(--ink)}
+.brand .mark{width:22px;height:22px;border:2px solid var(--cyan);border-radius:6px;position:relative;flex:none}
+.brand .mark::before{content:"";position:absolute;left:5px;top:8px;width:8px;height:2px;border-radius:1px;background:var(--green)}
+.brand .mark::after{content:"";position:absolute;left:5px;top:13px;width:5px;height:2px;border-radius:1px;background:var(--cyan)}
+.navlinks{display:flex;gap:22px;font-size:14px;font-weight:500;color:var(--muted)}
+.navlinks a{color:var(--muted)}
+.navlinks a:hover{color:var(--ink);text-decoration:none}
+
+/* ===== Hero ===== */
+.hero{
+  position:relative;min-height:88vh;display:flex;align-items:center;
+  border-bottom:1px solid var(--line);overflow:hidden;
+}
+.hero-bg{position:absolute;inset:0;background:url('assets/hero.jpg') center/cover no-repeat;filter:saturate(.92)}
+.hero-bg::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(100deg,rgba(7,11,15,.97) 0%,rgba(7,11,15,.82) 42%,rgba(7,11,15,.35) 100%)}
+.hero-inner{position:relative;z-index:2;max-width:680px;padding:88px 20px 96px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13px;color:var(--green);margin-bottom:18px}
+.eyebrow .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+h1{font-size:clamp(30px,5vw,52px);font-weight:900;line-height:1.25;letter-spacing:-.01em;margin-bottom:18px}
+h1 .acc{color:var(--cyan)}
+.hero-sub{font-size:clamp(15px,1.6vw,18px);color:var(--muted);max-width:560px;margin-bottom:30px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:8px;font-weight:700;font-size:15px;transition:transform .15s ease,background .15s ease}
+.btn:hover{transform:translateY(-1px);text-decoration:none}
+.btn-primary{background:var(--cyan);color:#04121A}
+.btn-primary:hover{background:#5ADEF7}
+.btn-ghost{border:1px solid var(--line);color:var(--ink);background:rgba(13,20,27,.55)}
+.btn-ghost:hover{background:var(--panel2)}
+.statusline{
+  margin-top:42px;font-family:var(--mono);font-size:13px;color:var(--muted);
+  border:1px solid var(--line);border-radius:8px;background:rgba(13,20,27,.72);padding:10px 14px;
+  display:flex;gap:16px;flex-wrap:wrap;width:fit-content;max-width:100%;
+}
+.statusline b{color:var(--green);font-weight:500}
+.statusline .sep{color:#33475A}
+
+/* ===== 通用 section ===== */
+section{padding:84px 0;border-bottom:1px solid var(--line)}
+.sec-head{margin-bottom:40px}
+.sec-head .k{font-family:var(--mono);font-size:13px;color:var(--cyan);margin-bottom:8px;display:block}
+.sec-head h2{font-size:clamp(24px,3vw,34px);font-weight:900;line-height:1.3;max-width:640px}
+.sec-head p{color:var(--muted);max-width:640px;margin-top:10px}
+
+/* ===== 三个支点 ===== */
+.pillars{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:768px){.pillars{grid-template-columns:repeat(3,1fr)}}
+.pillar{
+  background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--cyan);
+  border-radius:10px;padding:26px 24px;
+}
+.pillar:nth-child(2){border-left-color:var(--green)}
+.pillar:nth-child(3){border-left-color:var(--violet)}
+.pillar svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.8;margin-bottom:14px;color:var(--cyan)}
+.pillar:nth-child(2) svg{color:var(--green)}
+.pillar:nth-child(3) svg{color:var(--violet)}
+.pillar h3{font-size:18px;font-weight:700;margin-bottom:8px}
+.pillar p{color:var(--muted);font-size:14.5px}
+.pillar code{color:var(--ink);background:var(--panel2);border:1px solid var(--line);padding:1px 6px;border-radius:5px;font-size:13px}
+
+/* ===== 界面展示 ===== */
+.shots{display:grid;grid-template-columns:1fr;gap:22px}
+@media (min-width:900px){.shots{grid-template-columns:1fr 1fr}}
+.shot{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.shot .capbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--muted)}
+.shot .capbar i{width:9px;height:9px;border-radius:50%;background:#3B4A59;flex:none}
+.shot .capbar i:first-child{background:#F87171}
+.shot .capbar i:nth-child(2){background:#FBBF24}
+.shot .capbar i:nth-child(3){background:#4ADE80}
+.shot .capbar span{margin-left:6px}
+.shot img{display:block;width:100%;height:auto}
+.shot .note{padding:12px 14px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line)}
+.shot .note code{font-size:12px}
+.shot.wide{grid-column:1/-1}
+.shots3{display:grid;grid-template-columns:1fr;gap:22px}
+.shots3 .shot img{width:100%;height:auto;display:block}
+
+/* 迷你轨迹示意 */
+.trace{
+  margin-top:34px;background:#080D12;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  font-family:var(--mono);font-size:13px;
+}
+.trace .tbar{padding:9px 14px;border-bottom:1px solid var(--line);color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;font-size:12px}
+.trace .tbar b{color:var(--cyan);font-weight:500}
+.trace .tbody{padding:16px 14px 8px;overflow-x:auto}
+.trow{display:grid;grid-template-columns:42px 1fr;gap:10px;align-items:start;margin-bottom:0}
+.trow .idx{color:#33475A;text-align:right;font-size:12px;padding-top:2px}
+.trow .tcol{position:relative;padding-bottom:14px;padding-left:18px;border-left:1px solid #24384A}
+.trow .tcol::before{content:"";position:absolute;left:-5px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--cyan)}
+.trow.user .tcol::before{background:var(--cyan)}
+.trow.model .tcol::before{background:var(--violet)}
+.trow.tool .tcol::before{background:var(--amber)}
+.trow.perm .tcol::before{background:var(--green)}
+.trow .ev{color:var(--ink)}
+.trow .ev .tag{color:var(--green)}
+.trow .meta{color:var(--muted);font-size:12px;margin-top:2px}
+.trow:last-child .tcol{border-left-color:transparent}
+
+/* ===== Soul ===== */
+.soul{display:grid;grid-template-columns:1fr;gap:28px;align-items:center}
+@media (min-width:900px){.soul{grid-template-columns:1.15fr 1fr}}
+.soul img{width:100%;border-radius:12px;border:1px solid var(--line);display:block}
+.soul .sbody h3{font-size:20px;font-weight:700;margin-bottom:12px}
+.soul .sbody p{color:var(--muted);margin-bottom:12px}
+.soul ul{list-style:none;margin-top:14px}
+.soul li{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:14.5px;margin-bottom:8px}
+.soul li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--violet);flex:none}
+
+/* ===== 快速开始 ===== */
+.start-grid{display:grid;grid-template-columns:1fr;gap:26px}
+@media (min-width:900px){.start-grid{grid-template-columns:1fr 1.2fr}}
+.step{margin-bottom:20px;padding-left:16px;border-left:2px solid var(--line)}
+.step:first-child{border-left-color:var(--green)}
+.step .st{font-family:var(--mono);font-size:12px;color:var(--green)}
+.step h3{font-size:16.5px;font-weight:700;margin:4px 0 6px}
+.step p{color:var(--muted);font-size:14.5px}
+.term{background:#080D12;border:1px solid var(--line);border-radius:12px;overflow:hidden;font-family:var(--mono);font-size:13.5px}
+.term .tbar{padding:9px 14px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px;display:flex;gap:6px}
+.term .tbar i{width:9px;height:9px;border-radius:50%;background:#3B4A59}
+.term .tbar i:first-child{background:#F87171}
+.term .tbar i:nth-child(2){background:#FBBF24}
+.term .tbar i:nth-child(3){background:#4ADE80}
+.term pre{padding:16px 14px;overflow-x:auto;line-height:1.75;color:#C8D6E0}
+.term .p{color:var(--green)}
+.term .c{color:#52677A}
+.term .o{color:#C8D6E0}
+.term .cursor{display:inline-block;width:8px;height:15px;background:var(--cyan);vertical-align:-2px;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ===== 文档 ===== */
+.docs{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:768px){.docs{grid-template-columns:repeat(2,1fr)}}
+.doc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:block;transition:border-color .15s ease}
+.doc:hover{border-color:var(--cyan);text-decoration:none}
+.doc .d{font-family:var(--mono);font-size:12px;color:var(--cyan);margin-bottom:6px;display:block}
+.doc h3{font-size:15.5px;font-weight:700;color:var(--ink);margin-bottom:4px}
+.doc p{font-size:13.5px;color:var(--muted)}
+
+/* ===== 路线图时间轴 ===== */
+.road{display:grid;grid-template-columns:92px 14px 1fr;gap:0;margin-top:8px}
+.road .rdate{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right;padding-right:14px;padding-bottom:26px}
+.road .rax{position:relative}
+.road .rax::before{content:"";position:absolute;left:50%;top:4px;bottom:4px;width:1px;background:var(--line);transform:translateX(-50%)}
+.road .rax::after{content:"";position:absolute;left:50%;top:6px;width:9px;height:9px;border-radius:50%;background:var(--cyan);transform:translateX(-50%)}
+.road:last-child .rax::before{display:none}
+.road .rbody{padding-bottom:26px;padding-left:16px}
+.road .rbody h3{font-size:15.5px;font-weight:700;margin-bottom:4px}
+.road .rbody p{font-size:13.5px;color:var(--muted)}
+
+/* ===== footer ===== */
+footer{padding:44px 0 56px}
+.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+.foot .mono{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.footlinks{display:flex;gap:18px;font-size:14px}
+
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .eyebrow .dot{animation:none}
+  .term .cursor{animation:none}
+}
+</style>
+</head>
+<body>
+
+<header id="top">
+  <div class="wrap nav">
+    <a class="brand" href="#top"><span class="mark"></span>domi</a>
+    <nav class="navlinks">
+      <a href="#pillars">功能</a>
+      <a href="#interface">界面</a>
+      <a href="#start">快速开始</a>
+      <a href="#docs">文档</a>
+      <a href="#roadmap">路线</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-bg" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <span class="eyebrow"><span class="dot"></span>local agent runtime · 本地优先</span>
+    <h1>能看见<b>每一步</b>的<br>本地 Agent 运行时</h1>
+    <p class="hero-sub">domi 是一个会积累「人格」的本地 Agent 运行时。对话、工具调用、权限决定全部记成一条只追加的事件流——每一步思考都<b style="color:var(--ink)">可见、可回放、可审计</b>。</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="#start">快速开始</a>
+      <a class="btn btn-ghost" href="https://github.com/oi8io/domi" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+      <a class="btn btn-ghost" href="../docs/index.html">开发者文档</a>
+    </div>
+    <div class="statusline mono">
+      <span><b>●</b> domid 运行中</span><span class="sep">/</span><span>3 端就绪 TUI · Web · Desktop</span><span class="sep">/</span><span>权限默认拒绝</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 三个支点 ===== -->
+<section id="pillars">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">THREE PILLARS</span>
+      <h2>缺一个，domi 就变成「又一个 agent 框架」</h2>
+      <p>三个支点不是功能清单，而是 domi 与黑盒 agent 的分界线。</p>
+    </div>
+    <div class="pillars">
+      <div class="pillar">
+        <svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7l7-4z"/><path d="M9.5 12.5l2 2 3.5-4"/></svg>
+        <h3>Soul · 会积累的人格</h3>
+        <p>跨会话沉淀的人格层，<code>人类可读</code>的 Markdown：可 diff、可手改、可否决、可导出分享。它不是黑盒参数，而是一份你能读懂并干预的成长记录。</p>
+      </div>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8M18 8v8M8 6h8M8 18h8M12 10v8"/></svg>
+        <h3>轨迹 · 每一步都可见</h3>
+        <p>思考、工具调用、权限决策都是追加的事件流。轨迹面板让你<b style="color:var(--ink)">回放任意一次会话</b>——真实会话还能直接当测试 fixture 重放。</p>
+      </div>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 10v9M8 14h1M15 14h1"/></svg>
+        <h3>本地优先 · 默认拒绝</h3>
+        <p>你的数据留在你的机器上。权限引擎<b style="color:var(--ink)">默认拒绝</b>，没有规则的能力不放行；每一次放行/拒绝都是一条可审计事件。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 界面展示 ===== -->
+<section id="interface">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">RUN IT</span>
+      <h2>三端，同一件事</h2>
+      <p>TUI、Web、Desktop 都只是同一条事件流的不同视图——端上没有业务逻辑，全是投影。</p>
+    </div>
+    <div class="shots">
+      <figure class="shot wide">
+        <div class="capbar"><i></i><i></i><i></i><span>domi — TUI（全屏终端 · 真实会话）</span></div>
+        <img src="assets/tui-real.png" alt="domi TUI 真实运行界面：Zod 会话讲解，底部为已连接状态栏">
+        <figcaption class="note">终端里跑通「读 → 改 → 测」闭环。这是一次真实会话：模型按上下文自动切换、每步工具与权限决策都可回放。<code>真实界面</code></figcaption>
+      </figure>
+    </div>
+    <div class="shots3">
+      <figure class="shot">
+        <div class="capbar"><i></i><i></i><i></i><span>domi — 桌面端会话</span></div>
+        <img src="assets/web-real.png" alt="domi 桌面端真实运行界面：会话侧栏与对话主区">
+        <figcaption class="note">会话侧栏 + 对话主区 + 实时状态（已连接 · turns · steps · tok/s）。<code>真实界面</code></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="capbar"><i></i><i></i><i></i><span>domi — 轨迹视图</span></div>
+        <img src="assets/trace-real.png" alt="domi Trajectory 真实轨迹视图：每一步事件可回放">
+        <figcaption class="note">每一步都可见：USER / ASSISTANT / TOOL / PERMISSION / CONTEXT 全部是事件。<code>真实界面</code></figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="capbar"><i></i><i></i><i></i><span>domi — Soul 人格</span></div>
+        <img src="assets/soul-real.png" alt="domi Soul 与人格设置真实界面">
+        <figcaption class="note">人格是一份人类可读、可 diff、可手改的 Markdown 文档。<code>真实界面</code></figcaption>
+      </figure>
+    </div>
+
+    <div class="trace" aria-label="domi 事件流示意">
+      <div class="tbar"><span>session #42 · 事件流（append-only）</span><b>● live</b></div>
+      <div class="tbody">
+        <div class="trow user"><span class="idx">01</span><div class="tcol"><div class="ev">user.input <span class="tag">text</span></div><div class="meta">“把这段日志按级别聚一下类”</div></div></div>
+        <div class="trow model"><span class="idx">02</span><div class="tcol"><div class="ev">model.delta <span class="tag">stream</span></div><div class="meta">逐 token 落盘，可回放每一步生成</div></div></div>
+        <div class="trow tool"><span class="idx">03</span><div class="tcol"><div class="ev">tool.call <span class="tag">fs.read</span></div><div class="meta">读取日志文件</div></div></div>
+        <div class="trow perm"><span class="idx">04</span><div class="tcol"><div class="ev">permission <span class="tag">allow · 规则命中</span></div><div class="meta">权限决策本身也是一条事件</div></div></div>
+        <div class="trow tool"><span class="idx">05</span><div class="tcol"><div class="ev">tool.result <span class="tag">ok</span></div><div class="meta">结果回灌上下文，进入下一轮</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Soul ===== -->
+<section id="soul">
+  <div class="wrap soul">
+    <img src="assets/soul-real.png" alt="domi Soul 与人格设置真实界面">
+    <div class="sbody">
+      <span class="k mono" style="color:var(--violet);font-family:var(--mono);font-size:13px">SOUL</span>
+      <h3>人格是一份你能审阅的文档</h3>
+      <p>Soul 是跨会话沉淀的人格层：每一轮沉淀都以人类可读的 Markdown 落盘，成长可 diff、可否决、可导出——别人导入你的 Soul 文件，就能复现你的行为差异。</p>
+      <ul>
+        <li>人类可读、可手改，不是黑盒参数</li>
+        <li>每次改动都是一条可对比、可否决的记录</li>
+        <li>单文件导出，他人可 import 并复现行为差异</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 快速开始 ===== -->
+<section id="start">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">QUICKSTART</span>
+      <h2>装好、配好、开始用</h2>
+      <p>适合有 CLI 习惯的开发者。从安装到第一次对话，四步。</p>
+    </div>
+    <div class="start-grid">
+      <div>
+        <div class="step">
+          <span class="st">STEP 01</span>
+          <h3>安装</h3>
+          <p>克隆仓库，<code>pnpm install && pnpm build</code>，产物是 <code>dist/domi</code> 单二进制。</p>
+        </div>
+        <div class="step">
+          <span class="st">STEP 02</span>
+          <h3>初始化并配模型</h3>
+          <p><code>domi init</code> 生成配置；把 API key 写进 <code>~/.domi/secrets.yaml</code>，或直接设 <code>DEEPSEEK_API_KEY</code> 之类的环境变量。</p>
+        </div>
+        <div class="step">
+          <span class="st">STEP 03</span>
+          <h3>体检</h3>
+          <p><code>domi doctor</code> 逐项检查，每条问题都带一条能直接粘贴的修复命令。</p>
+        </div>
+        <div class="step">
+          <span class="st">STEP 04</span>
+          <h3>进入对话</h3>
+          <p><code>domi</code> 进 TUI，第一次会自动在后台拉起 domid；浏览器里 <code>pnpm --filter @domi/web dev</code> 看到的是同一批会话。</p>
+        </div>
+      </div>
+      <div class="term">
+        <div class="tbar"><i></i><i></i><i></i><span>~/.domi — zsh</span></div>
+        <pre><span class="p">$</span> <span class="o">domi init</span>
+<span class="c"># 生成 ~/.domi/config.yaml</span>
+<span class="p">$</span> <span class="o">export DEEPSEEK_API_KEY=sk-…</span>
+<span class="p">$</span> <span class="o">domi doctor</span>
+<span class="c"># 全部通过：daemon ✓ 模型 ✓ 权限规则 ✓</span>
+<span class="p">$</span> <span class="o">domi</span>
+<span class="c"># 进入 TUI，全屏模式，对话区自己滚动</span>
+<span class="p">❯</span> <span class="o">/model</span> 换模型 · <span class="o">/mode</span> 切确认模式 · <span class="o">/soul</span> 看人格改动<span class="cursor"></span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 文档 ===== -->
+<section id="docs">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">DOCS</span>
+      <h2>开发者文档站</h2>
+      <p>改 domi 本身的人从「架构」和「内幕」开始，基于 domi 做扩展的人直接看「扩展」。</p>
+    </div>
+    <div class="docs">
+      <a class="doc" href="../docs/quickstart.html"><span class="d">GET STARTED</span><h3>快速开始</h3><p>装好、配上模型、第一次对话、权限与长任务</p></a>
+      <a class="doc" href="../docs/architecture.html"><span class="d">ARCHITECTURE</span><h3>架构</h3><p>进程模型、包分层、一次提交的数据流、事件流与不变量</p></a>
+      <a class="doc" href="../docs/agent-loop.html"><span class="d">INTERNALS</span><h3>Agent Loop 内部机制</h3><p>kernel 的循环：拼上下文 → 生成 → 落盘 → 执行工具 → 回灌</p></a>
+      <a class="doc" href="../docs/protocol.html"><span class="d">PROTOCOL</span><h3>Domi Protocol</h3><p>传输约定、方法 / 通知 / 事件清单、版本演进规则</p></a>
+      <a class="doc" href="../docs/memory-and-soul.html"><span class="d">MEMORY</span><h3>记忆与 Soul</h3><p>记忆分层、压缩与可 diff 的人格沉淀</p></a>
+      <a class="doc" href="../docs/clients.html"><span class="d">CLIENTS</span><h3>三端</h3><p>TUI / Web / Desktop 与共享的 client-core</p></a>
+      <a class="doc" href="../docs/plugin-dev.html"><span class="d">EXTEND</span><h3>插件开发</h3><p>写一个插件：tool / skill / mcp / ui</p></a>
+      <a class="doc" href="../docs/index.html"><span class="d">INDEX</span><h3>全部文档</h3><p>架构导图、各子系统机制、扩展指南、贡献指南</p></a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 路线图 ===== -->
+<section id="roadmap">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="k">ROADMAP</span>
+      <h2>从「能跑」到「能讲清楚」</h2>
+      <p>里程碑以能力证明为判据，不以功能数量堆叠。</p>
+    </div>
+    <div class="road">
+      <span class="rdate">M0</span><span class="rax"></span><div class="rbody"><h3>终端里跑通读 → 改 → 测闭环</h3><p>demo 录屏作为成功判据。</p></div>
+    </div>
+    <div class="road">
+      <span class="rdate">M1</span><span class="rax"></span><div class="rbody"><h3>自己每天用</h3><p>连续 5 个工作日用 domi 完成真实开发任务，不想切回其他工具。</p></div>
+    </div>
+    <div class="road">
+      <span class="rdate">M2</span><span class="rax"></span><div class="rbody"><h3>终端可导航的轨迹面板</h3><p>「压缩 × prompt cache 交叉」一文讲透。</p></div>
+    </div>
+    <div class="road">
+      <span class="rdate">M4</span><span class="rax"></span><div class="rbody"><h3>可分享的人格</h3><p>Soul 单文件导出，他人可 import 并复现行为差异。</p></div>
+    </div>
+    <div class="road">
+      <span class="rdate">v1.0</span><span class="rax"></span><div class="rbody"><h3>能讲满 20 分钟的技术决策 ≥ 3 个</h3><p>每个决策都有候选方案、选择理由、反悔成本与触发重新决策的条件。</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <span class="mono">domi · local-first agent runtime</span>
+    <div class="footlinks">
+      <a href="https://github.com/oi8io/domi" target="_blank" rel="noopener">GitHub</a>
+      <a href="../docs/index.html">文档</a>
+      <a href="../../README.md">README</a>
+      <a href="#top">回到顶部</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+// 顶栏滚动时加底色
+const header=document.querySelector('header');
+const onScroll=()=>{header.classList.toggle('scrolled',window.scrollY>8)};
+window.addEventListener('scroll',onScroll,{passive:true});
+onScroll();
+</script>
+</body>
+</html>

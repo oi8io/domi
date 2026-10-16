@@ -1,7 +1,7 @@
 /**
  * PRD-M6-004 AC-3 · 文档里的代码示例真的能跑
  *
- * 规则：docs/site/*.md 里标成 ```ts run 的代码块会被抽出来、写进临时文件、用 bun 执行，退出码非 0 就红。
+ * 规则：docs/site/docs/*.md 里标成 ```ts run 的代码块会被抽出来、写进临时文件、用 bun 执行，退出码非 0 就红。
  * 每篇文档至少要有一个可执行的例子——没有的话这道守卫就是空转。
  *
  * 用法：bun run scripts/test-docs-snippets.ts [--inject]
@@ -11,7 +11,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const DIR = join('docs', 'site')
+const DIR = join('docs', 'site', 'docs')
 const REQUIRED = ['quickstart.md', 'architecture.md', 'plugin-dev.md', 'skill-writing.md']
 
 const files = readdirSync(DIR).filter((f) => f.endsWith('.md'))

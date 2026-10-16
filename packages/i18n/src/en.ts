@@ -996,7 +996,7 @@ export const en: Record<keyof typeof zh, string> = {
   'cli.doctor.cap.serverSideOff': 'off (default, P1 skeleton)',
   'cli.args.unknown': 'Unknown command: {given}\nAvailable commands: {join}\n$ domi --help',
   'cli.plugin.usage':
-    'Usage:\n  domi plugin list                        installed plugins, sandbox status, and why any failed to load\n  domi plugin install <dir>               install (lists every permission and installs only after you confirm; restart domid afterwards)\n  domi plugin remove <name>               uninstall\n  domi plugin scaffold <tool|skill|mcp> <dir> [name]\n                                          generate a plugin skeleton (with bun test)\n\nSee docs/site/plugin-dev.md for how to write one.',
+    'Usage:\n  domi plugin list                        installed plugins, sandbox status, and why any failed to load\n  domi plugin install <dir>               install (lists every permission and installs only after you confirm; restart domid afterwards)\n  domi plugin remove <name>               uninstall\n  domi plugin scaffold <tool|skill|mcp> <dir> [name]\n                                          generate a plugin skeleton (with bun test)\n\nSee docs/site/docs/plugin-dev.md for how to write one.',
   'cli.plugin.none': 'No plugins installed yet.',
   'cli.plugin.counts': '    tools {length} · skills {length2} · MCP {length3} · panels {length4}',
   'cli.plugin.needs': '\nPlugin {name} {version}: {description}\nIt needs:',

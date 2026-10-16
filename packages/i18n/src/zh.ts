@@ -966,7 +966,7 @@ export const zh = {
   'cli.doctor.cap.serverSideOff': '关（默认，P1 骨架）',
   'cli.args.unknown': '未知命令：{given}\n可用命令：{join}\n$ domi --help',
   'cli.plugin.usage':
-    '用法：\n  domi plugin list                        已安装的插件、沙箱状态、没加载上的原因\n  domi plugin install <目录>              安装（逐条列出权限，确认后才装；装好后重启 domid 生效）\n  domi plugin remove <名字>               卸载\n  domi plugin scaffold <tool|skill|mcp> <目录> [名字]\n                                          生成插件骨架（自带 bun test）\n\n写法见 docs/site/plugin-dev.md。',
+    '用法：\n  domi plugin list                        已安装的插件、沙箱状态、没加载上的原因\n  domi plugin install <目录>              安装（逐条列出权限，确认后才装；装好后重启 domid 生效）\n  domi plugin remove <名字>               卸载\n  domi plugin scaffold <tool|skill|mcp> <目录> [名字]\n                                          生成插件骨架（自带 bun test）\n\n写法见 docs/site/docs/plugin-dev.md。',
   'cli.plugin.none': '还没有安装插件。',
   'cli.plugin.counts': '    工具 {length} · skill {length2} · MCP {length3} · 面板 {length4}',
   'cli.plugin.needs': '\n插件 {name} {version}：{description}\n它需要：',
