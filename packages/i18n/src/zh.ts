@@ -1038,7 +1038,7 @@ export const zh = {
   'common.or': ' 或 ',
   'cli.memory.deletedTag': '  （已删除）',
   'common.untitledParenAscii': '(未命名)',
-  'cli.help': `domi —— 本地优先的 agent 运行时
+  'cli.help': `domi —— 通用 AI Agent
 
 用法：
   domi                      进入对话（最常用，不需要子命令）

@@ -1,6 +1,6 @@
 [package]
 name = "domi-desktop"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "domi 桌面端：Web 界面的一层壳"
 license = "MIT"

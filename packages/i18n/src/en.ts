@@ -1085,7 +1085,7 @@ export const en: Record<keyof typeof zh, string> = {
   'common.or': ' or ',
   'cli.memory.deletedTag': '  (deleted)',
   'common.untitledParenAscii': '(untitled)',
-  'cli.help': `domi — a local-first agent runtime
+  'cli.help': `domi — a general-purpose AI agent
 
 Usage:
   domi                      start chatting (the usual way; no subcommand needed)

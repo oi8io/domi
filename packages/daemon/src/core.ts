@@ -43,7 +43,7 @@ import {
   type ScheduleStore,
 } from './scheduler.ts'
 
-export const DAEMON_VERSION = '0.1.0'
+export const DAEMON_VERSION = '0.1.1'
 
 /** 成功之后会话列表就变了的方法（新建、删除、恢复、改名、分支、转任务） */
 const LIST_CHANGING = new Set<string>([

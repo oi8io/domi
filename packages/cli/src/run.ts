@@ -32,7 +32,7 @@ import type { Io } from './io.ts'
 import { formatOnboarding } from './onboarding.ts'
 import { ping } from './ping.ts'
 
-export const VERSION = '0.1.0'
+export const VERSION = '0.1.1'
 
 export type { Io } from './io.ts'
 
