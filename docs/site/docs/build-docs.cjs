@@ -169,7 +169,7 @@ function page(title, slug, bodyHtml, intro) {
   </main>
 </div>
 <footer class="foot">
-  <span>domi · local-first agent runtime — 文档站</span>
+  <span>domi · 通用 AI Agent — 文档站</span>
   <a href="${HOME}">返回主站</a>
 </footer>
 </body>

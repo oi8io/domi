@@ -95,18 +95,23 @@ code,kbd,.mono{font-family:var(--mono)}
 </blockquote>
 <h2>先说结论</h2>
 <ul>
-<li>一条命令跑起来：<code>domi</code> 进 TUI，第一次会在后台拉起 domid。</li>
+<li>下载一个二进制，一条命令跑起来：<code>domi</code> 进终端界面，第一次会自动启动后台服务。</li>
 <li>key 写进 <code>~/.domi/secrets.yaml</code> 或环境变量；<code>domi doctor</code> 每条问题都带修复命令。</li>
 <li><strong>没有规则的能力默认拒绝</strong>；危险能力只有你亲手写了 <code>allow</code> 规则才放行。</li>
-<li>任务在 domid 里跑，关掉终端也继续；重启后从上次完成的节点接着跑。</li>
+<li>任务在后台服务里跑，关掉终端也继续；重启后从上次完成的节点接着跑。</li>
 <li>出问题了先跑 <code>domi doctor</code>——它给出能直接粘贴的修复命令。</li>
 </ul>
 <h2>1. 装好并配上模型</h2>
-<pre><code class="language-sh">git clone &lt;仓库地址&gt; domi &amp;&amp; cd domi
-pnpm install &amp;&amp; pnpm build     # 产物是 dist/domi 单二进制；开发时也可以 bun apps/tui/src/main.tsx
-domi init &gt; ~/.domi/config.yaml
+<p>到 <a href="https://github.com/oi8io/domi/releases/latest">Releases</a> 下载适合你电脑的包（<code>domi-&lt;版本&gt;-&lt;系统&gt;-&lt;架构&gt;.tar.gz</code>），解压后放进 <code>PATH</code>：</p>
+<pre><code class="language-sh">tar -xzf domi-*-darwin-arm64.tar.gz
+mkdir -p ~/.local/bin &amp;&amp; mv domi ~/.local/bin/
+xattr -d com.apple.quarantine ~/.local/bin/domi   # 只有 macOS 要：二进制还没签名
+</code></pre>
+<p>想从源码构建：<code>git clone https://github.com/oi8io/domi &amp;&amp; cd domi &amp;&amp; pnpm install &amp;&amp; pnpm build</code>，产物是 <code>dist/domi</code>。</p>
+<p>然后生成配置、填 key、体检：</p>
+<pre><code class="language-sh">mkdir -p ~/.domi &amp;&amp; domi init &gt; ~/.domi/config.yaml
 export DEEPSEEK_API_KEY=sk-...     # 或者把 key 写进 ~/.domi/secrets.yaml
-domi doctor                    # 每条问题都带一条能直接粘贴的修复命令
+domi doctor                        # 每条问题都带一条能直接粘贴的修复命令
 </code></pre>
 <p>key 写进 <code>~/.domi/secrets.yaml</code>（<code>providers.&lt;id&gt;.api_key</code>），或者用各家自己的环境变量（每家都认 <code>DOMI_&lt;ID&gt;_API_KEY</code>，厂商模板再加惯用名，例如 <code>ANTHROPIC_API_KEY</code>、<code>DEEPSEEK_API_KEY</code>）。</p>
 <p>多家供应商、本地模型或网关（LiteLLM、OpenRouter、Ollama）写在 <code>providers</code> 下，每家一段：</p>
@@ -126,10 +131,10 @@ providers:
 </code></pre>
 <p>这些在 Web「设置 › 模型供应商」里都能改；模型清单会按 <code>/v1/models</code> 自动探测，对话里按 provider 分组切换。</p>
 <h2>2. 对话</h2>
-<pre><code class="language-sh">domi                           # 进 TUI；第一次会在后台拉起 domid
+<pre><code class="language-sh">domi                           # 进终端界面；第一次会自动启动后台服务（domid）
 </code></pre>
 <p>对话里常用的命令：<code>/model</code> 换模型、<code>/mode &lt;档位&gt;</code> 切确认模式、<code>/compact</code> 压缩上下文、<code>/branch</code> 从某一条分出新会话、<code>/ref &lt;会话&gt; [起-止]</code> 引用另一个会话的一段、<code>/continue</code> 接着做计划里没做完的步骤、<code>/soul</code> 看 Soul 待审阅的改动。模型跑着的时候也能接着打字：回车是<strong>补充</strong>，排队、下一步送达；要停下这一轮，Web 点「停止」、TUI 按 <code>Esc</code>。</p>
-<p>浏览器里打开 Web 端（<code>pnpm --filter @domi/web dev</code>），看到的是同一个 domid 里的同一批会话。</p>
+<p>Web 端目前要从源码运行（仓库里 <code>pnpm web</code>），看到的是同一批会话。</p>
 <p>TUI 默认是<strong>全屏模式</strong>（和 Claude Code 一样用终端的备用屏）：对话区自己滚动，输入框钉在底部。PgUp / PgDn 翻半屏，Ctrl+Home / Ctrl+End 到顶 / 到底，鼠标滚轮也能滚（<code>tui.mouse: false</code> 关掉，好让终端自己的鼠标选择可用）；往上翻着的时候来了新消息，底部会提示「N 条新消息」。要用终端自带的搜索或选择复制，按 <strong>Ctrl+O</strong> 把整段对话倒进终端的回滚区，按任意键回来。想要老样子（对话直接留在终端回滚里）：<code>tui.renderer: classic</code>，或临时 <code>DOMI_TUI_RENDERER=classic domi</code>。</p>
 <p>界面语言：<code>ui.locale: auto | zh | en</code>（auto 跟系统，TUI 看 <code>LANG</code>，Web 看浏览器）。</p>
 <h2>3. 权限</h2>
@@ -139,7 +144,7 @@ providers:
     - { name: read, capability: fs.read, decision: allow }
     - { name: write, capability: fs.write, decision: ask }
 </code></pre>
-<p>每个会话还有一个<strong>确认模式</strong>（<code>/mode</code>，Web 在输入框的下拉里，状态栏常驻显示）：</p>
+<p>每个会话还有一个<strong>确认模式</strong>（<code>/mode</code>，Web 在输入框旁的下拉里）：</p>
 <ul>
 <li><code>on-demand</code>（默认）：按上面的规则走；危险能力（写 / 删 / 移动文件、跑命令、联网、MCP 与插件工具）只有你亲手写了 <code>allow</code> 规则才放行，规则是 <code>ask</code> 就问；</li>
 <li><code>always-ask</code>：没规则的普通能力也问你（没规则的危险能力仍然拒绝），危险能力即使规则 <code>allow</code> 也每次都问；</li>
@@ -161,7 +166,7 @@ assert.equal(matches('fs.read', 'fs.read'), true)
 <h2>4. 长任务</h2>
 <pre><code class="language-sh">domi task run docs/tasks-example.yaml --follow
 </code></pre>
-<p>任务在 domid 里跑，关掉终端也继续；domid 被杀后重启会从上次完成的节点接着跑。</p>
+<p>任务在后台服务（domid）里跑，关掉终端也继续；后台服务被杀后重启会从上次完成的节点接着跑。</p>
 <h2>5. 出错了怎么办</h2>
 <table>
 <thead>
@@ -204,7 +209,7 @@ assert.equal(matches('fs.read', 'fs.read'), true)
   </main>
 </div>
 <footer class="foot">
-  <span>domi · local-first agent runtime — 文档站</span>
+  <span>domi · 通用 AI Agent — 文档站</span>
   <a href="../web/index.html">返回主站</a>
 </footer>
 </body>

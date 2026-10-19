@@ -306,7 +306,7 @@ INV-xx  ─┐
 
 **git log** —— commit 带 task id，本身就是进度日志
 
-**恢复流程固定为**（写进 README 的"开发者入口"）：
+**恢复流程固定为**（写在 `DEVELOPMENT.md` 的「恢复流程」）：
 ```
 1. 读 NEXT.md                      （30 秒）
 2. git log --oneline -20           （30 秒）

@@ -91,64 +91,124 @@ code,kbd,.mono{font-family:var(--mono)}
     <div class="crumb">DOMI · DOCS</div>
     <h1>domi 是什么</h1>
 <blockquote>
-<p>面向第一次接触 domi 的人：它解决什么问题、和别的 agent 工具有什么不同、你能拿它干什么。
-想直接上手看<a href="quickstart.html">快速开始</a>；想读架构看<a href="architecture.html">架构</a>。</p>
+<p>面向第一次接触 domi 的人：它能帮你做什么、为什么能放心交给它、现在有哪些限制。
+想直接上手看<a href="quickstart.html">快速开始</a>；想了解内部怎么工作看<a href="architecture.html">架构</a>。</p>
 </blockquote>
 <h2>先说结论</h2>
 <ul>
-<li>domi 是一个<strong>本地 Agent 运行时</strong>：对话、工具调用、权限决定全部记成一条只追加的事件流。</li>
-<li>它<strong>不是黑盒</strong>：每一步思考都可见、可回放、可审计。</li>
-<li>三个支点缺一不可：<strong>Soul（会积累的人格）</strong>、<strong>轨迹（每一步可见）</strong>、<strong>本地优先（默认拒绝）</strong>。</li>
-<li>数据留在你自己的机器上；权限引擎默认拒绝，每次放行 / 拒绝都是一条可审计事件。</li>
-<li>三端（TUI / Web / Desktop）只是同一条事件流的不同视图。</li>
+<li>domi 是一个<strong>通用 AI Agent，正在向 personal Agent 进化</strong>。</li>
+<li>它能帮你处理复杂任务：会做计划、懂编排，可中断、可恢复，每一步可跟踪、可追溯。</li>
+<li>场景包括但不限于编程、设计、办公。</li>
+<li>你可以定义它的人格。它在和你的相处中学习，越来越懂你。</li>
+<li>数据仅存在你自己的电脑上。写文件、跑命令、联网，你放行了它才做。</li>
 </ul>
-<h2>一句话</h2>
-<p><strong>domi 是一个会积累「人格」的、你能看见它每一步在想什么的本地 Agent 运行时。</strong></p>
-<h2>三个支点</h2>
-<p><img src="img/intro-pillars.svg" alt="三个支点" /></p>
-<p>缺任何一个，domi 就变成「又一个 agent 框架」：</p>
-<h3>1. Soul —— 会积累的人格</h3>
-<p>跨会话沉淀的人格层。它不是藏在参数里的黑盒，而是一份<strong>人类可读的 Markdown</strong>：</p>
+<p><img src="../web/assets/web-real.png" alt="domi 的 Web 界面" /></p>
+<h2>它能帮你做什么</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>编程</td>
+<td>读代码、改代码、跑测试。大一点的任务放在单独的工作区里做，你看过改动再带回原仓库</td>
+</tr>
+<tr>
+<td>设计</td>
+<td>整理需求、写设计说明、做页面原型</td>
+</tr>
+<tr>
+<td>办公</td>
+<td>整理资料、批量处理文件、写报告。接上 MCP 服务或 Skill，能用上更多工具</td>
+</tr>
+<tr>
+<td>定时的活</td>
+<td>按时间表自动跑，比如每天早上汇总一遍</td>
+</tr>
+<tr>
+<td>长任务</td>
+<td>关掉终端也接着跑；中途停了，回来接着做</td>
+</tr>
+</tbody>
+</table>
+<h2>为什么能放心交给它</h2>
+<h3>会计划，懂编排</h3>
+<p>domi 先列计划，再动手。复杂任务拆成几步，按先后依赖排好再执行。做到哪一步、还剩哪几步，你随时能看到。</p>
+<h3>可中断，可恢复</h3>
 <ul>
-<li>可 diff：每一次成长都能看到改了什么</li>
-<li>可手改：你能否决、能编辑它</li>
-<li>可导出分享：单文件导出，别人 import 后能复现你的行为差异</li>
+<li>它干活时，你可以接着打字补充要求。补充会排队，在下一步送达。</li>
+<li>你可以随时叫停：Web 点「停止」，终端按 <code>Esc</code>。停下的只是这一轮，已经生成的内容保留。</li>
+<li>出错停下后，计划和做完的部分都还在。点「继续」（或输入 <code>/continue</code>）就接着做。</li>
+<li>domi 不会替你自动重跑做了一半的操作。要不要继续，由你决定。</li>
 </ul>
-<h3>2. 轨迹 —— 每一步都可见</h3>
-<p>思考、工具调用、权限决策都是追加进事件流的事件。轨迹面板可以<strong>回放任意一次会话</strong>——甚至真实会话可以直接当作测试 fixture 重放（评估不新增埋点，以事件流回放为唯一数据源）。</p>
-<h3>3. 本地优先 —— 默认拒绝</h3>
+<h3>可跟踪，可追溯</h3>
+<p>每一步想了什么、调了什么工具、你批准了什么，都有记录。做的时候在侧栏看进度和改动；做完能回放整个过程，找到是哪一步出了问题。</p>
+<h3>可以定义人格，越来越懂你</h3>
+<p>domi 的人格是一份你能直接读、直接改的文档：</p>
 <ul>
-<li>你的数据留在你的机器上，不上云</li>
-<li>权限引擎<strong>默认拒绝</strong>：没有规则的能力不放行</li>
-<li>每一次放行/拒绝都是一条可审计事件</li>
+<li>你可以一开始就写好它该是什么样。</li>
+<li>它在和你的相处中学习。新学到的每一条都先给你看，你接受或否决（<code>/soul</code>）。否决的不会再提。</li>
+<li>你手改过的内容，它不会覆盖。</li>
+<li>人格可以导出成一个文件，分享给别人用。</li>
 </ul>
-<h2>你能拿它干什么</h2>
+<h3>数据仅存本地，隐私无忧</h3>
 <ul>
-<li><strong>日常开发任务</strong>：读代码、改代码、跑测试的完整闭环，全部在终端里可见</li>
-<li><strong>长任务</strong>：任务在 daemon 里跑，关掉终端也继续；重启后从上次完成的节点接着跑</li>
-<li><strong>多模型</strong>：多家供应商、本地模型（Ollama）或网关（LiteLLM / OpenRouter）切换</li>
-<li><strong>定时任务</strong>：cron 调度，在 domid 里托管</li>
-<li><strong>扩展</strong>：插件（tool / skill / mcp / ui）、MCP 接入、Skill 编写</li>
+<li>会话、记忆、人格都存在你自己的电脑上，只发给你配置的模型。</li>
+<li>写文件、跑命令、联网、用外部工具，你放行了它才做。</li>
+<li>你可以选每次都问、按规则问，或者全部放行（<code>/mode</code>）。</li>
 </ul>
-<h2>三端，同一件事</h2>
-<p>TUI（全屏终端）、Web（浏览器）、Desktop（桌面应用）都只是同一条事件流的不同<strong>视图</strong>——端上没有业务逻辑，全是投影。同一批会话，三端共享。</p>
-<h2>适合谁</h2>
+<h3>模型随你选</h3>
+<p>OpenAI、Anthropic、DeepSeek、Gemini，本地模型（Ollama），或者网关（LiteLLM、OpenRouter）。对话中途也能换（<code>/model</code>）。</p>
+<h2>在哪儿用</h2>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>适合</th>
+<th>现在怎么用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>终端</td>
+<td>习惯命令行、远程机器上</td>
+<td>下载二进制，输入 <code>domi</code></td>
+</tr>
+<tr>
+<td>Web</td>
+<td>想要完整界面、看改动和进度</td>
+<td>从源码运行</td>
+</tr>
+<tr>
+<td>桌面应用</td>
+<td>macOS 上当普通应用用</td>
+<td>从源码构建</td>
+</tr>
+</tbody>
+</table>
+<p>三个入口看到的是同一批会话。在终端开始的事，可以在 Web 里接着看。</p>
+<h2>已知限制</h2>
 <ul>
-<li>主：<strong>有 CLI 习惯的开发者</strong>，愿意为可控性接受配置成本，对「黑盒 agent」有戒心</li>
-<li>次：想自建 agent 工作流的技术团队</li>
+<li>目前安装和使用需要会用终端；支持 macOS 和 Linux，Windows 请用 WSL。</li>
+<li>Web 和桌面端还要从源码运行，计划改成下载就能用。</li>
+<li>还不能直接操作浏览器和桌面应用。设计、办公类任务目前靠读写文件、跑命令、MCP 和 Skill 完成。</li>
+<li>macOS 二进制还没有签名，第一次运行前要解除隔离（见<a href="quickstart.html">快速开始</a>）。</li>
 </ul>
-<p>domi <strong>明确不服务</strong>：非技术用户、需要开箱即用零配置的人、需要多租户/团队协作的组织。</p>
 <h2>下一步</h2>
 <ul>
 <li>想马上跑起来：<a href="quickstart.html">快速开始</a></li>
-<li>想了解内部怎么工作：<a href="architecture.html">架构</a> → <a href="agent-loop.html">Agent Loop 内部机制</a></li>
+<li>接模型、改配置：<a href="config.html">配置与厂商</a></li>
 <li>想给它加东西：<a href="plugin-dev.html">插件开发</a> · <a href="skill-writing.html">Skill 编写</a></li>
+<li>想了解内部怎么工作：<a href="architecture.html">架构</a></li>
 </ul>
 
   </main>
 </div>
 <footer class="foot">
-  <span>domi · local-first agent runtime — 文档站</span>
+  <span>domi · 通用 AI Agent — 文档站</span>
   <a href="../web/index.html">返回主站</a>
 </footer>
 </body>

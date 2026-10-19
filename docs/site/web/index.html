@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>domi — 能看见每一步的本地 Agent 运行时</title>
+<title>domi — 正在向 personal Agent 进化的通用 AI Agent</title>
+<meta name="description" content="domi 是一个通用 AI Agent，正在向 personal Agent 进化。会计划、懂编排，可中断、可恢复，每一步可跟踪、可追溯。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='6' y='6' width='20' height='20' rx='5' fill='%23070B0F' stroke='%2322D3EE' stroke-width='2'/%3E%3Crect x='12' y='13' width='8' height='2' rx='1' fill='%234ADE80'/%3E%3Crect x='12' y='18' width='5' height='2' rx='1' fill='%2322D3EE'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
@@ -213,7 +214,7 @@ footer{padding:44px 0 56px}
       <a href="#interface">界面</a>
       <a href="#start">快速开始</a>
       <a href="#docs">文档</a>
-      <a href="#roadmap">路线</a>
+      <a href="#roadmap">接下来</a>
     </nav>
   </div>
 </header>
@@ -221,43 +222,58 @@ footer{padding:44px 0 56px}
 <section class="hero">
   <div class="hero-bg" aria-hidden="true"></div>
   <div class="hero-inner">
-    <span class="eyebrow"><span class="dot"></span>local agent runtime · 本地优先</span>
-    <h1>能看见<b>每一步</b>的<br>本地 Agent 运行时</h1>
-    <p class="hero-sub">domi 是一个会积累「人格」的本地 Agent 运行时。对话、工具调用、权限决定全部记成一条只追加的事件流——每一步思考都<b style="color:var(--ink)">可见、可回放、可审计</b>。</p>
+    <span class="eyebrow"><span class="dot"></span>general AI agent · 数据仅存本地</span>
+    <h1>通用 AI Agent，<br>正在成为<b>你的</b> Agent</h1>
+    <p class="hero-sub">把复杂的事交给 domi：它会计划，懂编排，可中断，可恢复，每一步<b style="color:var(--ink)">可跟踪、可追溯</b>。编程、设计、办公都能用。</p>
     <div class="cta">
       <a class="btn btn-primary" href="#start">快速开始</a>
       <a class="btn btn-ghost" href="https://github.com/oi8io/domi" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
-      <a class="btn btn-ghost" href="../docs/index.html">开发者文档</a>
+      <a class="btn btn-ghost" href="../docs/intro.html">了解 domi</a>
     </div>
     <div class="statusline mono">
-      <span><b>●</b> domid 运行中</span><span class="sep">/</span><span>3 端就绪 TUI · Web · Desktop</span><span class="sep">/</span><span>权限默认拒绝</span>
+      <span><b>●</b> 在你的电脑上运行</span><span class="sep">/</span><span>终端 · Web · 桌面</span><span class="sep">/</span><span>没你放行不动手</span>
     </div>
   </div>
 </section>
 
-<!-- ===== 三个支点 ===== -->
+<!-- ===== 为什么用 domi ===== -->
 <section id="pillars">
   <div class="wrap">
     <div class="sec-head">
-      <span class="k">THREE PILLARS</span>
-      <h2>缺一个，domi 就变成「又一个 agent 框架」</h2>
-      <p>三个支点不是功能清单，而是 domi 与黑盒 agent 的分界线。</p>
+      <span class="k">WHY DOMI</span>
+      <h2>放心把复杂的事交给它</h2>
+      <p>编程、设计、办公、定时的活、要跑很久的任务，都能交给 domi 一步步做完。</p>
     </div>
     <div class="pillars">
       <div class="pillar">
-        <svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7l7-4z"/><path d="M9.5 12.5l2 2 3.5-4"/></svg>
-        <h3>Soul · 会积累的人格</h3>
-        <p>跨会话沉淀的人格层，<code>人类可读</code>的 Markdown：可 diff、可手改、可否决、可导出分享。它不是黑盒参数，而是一份你能读懂并干预的成长记录。</p>
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8M18 8v8M8 6h8M8 18h8M12 10v8"/></svg>
+        <h3>会计划，懂编排</h3>
+        <p>先列计划再动手。复杂任务拆成几步，按先后依赖排好再执行。</p>
       </div>
       <div class="pillar">
-        <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6 8v8M18 8v8M8 6h8M8 18h8M12 10v8"/></svg>
-        <h3>轨迹 · 每一步都可见</h3>
-        <p>思考、工具调用、权限决策都是追加的事件流。轨迹面板让你<b style="color:var(--ink)">回放任意一次会话</b>——真实会话还能直接当测试 fixture 重放。</p>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/></svg>
+        <h3>可中断，可恢复</h3>
+        <p>干活时你可以补充要求，也可以随时叫停。停下后计划和做完的部分都在，点「继续」接着做。</p>
+      </div>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/><circle cx="19" cy="12" r="2"/></svg>
+        <h3>可跟踪，可追溯</h3>
+        <p>每一步想了什么、调了什么工具、你批准了什么，都有记录。做的时候看进度，做完<b style="color:var(--ink)">能回放</b>。</p>
+      </div>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V7l7-4z"/><path d="M9.5 12.5l2 2 3.5-4"/></svg>
+        <h3>可以定义人格，越来越懂你</h3>
+        <p>人格是一份你能直接读、直接改的文档。它在和你的相处中慢慢学习，新学到的每一条由你决定留不留。</p>
       </div>
       <div class="pillar">
         <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M12 10v9M8 14h1M15 14h1"/></svg>
-        <h3>本地优先 · 默认拒绝</h3>
-        <p>你的数据留在你的机器上。权限引擎<b style="color:var(--ink)">默认拒绝</b>，没有规则的能力不放行；每一次放行/拒绝都是一条可审计事件。</p>
+        <h3>数据仅存本地，隐私无忧</h3>
+        <p>会话、记忆、人格都存在你自己的电脑上，只发给你配置的模型。写文件、跑命令、联网，<b style="color:var(--ink)">你放行了才做</b>。</p>
+      </div>
+      <div class="pillar">
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 14v5M14 16.5h5"/></svg>
+        <h3>模型随你选</h3>
+        <p>OpenAI、Anthropic、DeepSeek、Gemini，本地模型（Ollama），或者网关（LiteLLM、OpenRouter）。对话中途也能换。</p>
       </div>
     </div>
   </div>
@@ -267,43 +283,43 @@ footer{padding:44px 0 56px}
 <section id="interface">
   <div class="wrap">
     <div class="sec-head">
-      <span class="k">RUN IT</span>
-      <h2>三端，同一件事</h2>
-      <p>TUI、Web、Desktop 都只是同一条事件流的不同视图——端上没有业务逻辑，全是投影。</p>
+      <span class="k">INTERFACE</span>
+      <h2>终端、浏览器、桌面，同一批会话</h2>
+      <p>在哪儿开始都行，换个地方接着看。</p>
     </div>
     <div class="shots">
       <figure class="shot wide">
-        <div class="capbar"><i></i><i></i><i></i><span>domi — TUI（全屏终端 · 真实会话）</span></div>
+        <div class="capbar"><i></i><i></i><i></i><span>domi — 终端</span></div>
         <img src="assets/tui-real.png" alt="domi TUI 真实运行界面：Zod 会话讲解，底部为已连接状态栏">
-        <figcaption class="note">终端里跑通「读 → 改 → 测」闭环。这是一次真实会话：模型按上下文自动切换、每步工具与权限决策都可回放。<code>真实界面</code></figcaption>
+        <figcaption class="note">在终端里对话：读代码、改代码、跑测试，全程看得见。<code>真实界面</code></figcaption>
       </figure>
     </div>
     <div class="shots3">
       <figure class="shot">
-        <div class="capbar"><i></i><i></i><i></i><span>domi — 桌面端会话</span></div>
+        <div class="capbar"><i></i><i></i><i></i><span>domi — Web / 桌面</span></div>
         <img src="assets/web-real.png" alt="domi 桌面端真实运行界面：会话侧栏与对话主区">
-        <figcaption class="note">会话侧栏 + 对话主区 + 实时状态（已连接 · turns · steps · tok/s）。<code>真实界面</code></figcaption>
+        <figcaption class="note">左边是项目和会话，中间对话，顶上实时看进度和用量。<code>真实界面</code></figcaption>
       </figure>
       <figure class="shot">
         <div class="capbar"><i></i><i></i><i></i><span>domi — 轨迹视图</span></div>
         <img src="assets/trace-real.png" alt="domi Trajectory 真实轨迹视图：每一步事件可回放">
-        <figcaption class="note">每一步都可见：USER / ASSISTANT / TOOL / PERMISSION / CONTEXT 全部是事件。<code>真实界面</code></figcaption>
+        <figcaption class="note">每一步都有记录：你说了什么、它做了什么、你批准了什么。<code>真实界面</code></figcaption>
       </figure>
       <figure class="shot">
         <div class="capbar"><i></i><i></i><i></i><span>domi — Soul 人格</span></div>
         <img src="assets/soul-real.png" alt="domi Soul 与人格设置真实界面">
-        <figcaption class="note">人格是一份人类可读、可 diff、可手改的 Markdown 文档。<code>真实界面</code></figcaption>
+        <figcaption class="note">人格是一份你能直接读、直接改的文档。<code>真实界面</code></figcaption>
       </figure>
     </div>
 
-    <div class="trace" aria-label="domi 事件流示意">
-      <div class="tbar"><span>session #42 · 事件流（append-only）</span><b>● live</b></div>
+    <div class="trace" aria-label="domi 每一步的记录示意">
+      <div class="tbar"><span>会话 #42 · 每一步的记录</span><b>● live</b></div>
       <div class="tbody">
         <div class="trow user"><span class="idx">01</span><div class="tcol"><div class="ev">user.input <span class="tag">text</span></div><div class="meta">“把这段日志按级别聚一下类”</div></div></div>
-        <div class="trow model"><span class="idx">02</span><div class="tcol"><div class="ev">model.delta <span class="tag">stream</span></div><div class="meta">逐 token 落盘，可回放每一步生成</div></div></div>
+        <div class="trow model"><span class="idx">02</span><div class="tcol"><div class="ev">model.delta <span class="tag">stream</span></div><div class="meta">生成过程完整保留，可以回放</div></div></div>
         <div class="trow tool"><span class="idx">03</span><div class="tcol"><div class="ev">tool.call <span class="tag">fs.read</span></div><div class="meta">读取日志文件</div></div></div>
-        <div class="trow perm"><span class="idx">04</span><div class="tcol"><div class="ev">permission <span class="tag">allow · 规则命中</span></div><div class="meta">权限决策本身也是一条事件</div></div></div>
-        <div class="trow tool"><span class="idx">05</span><div class="tcol"><div class="ev">tool.result <span class="tag">ok</span></div><div class="meta">结果回灌上下文，进入下一轮</div></div></div>
+        <div class="trow perm"><span class="idx">04</span><div class="tcol"><div class="ev">permission <span class="tag">allow · 规则命中</span></div><div class="meta">你的放行也记在里面</div></div></div>
+        <div class="trow tool"><span class="idx">05</span><div class="tcol"><div class="ev">tool.result <span class="tag">ok</span></div><div class="meta">拿到结果，接着做下一步</div></div></div>
       </div>
     </div>
   </div>
@@ -315,12 +331,12 @@ footer{padding:44px 0 56px}
     <img src="assets/soul-real.png" alt="domi Soul 与人格设置真实界面">
     <div class="sbody">
       <span class="k mono" style="color:var(--violet);font-family:var(--mono);font-size:13px">SOUL</span>
-      <h3>人格是一份你能审阅的文档</h3>
-      <p>Soul 是跨会话沉淀的人格层：每一轮沉淀都以人类可读的 Markdown 落盘，成长可 diff、可否决、可导出——别人导入你的 Soul 文件，就能复现你的行为差异。</p>
+      <h3>定义它的人格，它会越来越懂你</h3>
+      <p>domi 的人格是一份你能直接读、直接改的文档。你可以一开始就写好它该是什么样；它也会在和你的相处中慢慢学习，每条新学到的东西都先给你看。</p>
       <ul>
-        <li>人类可读、可手改，不是黑盒参数</li>
-        <li>每次改动都是一条可对比、可否决的记录</li>
-        <li>单文件导出，他人可 import 并复现行为差异</li>
+        <li>人格写成文档，直接读、直接改</li>
+        <li>新学到的每一条，由你决定留不留</li>
+        <li>可以导出一份，分享给别人用</li>
       </ul>
     </div>
   </div>
@@ -332,19 +348,19 @@ footer{padding:44px 0 56px}
     <div class="sec-head">
       <span class="k">QUICKSTART</span>
       <h2>装好、配好、开始用</h2>
-      <p>适合有 CLI 习惯的开发者。从安装到第一次对话，四步。</p>
+      <p>目前需要会用终端，支持 macOS 和 Linux。从下载到第一次对话，四步。</p>
     </div>
     <div class="start-grid">
       <div>
         <div class="step">
           <span class="st">STEP 01</span>
           <h3>安装</h3>
-          <p>克隆仓库，<code>pnpm install && pnpm build</code>，产物是 <code>dist/domi</code> 单二进制。</p>
+          <p>到 <a href="https://github.com/oi8io/domi/releases/latest" target="_blank" rel="noopener">GitHub Releases</a> 下载适合你电脑的包，解压后把 <code>domi</code> 放进 <code>PATH</code>。</p>
         </div>
         <div class="step">
           <span class="st">STEP 02</span>
           <h3>初始化并配模型</h3>
-          <p><code>domi init</code> 生成配置；把 API key 写进 <code>~/.domi/secrets.yaml</code>，或直接设 <code>DEEPSEEK_API_KEY</code> 之类的环境变量。</p>
+          <p><code>domi init</code> 生成配置模板；把 API key 写进 <code>~/.domi/secrets.yaml</code>，或直接设 <code>DEEPSEEK_API_KEY</code> 之类的环境变量。</p>
         </div>
         <div class="step">
           <span class="st">STEP 03</span>
@@ -354,19 +370,19 @@ footer{padding:44px 0 56px}
         <div class="step">
           <span class="st">STEP 04</span>
           <h3>进入对话</h3>
-          <p><code>domi</code> 进 TUI，第一次会自动在后台拉起 domid；浏览器里 <code>pnpm --filter @domi/web dev</code> 看到的是同一批会话。</p>
+          <p>输入 <code>domi</code>，直接说你要做什么。干活时可以接着补充要求，按 <code>Esc</code> 叫停。</p>
         </div>
       </div>
       <div class="term">
         <div class="tbar"><i></i><i></i><i></i><span>~/.domi — zsh</span></div>
-        <pre><span class="p">$</span> <span class="o">domi init</span>
-<span class="c"># 生成 ~/.domi/config.yaml</span>
+        <pre><span class="p">$</span> <span class="o">domi init &gt; ~/.domi/config.yaml</span>
+<span class="c"># 生成配置</span>
 <span class="p">$</span> <span class="o">export DEEPSEEK_API_KEY=sk-…</span>
 <span class="p">$</span> <span class="o">domi doctor</span>
-<span class="c"># 全部通过：daemon ✓ 模型 ✓ 权限规则 ✓</span>
+<span class="c"># 全部通过：后台服务 ✓ 模型 ✓ 权限规则 ✓</span>
 <span class="p">$</span> <span class="o">domi</span>
-<span class="c"># 进入 TUI，全屏模式，对话区自己滚动</span>
-<span class="p">❯</span> <span class="o">/model</span> 换模型 · <span class="o">/mode</span> 切确认模式 · <span class="o">/soul</span> 看人格改动<span class="cursor"></span></pre>
+<span class="c"># 开始对话</span>
+<span class="p">❯</span> <span class="o">/model</span> 换模型 · <span class="o">/mode</span> 要不要每次问你 · <span class="o">/soul</span> 看它新学到的<span class="cursor"></span></pre>
       </div>
     </div>
   </div>
@@ -377,51 +393,48 @@ footer{padding:44px 0 56px}
   <div class="wrap">
     <div class="sec-head">
       <span class="k">DOCS</span>
-      <h2>开发者文档站</h2>
-      <p>改 domi 本身的人从「架构」和「内幕」开始，基于 domi 做扩展的人直接看「扩展」。</p>
+      <h2>文档</h2>
+      <p>第一次用先看「快速开始」；想接更多工具看「扩展」；想改 domi 本身看「架构」。</p>
     </div>
     <div class="docs">
       <a class="doc" href="../docs/quickstart.html"><span class="d">GET STARTED</span><h3>快速开始</h3><p>装好、配上模型、第一次对话、权限与长任务</p></a>
-      <a class="doc" href="../docs/architecture.html"><span class="d">ARCHITECTURE</span><h3>架构</h3><p>进程模型、包分层、一次提交的数据流、事件流与不变量</p></a>
-      <a class="doc" href="../docs/agent-loop.html"><span class="d">INTERNALS</span><h3>Agent Loop 内部机制</h3><p>kernel 的循环：拼上下文 → 生成 → 落盘 → 执行工具 → 回灌</p></a>
-      <a class="doc" href="../docs/protocol.html"><span class="d">PROTOCOL</span><h3>Domi Protocol</h3><p>传输约定、方法 / 通知 / 事件清单、版本演进规则</p></a>
-      <a class="doc" href="../docs/memory-and-soul.html"><span class="d">MEMORY</span><h3>记忆与 Soul</h3><p>记忆分层、压缩与可 diff 的人格沉淀</p></a>
-      <a class="doc" href="../docs/clients.html"><span class="d">CLIENTS</span><h3>三端</h3><p>TUI / Web / Desktop 与共享的 client-core</p></a>
-      <a class="doc" href="../docs/plugin-dev.html"><span class="d">EXTEND</span><h3>插件开发</h3><p>写一个插件：tool / skill / mcp / ui</p></a>
-      <a class="doc" href="../docs/index.html"><span class="d">INDEX</span><h3>全部文档</h3><p>架构导图、各子系统机制、扩展指南、贡献指南</p></a>
+      <a class="doc" href="../docs/intro.html"><span class="d">OVERVIEW</span><h3>domi 是什么</h3><p>它能帮你做什么、为什么放心交给它</p></a>
+      <a class="doc" href="../docs/config.html"><span class="d">CONFIG</span><h3>配置与模型</h3><p>接哪家模型、key 放哪里、怎么切换</p></a>
+      <a class="doc" href="../docs/memory-and-soul.html"><span class="d">SOUL</span><h3>记忆与人格</h3><p>它记住了什么、怎么学、你怎么改</p></a>
+      <a class="doc" href="../docs/plugin-dev.html"><span class="d">EXTEND</span><h3>插件开发</h3><p>写一个插件：工具、Skill、MCP、界面</p></a>
+      <a class="doc" href="../docs/skill-writing.html"><span class="d">EXTEND</span><h3>Skill 编写</h3><p>把你的做事方法写成 domi 能用的 Skill</p></a>
+      <a class="doc" href="../docs/architecture.html"><span class="d">ARCHITECTURE</span><h3>架构</h3><p>给想改 domi 本身的人：它内部怎么工作</p></a>
+      <a class="doc" href="../docs/index.html"><span class="d">INDEX</span><h3>全部文档</h3><p>使用、扩展、内部机制与贡献指南</p></a>
     </div>
   </div>
 </section>
 
-<!-- ===== 路线图 ===== -->
+<!-- ===== 接下来 ===== -->
 <section id="roadmap">
   <div class="wrap">
     <div class="sec-head">
-      <span class="k">ROADMAP</span>
-      <h2>从「能跑」到「能讲清楚」</h2>
-      <p>里程碑以能力证明为判据，不以功能数量堆叠。</p>
+      <span class="k">WHAT'S NEXT</span>
+      <h2>接下来会有什么</h2>
+      <p>domi 正在向 personal Agent 进化。下面是接下来要做的事。</p>
     </div>
     <div class="road">
-      <span class="rdate">M0</span><span class="rax"></span><div class="rbody"><h3>终端里跑通读 → 改 → 测闭环</h3><p>demo 录屏作为成功判据。</p></div>
+      <span class="rdate">计划中</span><span class="rax"></span><div class="rbody"><h3>打开就能用的 Web 和桌面端</h3><p>现在 Web 和桌面端要从源码运行。之后下载一个包就能打开。</p></div>
     </div>
     <div class="road">
-      <span class="rdate">M1</span><span class="rax"></span><div class="rbody"><h3>自己每天用</h3><p>连续 5 个工作日用 domi 完成真实开发任务，不想切回其他工具。</p></div>
+      <span class="rdate">计划中</span><span class="rax"></span><div class="rbody"><h3>能操作浏览器和电脑</h3><p>让 domi 直接在网页和桌面应用里动手，设计、办公类的活能做得更完整。</p></div>
     </div>
     <div class="road">
-      <span class="rdate">M2</span><span class="rax"></span><div class="rbody"><h3>终端可导航的轨迹面板</h3><p>「压缩 × prompt cache 交叉」一文讲透。</p></div>
+      <span class="rdate">计划中</span><span class="rax"></span><div class="rbody"><h3>更懂你</h3><p>记忆和人格持续改进：记得更准，学得更稳，每一条仍由你决定。</p></div>
     </div>
     <div class="road">
-      <span class="rdate">M4</span><span class="rax"></span><div class="rbody"><h3>可分享的人格</h3><p>Soul 单文件导出，他人可 import 并复现行为差异。</p></div>
-    </div>
-    <div class="road">
-      <span class="rdate">v1.0</span><span class="rax"></span><div class="rbody"><h3>能讲满 20 分钟的技术决策 ≥ 3 个</h3><p>每个决策都有候选方案、选择理由、反悔成本与触发重新决策的条件。</p></div>
+      <span class="rdate">计划中</span><span class="rax"></span><div class="rbody"><h3>不在电脑前也能把关</h3><p>在手机上看进度、批准它要做的操作。数据仍然只在你的电脑上。</p></div>
     </div>
   </div>
 </section>
 
 <footer>
   <div class="wrap foot">
-    <span class="mono">domi · local-first agent runtime</span>
+    <span class="mono">domi · general AI agent · MIT</span>
     <div class="footlinks">
       <a href="https://github.com/oi8io/domi" target="_blank" rel="noopener">GitHub</a>
       <a href="../docs/index.html">文档</a>

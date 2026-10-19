@@ -9,7 +9,7 @@ pnpm install
 pnpm check        # typecheck + 全部守卫 + 测试 + L1 回放；必须全绿
 ```
 
-读这三份再动手：`PRD-VISION.md`（不变量）、`docs/PRD.md` 里你要做的那一条、对应的 `docs/tasks/M*.md`。
+文档导航与可追溯链见 [`DEVELOPMENT.md`](DEVELOPMENT.md)。读这三份再动手：`PRD-VISION.md`（不变量）、`docs/PRD.md` 里你要做的那一条、对应的 `docs/tasks/M*.md`。
 
 ## 规矩
 

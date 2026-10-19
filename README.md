@@ -1,79 +1,90 @@
+<!-- LOGO -->
+
 # domi
 
-> 一个会积累"人格"的、你能看见它每一步在想什么的本地 Agent 运行时。
+**English** · [中文](README.zh-CN.md)
 
-**早期开发中，暂不接受 PR。**
+**domi is a general-purpose AI agent, evolving into your personal agent.**
 
----
+Hand it something complex. It makes a plan first, then works through the steps in order. You can interrupt it at any time, and it picks up where it stopped. You see every step as it happens, and you can look back at all of them later.
 
-## 文档导航
+![The domi web interface](docs/site/web/assets/web-real.png)
 
-### 先读这几份
+## What it can do for you
 
-| 文件 | 是什么 | 什么时候读 |
-|---|---|---|
-| [`PRD-VISION.md`](PRD-VISION.md) | 定位 + **12 条不变量** | **每次开工必读。这是唯一的跑偏判定依据** |
-| [`AGENTS.md`](AGENTS.md) | AI 开工必读的硬规则 | AI 会话开始时 |
-| [`NEXT.md`](NEXT.md) | 三行现状：在做什么 / 下一步 / 卡在哪 | 每次开工第一眼；**每次收工前更新** |
-| [`HANDOFF.md`](HANDOFF.md) | 交接：现在在哪 / 下一步做什么 / 哪里会踩坑 | 第一次接手这个仓库时 |
+Including, but not limited to:
 
-### 设计与流程
+- **Coding**: read code, change code, run tests. Larger tasks run in a separate workspace; you review the changes before they go back into your repo.
+- **Design**: sort out requirements, write design notes, build page prototypes.
+- **Office work**: organize material, process files in bulk, write reports. Add MCP servers or Skills to reach more tools.
+- **Scheduled jobs**: run on a timetable, for example a summary every morning.
+- **Long tasks**: keep running after you close the terminal; if they stop, they resume where they left off.
 
-| 文件 | 是什么 |
+## Why domi
+
+- **Plans and orchestrates**: it writes a plan before it acts. It splits a complex task into steps and runs them in dependency order.
+- **Interrupt and resume**: add instructions while it works, or stop it at any time. When it stops on an error, the plan and the finished work stay; click Continue (or type `/continue`) and it carries on.
+- **Track and trace**: every thought, tool call and approval is recorded. Watch progress live, replay it afterwards.
+- **Define its personality; it gets to know you**: domi's personality is a document you can read and edit. It learns from working with you, and you accept or reject each thing it learns.
+- **Your data stays on your machine**: sessions, memory and personality live on your computer and go only to the model you configure. Writing files, running commands and network access need your permission.
+- **Bring your own model**: OpenAI, Anthropic, DeepSeek, Gemini, local models (Ollama), or gateways (LiteLLM, OpenRouter). Switch mid-conversation.
+
+## Install
+
+> For now you need to be comfortable with a terminal. macOS and Linux are supported; on Windows, use WSL.
+
+Download the package for your machine from [Releases](https://github.com/oi8io/domi/releases/latest):
+
+| System | File |
 |---|---|
-| [`docs/DESIGN.md`](docs/DESIGN.md) | 架构与路线图：三个不可逆决策、10 项需求的固化分层、技术选型、M0–M6 排期 |
-| [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | 工程规约：walking skeleton、三层测试金字塔、架构守卫、发布工程 |
-| [`docs/PROCESS.md`](docs/PROCESS.md) | 研发流程：四角色环节、回写门、可追溯链、中断恢复机制 |
-| [`docs/site/docs/index.md`](docs/site/docs/index.md) | **开发者文档站**：架构导图、各子系统内部机制、扩展指南（加工具 / 加模型 / 插件 / Skill）、贡献指南 |
+| macOS (Apple silicon) | `domi-<version>-darwin-arm64.tar.gz` |
+| macOS (Intel) | `domi-<version>-darwin-x64.tar.gz` |
+| Linux (x86_64) | `domi-<version>-linux-x64.tar.gz` |
+| Linux (ARM64) | `domi-<version>-linux-arm64.tar.gz` |
 
-### 需求与执行
+Unpack it and put `domi` in a directory on your `PATH`:
 
-| 路径 | 是什么 | 产出角色 |
-|---|---|---|
-| [`docs/PRD.md`](docs/PRD.md) | 全量 PRD，覆盖 M0–M13 | 产品专家 |
-| `docs/prd/M{n}.md` | 单册 PRD——`SKETCH` 里程碑过**再批准门**时在此重写为 `COMMITTED` | 产品专家 |
-| `docs/spec/M{n}.md` | 接口契约 + 取舍记录 | 架构师 |
-| `docs/tasks/M{n}.md` | 任务清单 + 状态机 | 工程师 |
-| `docs/qa/M{n}.md` | 对抗性验收报告 | 测试工程师（独立会话） |
-| `docs/adr/` | 架构决策记录，10 行以内 | 任意环节 |
-| `docs/templates/` | 上述四类文档的模板 | — |
-
----
-
-## 可追溯链
-
-```
-INV-xx ──→ PRD-M{n}-xxx ──→ SPEC-M{n}-xxx ──→ TASK-M{n}-xxx ──→ TEST ──→ QA-AC
-              ↑                                                            │
-              └──────────────────── 回写门 ←────────────────────────────────┘
+```sh
+tar -xzf domi-*-darwin-arm64.tar.gz
+mkdir -p ~/.local/bin && mv domi ~/.local/bin/
 ```
 
-**这条链断在哪里，腐蚀就从哪里进来。** 每个里程碑收尾做一次 10 分钟对账：
-拉一张四列表（PRD-ID / SPEC-ID / TASK-ID / QA 结论），看有没有空格。
+The macOS binaries are not signed yet. Remove the quarantine flag before the first run:
 
----
-
-## 当前进度
-
-> 2026-09-24 · 十四个里程碑（M0–M13）的**功能全部落地**，剩下的是验证补齐与用户侧 DoD。接手请先读 [`HANDOFF.md`](HANDOFF.md)，最新进度看 [`NEXT.md`](NEXT.md)。
-
-| 环节 | 状态 | 产出 |
-|---|---|---|
-| 产品专家 | ✅ 完成 | `docs/PRD.md` **v1.18**（101 条，M0–M13）· 各里程碑再批准材料在 `docs/prd/` |
-| 架构师 | ✅ 完成 | `docs/spec/M0 / M1 / M2 / M6 … M13.md`，均带"触发重新决策的条件"· 27 份 ADR |
-| 工程师 | ✅ 功能完成 | M0–M13 共 14 个任务文件；typecheck + lint + 22 道守卫 + **1511 个测试** + L1 回放全绿 |
-| 测试工程师 | 🔵 进行中 | M0 / M1 / M7 / M8 / M9 / M10 已纳入 `check-ac-coverage` 强制范围（236 条 AC）；M11–M13 待进强制范围，M4 / M5 / M6 的「验证补齐」待做 |
-
-**下一步**：M11–M13 进 AC 覆盖强制范围；M4 / M5 / M6 验证补齐。
-只有用户能做的：各里程碑 DoD（M12 / M13 优先）、M8 逐屏截图走查、TUI fullscreen 真终端手测、桌面端与 macOS 沙箱的真机验证。详见 `NEXT.md`。
-
-**2026-09-14 方向变更**：见 `docs/adr/003-revert-to-self-built-runtime.md`。
-`docs/RECON-DSH.md` 的"收缩为 DSH 发行版"结论已作废，该文档降级为情报文档。
-
-## 本地开发
-
-```bash
-pnpm install
-pnpm check      # typecheck + 架构守卫(INV-02/INV-10) + bun test
+```sh
+xattr -d com.apple.quarantine ~/.local/bin/domi
 ```
 
+## Get started
+
+```sh
+mkdir -p ~/.domi && domi init > ~/.domi/config.yaml   # create the config
+export DEEPSEEK_API_KEY=sk-...                          # or put the key in ~/.domi/secrets.yaml
+domi doctor                                             # health check; every problem comes with a fix command
+domi                                                    # start a conversation
+```
+
+Then just say what you want done. Common actions:
+
+| To do this | Use |
+|---|---|
+| Add instructions while it works | Keep typing, press Enter |
+| Stop the current turn | `Esc` |
+| Continue unfinished steps | `/continue` |
+| Switch model | `/model` |
+| Choose how often it asks you | `/mode` |
+| See what domi has learned | `/soul` |
+
+`/` lists all commands; `?` shows the shortcuts. The web and desktop apps currently run from source; see [`DEVELOPMENT.md`](DEVELOPMENT.md).
+
+## Docs
+
+The docs are in Chinese for now.
+
+- [What is domi](docs/site/docs/intro.md) · [Quick start](docs/site/docs/quickstart.md) · [Config and models](docs/site/docs/config.md)
+- Extend: [Plugins](docs/site/docs/plugin-dev.md) · [Skills](docs/site/docs/skill-writing.md) · [MCP](docs/site/docs/mcp-internals.md)
+- Develop: [`DEVELOPMENT.md`](DEVELOPMENT.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)
+
+## License
+
+[MIT](LICENSE)
