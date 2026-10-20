@@ -35,3 +35,4 @@ _tmp_*
 # Tauri 构建产物
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/gen/
+_site/

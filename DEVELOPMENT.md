@@ -37,6 +37,7 @@ AI 会话另外先读 [`AGENTS.md`](AGENTS.md)。
 | [`docs/ENGINEERING.md`](docs/ENGINEERING.md) | 工程规约：walking skeleton、三层测试金字塔、架构守卫、发布工程 |
 | [`docs/PROCESS.md`](docs/PROCESS.md) | 研发流程：四角色环节、回写门、可追溯链、中断恢复机制 |
 | [`docs/site/docs/index.md`](docs/site/docs/index.md) | **开发者文档站**：架构导图、各子系统内部机制、扩展指南（加工具 / 加模型 / 插件 / Skill）、贡献指南 |
+| [`scripts/build-site.sh`](scripts/build-site.sh) | **站点发布**：把 `docs/site` 组装成主站在根、文档站在 `docs/` 的静态站；`.github/workflows/pages.yml` 在 master 上 `docs/site/**` 有改动时发布到 GitHub Pages（https://oi8io.cn/domi/） |
 
 ### 需求与执行
 
